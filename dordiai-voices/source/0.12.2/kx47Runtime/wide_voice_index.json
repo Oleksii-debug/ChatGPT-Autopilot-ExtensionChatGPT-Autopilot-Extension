@@ -577,5 +577,413 @@
     "name": "Лігурійська",
     "voice": "upstream:roa/lij",
     "source": "wide-sources/lij.npy"
+  },
+  "sat": {
+    "voice": "extra:sat",
+    "name": "Санталі",
+    "backend": "extra-onnx",
+    "source": "ExtraLanguages/sat/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "rm": {
+    "voice": "omni:rm",
+    "name": "Ретороманська",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/rm/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "ks": {
+    "voice": "omni:ks",
+    "name": "Кашмірська",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/ks/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "mni": {
+    "voice": "omni:mni",
+    "name": "Маніпурі (мейтей)",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/mni/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "brx": {
+    "voice": "omni:brx",
+    "name": "Бодо",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/brx/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "ig": {
+    "voice": "extra:ig",
+    "name": "Ігбо",
+    "backend": "extra-onnx",
+    "source": "ExtraLanguages/ig/source.npy",
+    "iso_code": "ibo",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "ln": {
+    "voice": "extra:ln",
+    "name": "Лінгала",
+    "backend": "extra-onnx",
+    "source": "ExtraLanguages/ln/source.npy",
+    "iso_code": "lin",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "zu": {
+    "voice": "omni:zu",
+    "name": "Зулу",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/zu/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "xh": {
+    "voice": "extra:xh",
+    "name": "Коса",
+    "backend": "extra-onnx",
+    "source": "ExtraLanguages/xh/source.npy",
+    "iso_code": "xho",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "wo": {
+    "voice": "omni:wo",
+    "name": "Волоф",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/wo/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "nso": {
+    "voice": "omni:nso",
+    "name": "Північна сото (сепеді)",
+    "backend": "omni-onnx",
+    "source": "SharedOmniONNX/references/nso/source.npy",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "ay": {
+    "voice": "mms:ay",
+    "name": "Аймара",
+    "backend": "mms-onnx",
+    "iso_code": "ayr",
+    "source": "MMS/ay/source.npy",
+    "standard": "Central Aymara (ayr)",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "fil": {
+    "voice": "mms:fil",
+    "name": "Філіппінська — стандарт на тагальській основі",
+    "backend": "mms-onnx",
+    "iso_code": "tgl",
+    "source": "MMS/fil/source.npy",
+    "standard": "Tagalog (tgl), basis of Filipino standard",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "km": {
+    "voice": "mms:km",
+    "name": "Кхмерська",
+    "backend": "mms-onnx",
+    "iso_code": "khm",
+    "source": "MMS/km/source.npy",
+    "standard": "khm",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "tg": {
+    "voice": "mms:tg",
+    "name": "Таджицька",
+    "backend": "mms-onnx",
+    "iso_code": "tgk",
+    "source": "MMS/tg/source.npy",
+    "standard": "tgk",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "lo": {
+    "voice": "mms:lo",
+    "name": "Лаоська",
+    "backend": "mms-onnx",
+    "iso_code": "lao",
+    "source": "MMS/lo/source.npy",
+    "standard": "lao",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "mai": {
+    "voice": "mms:mai",
+    "name": "Майтілі",
+    "backend": "mms-onnx",
+    "iso_code": "mai",
+    "source": "MMS/mai/source.npy",
+    "standard": "mai",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "doi": {
+    "voice": "mms:doi",
+    "name": "Догрі",
+    "backend": "mms-onnx",
+    "iso_code": "dgo",
+    "source": "MMS/doi/source.npy",
+    "standard": "Dogri (dgo)",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "dv": {
+    "voice": "mms:dv",
+    "name": "Дівехі",
+    "backend": "mms-onnx",
+    "iso_code": "div",
+    "source": "MMS/dv/source.npy",
+    "standard": "div",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "dz": {
+    "voice": "mms:dz",
+    "name": "Дзонг-кха",
+    "backend": "mms-onnx",
+    "iso_code": "dzo",
+    "source": "MMS/dz/source.npy",
+    "standard": "dzo",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "ha": {
+    "voice": "mms:ha",
+    "name": "Хауса",
+    "backend": "mms-onnx",
+    "iso_code": "hau",
+    "source": "MMS/ha/source.npy",
+    "standard": "hau",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "yo": {
+    "voice": "mms:yo",
+    "name": "Йоруба",
+    "backend": "mms-onnx",
+    "iso_code": "yor",
+    "source": "MMS/yo/source.npy",
+    "standard": "yor",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "ff": {
+    "voice": "mms:ff",
+    "name": "Фула, або фульфульде",
+    "backend": "mms-onnx",
+    "iso_code": "ful",
+    "source": "MMS/ff/source.npy",
+    "standard": "Fula/Fulfulde (ful), exact checkpoint variety requires listening",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "mg": {
+    "voice": "mms:mg",
+    "name": "Малагасійська",
+    "backend": "mms-onnx",
+    "iso_code": "mlg",
+    "source": "MMS/mg/source.npy",
+    "standard": "Malagasy (mlg), checkpoint standard",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "so": {
+    "voice": "mms:so",
+    "name": "Сомалійська",
+    "backend": "mms-onnx",
+    "iso_code": "som",
+    "source": "MMS/so/source.npy",
+    "standard": "som",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "sn": {
+    "voice": "mms:sn",
+    "name": "Шона",
+    "backend": "mms-onnx",
+    "iso_code": "sna",
+    "source": "MMS/sn/source.npy",
+    "standard": "sna",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "rw": {
+    "voice": "mms:rw",
+    "name": "Кіньяруанда",
+    "backend": "mms-onnx",
+    "iso_code": "kin",
+    "source": "MMS/rw/source.npy",
+    "standard": "kin",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "rn": {
+    "voice": "mms:rn",
+    "name": "Кірунді",
+    "backend": "mms-onnx",
+    "iso_code": "run",
+    "source": "MMS/rn/source.npy",
+    "standard": "run",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "ny": {
+    "voice": "mms:ny",
+    "name": "Чичева, або чева",
+    "backend": "mms-onnx",
+    "iso_code": "nya",
+    "source": "MMS/ny/source.npy",
+    "standard": "nya",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "ak": {
+    "voice": "mms:ak",
+    "name": "Акан",
+    "backend": "mms-onnx",
+    "iso_code": "aka",
+    "source": "MMS/ak/source.npy",
+    "standard": "Akan (aka), checkpoint standard",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "bm": {
+    "voice": "mms:bm",
+    "name": "Бамбара",
+    "backend": "mms-onnx",
+    "iso_code": "bam",
+    "source": "MMS/bm/source.npy",
+    "standard": "bam",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "dyu": {
+    "voice": "mms:dyu",
+    "name": "Діула",
+    "backend": "mms-onnx",
+    "iso_code": "dyu",
+    "source": "MMS/dyu/source.npy",
+    "standard": "dyu",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "mos": {
+    "voice": "mms:mos",
+    "name": "Мооре, або моссі",
+    "backend": "mms-onnx",
+    "iso_code": "mos",
+    "source": "MMS/mos/source.npy",
+    "standard": "mos",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "ts": {
+    "voice": "mms:ts",
+    "name": "Тсонга",
+    "backend": "mms-onnx",
+    "iso_code": "tso",
+    "source": "MMS/ts/source.npy",
+    "standard": "tso",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "sg": {
+    "voice": "mms:sg",
+    "name": "Санго",
+    "backend": "mms-onnx",
+    "iso_code": "sag",
+    "source": "MMS/sg/source.npy",
+    "standard": "sag",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "tpi": {
+    "voice": "mms:tpi",
+    "name": "Ток-пісін",
+    "backend": "mms-onnx",
+    "iso_code": "tpi",
+    "source": "MMS/tpi/source.npy",
+    "standard": "tpi",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "sm": {
+    "voice": "mms:sm",
+    "name": "Самоанська",
+    "backend": "mms-onnx",
+    "iso_code": "smo",
+    "source": "MMS/sm/source.npy",
+    "standard": "smo",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "fj": {
+    "voice": "mms:fj",
+    "name": "Фіджійська",
+    "backend": "mms-onnx",
+    "iso_code": "fij",
+    "source": "MMS/fj/source.npy",
+    "standard": "fij",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "gil": {
+    "voice": "mms:gil",
+    "name": "Гілбертська, або кірибаті",
+    "backend": "mms-onnx",
+    "iso_code": "gil",
+    "source": "MMS/gil/source.npy",
+    "standard": "gil",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "kab": {
+    "voice": "mms:kab",
+    "name": "Кабільська (берберська; Алжир)",
+    "backend": "mms-onnx",
+    "iso_code": "kab",
+    "source": "MMS/kab/source.npy",
+    "standard": "Kabyle (kab), Algeria; NOT Standard Moroccan Tamazight",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "selected_id": "tamazight",
+    "partial_variant": true
+  },
+  "st": {
+    "voice": "extra:st",
+    "name": "Сесото",
+    "backend": "extra-onnx",
+    "source": "ExtraLanguages/st/source.npy",
+    "iso_code": "sot",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
+  },
+  "nd": {
+    "voice": "extra:nd",
+    "name": "Північна ндебеле",
+    "backend": "extra-onnx",
+    "source": "ExtraLanguages/nd/source.npy",
+    "iso_code": "nde",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false
   }
 }

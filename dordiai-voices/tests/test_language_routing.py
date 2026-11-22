@@ -57,6 +57,16 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(policy.language_key("zh-cmn"), "cmn")
         self.assertEqual(policy.language_key("no-NO"), "nb")
 
+    def test_shared_iso3_and_longest_known_prefix(self):
+        self.assertEqual(policy.language_key("hau-NG"), "ha")
+        self.assertEqual(policy.language_key("eng-US"), "en")
+        self.assertEqual(policy.language_key("zh-yue-Hant-HK"), "yue")
+        self.assertEqual(policy.language_key("hy-arevmda-AM"), "hyw")
+        self.assertEqual(policy.language_key("nde"), "nd")
+        self.assertEqual(policy.language_key("nbl"), "nr")
+        self.assertNotEqual(policy.language_key("kab"), policy.language_key("zgh"))
+        self.assertNotEqual(policy.language_key("fil"), policy.language_key("tgl"))
+
     def test_dictionary_lists_are_not_reduced_to_one_label(self):
         result = policy.resolve_word("die", "en", {"en", "de"}, candidates=["en", "de"])
         self.assertEqual(result.language, "en")
@@ -218,6 +228,40 @@ class ExtendedRoutingTests(RoutingFixture, unittest.TestCase):
         wide._identify.side_effect = AssertionError("A letter must not invoke language ID")
         self.assertEqual(wide.split_extended("a", preferred="uk"), [(None, "a")])
         self.assertEqual(wide.split_extended("a", preferred="cs"), [("cs", "a")])
+
+    def test_extended_registration_uses_shared_iso3_without_merging_standards(self):
+        # Equivalent input tags must expose the same registration capability;
+        # normalising an ISO alias does not create a missing carrier.
+        for marked, primary in (("hau-NG", "ha"), ("sot-LS", "st"), ("xho-ZA", "xh"),
+                                ("nde-ZW", "nd"), ("nbl-ZA", "nr"), ("zh-yue-Hant-HK", "yue")):
+            self.assertEqual(wide.registered(marked), wide.registered(primary))
+        self.assertEqual(policy.language_key("nbl-ZA"), "nr")
+        if "nr" not in wide.REGISTRY:
+            self.assertIsNone(wide.registered("nbl-ZA"))
+        self.assertIsNone(wide.registered("zgh"))
+
+    def test_new_mms_native_scripts_resolve_only_to_enabled_language(self):
+        additions = {"km", "lo", "dv", "dz", "mai", "doi", "tg"}
+        with patch.object(wide, "CODES", wide.CODES | additions):
+            for text, wanted in (("សួស្តី", "km"), ("ສະບາຍດີ", "lo"), ("ސަލާމް", "dv"),
+                                 ("བཟང་པོ", "dz"), ("प्रणाम", "mai"), ("नमस्ते", "doi")):
+                with self.subTest(wanted=wanted):
+                    self.assertEqual(wide.split_extended(text, preferred="uk", enabled_languages={"uk", wanted}, mode="words"),
+                                     [(wanted, text)])
+                    disabled = wide.split_extended(text, preferred="uk", enabled_languages={"uk", "en"}, mode="words")
+                    self.assertTrue(all(code in {None, "uk", "en"} for code, _ in disabled))
+            self.assertIn("tg", wide.FAMILIES["cyrillic"])
+
+    def test_new_language_outside_word_model_can_use_strict_general_lid_fallback(self):
+        with patch.object(wide, "CODES", wide.CODES | {"ha"}), \
+             patch.object(policy, "classifier_languages", return_value=frozenset({"en", "de", "uk"})), \
+             patch.object(wide, "_identify", return_value=("ha", .995)):
+            self.assertEqual(wide.split_extended("barka", preferred="uk", enabled_languages={"uk", "ha"}, mode="words"),
+                             [("ha", "barka")])
+        with patch.object(policy, "classifier_languages", return_value=frozenset({"en", "de", "uk"})), \
+             patch.object(wide, "_identify", return_value=("de", .995)):
+            self.assertEqual(wide.split_extended("unknownword", preferred="uk", enabled_languages={"uk", "de", "ha"}, mode="words"),
+                             [("uk", "unknownword")])
 
     def test_unknown_is_not_a_random_foreign_language(self):
         self.assertEqual(wide.split_extended("qwertyunknown", preferred="uk", enabled_languages={"uk", "en"}, mode="words"),

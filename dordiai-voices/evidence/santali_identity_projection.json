@@ -1,0 +1,20 @@
+{
+  "language": "sat",
+  "source_audio_sha256": "657c11ad54996764b511a5d312b465a2b23a13a7bb85a217e7dc0a48a6c0fd5b",
+  "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+  "source_vector_sha256": "ce2da9b1dd39233450df558c23e70b51459db2875b6d884faa4924b15ca82eb9",
+  "source_vector_shape": [
+    1,
+    256,
+    1
+  ],
+  "source_vector_norm": 10.600454330444336,
+  "conversion_graphs": "original main0.12.2 OpenVoiceV2 encoder-flow+decoder",
+  "target_voice": "viktoriia",
+  "converted_samples": 33024,
+  "converted_peak": 0.2967991530895233,
+  "converted_finite": true,
+  "load_and_convert_seconds": 1.5081202089986618,
+  "windows_nvda_verified": false,
+  "native_pronunciation_verified": false
+}

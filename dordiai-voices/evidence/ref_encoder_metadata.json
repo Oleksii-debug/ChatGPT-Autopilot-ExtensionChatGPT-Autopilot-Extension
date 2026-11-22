@@ -1,0 +1,107 @@
+{
+  "format": 1,
+  "repo_id": "TigreGotico/voiceclonnx-openvoice-v2",
+  "revision": "34d010c192c97f763207f488f6057fd07fee42ad",
+  "license": "MIT",
+  "upstream_weights": "myshell-ai/OpenVoiceV2",
+  "files": {
+    "fp32": {
+      "filename": "tone_ref_encoder.onnx",
+      "size_bytes": 3259275,
+      "sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+      "url": "https://huggingface.co/TigreGotico/voiceclonnx-openvoice-v2/resolve/34d010c192c97f763207f488f6057fd07fee42ad/tone_ref_encoder.onnx",
+      "verified_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7"
+    },
+    "q8": {
+      "filename": "tone_ref_encoder_q8.onnx",
+      "size_bytes": 2315304,
+      "sha256": "8e46097e46a68a2137acf105b58bc67cf686ec0d811c1c45ada28557a608c0e3",
+      "url": "https://huggingface.co/TigreGotico/voiceclonnx-openvoice-v2/resolve/34d010c192c97f763207f488f6057fd07fee42ad/tone_ref_encoder_q8.onnx",
+      "verified_sha256": "8e46097e46a68a2137acf105b58bc67cf686ec0d811c1c45ada28557a608c0e3"
+    }
+  },
+  "provenance": {
+    "PROVENANCE.md": {
+      "url": "https://huggingface.co/TigreGotico/voiceclonnx-openvoice-v2/resolve/34d010c192c97f763207f488f6057fd07fee42ad/PROVENANCE.md",
+      "sha256": "40237288c29d999248c0896416f2e4187366f6d1b2c33922ac9f3ecfb20771ef",
+      "size_bytes": 2222
+    },
+    "README.md": {
+      "url": "https://huggingface.co/TigreGotico/voiceclonnx-openvoice-v2/resolve/34d010c192c97f763207f488f6057fd07fee42ad/README.md",
+      "sha256": "88380b6beb8dfdfd53babeeac35abbc7a9c4f01a5ba1f520ac19c6ecce7e2187",
+      "size_bytes": 3308
+    },
+    "config.json": {
+      "url": "https://huggingface.co/TigreGotico/voiceclonnx-openvoice-v2/resolve/34d010c192c97f763207f488f6057fd07fee42ad/config.json",
+      "sha256": "1375fbb9fa5f10c7284be819cab1b4d14d47644dd729643f631ab3b1051967ad",
+      "size_bytes": 737
+    },
+    "tone_ref_encoder_parity_report.json": {
+      "url": "https://huggingface.co/TigreGotico/voiceclonnx-openvoice-v2/resolve/34d010c192c97f763207f488f6057fd07fee42ad/tone_ref_encoder_parity_report.json",
+      "sha256": "950f4522181ce6bacba3f1ee5e3ecfa9af736835bbe2d87fb413e8ebbd29264e",
+      "size_bytes": 383
+    }
+  },
+  "preferred_calibration_variant": "fp32",
+  "validation": {
+    "onnxruntime": "1.27.0",
+    "sample": {
+      "kind": "deterministic-synthetic-harmonic-probe",
+      "sample_rate": 22050,
+      "samples": 44100
+    },
+    "encoders": {
+      "fp32": {
+        "shape": [
+          1,
+          256,
+          1
+        ],
+        "dtype": "float32",
+        "finite": true,
+        "norm": 11.958638191223145,
+        "deterministic_repeat": true,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "input": {
+          "name": "spec",
+          "shape": [
+            "batch",
+            "time",
+            513
+          ]
+        }
+      },
+      "q8": {
+        "shape": [
+          1,
+          256,
+          1
+        ],
+        "dtype": "float32",
+        "finite": true,
+        "norm": 11.630775451660156,
+        "deterministic_repeat": true,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "input": {
+          "name": "spec",
+          "shape": [
+            "batch",
+            "time",
+            513
+          ]
+        }
+      }
+    },
+    "fp32_q8_comparison": {
+      "cosine": 0.9664576649665833,
+      "max_abs_difference": 0.6605222821235657
+    },
+    "baseline_comparison": null,
+    "windows_nvda_audio_verified": false,
+    "interpretation": "real CPU graph execution and conditioning-vector validation; not native pronunciation or end-user audio acceptance"
+  }
+}

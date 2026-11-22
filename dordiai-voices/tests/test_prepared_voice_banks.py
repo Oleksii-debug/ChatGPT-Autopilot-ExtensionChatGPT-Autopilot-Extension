@@ -183,6 +183,70 @@ class PreparedVoiceBanksTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "another voice"):
             banks.generate_banks(WrongSpeaker(), probe, "fresh_voice", self.entries, self.base / "wrong-speaker")
 
+    def test_reviewed_spoken_name_is_literal_speech_with_two_lookup_keys_one_pcm(self):
+        class LiteralNamesOnly(FakeWorker):
+            def render(self,request,timeout):
+                if request["character"]:
+                    raise ValueError("No glyph-to-name mapping is installed")
+                self.assert_text=request["text"]
+                return super().render(request,timeout)
+        worker=LiteralNamesOnly()
+        jobs=[{"kind":"letter","language":"en","lookup_text":"b","text":"bee",
+               "semantic_kind":"spoken_name","aliases":["bee"],
+               "source_kind":"letter_name","source_id":"reviewed-fixture"}]
+        output=self.base/"reviewed-names"
+        roles,_=banks.generate_banks(worker,probe,"fresh_voice",jobs,output)
+        self.assertEqual(len(worker.requests),1)
+        self.assertFalse(worker.requests[0]["character"])
+        self.assertEqual(worker.assert_text,"bee")
+        index=json.loads((output/"letters.json").read_text(encoding="utf-8"))
+        self.assertEqual(index["kind"],"letters")
+        self.assertEqual(index["entries"][banks.entry_key("en","b")],
+                         index["entries"][banks.entry_key("en","bee")])
+        self.assertEqual((output/"letters.pcm").stat().st_size,600)
+        self.assertEqual(roles["letters.pcm"],"native_letters_audio")
+
+    def test_unreviewed_raw_glyph_keeps_character_mode_and_is_not_guessed(self):
+        class NoVerifiedNames(FakeWorker):
+            def render(self,request,timeout):
+                self.requests.append(request)
+                if request["character"]:
+                    raise ValueError("Verified character name is not installed")
+                return super().render(request,timeout)
+        worker=NoVerifiedNames()
+        jobs=[{"kind":"letter","language":"ha","lookup_text":"ɓ","text":"ɓ"}]
+        with self.assertRaisesRegex(ValueError,"Verified character name"):
+            banks.generate_banks(worker,probe,"fresh_voice",jobs,self.base/"unreviewed-glyph")
+        self.assertTrue(worker.requests[0]["character"])
+        self.assertEqual(worker.requests[0]["text"],"ɓ")
+
+    def test_phonetic_descriptions_and_conflicting_name_aliases_are_not_ordinary_names(self):
+        with self.assertRaisesRegex(ValueError,"phonetic description"):
+            banks.validate_entries([{"kind":"letter","language":"en","lookup_text":"a","text":"Alfa",
+                                     "semantic_kind":"spoken_name","source_kind":"phonetic_description"}])
+        with self.assertRaisesRegex(ValueError,"alias conflicts"):
+            banks.validate_entries([
+                {"kind":"letter","language":"en","lookup_text":"b","text":"bee","semantic_kind":"spoken_name"},
+                {"kind":"letter","language":"en","lookup_text":"c","text":"see","semantic_kind":"spoken_name"},
+                {"kind":"letter","language":"en","lookup_text":"b","text":"bee","semantic_kind":"spoken_name","aliases":["c"]},
+            ])
+        for key in ("kind","semantic_kind"):
+            with self.subTest(malformed=key),self.assertRaises(ValueError):
+                banks.validate_entries([{"kind":"letter","language":"en","text":"b",key:[]}])
+
+    def test_primary_source_document_uses_only_explicit_reviewed_jobs(self):
+        document={"format":"dordiai-character-name-sources","format_version":1,"language":"en",
+                  "bank_entries":[{"kind":"letter","language":"en","lookup_text":"b","text":"bee",
+                                   "semantic_kind":"spoken_name","source_kind":"letter_name"}],
+                  "phonetic_descriptions":{"a":"Alfa"},"missing_ordinary_letter_names":["a"]}
+        rows=banks.load_entries_document(document)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["lookup_text"],"b")
+        self.assertEqual(rows[0]["semantic_kind"],"spoken_name")
+        for override in ({"format":"unknown"},{"format_version":True},{"format_version":2},{"language":"ha"}):
+            with self.subTest(override=override),self.assertRaises(ValueError):
+                banks.load_entries_document({**document,**override})
+
 
 if __name__ == "__main__":
     unittest.main()

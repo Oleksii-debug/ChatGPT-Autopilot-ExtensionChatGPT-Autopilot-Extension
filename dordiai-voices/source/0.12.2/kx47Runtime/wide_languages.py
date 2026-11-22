@@ -35,8 +35,10 @@ def refresh_personal(force=False):
         NAMES={code:entry['name'] for code,entry in REGISTRY.items()}
 
 refresh_personal(True)
-ALIASES={"iw":"he","in":"id","no":"nb","zh":"cmn","zh-cmn":"cmn","zh-yue":"yue","el-gr":"el",
-         "sh":"sr","mo":"ro","hy-arevmda":"hyw","ckb":"ckb","gom":"kok","or-in":"or"}
+_code_spec=_import_util.spec_from_file_location("_dordiai_wide_language_codes",HERE/"language_codes.py")
+_language_codes=_import_util.module_from_spec(_code_spec)
+_code_spec.loader.exec_module(_language_codes)
+ALIASES=_language_codes.ALIASES
 _lock=Lock()
 _detector=None
 _detector_attempted=False
@@ -45,11 +47,13 @@ _detector_attempted=False
 def registered(code):
     parts=(code or "").strip().lower().replace("_","-")
     if not parts:return None
-    primary=parts.partition('-')[0]
+    primary=_language_codes.canonical_language(parts)
     if primary not in CORE and primary not in _public_registry:
         refresh_personal()
     while parts:
-        tag=ALIASES.get(parts,parts)
+        # Exact explicitly installed personal/script variants take precedence.
+        if parts in CODES:return parts
+        tag=_language_codes.canonical_language(parts)
         if tag in CODES:return tag
         parts=parts.rpartition("-")[0]
     return None
@@ -184,7 +188,7 @@ def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",pr
     if PERSONAL:
         local=_personal_catalog.detect_phrase(text,script,PERSONAL)
         if local and (enabled is None or local in enabled):return [(local,text)]
-    context=_tag(script,text,preferred) if mode=="context" else None
+    context=_tag(script,text,preferred,enabled) if mode=="context" else None
     if enabled is not None and context not in enabled:context=None
     matches=list(re.finditer(r"[^\W\d_]+(?:['’][^\W\d_]+)*",text))
     if not matches:return [(context,text)]
@@ -213,13 +217,20 @@ def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",pr
                 candidate,confidence=policy.classify_word(word,enabled)
                 if candidate:
                     guess=candidate
-                elif not policy.has_word_classifier() or mode=="context":
-                    candidate,confidence=_identify(word)
-                    threshold=.97 if len(word)<7 else .92
-                    if confidence>=threshold:
-                        guess=candidate
-                    elif len(word)>=8 and candidate and confidence>=.82 and _profiles().predict(word,script)[0]==candidate:
-                        guess=candidate
+                else:
+                    learned=policy.classifier_languages()
+                    outside=(enabled if enabled is not None else CODES|CORE)-learned
+                    if not learned or mode=="context" or outside:
+                        candidate,confidence=_identify(word)
+                        # The word-trained model's abstention remains authoritative
+                        # for its own classes. The older general LID may only add
+                        # languages outside that model's learned scope in word mode.
+                        if mode=="words" and candidate in learned:candidate=None
+                        threshold=.97 if len(word)<7 else .92
+                        if confidence>=threshold:
+                            guess=candidate
+                        elif len(word)>=8 and candidate and confidence>=.82 and _profiles().predict(word,script)[0]==candidate:
+                            guess=candidate
             if guess not in CODES|CORE or (enabled is not None and guess not in enabled):guess=None
             if script=="cyrillic" and guess not in FAMILIES["cyrillic"]:guess=None
             if guess is None:
@@ -241,6 +252,7 @@ def _script(char):
     if char.isascii():return "latin" if char.isalpha() else None
     if not unicodedata.category(char).startswith("L"):return None
     if 0x0590<=n<=0x05ff or 0xfb1d<=n<=0xfb4f:return "he"
+    if 0x0780<=n<=0x07bf:return "dv"
     if 0x0600<=n<=0x06ff or 0x0750<=n<=0x077f or 0x08a0<=n<=0x08ff or 0xfb50<=n<=0xfdff or 0xfe70<=n<=0xfeff:return "arabic"
     if 0x0400<=n<=0x052f:return "cyrillic"
     if 0x0370<=n<=0x03ff or 0x1f00<=n<=0x1fff:return "el"
@@ -257,6 +269,9 @@ def _script(char):
     if 0x0d00<=n<=0x0d7f:return "ml"
     if 0x0d80<=n<=0x0dff:return "si"
     if 0x0e00<=n<=0x0e7f:return "th"
+    if 0x0e80<=n<=0x0eff:return "lo"
+    if 0x0f00<=n<=0x0fff:return "tibetan"
+    if 0x1780<=n<=0x17ff:return "km"
     if 0x1000<=n<=0x109f:return "burmese"
     if 0x1200<=n<=0x137f:return "ethiopic"
     if 0x13a0<=n<=0x13ff or 0xab70<=n<=0xabbf:return "chr"
@@ -267,9 +282,10 @@ def _script(char):
     return "unknown"
 
 
-FAMILIES={"arabic":("ar","fa","ur","ps","ug","sd"),"devanagari":("hi","mr","ne","kok"),
+FAMILIES={"arabic":("ar","fa","ur","ps","ug","sd"),"devanagari":("hi","mr","ne","kok","mai","doi"),
           "bengali":("bn","as","bpy"),"ethiopic":("am","ti"),"burmese":("my","shn"),
-          "han":("cmn","yue","ja","hak"),"cyrillic":("uk","ru","bg","be","mk","sr","kk","tt","ba","cv","ky","mn","nog","kaa","ab")}
+          "han":("cmn","yue","ja","hak"),"tibetan":("dz","bo"),
+          "cyrillic":("uk","ru","bg","be","mk","sr","kk","tt","ba","cv","ky","mn","tg","uz","az","nog","kaa","ab")}
 
 
 def _hebrew_alphabet(text,preferred):
@@ -288,24 +304,29 @@ def _hebrew_alphabet(text,preferred):
     return "yi" if preferred=="yi" else "he"
 
 
-def _tag(script,text,preferred):
-    if script=="he":return _hebrew_alphabet(text,preferred)
-    if script in CODES:return script
-    if script=="kana":return "ja"
-    if script=="han" and preferred=="ja":return "ja"
+def _tag(script,text,preferred,enabled_languages=None):
+    allowed=_auxiliary("language_routing").enabled_keys(enabled_languages)
+    def enabled(code):return allowed is None or code in allowed
+    if script=="he":
+        result=_hebrew_alphabet(text,preferred)
+        return result if enabled(result) else None
+    if script in CODES:return script if enabled(script) else None
+    if script=="kana":return "ja" if enabled("ja") else None
+    if script=="han" and preferred=="ja":return "ja" if enabled("ja") else None
     if script=="unknown":return None
     if script in {"latin","cyrillic"}:
         letters=sum(c.isalpha() for c in text)
         if letters<3:return None
         tag,p=_phrase_language(text,script)
         threshold=.78 if letters<8 else .42 if len(text.split())>=4 else .64
-        if tag not in CODES or p<threshold:return None
+        if tag not in CODES or p<threshold or not enabled(tag):return None
         if script=="cyrillic" and tag not in FAMILIES[script] and PERSONAL.get(tag,{}).get("script")!=script:return None
         if script=="latin" and any(tag in options for family,options in FAMILIES.items() if family not in {"cyrillic","han"}):
             return None
         return tag
     if script in FAMILIES:
-        options=FAMILIES[script]
+        options=tuple(code for code in FAMILIES[script] if code in CODES|CORE and enabled(code))
+        if not options:return None
         if preferred in options:return preferred
         if len(text.strip())>2:
             tag,p=_identify(text)
@@ -341,7 +362,7 @@ def split_extended(text,preferred="uk",explicit=False,*,enabled_languages=None,m
             if script==usual or (pinned=="ja" and script=="han") or (
                 pinned in {"sr","uz","az","kaa"} and script in {"latin","cyrillic"}):
                 return requested
-        result=_tag(script,span,requested or preferred)
+        result=_tag(script,span,requested or preferred,enabled)
         return result if enabled is None or result in enabled else None
     spans=[]
     def add(code,value):

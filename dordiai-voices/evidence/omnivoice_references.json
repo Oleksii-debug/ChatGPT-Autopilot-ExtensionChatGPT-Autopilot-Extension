@@ -1,0 +1,220 @@
+{
+  "scope": "local-onnx-native-carrier-structural-probe",
+  "onnxruntime": "1.27.0",
+  "runtime_path": "/workspace/scratch/eb1194a9e557/onnx-safe-wheels/ort127/onnxruntime/__init__.py",
+  "weights_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+  "pronunciation_verified": false,
+  "nvda_verified": false,
+  "languages": {
+    "rm": {
+      "text": "Allegra. Bun di. Co vai?",
+      "samples": 48631,
+      "sample_rate": 24000,
+      "peak": 0.9061027765274048,
+      "reference_codes_shape": [
+        8,
+        51
+      ],
+      "source_identity_norm": 10.52243709564209,
+      "finite_pcm": true,
+      "preparation_seconds": 16.922952795999663,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "69977907ba1785cf6a0fd2911bb09ec9e02f42619f93620edfec178cad56d20a",
+        "codes.npy": "e8a17e5128a90944dfd7256b7b5b19be7e556097c3f58d0fb20764492e2c7240",
+        "source.npy": "24a7e4e01b9d7f6042f9d57aeec39f469be68c206b79ac8f0a7a793215667be4",
+        "text.txt": "8456069d1eb082a62ab7cc80448d33aa61429ed4f142540e16c52b26e224cdc1"
+      }
+    },
+    "ks": {
+      "text": "آداب۔",
+      "samples": 15731,
+      "sample_rate": 24000,
+      "peak": 0.8773753046989441,
+      "reference_codes_shape": [
+        8,
+        17
+      ],
+      "source_identity_norm": 9.373710632324219,
+      "finite_pcm": true,
+      "preparation_seconds": 13.425610238000445,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "8f7e1bd970c2fd180a025702492892aa85fa6a03a10c70bc540df12fd3fce650",
+        "codes.npy": "0bd533dd19501c8ccac325279fc468783d3367d003af7a96f96e8efdf521c738",
+        "source.npy": "9e36ab7bf89e552b43125194d50555ada707ff34826582ffff00c5e73903ba17",
+        "text.txt": "4d6c87dcae78708084d0d927a2ba14d2d580ea5509228a8c5597590385247021"
+      }
+    },
+    "mni": {
+      "text": "ꯈꯨꯔꯨꯝꯖꯔꯤ",
+      "samples": 22274,
+      "sample_rate": 24000,
+      "peak": 0.9705743193626404,
+      "reference_codes_shape": [
+        8,
+        24
+      ],
+      "source_identity_norm": 10.971139907836914,
+      "finite_pcm": true,
+      "preparation_seconds": 11.838288820999878,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "f0e1f69fec7c5b647c76438f8e621411f9f5834e566a9afced8b8a3c0eb68758",
+        "codes.npy": "1c07b092b2af671ba974b914bdf4b59e18d029791674a5ece40181acf6739e03",
+        "source.npy": "88681badf1fe244a61733f2285baef6353c0fc0c5dafd4e958fb15a5a115ef2e",
+        "text.txt": "1e1f9e8944e54bbbef45c09ccb759dd97c68e5b9c92566727760e56425ec0e42"
+      }
+    },
+    "brx": {
+      "text": "खुलुमबाय।",
+      "samples": 18962,
+      "sample_rate": 24000,
+      "peak": 0.7775849103927612,
+      "reference_codes_shape": [
+        8,
+        20
+      ],
+      "source_identity_norm": 10.496857643127441,
+      "finite_pcm": true,
+      "preparation_seconds": 10.134635358001105,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "94e95f6f01cd49688fb290c6b0c155ab93c8c3ca6e84527433bfd3550cd6c913",
+        "codes.npy": "5b0272fee06f3af73c6b1ee774fdac3005bb32437ee36e063f5dc68cc0f2298e",
+        "source.npy": "d75b9199463a036a66b760ab37e1e5ea582428bc739b309349ae8e3be52fe52e",
+        "text.txt": "4c2ac2d4ecb0a8a3b80fa2c62fe289357382b4c8dd5c166cad07b205f2a40835"
+      }
+    },
+    "ig": {
+      "text": "Ndewo. Kedu ka ị mere?",
+      "samples": 49747,
+      "sample_rate": 24000,
+      "peak": 0.8465911149978638,
+      "reference_codes_shape": [
+        8,
+        52
+      ],
+      "source_identity_norm": 11.211431503295898,
+      "finite_pcm": true,
+      "preparation_seconds": 14.352815057000043,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "31100e169eca42bffa9d7deebff63007f5cd01efecb4ae107a2aefa41d5bdc1a",
+        "codes.npy": "0c32026c028894b7b47264568d1af2420c23ef0f6cb4759b9f3e2616ba9a6436",
+        "source.npy": "ddd8900ecc1aef323c1448ffca9ac41751a22912d6e05b16c21ca79354dde0ab",
+        "text.txt": "858cfa56ed61566d2981c64cd515c3a2b811735261f4f2f26b5ebe6c9b5eab78"
+      }
+    },
+    "ln": {
+      "text": "Mbote. Ndenge nini?",
+      "samples": 48445,
+      "sample_rate": 24000,
+      "peak": 0.8874913454055786,
+      "reference_codes_shape": [
+        8,
+        51
+      ],
+      "source_identity_norm": 12.730460166931152,
+      "finite_pcm": true,
+      "preparation_seconds": 19.18760411599942,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "75684c01a7dd7ccc1cf6d66fe55a9a8d8770ddbdc268967a6938ae879d050494",
+        "codes.npy": "13c5614543d1795ca3eb8eccec45547f318f30ec206830b390927d0e96163b7f",
+        "source.npy": "55ca8cb73f92c2393823e712d9571fb811f7338bfc23bb833893820a3b0dac5f",
+        "text.txt": "f543bcbee233efc85a6002f5ebde60aa138fd11a9d59d03ddffe2384fa10dcc6"
+      }
+    },
+    "zu": {
+      "text": "Sawubona. Unjani?",
+      "samples": 47346,
+      "sample_rate": 24000,
+      "peak": 1.0597341060638428,
+      "reference_codes_shape": [
+        8,
+        50
+      ],
+      "source_identity_norm": 9.326336860656738,
+      "finite_pcm": true,
+      "preparation_seconds": 11.646273514999848,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "ebac3cadd605a0f0bdba2cf4c8a4964d5a7cb144b44541f4b0bc319b5d13f713",
+        "codes.npy": "e00c9ed213124bdb5a1874d65d3644f814e487aab421d6c10d5f518f23bd4b86",
+        "source.npy": "b9c3a301747b62d61b47402f144357dba04ebaf89e0d020a7ed01199dfc333f7",
+        "text.txt": "d3652677752eb7d99c66df48e6df3b464f12c9ec243675f05feb3736327a66b0"
+      }
+    },
+    "xh": {
+      "text": "Molo. Unjani?",
+      "samples": 67200,
+      "sample_rate": 24000,
+      "peak": 0.6085491180419922,
+      "reference_codes_shape": [
+        8,
+        70
+      ],
+      "source_identity_norm": 10.148050308227539,
+      "finite_pcm": true,
+      "preparation_seconds": 10.750705055001163,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "4a4a86cb1d8575c746c54d80b33cb370889aaf58c420940f656b1b6f8e8d6cbe",
+        "codes.npy": "c558a18afd4a6d0f7664e82273e4be3ceb2ab077198e3f285ff6d52bd33f458c",
+        "source.npy": "b3942431c50d3e3a090b65f0678ff625cd928cfd497cca324d33d22348d4c3f6",
+        "text.txt": "67e2a9a1d0fc61bd914d183a94ab1a51fdf13da24e2ba3a3eeee22c50c002d77"
+      }
+    },
+    "wo": {
+      "text": "Salaam aleekum. Nanga def?",
+      "samples": 63447,
+      "sample_rate": 24000,
+      "peak": 1.1515352725982666,
+      "reference_codes_shape": [
+        8,
+        67
+      ],
+      "source_identity_norm": 10.437161445617676,
+      "finite_pcm": true,
+      "preparation_seconds": 11.714308542999788,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "08d4c9fb63dceb9680748124d0cce4d2023ade20531de99b5fdf7180663fe22f",
+        "codes.npy": "40993335e23a66d8d60e89996dd66ba68005604ae965c036db5db15202d4c8e8",
+        "source.npy": "bf4fa97c245e7667fe183b0d4e3e15253d7e55413b396dd6934209162c57280f",
+        "text.txt": "bbc0d6c0a11c7ea67f1982abb5f23c86d0af5fd86c99ac277d25f86e53023aa2"
+      }
+    },
+    "nso": {
+      "text": "Dumela. O kae?",
+      "samples": 66294,
+      "sample_rate": 24000,
+      "peak": 0.87491375207901,
+      "reference_codes_shape": [
+        8,
+        70
+      ],
+      "source_identity_norm": 10.538423538208008,
+      "finite_pcm": true,
+      "preparation_seconds": 11.559419160999823,
+      "pronunciation_verified": false,
+      "nvda_latency_accepted": false,
+      "files": {
+        "reference.wav": "67e329b79d18f828b716e116e99540c07ce5b639b8227314cc31072123a5ba8b",
+        "codes.npy": "90bae08e3a04e6ab9856a395d7f70eb24c1adfd40a26698143c65363bba0f559",
+        "source.npy": "3d20ccd616249751b6e72845c42cfe73b975149e8375fdf001786d2f3737d059",
+        "text.txt": "e0158bbaee59206ed26ac664389f6060d101d8a70786ded1235fd5a7c8970e88"
+      }
+    }
+  }
+}

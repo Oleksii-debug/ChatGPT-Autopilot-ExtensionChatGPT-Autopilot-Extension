@@ -3,7 +3,7 @@
   "authorization": "User said старт on 2026-11-22",
   "status": "implementation_in_progress",
   "base_version": "0.12.2",
-  "target_version": "0.13.0-dev.1",
+  "target_version": "0.13.1-dev.1",
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
@@ -18,10 +18,11 @@
     "Windows engine and actual NVDA probe tools plus GitHub Actions workflow implemented"
   ],
   "open_requirements": [
-    "52 selected entries require additional integrated resources; 44 have candidates not adopted, 8 have no verified checkpoint found",
-    "Windows/NVDA actual audio, keyboard accessibility and pronunciation acceptance",
-    "Measured P95/P99 latency and audio-underrun acceptance on reference Windows hardware",
-    "Final frozen-source archive verification and durable artifact delivery"
+    "10 selected entries have no integrated resources; one selected group is explicitly partial",
+    "Character naming and keyboard echo for new languages; existing word-trained classifier covers45labels",
+    "Remaining seven Omni languages are too slow for interactive NVDA; validated improvements retain quality but do not meet targets",
+    "Windows actual models/NVDA output/accessibility/latency acceptance on matching final source",
+    "Native-speaker pronunciation acceptance and robust long fast multilingual reading"
   ],
   "environment": {
     "os": "Linux",
@@ -29,16 +30,51 @@
     "windows_verification_route": "GitHub Actions Windows runner configured; full run pending source freeze"
   },
   "verification": {
-    "local_unit_tests": 186,
+    "local_unit_tests": 363,
     "local_unit_tests_passed": true,
     "resource_catalog_entries_present": 83,
     "missing_selected_resource_entries": 52,
     "windows_audio_verified": false,
     "nvda_accessibility_verified": false,
     "latency_targets_verified": false,
-    "first_remote_ci": "Missing NumPy in clean runner; dependency pin added, rerun pending"
+    "first_remote_ci": "Missing NumPy in clean runner; dependency pin added, rerun pending",
+    "linux_remote_unit_tests_passed": true,
+    "windows_remote_unit_tests_passed": true,
+    "current_windows_run": 44987758880,
+    "current_windows_stage": "Core and baseline additional engines passed; actual NVDA blocked by missing physical audio endpoint; new full source run preparing",
+    "dev2_staged_resource_entries": 125,
+    "dev2_staged_full_entries": 124,
+    "dev2_staged_partial_entries": 1,
+    "dev2_entirely_missing_entries": 10,
+    "windows_core_engine_probe_passed": true,
+    "windows_extra_engine_probe_passed": true,
+    "windows_nvda_probe_passed": false,
+    "windows_nvda_failure": "Recovered exact real NVDA log: zero Windows audio endpoints; nvwave.WavePlayer constructor raises WinError -2147023728 Element not found. Imported driver otherwise reaches audio setup.",
+    "recovered_diagnostics_run": 44989248999,
+    "recovered_artifact_bytes_read": 1954355,
+    "recovered_artifact_total_bytes": 1941758431,
+    "next_nvda_check": "Audio services/device diagnostics and explicitly labeled headless recording-sink GUI/API probe; physical acceptance remains blocked",
+    "local_optional_model_tests_skipped": 4
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Integrate available missing-language model families as optional packs and run real Windows validation"
+  "next_work": "Integrate available missing-language model families as optional packs and run real Windows validation",
+  "new_model_status": {
+    "mms_models_downloaded_and_native_run": 29,
+    "omni_fixed_reference_sets": 10,
+    "santali_native_and_identity_projection": true,
+    "windows_audio_verified": false,
+    "native_pronunciation_verified": false,
+    "character_names_complete": false,
+    "omni_fast_nvda_latency_accepted": false,
+    "compact_alternatives_prepared": [
+      "Igbo",
+      "Lingala",
+      "Sesotho",
+      "Xhosa",
+      "Northern Ndebele"
+    ],
+    "mms_per_language_packs_built": 29,
+    "additional_native_resource_packs_built": 35
+  }
 }

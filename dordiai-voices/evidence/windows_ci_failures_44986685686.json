@@ -1,0 +1,48 @@
+{
+  "format": "dordiai-windows-ci-failure-analysis",
+  "format_version": 1,
+  "workflow_run_id": 44986685686,
+  "commit_sha": "bbf619128904371ae69bcb2dec556d70f483e52d",
+  "workflow_url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44986685686",
+  "source": "Connected GitHub workflow job logs",
+  "jobs": [
+    {
+      "id": 137098681567,
+      "name": "unit-tests",
+      "platform": "Linux",
+      "observed_status": "success"
+    },
+    {
+      "id": 137098681806,
+      "name": "windows-probes",
+      "platform": "Windows",
+      "observed_status": "failure",
+      "tests_run": 211,
+      "errors": 0,
+      "failures": 1,
+      "skipped": 13
+    }
+  ],
+  "remaining_failure": {
+    "test": "test_archive_path_escape_rejected (inside\\escape)",
+    "cause": "Windows ZipInfo normalizes backslashes again when reading the ZIP. Checking only its normalized filename hides the noncanonical raw member name.",
+    "fix": "Validate ZipInfo.orig_filename and normalized filename before extraction/inspection across NVDA probe, resource/voice package validators, release verifier and baseline restorer. Reject raw backslash/NUL aliases; preserve valid forward-slash paths.",
+    "changed_files": [
+      "tools/windows_nvda_probe.py",
+      "tools/verify_release.py",
+      "tools/restore.py",
+      "source/0.12.2/kx47Runtime/package_manager.py",
+      "source/0.12.2/kx47Runtime/voice_packages.py",
+      "tests/test_windows_nvda_probe.py",
+      "tests/test_zip_raw_names.py"
+    ]
+  },
+  "focused_local_validation": {
+    "platform": "Linux",
+    "nvda_probe_scaffolding_tests": 9,
+    "raw_zip_identity_tests": 5,
+    "result": "passed"
+  },
+  "windows_rerun_after_fix": "not_yet_observed",
+  "engine_probes_in_failed_run": "not_executed; Windows unit regression failed first"
+}

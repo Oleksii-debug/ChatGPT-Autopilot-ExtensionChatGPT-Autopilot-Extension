@@ -1,0 +1,94 @@
+{
+  "format": "dordiai-phonology-candidate-v1",
+  "selected_id": "aa",
+  "iso_code": "aar",
+  "checked_at": "2026-11-22",
+  "installed": false,
+  "ready_for_runtime": false,
+  "candidate_type": "orthography-to-IPA table, not acoustic model",
+  "source": {
+    "repository": "dmort27/epitran",
+    "revision": "2387d95820d6d9b8f459c35141e6239f4de5dbfb",
+    "url": "https://raw.githubusercontent.com/dmort27/epitran/2387d95820d6d9b8f459c35141e6239f4de5dbfb/epitran/data/map/aar-Latn.csv",
+    "bytes": 166,
+    "sha256": "b7b6d723ad421d3e3eb85700fb90befeb2cbbecad424d5730bcd2d2f00d0b09e",
+    "license": "MIT",
+    "license_url": "https://raw.githubusercontent.com/dmort27/epitran/2387d95820d6d9b8f459c35141e6239f4de5dbfb/LICENSE.txt"
+  },
+  "upstream_mapping": {
+    "t": "t",
+    "k": "k",
+    "b": "d",
+    "d": "d",
+    "x": "ɖ",
+    "g": "ɡ",
+    "f": "f",
+    "s": "s",
+    "c": "ħ",
+    "h": "h",
+    "q": "ʕ",
+    "m": "m",
+    "n": "n",
+    "w": "w",
+    "l": "l",
+    "y": "j",
+    "r": "ɾ",
+    "a": "a",
+    "e": "e",
+    "i": "i",
+    "o": "o",
+    "u": "u",
+    "aa": "aː",
+    "ee": "eː",
+    "ii": "iː",
+    "oo": "oː",
+    "uu": "uː"
+  },
+  "issues": [
+    {
+      "type": "probable-upstream-phoneme-mapping-error",
+      "upstream": "b -> d",
+      "inference": "The supplied rule merges b into d; the primary reference inventory distinguishes /b/ and /d/. This must be corrected and tested before adoption.",
+      "suggested_review": "orthographic b -> IPA b",
+      "applied": false
+    },
+    {
+      "type": "missing-prosody-rules",
+      "fact": "No aar-Latn pre/post files exist in this pinned Epitran tree. Long vowels are represented, but consonant gemination/stress/grammatical phrase-final changes are not established by this table alone."
+    },
+    {
+      "type": "unprepared-acoustic-projection",
+      "fact": "Native /ɖ ħ ʕ/ need an explicit matching carrier phoneme table. Actual same-carrier reference audio/embedding and selected-voice projection have not been prepared."
+    }
+  ],
+  "primary_comparison_sources": [
+    {
+      "url": "https://pbase.phon.chass.ncsu.edu/language/7",
+      "basis": "NCSU research inventory referencing Bliese1981; b,d,retroflex/pharyngeal inventory and long vowels are separately listed."
+    },
+    {
+      "url": "https://www.cambridge.org/core/journals/bulletin-of-the-school-of-oriental-and-african-studies/article/abs/segmental-phonemes-of-afar/4A7D3BF2519F3DE4252A1600FB503D3A",
+      "doi": "10.1017/S0041977X00136304",
+      "author": "R. J. Hayward",
+      "year": 1974,
+      "basis": "Primary field research describes distinct stops and complex segmental/grammatical context; this simple map is not complete pronunciation acceptance."
+    }
+  ],
+  "other_gap_exact_maps_in_revision": [],
+  "searched_other_iso_prefixes": [
+    "cnr",
+    "ito",
+    "tet",
+    "ssw",
+    "ven",
+    "nde",
+    "nbl",
+    "ton",
+    "hmo",
+    "swb",
+    "zdj",
+    "wni",
+    "wlc"
+  ],
+  "interpretation": "Potential reusable rules frontend only. It does not add an installed language or close any acoustic quality requirement."
+}

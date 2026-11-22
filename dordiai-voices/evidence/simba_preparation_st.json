@@ -1,0 +1,30 @@
+{
+  "language": "st",
+  "iso_code": "sot",
+  "precision": "fp32",
+  "graph_sha256": "a4c30c2226cd00cfb46c673855e095f6dcdfd817e29e93bded9279d9a8b4c95c",
+  "text": "Baahi bohle ba Toropo ya Vatican ke Roma.",
+  "sample_rate": 16000,
+  "samples": 81664,
+  "seconds": 5.104,
+  "finite": true,
+  "peak": 0.17437046766281128,
+  "load_seconds": 1.7271951720013021,
+  "render_seconds": 1.5881504040007712,
+  "real_time_factor": 0.3111579945142577,
+  "source_identity_shape": [
+    1,
+    256,
+    1
+  ],
+  "source_identity_norm": 11.966107368469238,
+  "source_identity_sha256": "7c7c5e50a8bc3bf1b778670560b7ae8245a910ee1ed8718687e3baa2b5bc6fd0",
+  "source_audio_sha256": "8f8c68e00f742676107917bf5dd432479ac9dd4943ddd94e2ec0627aec791bc6",
+  "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+  "onnxruntime": "1.27.0",
+  "ort_telemetry_disabled": true,
+  "model_downloads_made": false,
+  "native_pronunciation_verified": false,
+  "navigation_verified": false,
+  "windows_nvda_verified": false
+}

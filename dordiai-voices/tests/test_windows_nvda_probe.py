@@ -5,6 +5,8 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
@@ -17,6 +19,42 @@ spec.loader.exec_module(probe)
 
 
 class WindowsProbeScaffoldingTests(unittest.TestCase):
+    def probe_tree(self):
+        return ast.parse(probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", "{}"))
+
+    def test_recording_sink_is_explicit_double_and_validates_pcm(self):
+        tree = self.probe_tree()
+        definition = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "RecordingPCMSink")
+        namespace = {}
+        exec(compile(ast.Module(body=[definition], type_ignores=[]), "recording-sink-unit-test", "exec"), namespace)
+        sink = namespace["RecordingPCMSink"](1, 24000, 16)
+        self.assertTrue(sink._dordiai_recording_test_double)
+        called = []
+        sink.feed(b"\x01\x00", onDone=lambda: called.append(True))
+        self.assertEqual(called, [True])
+        with self.assertRaises(ValueError):
+            sink.feed(b"odd")
+        sink.close()
+        with self.assertRaises(OSError):
+            sink.feed(b"\x01\x00")
+
+    def test_headless_probe_cannot_finish_as_passed_even_if_api_checks_pass(self):
+        definition = next(node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef) and node.name == "finish")
+        result = {"checks": [{"status": "passed"}], "wave_player_verified": False, "physical_audio_verified": False,
+                  "acoustic_latency_verified": False, "product_ready": False}
+        namespace = {"FINISHED": False, "SETTINGS": {"headless_ui_probe": True}, "LATENCY_STOP": threading.Event(),
+                     "DRIVER": None, "RESULT": result, "LOCK": threading.Lock(), "METRICS": {}, "SAMPLES": {},
+                     "save": lambda: None, "time": time, "on_done": lambda: None,
+                     "synthDriverHandler": SimpleNamespace(synthDoneSpeaking=SimpleNamespace(unregister=lambda callback: None)),
+                     "core": SimpleNamespace(callLater=lambda *args: None, triggerNVDAExit=lambda: None)}
+        exec(compile(ast.Module(body=[definition], type_ignores=[]), "headless-finish-unit-test", "exec"), namespace)
+        namespace["finish"]()
+        self.assertEqual(result["status"], "partial")
+        self.assertFalse(result["wave_player_verified"])
+        self.assertFalse(result["physical_audio_verified"])
+        self.assertFalse(result["acoustic_latency_verified"])
+        self.assertFalse(result["product_ready"])
+
     def test_embedded_plugin_is_valid_python_without_executing_nvda(self):
         code = probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", repr({"output": "C:/isolated/test", "run_id": "abc"}))
         compile(code, "dordiaiProbe.py", "exec")

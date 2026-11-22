@@ -1,0 +1,34 @@
+{
+  "format": "dordiai-ndebele-checkpoint-v1",
+  "repo_id": "multilingual-tts/VITS-OpenBible-Ndebele",
+  "revision": "b9177e02bcca72b90dee5f331755275a95af946a",
+  "language": "nd",
+  "iso_code": "nde",
+  "license": "cc-by-sa-4.0",
+  "assets": {
+    "README.md": {
+      "url": "https://huggingface.co/multilingual-tts/VITS-OpenBible-Ndebele/resolve/b9177e02bcca72b90dee5f331755275a95af946a/README.md",
+      "bytes": 3589,
+      "git_blob_sha1": "11fc32986c81adcc4d1a6495ebb772a435df42a5",
+      "sha256": "c038d33e5c091e5d85ad510d27451670e7c76a725c72ee90331e7c65bd5763ff"
+    },
+    "config.json": {
+      "url": "https://huggingface.co/multilingual-tts/VITS-OpenBible-Ndebele/resolve/b9177e02bcca72b90dee5f331755275a95af946a/config.json",
+      "bytes": 7733,
+      "git_blob_sha1": "8b91c96c200d0ac0ea2d30193c005f4f0c2e2bdd",
+      "sha256": "9afb8204cd74af433624062e02e6c60095335e582b231d678d298c60e7e73439"
+    },
+    "model_last.pth": {
+      "url": "https://huggingface.co/multilingual-tts/VITS-OpenBible-Ndebele/resolve/b9177e02bcca72b90dee5f331755275a95af946a/model_last.pth",
+      "bytes": 997756163,
+      "git_blob_sha1": "d473e283f00e274d57128d4257104b7354d24669",
+      "sha256": "f54448025c1d9cebdac4adae480bc52d6b9c98e213b84c7eb0cd711f5d13e18c"
+    },
+    "speakers.pth": {
+      "url": "https://huggingface.co/multilingual-tts/VITS-OpenBible-Ndebele/resolve/b9177e02bcca72b90dee5f331755275a95af946a/speakers.pth",
+      "bytes": 1325,
+      "git_blob_sha1": "fe41e9010be892e2f5ec548f767b921a665b1497",
+      "sha256": "9be3ebdc3376ef7f8c121bd82965b225cd351c07f8954ee2baedf353a122121c"
+    }
+  }
+}

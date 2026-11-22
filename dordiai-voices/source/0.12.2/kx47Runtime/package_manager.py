@@ -201,10 +201,27 @@ def _hash(path):
 
 
 def _version(value):
-    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$", str(value))
+    # Preserve SemVer prerelease ordering: dev.2 requires more than dev.1,
+    # numeric identifiers compare numerically, and stable outranks prerelease.
+    number = r"(0|[1-9][0-9]*)"
+    identifier = r"[0-9A-Za-z-]+"
+    match = re.fullmatch(number + r"\." + number + r"\." + number
+                         + r"(?:-(" + identifier + r"(?:\." + identifier + r")*))?"
+                         + r"(?:\+(" + identifier + r"(?:\." + identifier + r")*))?", str(value))
     if not match:
         raise PackageError("Некоректна версія пакета або ядра.")
-    return tuple(map(int, match.groups()))
+    major, minor, patch, prerelease, _build = match.groups()
+    if prerelease is None:
+        return int(major), int(minor), int(patch), 1, ()
+    identifiers = []
+    for part in prerelease.split("."):
+        if part.isdecimal():
+            if len(part) > 1 and part.startswith("0"):
+                raise PackageError("Числовий суфікс версії не може починатися з нуля.")
+            identifiers.append((0, int(part)))
+        else:
+            identifiers.append((1, part))
+    return int(major), int(minor), int(patch), 0, tuple(identifiers)
 
 
 def _core_version(root):
@@ -280,6 +297,7 @@ def _read_manifest(archive):
         raise PackageError("Некоректні залежності пакета.")
     if meta["id"] in dependencies:
         raise PackageError("Пакет не може залежати від самого себе.")
+    _dependency_versions(meta)
     return meta
 
 
@@ -371,6 +389,19 @@ def inspect_pack(archive_path):
         raise PackageError("Не вдалося відкрити пакет ресурсів.") from exc
 
 
+def _dependency_versions(pack):
+    versions = pack.get("dependency_versions", {})
+    if not isinstance(versions, dict):
+        raise PackageError("Некоректний опис версій залежностей пакета.")
+    for identity, version in versions.items():
+        if not isinstance(identity, str) or identity not in pack.get("dependencies", []):
+            raise PackageError("Версію вказано для неоголошеної залежності.")
+        if not isinstance(version, str):
+            raise PackageError("Версія залежності повинна бути рядком.")
+        _version(version)
+    return versions
+
+
 def _validate_dependencies(packs):
     visiting, complete = set(), set()
 
@@ -380,9 +411,15 @@ def _validate_dependencies(packs):
         if identity in complete:
             return
         visiting.add(identity)
+        required_versions = _dependency_versions(packs[identity])
         for dependency in packs[identity].get("dependencies", []):
             if dependency not in packs:
                 raise PackageError("Спочатку встановіть залежність: " + dependency)
+            # Exact model-family identity, including build metadata. SemVer
+            # precedence alone cannot establish codec/reference compatibility.
+            if dependency in required_versions and packs[dependency].get("version") != required_versions[dependency]:
+                raise PackageError("Пакет " + identity + " потребує точної версії "
+                                   + dependency + " " + required_versions[dependency])
             visit(dependency)
         visiting.remove(identity)
         complete.add(identity)

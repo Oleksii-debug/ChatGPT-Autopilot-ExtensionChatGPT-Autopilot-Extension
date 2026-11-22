@@ -1,0 +1,100 @@
+{
+  "onnxruntime": "1.32.0",
+  "sample": {
+    "kind": "provided-audio",
+    "filename": "downloads/reference_encoder_probe_sara_archive.wav",
+    "sha256": "e46628d537fb75a9cade1083ca3073e9c59af7b1e6310594bbffa76a12bdd4e9",
+    "sample_rate": 24000,
+    "samples": 157440
+  },
+  "encoders": {
+    "fp32": {
+      "shape": [
+        1,
+        256,
+        1
+      ],
+      "dtype": "float32",
+      "finite": true,
+      "norm": 11.334065437316895,
+      "deterministic_repeat": true,
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "input": {
+        "name": "spec",
+        "shape": [
+          "batch",
+          "time",
+          513
+        ]
+      }
+    },
+    "q8": {
+      "shape": [
+        1,
+        256,
+        1
+      ],
+      "dtype": "float32",
+      "finite": true,
+      "norm": 10.85569953918457,
+      "deterministic_repeat": true,
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "input": {
+        "name": "spec",
+        "shape": [
+          "batch",
+          "time",
+          513
+        ]
+      }
+    }
+  },
+  "fp32_q8_comparison": {
+    "cosine": 0.9067195057868958,
+    "max_abs_difference": 0.886211097240448
+  },
+  "baseline_comparison": {
+    "file": "packages/0.12.2/kx47Runtime/models/voices/sara_archive.npy",
+    "norm": 9.798233985900879,
+    "cosine": 0.4571024775505066,
+    "interpretation": "comparison only; same original enrollment waveform is not available, so exact parity is not asserted"
+  },
+  "windows_nvda_audio_verified": false,
+  "interpretation": "real CPU graph execution and conditioning-vector validation; not native pronunciation or end-user audio acceptance",
+  "probe_composition": [
+    {
+      "path": "packages/0.12.2/kx47Runtime/models/voices/navigation_native/sara_archive/be482c883081862a1893073f.wav",
+      "sha256": "1be12cae4e354c1865773dc63d533a20262ca4dfd72452a41a43899570ed528e",
+      "samples": 26040
+    },
+    {
+      "path": "packages/0.12.2/kx47Runtime/models/voices/navigation_native/sara_archive/9811aa6c491d923c00dded73.wav",
+      "sha256": "7def5231fd8cce78f78f2ef6740cfcc52e55ce8f5075dfa2c3b7b1eaaf70d4dd",
+      "samples": 26040
+    },
+    {
+      "path": "packages/0.12.2/kx47Runtime/models/voices/navigation_native/sara_archive/9cd81ec2195955af7fa299e6.wav",
+      "sha256": "ba294846d875fd440f5fc7146aac56fd6cccee6f39337a29bc2b7d36081f4296",
+      "samples": 23040
+    },
+    {
+      "path": "packages/0.12.2/kx47Runtime/models/voices/navigation_native/sara_archive/3c4ecee3733a816481115fa9.wav",
+      "sha256": "eb2a0d0337d9a2a58e161ccf8b6613b13cdab68c9761d7c79614ab38bc2a9799",
+      "samples": 23040
+    },
+    {
+      "path": "packages/0.12.2/kx47Runtime/models/voices/navigation_native/sara_archive/45b0207c5f4aa4ad20d38a0e.wav",
+      "sha256": "40e156cc089c9fd0a26ed5fa2d8e2586f8af5a90fd47f25be4ae66ad965c8e70",
+      "samples": 22440
+    },
+    {
+      "path": "packages/0.12.2/kx47Runtime/models/voices/navigation_native/sara_archive/ebb01e314e30b52c89993cbb.wav",
+      "sha256": "5470463a471b7a68ccaf46589fa367160a17194db23620ee40b007b6813f8ec5",
+      "samples": 22440
+    }
+  ]
+}

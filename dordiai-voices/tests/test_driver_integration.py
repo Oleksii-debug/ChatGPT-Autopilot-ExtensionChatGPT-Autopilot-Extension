@@ -62,6 +62,14 @@ class DriverPlanningTests(unittest.TestCase):
         self.assertEqual(len(values), 1)
         self.assertEqual(values[0][1]["language"], "uk")
 
+    def test_iso_aliases_resolve_before_core_fallback(self):
+        d = self.module
+        for tag, expected in (("eng", "en-US"), ("ukr", "uk"),
+                              ("rus", "ru"), ("deu", "de"),
+                              ("fra", "fr"), ("en_GB", "en-GB")):
+            with self.subTest(tag=tag):
+                self.assertEqual(d.language_code(tag, "uk", "en-US"), expected)
+
     def test_shared_lone_letter_uses_current_language(self):
         d = self.module
         values = self.planned(self.synth(), [d.LangChangeCommand("ru"), "б"])

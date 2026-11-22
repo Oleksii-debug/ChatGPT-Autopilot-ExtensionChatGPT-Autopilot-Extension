@@ -175,6 +175,29 @@ class UpgradePackagesTests(unittest.TestCase):
         self.assertEqual((previous / name).read_bytes(), b"verified model")
         self.assertEqual((config / "WorldVoice-workspace/DordiaiVoices/DordiaiVoices/__init__.py").read_text(), "wrapper")
 
+    def test_exact_resource_dependency_versions_survive_core_upgrade(self):
+        self.resource()
+        state = manager._state(self.old)
+        name = "kx47Runtime/models/Extra/reference.bin"
+        path = self.old / name
+        path.write_bytes(b"reference")
+        record = {"size_bytes": path.stat().st_size, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        state["packs"]["reference"] = dict(state["packs"]["extra"], id="reference", files={name: record},
+                                            dependencies=["extra"], dependency_versions={"extra": "1.0.0"})
+        manager._write_state(self.old, state)
+        upgrade.migrate_installed_packages(self.old, self.new)
+        self.assertEqual(manager._state(self.new)["packs"]["reference"]["dependency_versions"], {"extra": "1.0.0"})
+
+    def test_wrong_exact_resource_dependency_blocks_migration(self):
+        self.resource()
+        state = manager._state(self.old)
+        state["packs"]["reference"] = dict(state["packs"]["extra"], id="reference", files={},
+                                            dependencies=["extra"], dependency_versions={"extra": "2.0.0"})
+        manager._write_state(self.old, state)
+        with self.assertRaises(ValueError):
+            upgrade.migrate_installed_packages(self.old, self.new)
+        self.assertFalse(manager._state_path(self.new).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

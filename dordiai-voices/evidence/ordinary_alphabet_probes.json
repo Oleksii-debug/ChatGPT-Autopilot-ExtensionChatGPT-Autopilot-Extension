@@ -1,0 +1,121 @@
+{
+  "scope": "Real offline Linux native-carrier PCM. No human pronunciation, full alphabet audio, target-voice projection or NVDA acceptance claim.",
+  "onnxruntime": "1.27.0",
+  "languages": {
+    "ha": {
+      "source_alphabet_complete": true,
+      "source_native_names": 28,
+      "clips": [
+        {
+          "glyph": "b",
+          "resolved_native_name": "ba",
+          "samples": 14848,
+          "sample_rate": 16000,
+          "seconds": 0.7782573149997916,
+          "peak": 0.46625739336013794,
+          "sha256": "dda8b5eb2c39e6a29e3721dc0c01465a577a00929fd9d760f73448fa6d6d1722",
+          "path": "evidence/ordinary_alphabet_probes/ha-0.wav"
+        },
+        {
+          "glyph": "ɓ",
+          "resolved_native_name": "ɓa",
+          "samples": 16128,
+          "sample_rate": 16000,
+          "seconds": 0.17213769700174453,
+          "peak": 0.5085945129394531,
+          "sha256": "5254c24d86d3754b6ef005cd97235904a7b6415fe7273dd36e96709b4e5c2436",
+          "path": "evidence/ordinary_alphabet_probes/ha-1.wav"
+        },
+        {
+          "glyph": "sh",
+          "resolved_native_name": "sha",
+          "samples": 18176,
+          "sample_rate": 16000,
+          "seconds": 0.19379649799884646,
+          "peak": 0.5811359286308289,
+          "sha256": "31aef4004e78a21eb89e3f071c3e48242e93e8c68f454cb78d87c4bc012f789e",
+          "path": "evidence/ordinary_alphabet_probes/ha-2.wav"
+        }
+      ],
+      "human_pronunciation_accepted": false,
+      "all_source_names_native_vocabulary_errors": {
+        "ƴ": "Unsupported native graphemes for ha: U+01B4"
+      }
+    },
+    "ay": {
+      "source_alphabet_complete": false,
+      "source_native_names": 31,
+      "clips": [
+        {
+          "glyph": "ch",
+          "resolved_native_name": "cha",
+          "samples": 9216,
+          "sample_rate": 16000,
+          "seconds": 0.6702851849986473,
+          "peak": 0.11786561459302902,
+          "sha256": "99a035db79e28f22936587b950ce6d02cfc20cad1fec0bed34ea44b33b20fbdd",
+          "path": "evidence/ordinary_alphabet_probes/ay-0.wav"
+        },
+        {
+          "glyph": "ñ",
+          "resolved_native_name": "ña",
+          "samples": 9984,
+          "sample_rate": 16000,
+          "seconds": 0.12483616999998048,
+          "peak": 0.1273367553949356,
+          "sha256": "9e4a7b52e31411b19a99e71991af99af43ce573936e69ac19ba6458c0b166231",
+          "path": "evidence/ordinary_alphabet_probes/ay-1.wav"
+        },
+        {
+          "glyph": "q'",
+          "resolved_native_name": "q'a",
+          "samples": 9216,
+          "sample_rate": 16000,
+          "seconds": 0.11082457799966505,
+          "peak": 0.13178203999996185,
+          "sha256": "6daf1899d4bd6d6f42c745ea02f58960ea64fe90373629c0d59b6aba0493a6a2",
+          "path": "evidence/ordinary_alphabet_probes/ay-2.wav"
+        }
+      ],
+      "human_pronunciation_accepted": false,
+      "all_source_names_native_vocabulary_errors": {}
+    },
+    "rm": {
+      "source_alphabet_complete": true,
+      "source_native_names": 26,
+      "clips": [
+        {
+          "glyph": "b",
+          "resolved_native_name": "be",
+          "samples": 22080,
+          "sample_rate": 24000,
+          "seconds": 15.512256697000339,
+          "peak": 0.5161250829696655,
+          "sha256": "e8f1af7911ee51a3f09cb03d497e04ee16df46283717747a02eb786b616e0351",
+          "path": "evidence/ordinary_alphabet_probes/rm-0.wav"
+        },
+        {
+          "glyph": "c",
+          "resolved_native_name": "tse",
+          "samples": 25920,
+          "sample_rate": 24000,
+          "seconds": 11.739099700000224,
+          "peak": 0.5026227831840515,
+          "sha256": "d5d16c0e52713c7c16af5abec974c91ffe28648e31c343ce1359d8253a6fb748",
+          "path": "evidence/ordinary_alphabet_probes/rm-1.wav"
+        },
+        {
+          "glyph": "w",
+          "resolved_native_name": "ve dubel",
+          "samples": 34560,
+          "sample_rate": 24000,
+          "seconds": 12.069160447001195,
+          "peak": 0.4341077506542206,
+          "sha256": "bc384e66ca5a8a40a51c85e897f4abe31026a7c8cbce97cfea837103f4891345",
+          "path": "evidence/ordinary_alphabet_probes/rm-2.wav"
+        }
+      ],
+      "human_pronunciation_accepted": false
+    }
+  }
+}

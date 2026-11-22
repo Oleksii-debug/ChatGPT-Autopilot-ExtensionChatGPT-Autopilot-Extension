@@ -1,0 +1,118 @@
+{
+  "format": "dordiai-archived-south-african-model-research",
+  "format_version": 1,
+  "checked_date": "2026-11-22",
+  "research_only": true,
+  "models_downloaded": 0,
+  "models_published": 0,
+  "purchases_or_trial_extractions": 0,
+  "models": [
+    {
+      "catalogue_code": "nr",
+      "iso639_3": "nbl",
+      "standard": "Southern Ndebele, South Africa; not Northern Ndebele (nd/nde)",
+      "filename": "Voice.Lwazi.Nbl.1.2.zip",
+      "listed_size": "110M",
+      "original_url": "http://hlt.mirror.ac.za/TTS/Voices/Voice.Lwazi.Nbl.1.2.zip",
+      "live_https_status": 410,
+      "wayback_available_snapshots": {},
+      "weight_bytes_recovered": false,
+      "weight_license_verified": false
+    },
+    {
+      "catalogue_code": "ss",
+      "iso639_3": "ssw",
+      "standard": "Swati",
+      "filename": "Voice.Lwazi.Ssw.1.2.zip",
+      "listed_size": "106M",
+      "original_url": "http://hlt.mirror.ac.za/TTS/Voices/Voice.Lwazi.Ssw.1.2.zip",
+      "live_https_status": 410,
+      "wayback_available_snapshots": {},
+      "weight_bytes_recovered": false,
+      "weight_license_verified": false
+    },
+    {
+      "catalogue_code": "ve",
+      "iso639_3": "ven",
+      "standard": "Venda",
+      "filename": "Voice.Lwazi.Ven.1.2.zip",
+      "listed_size": "80M",
+      "original_url": "http://hlt.mirror.ac.za/TTS/Voices/Voice.Lwazi.Ven.1.2.zip",
+      "live_https_status": 410,
+      "wayback_available_snapshots": {},
+      "weight_bytes_recovered": false,
+      "weight_license_verified": false
+    }
+  ],
+  "archived_official_directory": {
+    "url": "https://web.archive.org/web/20170325232059id_/http://hlt.mirror.ac.za/TTS/Voices/",
+    "capture": "20170325232059",
+    "http_status_observed": 200,
+    "result": "Directory listing recovered exact historical model filenames, but archive.org availability API has no snapshots for the three ZIP payloads."
+  },
+  "archived_speect_directory": {
+    "url": "https://web.archive.org/web/20130228022851id_/http://hlt.mirror.ac.za/TTS/Speect/",
+    "capture": "20130228022851",
+    "http_status_observed": 200,
+    "voice_archives": [
+      "cmu_arctic_slt-1.0.tar.gz",
+      "meraka_lwazi2_alta-1.0.tar.gz",
+      "meraka_lwazi2_john-1.2.tar.gz"
+    ],
+    "target_language_weights_listed": false
+  },
+  "cdx_query": {
+    "url": "https://web.archive.org/cdx/search/cdx?url=hlt.mirror.ac.za%2FTTS%2F*&output=json&filter=statuscode%3A200&collapse=urlkey&fl=timestamp%2Coriginal%2Cmimetype%2Clength&limit=1000",
+    "captures_returned": 4,
+    "result": "TTS directory pages and sanote/kies archive; no target voice ZIP capture"
+  },
+  "launchpad": {
+    "archive": "https://api.launchpad.net/1.0/~speect/+archive/ubuntu/voices",
+    "published_binaries": 0,
+    "source_counts": {
+      "Published": 0,
+      "Superseded": 0,
+      "Deleted": 0,
+      "Obsolete": 0
+    },
+    "invalid_initial_probe": "ws.size=1000 caused HTTP400; successful subsequent probes omitted that parameter."
+  },
+  "engine_portability": {
+    "primary_documentation": "https://speect.sourceforge.net/download.html",
+    "documentation_date": "2013-01-30",
+    "finding": "Official historical documentation says Linux-tested and not Windows-compilable at that time; a current compatible Windows backend has not been established here. MIT engine license is not proof of a license for separate voice weights."
+  },
+  "marytts_lead": {
+    "primary_thesis": "https://ulspace.ul.ac.za/server/api/core/bitstreams/5e3aa4a4-467c-4d94-8213-9a24dd6f029e/content",
+    "author": "Tshephisho Joseph Sefara",
+    "year": 2019,
+    "reported_artifacts": [
+      {
+        "filename": "voice-lwazi2-ndebele-hsmm-5.2-SNAPSHOT.zip",
+        "reported_size": "1.8 MB",
+        "catalogue_code": "nr"
+      },
+      {
+        "filename": "voice-lwazi2-tshivenda-hsmm-5.2-SNAPSHOT.zip",
+        "reported_size": "1.4 MB",
+        "catalogue_code": "ve"
+      }
+    ],
+    "public_licensed_weight_download_found": false,
+    "demo": "https://www.speechtech.co.za/",
+    "demo_terms": "Evaluation-only service; commercial use and redistribution of static generated audio prohibited. Not used as an offline model source."
+  },
+  "corpora_not_weights": [
+    {
+      "url": "https://repo.sadilar.org/items/106d8b89-39d9-47d7-b9fc-6b7417b9de55",
+      "type": "Lwazi II Southern Ndebele corpus",
+      "declared_license": "CC-BY-NC-ND-3.0-ZA"
+    },
+    {
+      "url": "https://repo.sadilar.org/items/9a9b5d8c-a768-4265-b1bb-632bb284268a/full",
+      "type": "Lwazi II Swati corpus",
+      "declared_license": "CC-BY-NC-ND-3.0-ZA"
+    }
+  ],
+  "conclusion": "Historical target voice filenames are verified, but this search recovered no model binaries or verified weight licenses. Do not mark Southern Ndebele, Swati or Venda supported from directory listings, engine source or corpora alone. Northern Ndebele is a distinct language and its separately exported Coqui model is covered by evidence/ndebele_export.json."
+}

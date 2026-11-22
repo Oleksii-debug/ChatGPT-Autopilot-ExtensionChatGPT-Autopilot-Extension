@@ -89,6 +89,17 @@ def prepare(output, families=("sat", "omni"), with_encoder=False, verify_only=Fa
                           license=specification["license"], files=verified_files,
                           audio_verified=False, windows_verified=False)
         folder.joinpath("source.json").write_text(json.dumps(provenance, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if family == "sat":
+            folder.joinpath("NOTICE.txt").write_text(
+                "Santali Piper VITS (Ol Chiki) by kaushalkrishnax, Apache-2.0.\n"
+                "Source: https://huggingface.co/kaushalkrishnax/santali-piper-vits\n"
+                "Pinned revision: 50da29423065a25393d58d48d83de21ad85c4d4d\n"
+                "The matching deterministic phonemizer is retained in the shared runtime with attribution.\n"
+                "Training corpus: AI4Bharat Rasa Santali Female. See the included upstream README.\n"
+                "Native pronunciation, number names and symbol names are not certified by asset availability.\n", encoding="utf-8")
+            license_file = Path(__file__).resolve().parents[1] / "source/0.12.2/doc/third-party/DordiaiNative/COPYING.APACHE"
+            if license_file.is_file():
+                shutil.copyfile(license_file, folder / "LICENSE-APACHE-2.0.txt")
         if family == "omni":
             folder.joinpath("UPSTREAM-LICENSE-NOTICE.txt").write_text(
                 "These ONNX graphs derive from k2-fsa/OmniVoice, whose pre-trained weights are CC-BY-NC "

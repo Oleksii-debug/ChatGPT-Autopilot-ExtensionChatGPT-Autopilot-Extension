@@ -120,9 +120,15 @@ jobs:
         if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
         shell: python
         run: |
-          import pathlib, subprocess, sys
+          import json, pathlib, subprocess, sys
           addon = next(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
-          subprocess.run([sys.executable, "dordiai-voices/tools/windows_nvda_probe.py", "--addon", str(addon), "--output", "dordiai-voices/windows-results/nvda"], check=True)
+          subprocess.run([sys.executable, "dordiai-voices/tools/setup_audio_endpoint.py", "--output", "dordiai-voices/windows-results/audio", "--ephemeral-ci", "--start-existing-services"], check=False)
+          command = [sys.executable, "dordiai-voices/tools/windows_nvda_probe.py", "--addon", str(addon), "--output", "dordiai-voices/windows-results/nvda"]
+          audio_report = pathlib.Path("dordiai-voices/windows-results/audio/audio-endpoint.json")
+          if audio_report.is_file() and json.loads(audio_report.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
+              print("No actual audio endpoint: explicitly opting into recording PCM sink TEST DOUBLE for NVDA/GUI checks. WavePlayer and acoustic acceptance remain blocked.", flush=True)
+              command.append("--headless-ui-probe")
+          subprocess.run(command, check=True)
       - name: Print probe failures and collect bounded Windows diagnostics
         if: always()
         run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence

@@ -1,0 +1,25 @@
+{
+  "model": "Sesotho Simba actual INT8 ONNX",
+  "text": "Baahi bohle ba Toropo ya Vatican ke Roma.",
+  "sample_rate": 16000,
+  "samples": 80128,
+  "seconds": 5.008,
+  "finite": true,
+  "peak": 0.20295819640159607,
+  "load_seconds": 2.474129031999837,
+  "render_seconds": 10.142618787000174,
+  "real_time_factor": 2.0252833041134535,
+  "source_identity_shape": [
+    1,
+    256,
+    1
+  ],
+  "source_identity_norm": 11.628562927246094,
+  "source_identity_sha256": "ce1e6060a3d05131229b4d299907e8deb81204e6f16ec130ff77c111772ad757",
+  "source_audio_sha256": "128aa8819a2538f3c726be04de8da17c17aa666e7ec291a0145eccdb102c82a0",
+  "onnxruntime": "1.27.0",
+  "native_pronunciation_verified": false,
+  "navigation_verified": false,
+  "windows_nvda_verified": false,
+  "status": "historical-int8-comparison-not-the-active-shipping-model"
+}

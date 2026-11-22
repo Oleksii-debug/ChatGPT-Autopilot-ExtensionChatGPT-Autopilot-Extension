@@ -1,0 +1,130 @@
+{
+  "format": "dordiai-compact-gap-research-v1",
+  "checked_at": "2026-11-22",
+  "scope": "Older compact offline/statistical engines for eight unresolved selected catalogue entries; historical search snapshot, not current inference acceptance",
+  "download_checks": [
+    {
+      "url": "http://hlt.mirror.ac.za/TTS/Speect/",
+      "error": "HTTP Error 410: Gone"
+    },
+    {
+      "url": "https://hlt.mirror.ac.za/TTS/Speect/",
+      "error": "HTTP Error 410: Gone"
+    },
+    {
+      "url": "https://api.launchpad.net/1.0/~speect/+archive/ubuntu/voices?ws.op=getPublishedSources",
+      "status": "ok",
+      "headers": {
+        "date": "Sun, 22 Nov 2026 04:40:23 GMT",
+        "server": "envoy",
+        "x-powered-by": "Zope (www.zope.org), Python (www.python.org)",
+        "content-length": "44",
+        "content-security-policy": "frame-ancestors 'self';",
+        "content-type": "application/json",
+        "strict-transport-security": "max-age=15552000",
+        "vary": "Accept",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "SAMEORIGIN",
+        "x-launchpad-revision": "5893e20085ddb97aea2534e1b2a802438957dea5",
+        "x-lazr-notifications": "[]",
+        "x-xss-protection": "1; mode=block",
+        "x-vcs-revision": "5893e20085ddb97aea2534e1b2a802438957dea5",
+        "x-request-id": "b2896a37-4d59-4a5c-ad67-40368ed9a5d8",
+        "x-cache": "MISS from juju-98d295-prod-launchpad-30",
+        "x-cache-lookup": "MISS from juju-98d295-prod-launchpad-30:3128",
+        "via": "1.1 juju-98d295-prod-launchpad-30 (squid/4.10)",
+        "x-envoy-upstream-service-time": "937",
+        "connection": "close"
+      },
+      "body": "{\"start\": 0, \"total_size\": 0, \"entries\": []}"
+    },
+    {
+      "url": "https://www.qfrency.com/",
+      "error": "HTTP Error 503: Service Unavailable"
+    }
+  ],
+  "candidates": [
+    {
+      "selected_ids": [
+        "nr",
+        "ss",
+        "ve"
+      ],
+      "family": "CSIR Lwazi / Speect",
+      "engine_license": "MIT",
+      "engine_source": "https://github.com/mivoq/speect",
+      "ready_weights_verified": false,
+      "windows_adapter_ready": false,
+      "blocking_facts": [
+        "Official historical voice mirror returns HTTP 410 Gone.",
+        "Published source package API for the Speect voices PPA currently returns zero entries.",
+        "An engine source license does not establish voice data redistribution or Windows runtime compatibility."
+      ],
+      "voice_archive": "https://hlt.mirror.ac.za/TTS/Speect/"
+    },
+    {
+      "selected_ids": [
+        "nr",
+        "ss",
+        "ve"
+      ],
+      "family": "Qfrency South African SAPI 5 voices",
+      "ready_weights_verified": false,
+      "distribution_type": "licensed Windows binary installer / SDK, not acquired",
+      "technical_option": "Potential future separate SAPI5 adapter; current NVDA native ONNX adapter does not load SAPI5 installers.",
+      "redistribution_license": "Not established; single-user purchase/trial terms do not authorize bundling a redistributable voice SDK.",
+      "sources": [
+        "https://editmicro.co.za/product/qfrency-south-african-voices/",
+        "https://www.inclusivesolutions.co.za/qfrency-sa-voices",
+        "https://www.inclusivesolutions.co.za/online-shop/South-African-Text-to-Speech-Voice-Single-User-p199449558"
+      ],
+      "published_installer_links": [
+        "https://editmicro.co.za/wp-content/uploads/2020/04/Qfrency-isiNdebele-Banele-2.8.0.zip",
+        "https://editmicro.co.za/wp-content/uploads/2020/04/Qfrency-Tshivenda-Rabelani-2.8.0.zip",
+        "https://editmicro.co.za/wp-content/uploads/2020/04/Qfrency-Siswati-Temaswati-2.8.0.zip"
+      ],
+      "installer_downloaded": false
+    },
+    {
+      "selected_ids": [
+        "nr",
+        "ss",
+        "ve"
+      ],
+      "family": "SADiLaR voice corpora",
+      "resource_type": "recorded speech corpus, not ready acoustic checkpoint",
+      "license": "CC-BY-NC-ND-3.0-ZA as recorded in primary item metadata",
+      "source": "https://repo.sadilar.org/items/9a9b5d8c-a768-4265-b1bb-632bb284268a",
+      "coverage_effect": "No runtime language added; corpus access alone is not a trained model."
+    },
+    {
+      "selected_ids": [
+        "to",
+        "tet",
+        "ho"
+      ],
+      "family": "Pacific compact Festival/Flite/Speect/HTS search",
+      "ready_weights_verified": false,
+      "coverage_effect": "No validated downloadable offline acoustic checkpoint found in the searched primary sources. API marketing support is not an offline checkpoint or pronunciation verification."
+    },
+    {
+      "selected_ids": [
+        "cnr"
+      ],
+      "family": "Montenegrin explicit standard",
+      "source": "https://github.com/Balkansmedia/tts-ai-",
+      "ready_weights_verified": false,
+      "coverage_effect": "Croatian/Serbian resources or planned Montenegrin data collection are not a verified Montenegrin standard acoustic model."
+    },
+    {
+      "selected_ids": [
+        "ito"
+      ],
+      "family": "Itonama",
+      "source": "https://glottolog.org/resource/languoid/id/iton1250",
+      "ready_weights_verified": false,
+      "coverage_effect": "Linguistic documentation is not a trained acoustic checkpoint; search result does not prove universal model nonexistence."
+    }
+  ],
+  "interpretation": "These records do not lower the 135-entry goal, do not add runtime languages, and do not claim that candidate models cannot exist elsewhere."
+}

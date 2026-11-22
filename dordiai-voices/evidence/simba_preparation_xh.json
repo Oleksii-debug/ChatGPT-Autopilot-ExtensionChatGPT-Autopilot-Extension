@@ -1,0 +1,30 @@
+{
+  "language": "xh",
+  "iso_code": "xho",
+  "precision": "fp32",
+  "graph_sha256": "70f52bf621fd540971693cb31a6fdda61b921123850e4b0973ec1726bf4156da",
+  "text": "Molo. Unjani namhlanje?",
+  "sample_rate": 16000,
+  "samples": 28672,
+  "seconds": 1.792,
+  "finite": true,
+  "peak": 0.38757967948913574,
+  "load_seconds": 1.3418384979995608,
+  "render_seconds": 0.535753484999077,
+  "real_time_factor": 0.29896957868252066,
+  "source_identity_shape": [
+    1,
+    256,
+    1
+  ],
+  "source_identity_norm": 11.49756145477295,
+  "source_identity_sha256": "4fc0abbb64a31a7c68ad7b1549b77a36b41d7ba359a7a611fcaa74e739b7e31f",
+  "source_audio_sha256": "b97d5d802c9827d89e4f224d3767264300b3b2e4581fbf1ff778bd8e407df241",
+  "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+  "onnxruntime": "1.27.0",
+  "ort_telemetry_disabled": true,
+  "model_downloads_made": false,
+  "native_pronunciation_verified": false,
+  "navigation_verified": false,
+  "windows_nvda_verified": false
+}

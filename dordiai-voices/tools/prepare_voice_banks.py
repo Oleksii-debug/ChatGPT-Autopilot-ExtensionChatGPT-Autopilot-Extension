@@ -54,25 +54,77 @@ def validate_entries(entries):
         raise ValueError("Provide 1..10000 letter/command entries")
     output, seen = [], {}
     for item in entries:
-        if not isinstance(item, dict) or item.get("kind", "letter") not in {"letter", "command"}:
+        if not isinstance(item,dict) or not isinstance(item.get("kind","letter"),str) or item.get("kind","letter") not in {"letter","command"}:
             raise ValueError("An entry must have kind letter or command")
         language, text = item.get("language"), item.get("text")
-        name = item.get("name", text)
+        name = item.get("lookup_text",item.get("name",text))
+        aliases=item.get("aliases",[])
         if (not isinstance(language, str) or not 2 <= len(language) <= 35
                 or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for c in language)
                 or not isinstance(text, str) or not text.strip() or len(text) > 160
                 or not isinstance(name, str) or not name.strip() or len(name) > 160):
             raise ValueError("Invalid entry language, lookup name or spoken text")
         kind = item.get("kind", "letter")
-        row = {"kind": kind, "language": language_key(language), "name": name, "text": text}
+        semantic=item.get("semantic_kind","raw_character" if kind=="letter" else "literal_text")
+        if not isinstance(semantic,str) or semantic not in {"spoken_name","raw_character","literal_text"} or (kind=="command" and semantic!="literal_text"):
+            raise ValueError("Invalid entry semantic_kind")
+        if kind=="letter" and semantic=="literal_text":
+            raise ValueError("Letter jobs must distinguish a reviewed spoken_name from a raw_character")
+        if (not isinstance(aliases,list) or len(aliases)>16 or
+                any(not isinstance(alias,str) or not alias.strip() or len(alias)>160 for alias in aliases)):
+            raise ValueError("Invalid prepared bank lookup aliases")
+        if kind=="letter" and item.get("source_kind") in ("phonetic_description","phonetic_descriptions"):
+            raise ValueError("A phonetic description cannot be promoted to an ordinary letter name")
+        row = {"kind":kind,"language":language_key(language),"name":name,"lookup_text":name,
+               "text":text,"semantic_kind":semantic,"aliases":list(dict.fromkeys(aliases))}
+        for key in ("source_kind","source_id"):
+            if key in item:
+                if not isinstance(item[key],str) or not 0<len(item[key])<=2048:
+                    raise ValueError("Invalid prepared bank source metadata")
+                row[key]=item[key]
         identity = kind, entry_key(language, name)
+        for alias in row["aliases"]:
+            key=kind,entry_key(language,alias)
+            if key in seen and (seen[key]["text"]!=text or seen[key]["semantic_kind"]!=semantic):
+                raise ValueError("Prepared bank lookup alias conflicts with another utterance")
         if identity in seen:
-            if seen[identity] != row:
+            existing=seen[identity]
+            if existing["text"]!=text or existing["semantic_kind"]!=semantic:
                 raise ValueError("Two entries use the same lookup key with different speech")
+            merged=list(dict.fromkeys(existing["aliases"]+row["aliases"]))
+            if len(merged)>16:
+                raise ValueError("Too many merged lookup aliases for one utterance")
+            existing["aliases"]=merged
+            for alias in merged:
+                seen[(kind,entry_key(language,alias))]=existing
             continue
         seen[identity] = row
+        for alias in row["aliases"]:
+            seen[(kind,entry_key(language,alias))]=row
         output.append(row)
     return output
+
+
+def load_entries_document(document):
+    """Accept manual job lists or the versioned primary-source inventory.
+
+    Only explicit bank_entries are rendered. Missing ordinary letter names and
+    phonetic descriptions remain inventory data, never implicit speech jobs.
+    """
+    if isinstance(document,dict):
+        if (document.get("format")!="dordiai-character-name-sources" or
+                type(document.get("format_version")) is not int or document["format_version"]!=1):
+            raise ValueError("Unsupported character-name source format or version")
+        language=document.get("language")
+        if not isinstance(language,str) or not language.strip():
+            raise ValueError("The character-name source must declare its language")
+        entries=validate_entries(document.get("bank_entries"))
+        declared=language_key(language)
+        if any((row["language"]!=declared if "-" in language.replace("_","-") else
+                row["language"].split("-")[0]!=declared.split("-")[0]) for row in entries):
+            raise ValueError("Bank entry language differs from its character-name source")
+        return entries
+    return validate_entries(document)
 
 
 def _core_letter_maps(driver_path):
@@ -115,7 +167,11 @@ def default_letter_entries(runtime, languages):
             names = list(extras.LETTERS[base].values())
         else:
             raise ValueError("Provide --entries-json with reviewed names for language " + locale)
-        output.extend({"language": locale, "kind": "letter", "name": name, "text": name} for name in names)
+        output.extend({"language":locale,"kind":"letter","lookup_text":name,"text":name,
+                       "semantic_kind":"spoken_name","source_kind":("symbol_name" if base in maps and
+                           name=={"uk":"пробіл","ru":"пробел","en":"space"}[base] else "letter_name"),
+                       "source_id":"dordiai-driver-core-letter-maps" if base in maps else "dordiai-experiment-letter-names"}
+                      for name in names)
     return validate_entries(output)
 
 
@@ -130,8 +186,10 @@ def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, p
     entries = validate_entries(entries)
     for kind in ("letter", "command"):
         selected = [row for row in entries if row["kind"] == kind]
-        preview = {"entries": {entry_key(row["language"], row["name"]): [10**12, MAX_CLIP_BYTES] for row in selected},
-                   "entry_texts": {entry_key(row["language"], row["name"]): row for row in selected}}
+        preview = {"entries": {entry_key(row["language"], name): [10**12, MAX_CLIP_BYTES]
+                               for row in selected for name in [row["lookup_text"],*row["aliases"]]},
+                   "entry_texts": {entry_key(row["language"], name):row for row in selected
+                                   for name in [row["lookup_text"],*row["aliases"]]}}
         if len(json.dumps(preview, ensure_ascii=False, indent=2).encode("utf-8")) > 2 * 1024 * 1024 - 1024:
             raise ValueError("The prepared bank index would be too large; prepare fewer languages per voice package")
     directory = Path(directory)
@@ -157,7 +215,9 @@ def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, p
         language = row["language"]
         base = language.split("-")[0]
         request = probe.make_request(base if base in CORE else language, voice_id, row["text"])
-        request.update(language=language, character=kind == "letter", speed=1.0)
+        # A reviewed NAME is literal text, not a glyph awaiting a second name
+        # lookup in MMS/Santali/Omni. The bank still stores it as a letter unit.
+        request.update(language=language,character=kind=="letter" and row["semantic_kind"]=="raw_character",speed=1.0)
         pcm, result = worker.render(request, timeout)
         if not isinstance(pcm, bytes) or not 2 <= len(pcm) <= MAX_CLIP_BYTES or len(pcm) % 2:
             raise ValueError("Prepared utterance must contain aligned 16-bit PCM of at most eight seconds")
@@ -170,9 +230,10 @@ def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, p
         offset = bank["audio_path"].stat().st_size
         with bank["audio_path"].open("ab") as audio:
             audio.write(pcm)
-        key = entry_key(language, row["name"])
-        bank["document"]["entries"][key] = [offset, len(pcm)]
-        bank["document"]["entry_texts"][key] = row
+        for lookup in [row["lookup_text"],*row["aliases"]]:
+            key=entry_key(language,lookup)
+            bank["document"]["entries"][key]=[offset,len(pcm)]
+            bank["document"]["entry_texts"][key]=row
         _atomic_json(bank["index_path"], bank["document"])
         runs.append({**row, "audio": statistics, "worker": result})
         _atomic_json(directory / "generation-progress.json", {"voice_id": voice_id, "complete": False, "runs": runs})
@@ -274,7 +335,10 @@ def run(args):
     try:
         recipe = copy_profile_source(runtime, assets, args.voice, stage, version=args.version, license_text=args.license)
         if args.entries_json:
-            entries = validate_entries(json.loads(Path(args.entries_json).read_text(encoding="utf-8")))
+            source_path=Path(args.entries_json)
+            if source_path.stat().st_size>8*1024*1024:
+                raise ValueError("The bank-entry source exceeds the 8 MiB metadata limit")
+            entries=load_entries_document(json.loads(source_path.read_text(encoding="utf-8")))
         else:
             languages = (args.languages.split(",") if args.languages else
                          [code for code in recipe["languages"] if code.split("-")[0] in CORE])

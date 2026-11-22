@@ -1,0 +1,62 @@
+{
+  "format": "dordiai-mms-preparation-v1",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "repo_id": "willwade/mms-tts-multilingual-models-onnx",
+  "revision": "4f49fc254f11ddb0e35fbf25b6e48b04463a6779",
+  "license": "CC-BY-NC-4.0",
+  "models": {
+    "ha": {
+      "code": "ha",
+      "iso_code": "hau",
+      "standard": "hau",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ha",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32",
+      "model_bytes": 114013956,
+      "tokens_sha256": "78b39313ddfc60be59cc12a957f11bf0f5dd4d1cdd3d5c16fe0bf3fae165d0c9",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "d ɗ s g t o y r a u ā i ū c n j b ɓ l e e l ɓ b j n c ū i ā u a r y o t g s ɗ d",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 6.752,
+        "samples": 108032,
+        "peak": 0.6180673837661743,
+        "rms": 0.07221245020627975,
+        "wave_sha256": "ff808a5c9a665a2d5426d5268c7171877ebb3dcae26850eb3048d8b76a22b7fc",
+        "graph_load_seconds": 0.7447559009997349,
+        "graph_inference_seconds": 1.1314954570007103,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/sample.wav",
+        "reference_wav_sha256": "a164ed01dc2548802fdd466600c05d98afbcdbceaa6d27850a10924700c9b0e6",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.689874649047852,
+        "source_dtype": "float32",
+        "unit_normalized": false
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    }
+  },
+  "all_selected_prepared": true,
+  "windows_nvda_verified": false,
+  "mode": "offline-verification",
+  "onnxruntime_version": "1.27.0",
+  "onnxruntime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+  "ort_telemetry_disabled": true,
+  "model_downloads_made": false,
+  "model_bytes": 114013956
+}

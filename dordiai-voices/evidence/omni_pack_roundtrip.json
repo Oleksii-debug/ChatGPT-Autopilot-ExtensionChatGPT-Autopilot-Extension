@@ -1,0 +1,16 @@
+{
+  "kind": "actual-omni-pack-dependency-roundtrip",
+  "reference": "rm",
+  "minimum_core_version": "0.13.1-dev.1",
+  "exact_common_version": "1.0.0",
+  "missing_dependency_rejected": true,
+  "in_use_shared_pack_removal_rejected": true,
+  "preparation_encoder_not_installed": true,
+  "probe_audio_not_installed": true,
+  "shared_installed_files": 13,
+  "shared_installed_bytes": 1091861650,
+  "clean_uninstall": true,
+  "experimental": true,
+  "interactive_nvda_latency_verified": false,
+  "windows_nvda_verified": false
+}

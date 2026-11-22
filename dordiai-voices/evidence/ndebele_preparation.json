@@ -1,0 +1,47 @@
+{
+  "format": "dordiai-coqui-onnx-v1",
+  "backend": "extra-onnx",
+  "code": "nd",
+  "iso_code": "nde",
+  "sample_rate": 22050,
+  "license": "cc-by-sa-4.0",
+  "repo_id": "multilingual-tts/VITS-OpenBible-Ndebele",
+  "revision": "b9177e02bcca72b90dee5f331755275a95af946a",
+  "model_sha256": "917b6bec0f8a5db90a86107cf4a1dc5ab279de66e4a3d58b910a9760607fe889",
+  "config_sha256": "4a99a153917cc72a8a5457d4173e2afd51c47f276fd6f06cf070ef544321fae8",
+  "speaker_conditioning": "none-in-trained-state",
+  "declared_training_speakers": 3,
+  "selectable_original_speakers_exposed": false,
+  "navigation_verified": false,
+  "native_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "source_identity": {
+    "source_sha256": "63d0d57354bd28e49a1349a47bdc99d4d3de6d1afa6459da6a80175388bd29ec",
+    "reference_wav_sha256": "1cd28fad017712b098b234e05af15e9c6a5d1ec28f19300d6491ad5de450faef",
+    "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+    "source_shape": [
+      1,
+      256,
+      1
+    ],
+    "source_dtype": "float32",
+    "source_norm": 11.427901268005371,
+    "basis": "actual-same-Northern-Ndebele-carrier-pcm16",
+    "unit_normalized": false
+  },
+  "technical_onnx_inference_verified": true,
+  "status": "prepared-real-onnx-carrier",
+  "onnxruntime_version": "1.27.0",
+  "torch_needed_on_client": false,
+  "model_bytes": 114239454,
+  "probe": {
+    "text": "a b c d e f g h i j k l m n o p q r s t t s r q p o n m l k j i h g f e d c b a",
+    "kind": "native-grapheme-smoke-test",
+    "audio_seconds": 5.642448979591837,
+    "graph_load_and_inference_seconds": 2.696594355000343,
+    "real_time_factor_including_load": 0.477912049316467,
+    "peak": 0.5702311396598816,
+    "rms": 0.07985278218984604
+  },
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41"
+}

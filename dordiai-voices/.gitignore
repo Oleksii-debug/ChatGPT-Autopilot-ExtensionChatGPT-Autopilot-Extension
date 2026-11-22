@@ -5,4 +5,7 @@ __pycache__/
 dist/
 probe-package/
 windows-results/
+windows-evidence/
 model-packs/
+evidence/**/*.wav
+evidence/**/*.pcm

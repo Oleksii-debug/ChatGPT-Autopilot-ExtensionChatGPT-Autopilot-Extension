@@ -1,0 +1,51 @@
+{
+  "format": "dordiai-coqui-sources-v1",
+  "models": {
+    "ig": {
+      "repo_id": "Phoonnx/vits-ig-openbible-graphemes",
+      "revision": "eeb9ba146287c20f46bcd76c31e28c1f534c0ce0",
+      "license": "cc-by-sa-4.0",
+      "assets": {
+        "README.md": {
+          "url": "https://huggingface.co/Phoonnx/vits-ig-openbible-graphemes/resolve/eeb9ba146287c20f46bcd76c31e28c1f534c0ce0/README.md",
+          "bytes": 4089,
+          "git_blob_sha1": "9f69f782d0fdcebcdaabe634a62e9e3bf5d94e9f"
+        },
+        "config.json": {
+          "url": "https://huggingface.co/Phoonnx/vits-ig-openbible-graphemes/resolve/eeb9ba146287c20f46bcd76c31e28c1f534c0ce0/config.json",
+          "bytes": 1659,
+          "git_blob_sha1": "f884df38957e9ba0d8bd718c51ee7eae66b03540"
+        },
+        "model.onnx": {
+          "url": "https://huggingface.co/Phoonnx/vits-ig-openbible-graphemes/resolve/eeb9ba146287c20f46bcd76c31e28c1f534c0ce0/model.onnx",
+          "bytes": 114250165,
+          "git_blob_sha1": "3408addba59bb26b4c408c522bed57fc34417d85",
+          "sha256": "b05b68d00c2715710cb3d8f72df76761475fcbf29896380b66226ec6c61a9df3"
+        }
+      }
+    },
+    "ln": {
+      "repo_id": "Phoonnx/vits-ln-openbible-graphemes",
+      "revision": "46d471ee11714d0a36990cb0bba93fa609ec1e35",
+      "license": "cc-by-sa-4.0",
+      "assets": {
+        "README.md": {
+          "url": "https://huggingface.co/Phoonnx/vits-ln-openbible-graphemes/resolve/46d471ee11714d0a36990cb0bba93fa609ec1e35/README.md",
+          "bytes": 2453,
+          "git_blob_sha1": "07e47c84e77dea1e404bdff4753be3649be4824f"
+        },
+        "config.json": {
+          "url": "https://huggingface.co/Phoonnx/vits-ln-openbible-graphemes/resolve/46d471ee11714d0a36990cb0bba93fa609ec1e35/config.json",
+          "bytes": 1740,
+          "git_blob_sha1": "9a75b83d1e2c8e938abce2aa2282a087dcacadf3"
+        },
+        "model.onnx": {
+          "url": "https://huggingface.co/Phoonnx/vits-ln-openbible-graphemes/resolve/46d471ee11714d0a36990cb0bba93fa609ec1e35/model.onnx",
+          "bytes": 114253237,
+          "git_blob_sha1": "2ce20507ebc5b72fc6675ea0c074dab1d9d129c8",
+          "sha256": "9a53fb4b1d875ff8335bf8d36b00f83893b4db2c93776b1f3132b9b54818edd7"
+        }
+      }
+    }
+  }
+}

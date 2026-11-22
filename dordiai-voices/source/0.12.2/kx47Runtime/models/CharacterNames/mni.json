@@ -1,0 +1,383 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "mni",
+  "sources": {
+    "nvda_descriptions": {
+      "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/mni/characterDescriptions.dic",
+      "sha256": "763cbae639f97e6abe4964c5a7c5ae31ae0570b9c2abede4fbd5a2bf147e1e38",
+      "license": "GPL-2.0-or-later"
+    },
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/mni/annotations.json",
+      "sha256": "51c7685d92aee50d397644e5e842ec9b833d122348807797aae098c62b32d312",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/mni/characters.json",
+      "sha256": "2fb62bd7cee9c5c6c1c71e5f464177d22ddf431de053dcf07f74778ce46da8e5",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "‾": "ওভরলাইন",
+    "‽": "ইন্টরোবাং",
+    "‸": "কেরেট",
+    "⁂": "অষ্টরিজম",
+    "|": "চপয়ুংবা লৈই",
+    "~": "টিল্ডু"
+  },
+  "phonetic_descriptions": {
+    "অ": [
+      "অঙাং"
+    ],
+    "আ": [
+      "আলু"
+    ],
+    "ই": [
+      "ইরোই"
+    ],
+    "ঈ": [
+      "ঈল"
+    ],
+    "উ": [
+      "উপাল"
+    ],
+    "ঊ": [
+      "ঊচি"
+    ],
+    "ঋ": [
+      "ঋশি"
+    ],
+    "এ": [
+      "কাগগাডী"
+    ],
+    "ও": [
+      "ওঝা"
+    ],
+    "অং": [
+      "অং Lর"
+    ],
+    "ক": [
+      "কৈ"
+    ],
+    "খ": [
+      "খজিং"
+    ],
+    "গ": [
+      "গমলা"
+    ],
+    "ঘ": [
+      "ঘড়ী"
+    ],
+    "ঙ": [
+      "ঙা"
+    ],
+    "চ": [
+      "চফূ"
+    ],
+    "ছ": [
+      "ছাটিন"
+    ],
+    "জ": [
+      "জীপ"
+    ],
+    "ঝ": [
+      "ঝাল"
+    ],
+    "ট": [
+      "টূপী"
+    ],
+    "ঠ": [
+      "ঠেলাগাড়ী"
+    ],
+    "ড": [
+      "ডম্বূব়"
+    ],
+    "ঢ": [
+      "ঢোল"
+    ],
+    "ত": [
+      "তেব়ং"
+    ],
+    "থ": [
+      "থম্বাল"
+    ],
+    "দ": [
+      "দলাল"
+    ],
+    "ধ": [
+      "ধুলোক"
+    ],
+    "ন": [
+      "নোংমৈ"
+    ],
+    "প": [
+      "পুং"
+    ],
+    "ফ": [
+      "পমুং"
+    ],
+    "ব": [
+      "বালতিন"
+    ],
+    "ভ": [
+      "ভারত"
+    ],
+    "ম": [
+      "মকু"
+    ],
+    "য": [
+      "যম"
+    ],
+    "র": [
+      "রেলগাড়ী"
+    ],
+    "ল": [
+      "লফোয়"
+    ],
+    "w": [
+      "wuইনু"
+    ],
+    "শ": [
+      "শীংজং"
+    ],
+    "ষ": [
+      "ষন"
+    ],
+    "স": [
+      "সনাবুল"
+    ],
+    "হ": [
+      "হৌদোং"
+    ],
+    "য়": [
+      "য়েন"
+    ]
+  },
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "়",
+    "ঁ",
+    "ং",
+    "ঃ",
+    "অ",
+    "আ",
+    "ই",
+    "ঈ",
+    "উ",
+    "ঊ",
+    "ঋ",
+    "এ",
+    "ঐ",
+    "ও",
+    "ঔ",
+    "ক",
+    "খ",
+    "গ",
+    "ঘ",
+    "ঙ",
+    "চ",
+    "ছ",
+    "জ",
+    "ঝ",
+    "ঞ",
+    "ট",
+    "ঠ",
+    "ড",
+    "ড়",
+    "ঢ",
+    "ঢ়",
+    "ণ",
+    "ত",
+    "থ",
+    "দ",
+    "ধ",
+    "ন",
+    "প",
+    "ফ",
+    "ব",
+    "ভ",
+    "ম",
+    "য",
+    "য়",
+    "র",
+    "ল",
+    "ৱ",
+    "শ",
+    "ষ",
+    "স",
+    "হ",
+    "া",
+    "ি",
+    "ী",
+    "ু",
+    "ূ",
+    "ৃ",
+    "ে",
+    "ৈ",
+    "ো",
+    "ৌ",
+    "্"
+  ],
+  "missing_ordinary_letter_names": [
+    "়",
+    "ঁ",
+    "ং",
+    "ঃ",
+    "অ",
+    "আ",
+    "ই",
+    "ঈ",
+    "উ",
+    "ঊ",
+    "ঋ",
+    "এ",
+    "ঐ",
+    "ও",
+    "ঔ",
+    "ক",
+    "খ",
+    "গ",
+    "ঘ",
+    "ঙ",
+    "চ",
+    "ছ",
+    "জ",
+    "ঝ",
+    "ঞ",
+    "ট",
+    "ঠ",
+    "ড",
+    "ড়",
+    "ঢ",
+    "ঢ়",
+    "ণ",
+    "ত",
+    "থ",
+    "দ",
+    "ধ",
+    "ন",
+    "প",
+    "ফ",
+    "ব",
+    "ভ",
+    "ম",
+    "য",
+    "য়",
+    "র",
+    "ল",
+    "ৱ",
+    "শ",
+    "ষ",
+    "স",
+    "হ",
+    "া",
+    "ি",
+    "ী",
+    "ু",
+    "ূ",
+    "ৃ",
+    "ে",
+    "ৈ",
+    "ো",
+    "ৌ",
+    "্"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "mni",
+      "lookup_text": "‾",
+      "aliases": [
+        "ওভরলাইন"
+      ],
+      "text": "ওভরলাইন",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "mni",
+      "lookup_text": "‽",
+      "aliases": [
+        "ইন্টরোবাং"
+      ],
+      "text": "ইন্টরোবাং",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "mni",
+      "lookup_text": "‸",
+      "aliases": [
+        "কেরেট"
+      ],
+      "text": "কেরেট",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "mni",
+      "lookup_text": "⁂",
+      "aliases": [
+        "অষ্টরিজম"
+      ],
+      "text": "অষ্টরিজম",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "mni",
+      "lookup_text": "|",
+      "aliases": [
+        "চপয়ুংবা লৈই"
+      ],
+      "text": "চপয়ুংবা লৈই",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "mni",
+      "lookup_text": "~",
+      "aliases": [
+        "টিল্ডু"
+      ],
+      "text": "টিল্ডু",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {},
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

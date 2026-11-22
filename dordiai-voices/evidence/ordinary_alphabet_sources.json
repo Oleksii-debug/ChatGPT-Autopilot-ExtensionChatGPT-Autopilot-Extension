@@ -1,0 +1,80 @@
+{
+  "scope": "Source-backed ordinary alphabet names; full speech quality and NVDA typing acceptance remain open.",
+  "curation_file": "tools/character_name_overrides.json",
+  "regenerate": "python tools/prepare_character_names.py",
+  "probe": "python tools/probe_native_character_names.py --onnxruntime-root VERIFIED_ORT127_DIRECTORY",
+  "languages": {
+    "rm": {
+      "ordinary_names": 26,
+      "source_complete": true,
+      "source": {
+        "url": "https://scienzarumantscha-darms.ch/wp-content/uploads/2016/12/Gramminstr09.pdf",
+        "sha256": "5654a3dae0414ea6727e45d6a754be375ef437204140d7ff94e49b365905e6ad",
+        "sha256_scope": "original PDF bytes",
+        "title": "Grammatica per l’instrucziun dal rumantsch grischun, corrected edition 2009",
+        "author": "Renzo Caduff, Uorschla N. Caprez, Georges Darms; Seminari da rumantsch, Universitad da Friburg",
+        "location": "§296, printed page 116 / PDF page 116; reuse notice printed page 2",
+        "role": "Explicit ordinary alphabet letter names, including loan-only k/w/y; first listed alternative chosen for j/y",
+        "short_quote": "Ils nums da las letras èn masculins",
+        "license_note": "Source p2 permits use of portions with source attribution; only factual name mappings transcribed, original PDF not redistributed",
+        "native_pronunciation_verified": false
+      },
+      "native_carrier_vocabulary_errors": "Omni tokenizer is subword-capable; three actual name PCM probes only, no whole-alphabet pronunciation claim",
+      "real_pcm_probes": 3,
+      "typing_ready": false
+    },
+    "ha": {
+      "ordinary_names": 28,
+      "source_complete": true,
+      "source": {
+        "url": "https://jblmflc.com/Hausa/Hausa%20PDF/Introduction%20to%20Hausa.pdf",
+        "sha256": "5393aae9fa003fc8de5ae8acc389dd24286061af69f47a1ecbd168970783a976",
+        "sha256_scope": "original PDF bytes",
+        "title": "Hausa Familiarization Course — Introduction",
+        "author": "Joint Base Lewis-McChord Foreign Language Center (hosting course publisher)",
+        "location": "Alphabet table, printed pages 11–12 / PDF pages 11–12",
+        "role": "Explicit Name of Letter in Hausa column; ordinary Boko letters and documented sh/ts digraphs",
+        "short_quote": "Name of Letter in Hausa",
+        "license_note": "Individual factual names transcribed with attribution; course PDF and teaching prose not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "native_carrier_vocabulary_errors": {
+        "ƴ": "Unsupported native graphemes for ha: U+01B4"
+      },
+      "real_pcm_probes": 3,
+      "typing_ready": false
+    },
+    "ay": {
+      "ordinary_names": 31,
+      "source_complete": false,
+      "source": {
+        "url": "https://www.ilcanet.org/ciberaymara/contexto/",
+        "sha256": "5e90a2dabdd65c4aa02760a13ecf709884d92e504eec5439e4a4403ddb97aeeb",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "Ciberaymara — Contexto — El alfabeto aymara",
+        "author": "Instituto de Lengua y Cultura Aymara (ILCA); course register based on INEL/SENALEP and Juan de Dios Yapita",
+        "location": "Escritura, §3 El alfabeto aymara, NOMBRE DE LA LETRA table",
+        "role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+        "short_quote": "NOMBRE DE LA LETRA",
+        "license_note": "Individual factual names transcribed with attribution; original page/teaching prose not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "native_carrier_vocabulary_errors": {},
+      "real_pcm_probes": 3,
+      "typing_ready": false
+    },
+    "fil": {
+      "status": "Primary complete28-name KWF table identified; original byte retrieval403 blocked; no unchecked names/hash added to runtime",
+      "primary_sources": [
+        "https://kwf.gov.ph/wp-content/uploads/Ortograpiyang_Pambansa_1.pdf",
+        "https://kwf.gov.ph/wp-content/uploads/MMP_Full.pdf",
+        "https://www.deped.gov.ph/wp-content/uploads/2013/08/DO_s2013_034.pdf"
+      ],
+      "ordinary_names_added": 0
+    },
+    "nd": {
+      "status": "Ordinary-name primary source table not established; available CLDR alphabet glyphs and letter sounds are not ordinary names",
+      "ordinary_names_added": 0
+    }
+  }
+}

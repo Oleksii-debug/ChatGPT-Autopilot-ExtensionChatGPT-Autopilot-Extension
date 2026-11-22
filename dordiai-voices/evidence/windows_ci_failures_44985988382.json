@@ -70,7 +70,7 @@
       ],
       "error": "Expected ValueError was not raised",
       "cause": "ZipInfo constructor normalized the backslash to a slash when the fixture was built on Windows.",
-      "fix": "Set the raw ZipInfo.filename after construction so extraction sees the actual prohibited backslash; production rejection remains unchanged."
+      "fix": "Initial fixture fix sets raw ZipInfo.filename after construction. Follow-up run44986685686 exposed a second normalization while reading on Windows; the final fix validates ZipInfo.orig_filename in all archive validators. See windows_ci_failures_44986685686.json."
     }
   ],
   "local_validation": {
@@ -96,5 +96,6 @@
   },
   "windows_rerun_after_fixes": "not_yet_observed",
   "windows_engine_model_tests_in_failed_run": "not_executed; blocked by unit-test failure",
-  "nvda_audio_verification_in_failed_run": "not_executed"
+  "nvda_audio_verification_in_failed_run": "not_executed",
+  "follow_up": "Run44986685686: Linux unit tests passed; Windows retained one raw-ZIP-name failure, subsequently fixed. Actual Windows speech/NVDA probes had not executed in either failed run."
 }

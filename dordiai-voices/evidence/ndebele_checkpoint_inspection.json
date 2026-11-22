@@ -1,0 +1,26 @@
+{
+  "status": "safe-tensor-checkpoint-inspected",
+  "safety": {
+    "weights_only": true,
+    "mmap": true,
+    "unsafe_pickle_globals": [],
+    "checkpoint_top_keys": [
+      "config",
+      "date",
+      "epoch",
+      "model",
+      "model_loss",
+      "optimizer",
+      "scaler",
+      "step"
+    ],
+    "model_tensor_count": 949
+  },
+  "speaker_embedding_shape": null,
+  "text_embedding_shape": [
+    59,
+    192
+  ],
+  "discriminator_tensors": 111,
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41"
+}

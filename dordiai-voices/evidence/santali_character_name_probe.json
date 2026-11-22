@@ -1,0 +1,109 @@
+{
+  "scope": "source-name-front-end-and-real-native-model-PCM-only",
+  "language": "sat",
+  "onnxruntime": "1.27.0",
+  "records": [
+    {
+      "glyph": "‾",
+      "source_kind": "CLDR_symbol_name",
+      "native_source_name": "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ",
+      "phoneme_ids": 22,
+      "samples": 20736,
+      "finite": true,
+      "peak": 0.2427535057067871,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "‽",
+      "source_kind": "CLDR_symbol_name",
+      "native_source_name": "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ",
+      "phoneme_ids": 22,
+      "samples": 18176,
+      "finite": true,
+      "peak": 0.3036480247974396,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "‸",
+      "source_kind": "CLDR_symbol_name",
+      "native_source_name": "ᱠᱮᱨᱮᱴ",
+      "phoneme_ids": 12,
+      "samples": 13824,
+      "finite": true,
+      "peak": 0.18386472761631012,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "⁂",
+      "source_kind": "CLDR_symbol_name",
+      "native_source_name": "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ",
+      "phoneme_ids": 18,
+      "samples": 19456,
+      "finite": true,
+      "peak": 0.31829094886779785,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "ᱸ",
+      "source_kind": "explicit_primary_modifier_name",
+      "native_source_name": "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ",
+      "phoneme_ids": 18,
+      "samples": 17408,
+      "finite": true,
+      "peak": 0.3141884505748749,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "ᱹ",
+      "source_kind": "explicit_primary_modifier_name",
+      "native_source_name": "ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+      "phoneme_ids": 24,
+      "samples": 20992,
+      "finite": true,
+      "peak": 0.4650592505931854,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "ᱺ",
+      "source_kind": "explicit_primary_modifier_name",
+      "native_source_name": "ᱢᱩᱸ ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+      "phoneme_ids": 30,
+      "samples": 36096,
+      "finite": true,
+      "peak": 0.37015652656555176,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "ᱻ",
+      "source_kind": "explicit_primary_modifier_name",
+      "native_source_name": "ᱨᱮᱞᱟ",
+      "phoneme_ids": 10,
+      "samples": 12544,
+      "finite": true,
+      "peak": 0.1782863885164261,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "ᱼ",
+      "source_kind": "explicit_primary_modifier_name",
+      "native_source_name": "ᱯᱷᱟᱨᱠᱟ",
+      "phoneme_ids": 12,
+      "samples": 13568,
+      "finite": true,
+      "peak": 0.22588016092777252,
+      "pronunciation_verified": false
+    },
+    {
+      "glyph": "ᱽ",
+      "source_kind": "explicit_primary_modifier_name",
+      "native_source_name": "ᱚᱦᱚᱫ",
+      "phoneme_ids": 10,
+      "samples": 7168,
+      "finite": true,
+      "peak": 0.2165651172399521,
+      "pronunciation_verified": false
+    }
+  ],
+  "full_alphabet_names_ready": false,
+  "nvda_latency_accepted": false
+}

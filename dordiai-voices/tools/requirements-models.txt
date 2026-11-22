@@ -1,0 +1,8 @@
+# Local model preparation and ONNX validation; no Torch is needed.
+# ORT 1.27 wheel was checked for absence of the OneCollector implementation.
+numpy==2.3.5
+onnxruntime==1.27.0
+onnx==1.23.2
+soundfile==0.14.0
+scipy==1.18.1
+tokenizers==0.23.1

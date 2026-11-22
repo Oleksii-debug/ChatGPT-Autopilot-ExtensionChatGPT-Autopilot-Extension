@@ -6,6 +6,8 @@
   "summary": {
     "selected_catalogue_entries": 135,
     "registered_with_resources_present": 83,
+    "complete_selected_entries_with_resources": 83,
+    "partial_variant_resources_present": 0,
     "registered_with_missing_resources": 0,
     "not_registered": 52,
     "windows_audio_verified": 0,
@@ -83,6 +85,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Англійська",
       "windows_audio_verified": false
     },
     {
@@ -99,6 +102,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Російська",
       "windows_audio_verified": false
     },
     {
@@ -114,6 +118,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Німецька",
       "windows_audio_verified": false
     },
     {
@@ -132,6 +137,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Французька",
       "windows_audio_verified": false
     },
     {
@@ -147,6 +153,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Італійська",
       "windows_audio_verified": false
     },
     {
@@ -164,6 +171,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Іспанська",
       "windows_audio_verified": false
     },
     {
@@ -179,6 +187,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Польська",
       "windows_audio_verified": false
     },
     {
@@ -194,6 +203,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Українська",
       "windows_audio_verified": false
     },
     {
@@ -209,6 +219,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Румунська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -225,6 +271,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Нідерландська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -243,6 +325,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Португальська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -258,6 +376,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Грецька",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -273,6 +427,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Чеська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -288,6 +478,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Угорська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -303,6 +529,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Шведська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -318,6 +580,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Сербська",
       "windows_audio_verified": false
     },
     {
@@ -333,6 +596,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Болгарська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -348,6 +647,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Албанська",
       "windows_audio_verified": false
     },
     {
@@ -363,6 +663,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Хорватська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -378,6 +714,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Каталонська",
       "windows_audio_verified": false
     },
     {
@@ -393,6 +730,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Данська",
       "windows_audio_verified": false
     },
     {
@@ -408,6 +746,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Фінська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -423,6 +797,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Словацька",
       "windows_audio_verified": false
     },
     {
@@ -438,6 +813,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Норвезька",
       "windows_audio_verified": false
     },
     {
@@ -453,6 +829,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Литовська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -468,6 +880,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Боснійська",
       "windows_audio_verified": false
     },
     {
@@ -483,6 +896,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Словенська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -498,6 +947,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Македонська",
       "windows_audio_verified": false
     },
     {
@@ -513,6 +963,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Латиська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -528,6 +1014,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Естонська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -543,6 +1065,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Ірландська",
       "windows_audio_verified": false
     },
     {
@@ -558,6 +1081,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Чорногорська",
       "windows_audio_verified": false
     },
     {
@@ -573,6 +1097,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Люксембурзька",
       "windows_audio_verified": false
     },
     {
@@ -588,6 +1113,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Мальтійська",
       "windows_audio_verified": false
     },
     {
@@ -603,6 +1129,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Ісландська",
       "windows_audio_verified": false
     },
     {
@@ -618,6 +1145,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Ретороманська",
       "windows_audio_verified": false
     },
     {
@@ -633,6 +1161,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Латинська",
       "windows_audio_verified": false
     },
     {
@@ -648,6 +1177,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Гаїтянська креольська",
       "windows_audio_verified": false
     },
     {
@@ -663,6 +1193,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Кечуа",
       "windows_audio_verified": false
     },
     {
@@ -678,6 +1209,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Гуарані",
       "windows_audio_verified": false
     },
     {
@@ -693,6 +1225,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Аймара",
       "windows_audio_verified": false
     },
     {
@@ -708,6 +1241,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Ітонама",
       "windows_audio_verified": false
     },
     {
@@ -723,6 +1257,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Китайська — стандартна мандаринська",
       "windows_audio_verified": false
     },
     {
@@ -738,6 +1273,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Гінді",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -754,6 +1325,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Арабська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -769,6 +1376,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Бенгальська",
       "windows_audio_verified": false
     },
     {
@@ -784,6 +1392,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Урду",
       "windows_audio_verified": false
     },
     {
@@ -799,6 +1408,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Індонезійська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -814,6 +1459,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Японська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -829,6 +1510,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Панджабі",
       "windows_audio_verified": false
     },
     {
@@ -844,6 +1526,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Маратхі",
       "windows_audio_verified": false
     },
     {
@@ -859,6 +1542,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Телугу",
       "windows_audio_verified": false
     },
     {
@@ -874,6 +1558,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Турецька",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -889,6 +1609,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Тамільська",
       "windows_audio_verified": false
     },
     {
@@ -904,6 +1625,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "В’єтнамська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -919,6 +1676,42 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Корейська",
+      "capabilities": {
+        "languages": [
+          "en",
+          "ko",
+          "ja",
+          "ar",
+          "bg",
+          "cs",
+          "da",
+          "de",
+          "el",
+          "es",
+          "et",
+          "fi",
+          "fr",
+          "hi",
+          "hr",
+          "hu",
+          "id",
+          "it",
+          "lt",
+          "lv",
+          "nl",
+          "pl",
+          "pt",
+          "ro",
+          "ru",
+          "sk",
+          "sl",
+          "sv",
+          "tr",
+          "uk",
+          "vi"
+        ]
+      },
       "windows_audio_verified": false
     },
     {
@@ -934,6 +1727,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Перська, включно з дарі без окремого підрахунку",
       "windows_audio_verified": false
     },
     {
@@ -949,6 +1743,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Тайська",
       "windows_audio_verified": false
     },
     {
@@ -964,6 +1759,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Гуджараті",
       "windows_audio_verified": false
     },
     {
@@ -979,6 +1775,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Каннада",
       "windows_audio_verified": false
     },
     {
@@ -994,6 +1791,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Малайська",
       "windows_audio_verified": false
     },
     {
@@ -1009,6 +1807,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Бірманська",
       "windows_audio_verified": false
     },
     {
@@ -1024,6 +1823,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Малаялам",
       "windows_audio_verified": false
     },
     {
@@ -1039,6 +1839,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Філіппінська — стандарт на тагальській основі",
       "windows_audio_verified": false
     },
     {
@@ -1054,6 +1855,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Одія",
       "windows_audio_verified": false
     },
     {
@@ -1069,6 +1871,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Пушту",
       "windows_audio_verified": false
     },
     {
@@ -1084,6 +1887,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Узбецька",
       "windows_audio_verified": false
     },
     {
@@ -1099,6 +1903,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Синдхі",
       "windows_audio_verified": false
     },
     {
@@ -1114,6 +1919,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Непальська",
       "windows_audio_verified": false
     },
     {
@@ -1129,6 +1935,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Курдська",
       "windows_audio_verified": false
     },
     {
@@ -1144,6 +1951,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Сингальська",
       "windows_audio_verified": false
     },
     {
@@ -1159,6 +1967,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Асамська",
       "windows_audio_verified": false
     },
     {
@@ -1174,6 +1983,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Азербайджанська",
       "windows_audio_verified": false
     },
     {
@@ -1189,6 +1999,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Казахська",
       "windows_audio_verified": false
     },
     {
@@ -1204,6 +2015,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Кхмерська",
       "windows_audio_verified": false
     },
     {
@@ -1219,6 +2031,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Таджицька",
       "windows_audio_verified": false
     },
     {
@@ -1234,6 +2047,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Іврит",
       "windows_audio_verified": false
     },
     {
@@ -1249,6 +2063,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Лаоська",
       "windows_audio_verified": false
     },
     {
@@ -1264,6 +2079,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Майтілі",
       "windows_audio_verified": false
     },
     {
@@ -1279,6 +2095,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Санталі",
       "windows_audio_verified": false
     },
     {
@@ -1294,6 +2111,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Кашмірська",
       "windows_audio_verified": false
     },
     {
@@ -1309,6 +2127,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Вірменська",
       "windows_audio_verified": false
     },
     {
@@ -1324,6 +2143,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Туркменська",
       "windows_audio_verified": false
     },
     {
@@ -1339,6 +2159,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Киргизька",
       "windows_audio_verified": false
     },
     {
@@ -1354,6 +2175,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Грузинська",
       "windows_audio_verified": false
     },
     {
@@ -1369,6 +2191,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Монгольська",
       "windows_audio_verified": false
     },
     {
@@ -1384,6 +2207,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Конкані",
       "windows_audio_verified": false
     },
     {
@@ -1399,6 +2223,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Догрі",
       "windows_audio_verified": false
     },
     {
@@ -1414,6 +2239,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Маніпурі, або мейтей",
       "windows_audio_verified": false
     },
     {
@@ -1429,6 +2255,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Бодо",
       "windows_audio_verified": false
     },
     {
@@ -1444,6 +2271,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Дівехі",
       "windows_audio_verified": false
     },
     {
@@ -1459,6 +2287,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Дзонг-кха",
       "windows_audio_verified": false
     },
     {
@@ -1474,6 +2303,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Тетум",
       "windows_audio_verified": false
     },
     {
@@ -1489,6 +2319,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Суахілі",
       "windows_audio_verified": false
     },
     {
@@ -1504,6 +2335,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Хауса",
       "windows_audio_verified": false
     },
     {
@@ -1519,6 +2351,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Амхарська",
       "windows_audio_verified": false
     },
     {
@@ -1534,6 +2367,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Оромо",
       "windows_audio_verified": false
     },
     {
@@ -1549,6 +2383,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Йоруба",
       "windows_audio_verified": false
     },
     {
@@ -1564,6 +2399,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Фула, або фульфульде",
       "windows_audio_verified": false
     },
     {
@@ -1579,6 +2415,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Ігбо",
       "windows_audio_verified": false
     },
     {
@@ -1594,6 +2431,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Малагасійська",
       "windows_audio_verified": false
     },
     {
@@ -1609,6 +2447,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Сомалійська",
       "windows_audio_verified": false
     },
     {
@@ -1624,6 +2463,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Лінгала",
       "windows_audio_verified": false
     },
     {
@@ -1639,6 +2479,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Зулу",
       "windows_audio_verified": false
     },
     {
@@ -1654,6 +2495,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Шона",
       "windows_audio_verified": false
     },
     {
@@ -1669,6 +2511,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Кіньяруанда",
       "windows_audio_verified": false
     },
     {
@@ -1684,6 +2527,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Кірунді",
       "windows_audio_verified": false
     },
     {
@@ -1699,6 +2543,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Чичева, або чева",
       "windows_audio_verified": false
     },
     {
@@ -1714,6 +2559,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Коса",
       "windows_audio_verified": false
     },
     {
@@ -1729,6 +2575,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Акан",
       "windows_audio_verified": false
     },
     {
@@ -1744,6 +2591,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Бамбара",
       "windows_audio_verified": false
     },
     {
@@ -1759,6 +2607,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Діула",
       "windows_audio_verified": false
     },
     {
@@ -1774,6 +2623,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Мооре, або моссі",
       "windows_audio_verified": false
     },
     {
@@ -1789,6 +2639,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Волоф",
       "windows_audio_verified": false
     },
     {
@@ -1804,6 +2655,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Африкаанс",
       "windows_audio_verified": false
     },
     {
@@ -1819,6 +2671,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Тигринья",
       "windows_audio_verified": false
     },
     {
@@ -1828,12 +2681,16 @@
         "Африка"
       ],
       "first_priority_region": "Африка",
-      "runtime_code": "tamazight",
+      "runtime_code": "kab",
+      "display_name_uk": "Кабільська (берберська; Алжир)",
+      "partial_variant": true,
+      "standard_note": "Only an explicit Kabyle variant of the broad selected Berber group; not Standard Moroccan Tamazight (zgh/tzm).",
       "registered": false,
       "backend": "not-registered",
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Кабільська (берберська; Алжир)",
       "windows_audio_verified": false
     },
     {
@@ -1849,6 +2706,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Сесото",
       "windows_audio_verified": false
     },
     {
@@ -1864,6 +2722,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Тсвана",
       "windows_audio_verified": false
     },
     {
@@ -1879,6 +2738,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Північна сото, або сепеді",
       "windows_audio_verified": false
     },
     {
@@ -1894,6 +2754,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Тсонга",
       "windows_audio_verified": false
     },
     {
@@ -1909,6 +2770,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Сісваті",
       "windows_audio_verified": false
     },
     {
@@ -1924,6 +2786,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Венда",
       "windows_audio_verified": false
     },
     {
@@ -1939,6 +2802,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Північна ндебеле",
       "windows_audio_verified": false
     },
     {
@@ -1954,6 +2818,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Південна ндебеле",
       "windows_audio_verified": false
     },
     {
@@ -1969,6 +2834,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Афарська",
       "windows_audio_verified": false
     },
     {
@@ -1984,6 +2850,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Санго",
       "windows_audio_verified": false
     },
     {
@@ -1999,6 +2866,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Коморська",
       "windows_audio_verified": false
     },
     {
@@ -2014,6 +2882,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Ток-пісін",
       "windows_audio_verified": false
     },
     {
@@ -2029,6 +2898,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Самоанська",
       "windows_audio_verified": false
     },
     {
@@ -2044,6 +2914,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Фіджійська",
       "windows_audio_verified": false
     },
     {
@@ -2059,6 +2930,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Тонганська",
       "windows_audio_verified": false
     },
     {
@@ -2074,6 +2946,7 @@
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
+      "settings_label_uk": "Маорі",
       "windows_audio_verified": false
     },
     {
@@ -2089,6 +2962,7 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Гілбертська, або кірибаті",
       "windows_audio_verified": false
     },
     {
@@ -2104,14 +2978,15 @@
       "resources_present": false,
       "status": "not-registered",
       "missing_resources": [],
+      "settings_label_uk": "Хірі-моту",
       "windows_audio_verified": false
     }
   ],
   "scope_notes_uk": [
     "135 пунктів є вибраним каталогом, а не 135 доведеними акустичними можливостями.",
-    "83 позитивні записи — наявні зареєстровані файли; вимову, запуск Windows/NVDA й затримки цей аудит не перевіряє.",
+    "83 позитивних записів — наявні зареєстровані файли; вимову, запуск Windows/NVDA й затримки цей аудит не перевіряє.",
     "Норвезьку зіставлено з nb; існуючий nn залишається окремим необов’язковим варіантом ресурсу, а не додатковою вибраною мовою.",
-    "Коморська і Тамазигхт — групові назви; до підбору моделей потрібно визначити точний стандарт.",
+    "Коморська і Тамазигхт — групові назви. Кабільський ресурс позначається власним кодом kab і частковим варіантом вибраної берберської групи; це не стандартна марокканська тамазигхт (zgh/tzm).",
     "Для групових записів на кшталт кечуа, фула чи курдської потрібна перевірка конкретного стандарту: один готовий ресурс не доводить покриття всіх різновидів.",
     "Мандаринську не замінено всіма китайськими мовами; філіппінську та чорногорську не підмінено іншими ресурсами через близькість назв.",
     "Наявні 38 записів поза вибором не збільшують виконання цільового каталогу."

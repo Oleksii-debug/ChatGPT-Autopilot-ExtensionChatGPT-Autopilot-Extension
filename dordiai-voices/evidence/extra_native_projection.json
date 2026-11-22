@@ -1,0 +1,66 @@
+{
+  "scope": "Registered extra-onnx carriers through production WideVoices projection with actual original OpenVoice flow+decoder and actual selected Viktoriia profile; converter session/level methods mirror NativeLocale without importing unrelated unavailable Linux Piper frontend",
+  "onnxruntime": "1.27.0",
+  "windows_nvda_verified": false,
+  "native_pronunciation_verified": false,
+  "samples": {
+    "st": {
+      "backend": "extra-onnx",
+      "samples": 83277,
+      "seconds": 3.469875,
+      "finite": true,
+      "peak": 0.16810524463653564,
+      "elapsed_seconds": 6.022689579000144,
+      "real_time_factor": 1.735707937317668,
+      "selected_voice": "viktoriia",
+      "fallback_espeak_loaded": false
+    },
+    "xh": {
+      "backend": "extra-onnx",
+      "samples": 37147,
+      "seconds": 1.5477916666666667,
+      "finite": true,
+      "peak": 0.28402140736579895,
+      "elapsed_seconds": 2.2899996340001962,
+      "real_time_factor": 1.4795270470294966,
+      "selected_voice": "viktoriia",
+      "fallback_espeak_loaded": false
+    },
+    "ig": {
+      "backend": "extra-onnx",
+      "samples": 47672,
+      "seconds": 1.9863333333333333,
+      "finite": true,
+      "peak": 0.2204439640045166,
+      "elapsed_seconds": 2.297637575000408,
+      "real_time_factor": 1.1567230617555335,
+      "selected_voice": "viktoriia",
+      "fallback_espeak_loaded": false
+    },
+    "ln": {
+      "backend": "extra-onnx",
+      "samples": 40418,
+      "seconds": 1.6840833333333334,
+      "finite": true,
+      "peak": 0.9799999594688416,
+      "elapsed_seconds": 2.3913420270000643,
+      "real_time_factor": 1.419966565589627,
+      "selected_voice": "viktoriia",
+      "fallback_espeak_loaded": false
+    },
+    "nd": {
+      "backend": "extra-onnx",
+      "text": "Sawubona. Unjani?",
+      "samples": 58476,
+      "seconds": 2.4365,
+      "finite": true,
+      "peak": 0.9800000190734863,
+      "elapsed_seconds": 4.4086939099997835,
+      "real_time_factor": 1.8094372706750599,
+      "selected_voice": "viktoriia",
+      "fallback_espeak_loaded": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    }
+  }
+}

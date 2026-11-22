@@ -29,7 +29,7 @@ class GenericResourcePackTests(unittest.TestCase):
         self.assertEqual(result["sha256"], builder.create_resource_pack(self.source, second, **self.options)["sha256"])
         addon = self.root / "addon"
         addon.mkdir()
-        (addon / "manifest.ini").write_text('version = "0.13.0-dev.1"\n')
+        (addon / "manifest.ini").write_text('version = "' + builder.VERSION + '"\n')
         builder.manager.install_pack(archive, addon)
         self.assertEqual((addon / self.options["prefix"] / "lexicon.json").read_text(), '{"inna":"a language word"}')
         builder.manager.uninstall_pack("language-demo", addon)
@@ -45,6 +45,26 @@ class GenericResourcePackTests(unittest.TestCase):
     def test_output_cannot_be_included_in_its_own_payload(self):
         with self.assertRaises(ValueError):
             builder.create_resource_pack(self.source, self.source / "archive.zip", **self.options)
+
+    def test_provenance_metadata_preserved_but_cannot_override_files(self):
+        archive = self.root / "language.zip"
+        builder.create_resource_pack(self.source, archive, **self.options,
+                                     metadata_extra={"experimental": True, "license": "CC0-1.0"})
+        metadata = builder.manager.inspect_pack(archive)
+        self.assertTrue(metadata["experimental"])
+        self.assertEqual(metadata["license"], "CC0-1.0")
+        with self.assertRaises(ValueError):
+            builder.create_resource_pack(self.source, self.root / "bad.zip", **self.options, metadata_extra={"files": {}})
+
+    def test_exact_dependency_metadata_is_preserved_and_validated(self):
+        archive = self.root / "reference.zip"
+        builder.create_resource_pack(self.source, archive, **self.options,
+                                     dependencies=["shared"], dependency_versions={"shared": "1.0.0"})
+        metadata = builder.manager.inspect_pack(archive)
+        self.assertEqual(metadata["dependency_versions"], {"shared": "1.0.0"})
+        with self.assertRaises(ValueError):
+            builder.create_resource_pack(self.source, self.root / "bad.zip", **self.options,
+                                         dependency_versions={"not-declared": "1.0.0"})
 
 
 if __name__ == "__main__":

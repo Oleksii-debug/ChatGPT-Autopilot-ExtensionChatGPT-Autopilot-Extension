@@ -1,0 +1,168 @@
+{
+  "scope": "LinuxCPU-only-not-NVDA-not-audible-latency",
+  "onnxruntime": "1.27.0",
+  "thread_benchmarks": [
+    {
+      "threads": 1,
+      "spinning": false,
+      "warm_forward_seconds": [
+        0.7713927799995872,
+        0.7799423069991462,
+        0.7816951370004972
+      ],
+      "median_seconds": 0.7799423069991462,
+      "finite_logits": true
+    },
+    {
+      "threads": 1,
+      "spinning": true,
+      "warm_forward_seconds": [
+        0.7758078980004939,
+        0.7847665030003554,
+        0.7578781240008539
+      ],
+      "median_seconds": 0.7758078980004939,
+      "finite_logits": true
+    },
+    {
+      "threads": 3,
+      "spinning": false,
+      "warm_forward_seconds": [
+        0.5643842080007744,
+        0.5786419220003154,
+        0.5526685450004152
+      ],
+      "median_seconds": 0.5643842080007744,
+      "finite_logits": true
+    },
+    {
+      "threads": 3,
+      "spinning": true,
+      "warm_forward_seconds": [
+        0.5162243119993946,
+        0.5182241980000981,
+        0.5048446279997734
+      ],
+      "median_seconds": 0.5162243119993946,
+      "finite_logits": true
+    },
+    {
+      "threads": 6,
+      "spinning": false,
+      "warm_forward_seconds": [
+        0.3873394610000105,
+        0.38437549700029194,
+        0.4069586369987519
+      ],
+      "median_seconds": 0.3873394610000105,
+      "finite_logits": true
+    },
+    {
+      "threads": 6,
+      "spinning": true,
+      "warm_forward_seconds": [
+        0.3206925060003414,
+        0.3247448900001473,
+        0.3204044199992495
+      ],
+      "median_seconds": 0.3206925060003414,
+      "finite_logits": true
+    }
+  ],
+  "clips": [
+    {
+      "steps": 32,
+      "split": false,
+      "seconds": 11.97437334999995,
+      "audio_seconds": 1.44,
+      "rtf": 8.315537048611077,
+      "masked_code_nll": 2.573901414871216,
+      "masked_code_top1_accuracy": 0.5454545454545454,
+      "adjacent_codec_repetition": 0.08928571428571429,
+      "pcm_rms": 0.07160467654466629,
+      "near_clipping_fraction": 0.0,
+      "near_silence_fraction": 0.07673611111111112,
+      "peak": 0.6463137269020081,
+      "human_quality_accepted": false
+    },
+    {
+      "steps": 8,
+      "split": false,
+      "seconds": 3.401445004999914,
+      "audio_seconds": 1.44,
+      "rtf": 2.362114586805496,
+      "masked_code_nll": 3.4646997451782227,
+      "masked_code_top1_accuracy": 0.34545454545454546,
+      "adjacent_codec_repetition": 0.11785714285714285,
+      "pcm_rms": 0.0842081755399704,
+      "near_clipping_fraction": 0.0,
+      "near_silence_fraction": 0.09016203703703704,
+      "peak": 0.7636052370071411,
+      "human_quality_accepted": false
+    },
+    {
+      "steps": 4,
+      "split": false,
+      "seconds": 1.9265110370015464,
+      "audio_seconds": 1.44,
+      "rtf": 1.3378548868066296,
+      "masked_code_nll": 4.842416286468506,
+      "masked_code_top1_accuracy": 0.21818181818181817,
+      "adjacent_codec_repetition": 0.17857142857142858,
+      "pcm_rms": 0.07156708091497421,
+      "near_clipping_fraction": 0.0,
+      "near_silence_fraction": 0.0881076388888889,
+      "peak": 0.4799138307571411,
+      "human_quality_accepted": false
+    },
+    {
+      "steps": 8,
+      "split": true,
+      "seconds": 2.8595739440006582,
+      "audio_seconds": 1.44,
+      "rtf": 1.985815238889346,
+      "masked_code_nll": 2.6271259784698486,
+      "masked_code_top1_accuracy": 0.43636363636363634,
+      "adjacent_codec_repetition": 0.10714285714285714,
+      "pcm_rms": 0.07772140204906464,
+      "near_clipping_fraction": 0.0,
+      "near_silence_fraction": 0.19644097222222223,
+      "peak": 0.8084555268287659,
+      "human_quality_accepted": false
+    },
+    {
+      "steps": 4,
+      "split": true,
+      "seconds": 1.6099183700007416,
+      "audio_seconds": 1.44,
+      "rtf": 1.1179988680560706,
+      "masked_code_nll": 5.4332380294799805,
+      "masked_code_top1_accuracy": 0.2,
+      "adjacent_codec_repetition": 0.15714285714285714,
+      "pcm_rms": 0.04330013692378998,
+      "near_clipping_fraction": 0.0,
+      "near_silence_fraction": 0.09971064814814815,
+      "peak": 0.4569348692893982,
+      "human_quality_accepted": false
+    }
+  ],
+  "pronunciation_accepted": false,
+  "proxy_limit": "Masked-code self-consistency measures this model's reconstruction of its own outputs, not linguistic correctness or human perceived quality.",
+  "measured_best_thread_configuration": {
+    "threads": 6,
+    "spinning": true,
+    "warm_forward_seconds": [
+      0.3206925060003414,
+      0.3247448900001473,
+      0.3204044199992495
+    ],
+    "median_seconds": 0.3206925060003414,
+    "finite_logits": true
+  },
+  "baseline_vs_thread_optimized_pcm16": {
+    "files_equal": true,
+    "baseline_sha256": "8ef71db22e23295738d5e8a29f4ba178f359286c9b5194abf6d61588276f2540",
+    "thread_optimized_sha256": "8ef71db22e23295738d5e8a29f4ba178f359286c9b5194abf6d61588276f2540",
+    "scope": "one Romansh phrase probe; not a general bit-equivalence or human quality acceptance"
+  }
+}

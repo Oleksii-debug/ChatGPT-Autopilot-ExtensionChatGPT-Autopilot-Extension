@@ -166,7 +166,7 @@ def language_code(value, fallback, english):
     code = (value or "").lower().replace("_", "-")
     if code in ("en-gb", "en-us"):
         return code[:3] + code[3:].upper()
-    base = code.split("-", 1)[0]
+    base = _prefs.language_key(code)
     return base if base in _latin.EXTRA else {"en": english, "uk": "uk", "ru": "ru"}.get(base, fallback)
 
 
@@ -939,12 +939,43 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         else:
             self._engine=SpeechWorker(python,RUNTIME/'nvda_worker.py',models,reference_config,'uk' if separate else 'mixed')
         self._english_engine = SpeechWorker(python, RUNTIME / "nvda_worker.py", models, reference_config, "en") if separate else None
-        from synthDrivers import _sonic
-        _sonic.initialize()
-        self._player = nvwave.WavePlayer(1, SAMPLE_RATE, 16, outputDevice=config.conf["audio"]["outputDevice"])
-        self._player.enableTrimmingLeadingSilence(False)
+        self._initialize_audio_output()
         self._thread = Thread(target=self._run, daemon=True, name="Diordiai speech")
         self._thread.start()
+
+    def _initialize_audio_output(self):
+        """Audio failure must not leave an unstarted driver owning a worker.
+
+        No rendering thread exists yet. Preserve the original device/Sonic
+        exception; cleanup errors must not hide why NVDA rejected this synth.
+        """
+        self._player=None
+        try:
+            from synthDrivers import _sonic
+            _sonic.initialize()
+            self._player=nvwave.WavePlayer(1,SAMPLE_RATE,16,outputDevice=config.conf["audio"]["outputDevice"])
+            self._player.enableTrimmingLeadingSilence(False)
+        except BaseException:
+            self._closed=True
+            player,self._player=self._player,None
+            lease,self._worker_lease=self._worker_lease,None
+            engine,self._engine=self._engine,None
+            english,self._english_engine=self._english_engine,None
+            cleanup=[]
+            if player is not None:cleanup.append(player.close)
+            if lease is not None:
+                cleanup.append(lambda:release_shared_worker(lease))
+            elif engine is not None:
+                cleanup.append(engine.close)
+            if english is not None and english is not engine:cleanup.append(english.close)
+            for release in cleanup:
+                try:
+                    release()
+                except BaseException:
+                    # All owned resources still get a cleanup attempt; then
+                    # the untouched original exception leaves this constructor.
+                    pass
+            raise
 
 
     def _dordiai_all_voices(self):

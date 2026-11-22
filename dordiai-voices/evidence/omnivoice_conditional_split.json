@@ -1,0 +1,35 @@
+{
+  "onnxruntime": "1.27.0",
+  "parity": {
+    "max_absolute_diff": 0.7353343963623047,
+    "mean_absolute_diff": 0.06464605033397675,
+    "cosine": 0.9999995124540977,
+    "argmax_agreement_conditional": 0.9548611111111112,
+    "batch_seconds": 0.4128109699995548,
+    "split_seconds": 0.28079833400079224,
+    "shape": [
+      2,
+      8,
+      108
+    ]
+  },
+  "clips": [
+    {
+      "split": false,
+      "seconds": 4.646841922000021,
+      "audio_seconds": 1.44,
+      "sha256_float_pcm": "3fbaa828de3e2f5471d63379c97816f1d19eafdf8606c2ecf6be601b9eabf6f1",
+      "peak": 0.7636052370071411
+    },
+    {
+      "split": true,
+      "seconds": 2.4954911500008166,
+      "audio_seconds": 1.44,
+      "sha256_float_pcm": "d0aa61489f5f4fb7eb2856c87f987e4a476b4e88a02e7939029023d86cd57548",
+      "peak": 0.8084555268287659
+    }
+  ],
+  "enabled_by_default": false,
+  "pronunciation_verified": false,
+  "reason": "Global dynamic quantization ranges may change when padding/batch is removed; numerical differences are not silently accepted as equal quality."
+}

@@ -1,0 +1,37 @@
+{
+  "scope": "LinuxCPU-carrier-only-not-NVDA-not-acoustic",
+  "onnxruntime": "1.27.0",
+  "threads": 3,
+  "uncached_generation": [
+    {
+      "steps": 32,
+      "wall_seconds": 22.53328041900022,
+      "audio_seconds": 1.44,
+      "rtf": 15.648111402083487,
+      "peak": 0.6463137269020081,
+      "samples": 34560
+    },
+    {
+      "steps": 8,
+      "wall_seconds": 4.435006005000105,
+      "audio_seconds": 1.44,
+      "rtf": 3.079865281250073,
+      "peak": 0.7636052370071411,
+      "samples": 34560
+    },
+    {
+      "steps": 8,
+      "wall_seconds": 4.768201161001343,
+      "audio_seconds": 1.44,
+      "rtf": 3.311250806250933,
+      "peak": 0.7636052370071411,
+      "samples": 34560
+    }
+  ],
+  "native_carrier_cache_first_seconds": 20.77526994299842,
+  "native_carrier_cache_hit_seconds": 0.00019980999968538526,
+  "cache_pcm_identical": true,
+  "steps32_default_unchanged": true,
+  "pronunciation_verified": false,
+  "latency_accepted": false
+}

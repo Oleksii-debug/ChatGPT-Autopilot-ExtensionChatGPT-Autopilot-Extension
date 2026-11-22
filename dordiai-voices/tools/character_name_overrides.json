@@ -1,0 +1,187 @@
+{
+  "format_version": 1,
+  "languages": {
+    "sat": {
+      "source": {
+        "url": "https://www.unicode.org/L2/L2005/05243r-n2984-ol-chiki.pdf",
+        "sha256": "fb04ec4fa6b390ed9e5e4fc594fe33484ddb33ec548a28540c453326f47019fc",
+        "title": "Final proposal to encode the Ol Chiki script in the UCS, N2984R/L2/05-243R",
+        "author": "Michael Everson",
+        "date": "2005-09-21",
+        "location": "Processing items 1–6, pages 2–3",
+        "role": "Explicit native-script modifier names, transcoded from the proposal’s legacy Ol Chiki font encoding using its code chart",
+        "license_note": "Individual factual names transcribed with attribution; source PDF and embedded fonts are not redistributed",
+        "native_pronunciation_verified": false
+      },
+      "symbol_names": {
+        "ᱸ": "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ",
+        "ᱹ": "ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+        "ᱺ": "ᱢᱩᱸ ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+        "ᱻ": "ᱨᱮᱞᱟ",
+        "ᱼ": "ᱯᱷᱟᱨᱠᱟ",
+        "ᱽ": "ᱚᱦᱚᱫ"
+      },
+      "semantic_role": "modifier_name",
+      "ordinary_alphabet_complete": false
+    },
+    "rm": {
+      "source": {
+        "url": "https://scienzarumantscha-darms.ch/wp-content/uploads/2016/12/Gramminstr09.pdf",
+        "sha256": "5654a3dae0414ea6727e45d6a754be375ef437204140d7ff94e49b365905e6ad",
+        "sha256_scope": "original PDF bytes",
+        "title": "Grammatica per l’instrucziun dal rumantsch grischun, corrected edition 2009",
+        "author": "Renzo Caduff, Uorschla N. Caprez, Georges Darms; Seminari da rumantsch, Universitad da Friburg",
+        "location": "§296, printed page 116 / PDF page 116; reuse notice printed page 2",
+        "role": "Explicit ordinary alphabet letter names, including loan-only k/w/y; first listed alternative chosen for j/y",
+        "short_quote": "Ils nums da las letras èn masculins",
+        "license_note": "Source p2 permits use of portions with source attribution; only factual name mappings transcribed, original PDF not redistributed",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "b": "be",
+        "c": "tse",
+        "d": "de",
+        "e": "e",
+        "f": "ef",
+        "g": "ghe",
+        "h": "ha",
+        "i": "i",
+        "j": "jot",
+        "k": "ka",
+        "l": "el",
+        "m": "em",
+        "n": "en",
+        "o": "o",
+        "p": "pe",
+        "q": "ku",
+        "r": "er",
+        "s": "es",
+        "t": "te",
+        "u": "u",
+        "v": "ve",
+        "w": "ve dubel",
+        "x": "iks",
+        "y": "ipsilon",
+        "z": "tset"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "alternatives": {
+        "j": [
+          "i lung"
+        ],
+        "y": [
+          "i grec"
+        ]
+      }
+    },
+    "ha": {
+      "source": {
+        "url": "https://jblmflc.com/Hausa/Hausa%20PDF/Introduction%20to%20Hausa.pdf",
+        "sha256": "5393aae9fa003fc8de5ae8acc389dd24286061af69f47a1ecbd168970783a976",
+        "sha256_scope": "original PDF bytes",
+        "title": "Hausa Familiarization Course — Introduction",
+        "author": "Joint Base Lewis-McChord Foreign Language Center (hosting course publisher)",
+        "location": "Alphabet table, printed pages 11–12 / PDF pages 11–12",
+        "role": "Explicit Name of Letter in Hausa column; ordinary Boko letters and documented sh/ts digraphs",
+        "short_quote": "Name of Letter in Hausa",
+        "license_note": "Individual factual names transcribed with attribution; course PDF and teaching prose not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "b": "ba",
+        "ɓ": "ɓa",
+        "c": "ca",
+        "d": "da",
+        "ɗ": "ɗa",
+        "e": "e",
+        "f": "fa",
+        "g": "ga",
+        "h": "ha",
+        "i": "i",
+        "j": "ja",
+        "k": "ka",
+        "ƙ": "ƙa",
+        "l": "la",
+        "m": "ma",
+        "n": "na",
+        "o": "o",
+        "r": "ra",
+        "s": "sa",
+        "sh": "sha",
+        "t": "ta",
+        "ts": "tsa",
+        "u": "u",
+        "w": "wa",
+        "y": "ya",
+        "ƴ": "ƴa",
+        "z": "za"
+      },
+      "symbol_names": {
+        "’": "hamza"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "exclusions": {
+        "p": "Source states not a Hausa letter; no native ordinary name invented",
+        "q": "Not present in source alphabet",
+        "v": "Not present in source alphabet",
+        "x": "Not present in source alphabet"
+      }
+    },
+    "ay": {
+      "source": {
+        "url": "https://www.ilcanet.org/ciberaymara/contexto/",
+        "sha256": "5e90a2dabdd65c4aa02760a13ecf709884d92e504eec5439e4a4403ddb97aeeb",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "Ciberaymara — Contexto — El alfabeto aymara",
+        "author": "Instituto de Lengua y Cultura Aymara (ILCA); course register based on INEL/SENALEP and Juan de Dios Yapita",
+        "location": "Escritura, §3 El alfabeto aymara, NOMBRE DE LA LETRA table",
+        "role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+        "short_quote": "NOMBRE DE LA LETRA",
+        "license_note": "Individual factual names transcribed with attribution; original page/teaching prose not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "ä": "ä",
+        "ch": "cha",
+        "chh": "chha",
+        "ch'": "ch'a",
+        "i": "i",
+        "ï": "ï",
+        "j": "ja",
+        "k": "ka",
+        "kh": "kha",
+        "k'": "k'a",
+        "l": "la",
+        "ll": "lla",
+        "m": "ma",
+        "n": "na",
+        "ñ": "ña",
+        "p": "pa",
+        "ph": "pha",
+        "p'": "p'a",
+        "q": "qa",
+        "q'": "q'a",
+        "r": "ra",
+        "s": "sa",
+        "t": "ta",
+        "th": "tha",
+        "t'": "t'a",
+        "u": "u",
+        "ü": "ü",
+        "w": "wa",
+        "x": "xa",
+        "y": "ya"
+      },
+      "ordinary_alphabet_complete": false,
+      "semantic_role": "ordinary_letter_name",
+      "exclusions": {
+        "qh": "ILCA table currently says qa for both q and qh; do not silently correct an ambiguous source"
+      }
+    }
+  }
+}

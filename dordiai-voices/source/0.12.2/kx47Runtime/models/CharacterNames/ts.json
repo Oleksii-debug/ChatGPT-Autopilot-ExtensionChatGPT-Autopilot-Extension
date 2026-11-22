@@ -1,0 +1,31 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "ts",
+  "sources": {},
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions",
+    "cldr_annotations",
+    "cldr_characters"
+  ],
+  "letter_names": {},
+  "symbol_names": {},
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [],
+  "missing_ordinary_letter_names": [],
+  "bank_entries": [],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {},
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

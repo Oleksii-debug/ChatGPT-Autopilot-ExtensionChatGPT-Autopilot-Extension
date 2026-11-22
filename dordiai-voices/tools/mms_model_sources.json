@@ -1,0 +1,635 @@
+{
+  "format": "dordiai-mms-sources-v1",
+  "repository": "willwade/mms-tts-multilingual-models-onnx",
+  "revision": "4f49fc254f11ddb0e35fbf25b6e48b04463a6779",
+  "license": "CC-BY-NC-4.0",
+  "source_project": "facebook/mms-tts",
+  "converter_source": "https://github.com/willwade/mms-tts-multilingual-models-onnx",
+  "conversion_note": "Exporter rejects uroman and records native characters frontend; old VITS ONNX inputs x/x_length/noise/length_scale.",
+  "models": {
+    "ay": {
+      "iso_code": "ayr",
+      "name_uk": "Аймара",
+      "standard": "Central Aymara (ayr)",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/ayr/model.onnx",
+          "bytes": 114019332,
+          "git_blob_sha1": "cf9891ec16911e8a57a1229173949da09788a7cc",
+          "sha256": "06f7525be81f95b4879569b0c7174ca5945df96791f60b444d8d87e51250a687"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/ayr/tokens.txt",
+          "bytes": 395,
+          "git_blob_sha1": "4d8faaaf9626f47983f5ef8a7b5a29bd7091f967"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/ayr/sample.wav",
+          "bytes": 118316,
+          "git_blob_sha1": "0185300fe0edfb24f766eeac80c2ffb8e3426f9d"
+        }
+      }
+    },
+    "fil": {
+      "iso_code": "tgl",
+      "name_uk": "Філіппінська — стандарт на тагальській основі",
+      "standard": "Tagalog (tgl), basis of Filipino standard",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgl/model.onnx",
+          "bytes": 114020868,
+          "git_blob_sha1": "cc2f7425b4d45130ff4912b0bc8554e9762ed694",
+          "sha256": "f0594f259f7016a0ff00d5e72886f946e6ed6ae8edf1d9e78649f24d59c83ffb"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgl/tokens.txt",
+          "bytes": 337,
+          "git_blob_sha1": "61a3ff0e342577f53402bef939d91360ff84bf44"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgl/sample.wav",
+          "bytes": 142892,
+          "git_blob_sha1": "9d68746304ec240461cfabb7f5e1628f72a985b6"
+        }
+      }
+    },
+    "km": {
+      "iso_code": "khm",
+      "name_uk": "Кхмерська",
+      "standard": "khm",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/khm/model.onnx",
+          "bytes": 114044676,
+          "git_blob_sha1": "80be4af33a791ee5baff3e1da9da49d29d3d856f",
+          "sha256": "70acf4f024df6d6e742b6056d6e22e7632ebba8e11eab4e35a0d6f33bbf47189"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/khm/tokens.txt",
+          "bytes": 503,
+          "git_blob_sha1": "947df600756a35be1ba97540abfdfa552853ba76"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/khm/sample.wav",
+          "bytes": 133164,
+          "git_blob_sha1": "39f3a62b44db257a3edd5fce39d63790d4ba1213"
+        }
+      }
+    },
+    "tg": {
+      "iso_code": "tgk",
+      "name_uk": "Таджицька",
+      "standard": "tgk",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgk/model.onnx",
+          "bytes": 114019332,
+          "git_blob_sha1": "cd726f94b856680c0ad345dbf9597e78b14cd3ef",
+          "sha256": "45cc7aecb4b7dae96a8ace8a72e09b00eaf311e2f1bb69f44da7013eb275cfeb"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgk/tokens.txt",
+          "bytes": 449,
+          "git_blob_sha1": "8f5af44716c38ac279b91f3f6a718ddea4ba0d42"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgk/sample.wav",
+          "bytes": 108588,
+          "git_blob_sha1": "f178e884ace81e69ff9d8d5cb8cb73ccba18d77b"
+        }
+      }
+    },
+    "lo": {
+      "iso_code": "lao",
+      "name_uk": "Лаоська",
+      "standard": "lao",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/lao/model.onnx",
+          "bytes": 114027012,
+          "git_blob_sha1": "a0b3abfa206a240f53cf80e42e39433fd2197a9c",
+          "sha256": "4fe7b25f40804781e1f91340ce1183bba637f47d20a77a27aeff8eb3efbe77e5"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/lao/tokens.txt",
+          "bytes": 339,
+          "git_blob_sha1": "bd432a7e28cf7aa98c0f70d57b4a0e59aaf82175"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/lao/sample.wav",
+          "bytes": 122412,
+          "git_blob_sha1": "bec428d496d9969e5449bb9493bb53659c4e890b"
+        }
+      }
+    },
+    "mai": {
+      "iso_code": "mai",
+      "name_uk": "Майтілі",
+      "standard": "mai",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mai/model.onnx",
+          "bytes": 114038532,
+          "git_blob_sha1": "ff92a65b5d8c91db7571b9a7f9fa707806328fcf",
+          "sha256": "a4b628a1ecf177effd82de4f46af51eb0e711a05b17643e2afb2522354e8b29a"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mai/tokens.txt",
+          "bytes": 444,
+          "git_blob_sha1": "31885007a8c02882157f142619a62be709c79048"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mai/sample.wav",
+          "bytes": 140332,
+          "git_blob_sha1": "487f0813a41b6ba0609f2900d75642d5d787da8b"
+        }
+      }
+    },
+    "doi": {
+      "iso_code": "dgo",
+      "name_uk": "Догрі",
+      "standard": "Dogri (dgo)",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dgo/model.onnx",
+          "bytes": 114036996,
+          "git_blob_sha1": "481391e1b62fd217cf82ffb394b19346491a50a6",
+          "sha256": "e61748a8d40d91668f84c4fbd5244a63a846e7989bc1d17da833e3a35f44e9dd"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dgo/tokens.txt",
+          "bytes": 428,
+          "git_blob_sha1": "d32c031acf1245a04d70ef8f82e44b650b00dad1"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dgo/sample.wav",
+          "bytes": 90668,
+          "git_blob_sha1": "098187743b606381b34245b71d5eab82b009c14d"
+        }
+      }
+    },
+    "dv": {
+      "iso_code": "div",
+      "name_uk": "Дівехі",
+      "standard": "div",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/div/model.onnx",
+          "bytes": 114028548,
+          "git_blob_sha1": "bdb550b5358e9af8fda41e6ed5e2be0bd9d8f2bc",
+          "sha256": "02ca7770c5a73937de5244c57bb9ab49172d10a3f86bce903a9775952ac6c634"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/div/tokens.txt",
+          "bytes": 305,
+          "git_blob_sha1": "c30edc6d566ac62c7237105129bfaee8c96c433b"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/div/sample.wav",
+          "bytes": 61996,
+          "git_blob_sha1": "a0d4d270afd138ee1bf586cddbcbd029de15ecaa"
+        }
+      }
+    },
+    "dz": {
+      "iso_code": "dzo",
+      "name_uk": "Дзонг-кха",
+      "standard": "dzo",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dzo/model.onnx",
+          "bytes": 114032388,
+          "git_blob_sha1": "ddd5aa0573677003dc41a5145e174dfe328105f0",
+          "sha256": "3ec4468d456460ee802093db8adb20927fbbe9cca3f38a331588c3ac6593649c"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dzo/tokens.txt",
+          "bytes": 394,
+          "git_blob_sha1": "0212bb31a46c01ac913b20b676f1f65c36550ad3"
+        }
+      }
+    },
+    "ha": {
+      "iso_code": "hau",
+      "name_uk": "Хауса",
+      "standard": "hau",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/model.onnx",
+          "bytes": 114013956,
+          "git_blob_sha1": "24db9445964a6d1ef6e484c310adec35d26531d1",
+          "sha256": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/tokens.txt",
+          "bytes": 304,
+          "git_blob_sha1": "a007f22fa98b12a53dd362f015a785b45b9c66d6"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/sample.wav",
+          "bytes": 108076,
+          "git_blob_sha1": "d436babf5baf8fb2f6c4764f499f9d57414ebf20"
+        }
+      }
+    },
+    "yo": {
+      "iso_code": "yor",
+      "name_uk": "Йоруба",
+      "standard": "yor",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/yor/model.onnx",
+          "bytes": 114020868,
+          "git_blob_sha1": "7dad94d65a01870e099c9997cd635f2caaa7671b",
+          "sha256": "1daf1b837dfb032995a9afdfd1b974d07fd69fd42c91765fc551969ba6d4c183"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/yor/tokens.txt",
+          "bytes": 416,
+          "git_blob_sha1": "6cc49e372fefd0a6e232fd9a8299f81a0527e111"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/yor/sample.wav",
+          "bytes": 84012,
+          "git_blob_sha1": "151077570edbe376bf9fcf1718e7346d39733521"
+        }
+      }
+    },
+    "ff": {
+      "iso_code": "ful",
+      "name_uk": "Фула, або фульфульде",
+      "standard": "Fula/Fulfulde (ful), exact checkpoint variety requires listening",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/ful/model.onnx",
+          "bytes": 114019332,
+          "git_blob_sha1": "160620aa07360c29fe0527582eb4b732e0f7f250",
+          "sha256": "ea4d68f2c6e4abca462eb258c939997b8b43f4d4e1be17d4109a0da546ecf578"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/ful/tokens.txt",
+          "bytes": 328,
+          "git_blob_sha1": "7fcbaf47c366abcdec1c7c4975c9a0390ce53de3"
+        }
+      }
+    },
+    "mg": {
+      "iso_code": "mlg",
+      "name_uk": "Малагасійська",
+      "standard": "Malagasy (mlg), checkpoint standard",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mlg/model.onnx",
+          "bytes": 114010884,
+          "git_blob_sha1": "c28fa79f65f6c8c3f25c745a610e51df49a07c98",
+          "sha256": "14b608ff71fd2c2203f024782c1b65a977a75c8744f8a209807513cbb89a9f6d"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mlg/tokens.txt",
+          "bytes": 273,
+          "git_blob_sha1": "5322e19de14e6a450c1c8e1a311bd1c6522cfa9f"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mlg/sample.wav",
+          "bytes": 115756,
+          "git_blob_sha1": "0b8497abd6134735dedb927bdff85506a526d8db"
+        }
+      }
+    },
+    "so": {
+      "iso_code": "som",
+      "name_uk": "Сомалійська",
+      "standard": "som",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/som/model.onnx",
+          "bytes": 114008580,
+          "git_blob_sha1": "d6cabae677f2890b3ea7e620f4f2e0179db5e30b",
+          "sha256": "0199dd00b919d345110a04a7d3c96f621834afcce4bff396afd493c3e10de0c1"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/som/tokens.txt",
+          "bytes": 232,
+          "git_blob_sha1": "ce5ca816f0de0ff1ca428cc1f60e8959661affcd"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/som/sample.wav",
+          "bytes": 138284,
+          "git_blob_sha1": "1ffc92cbcd3e5a39736a92de692a9a273b692023"
+        }
+      }
+    },
+    "sn": {
+      "iso_code": "sna",
+      "name_uk": "Шона",
+      "standard": "sna",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/sna/model.onnx",
+          "bytes": 114013188,
+          "git_blob_sha1": "3d86b1ffd48baf5706d34b2c142723f0c5c4a2f8",
+          "sha256": "4d419c2c53b674f8d7cb72c0f52ed571db4043d465797ec1a1031c53483094de"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/sna/tokens.txt",
+          "bytes": 272,
+          "git_blob_sha1": "abf47663b0e98a7636292311d0add6660855a850"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/sna/sample.wav",
+          "bytes": 92204,
+          "git_blob_sha1": "1246015f667f32ea0ae2273408e4b0b4f1819fe8"
+        }
+      }
+    },
+    "rw": {
+      "iso_code": "kin",
+      "name_uk": "Кіньяруанда",
+      "standard": "kin",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kin/model.onnx",
+          "bytes": 114021636,
+          "git_blob_sha1": "35cc526170f26e75d3d91e71d65fa2d0d3540728",
+          "sha256": "531563be608dc805fce34d2a979d42a67a757735631544d09ed841faf3ecc055"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kin/tokens.txt",
+          "bytes": 356,
+          "git_blob_sha1": "779ee2de99638ea2a6ed026b2f444bc4baa3fea8"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kin/sample.wav",
+          "bytes": 99884,
+          "git_blob_sha1": "74c5b46b4580f49b1c60edc47969c459112cf037"
+        }
+      }
+    },
+    "rn": {
+      "iso_code": "run",
+      "name_uk": "Кірунді",
+      "standard": "run",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/run/model.onnx",
+          "bytes": 114010116,
+          "git_blob_sha1": "83444b3a27aed2874946bd829991846bad04fbde",
+          "sha256": "264de636f66e2c46da9dae929db73bdb4cb01afaa313ee5ef45a63422a8b70fb"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/run/tokens.txt",
+          "bytes": 248,
+          "git_blob_sha1": "1abce288a35c4f1d502d1439b0b8294ee5d6469a"
+        }
+      }
+    },
+    "ny": {
+      "iso_code": "nya",
+      "name_uk": "Чичева, або чева",
+      "standard": "nya",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/nya/model.onnx",
+          "bytes": 114017796,
+          "git_blob_sha1": "d8d1d3389c6ae62276160a50013825dbce05b19a",
+          "sha256": "16035b60edbc0d2736191e6d6828856e9d8dafc8755e940732a3ac52ff88d944"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/nya/tokens.txt",
+          "bytes": 303,
+          "git_blob_sha1": "46536c8aec364bf93c46b0ed4693032ca473576d"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/nya/sample.wav",
+          "bytes": 113708,
+          "git_blob_sha1": "462be6c41b320d79e2f70e2a28db97eee6f629a0"
+        }
+      }
+    },
+    "ak": {
+      "iso_code": "aka",
+      "name_uk": "Акан",
+      "standard": "Akan (aka), checkpoint standard",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/aka/model.onnx",
+          "bytes": 114010884,
+          "git_blob_sha1": "8e2a59b557013e61a604f945b9accdee2e013c39",
+          "sha256": "6667cf7efbc9deeef0ad37f1ff36bf06b9e167fe355cda1e90e09124068c6ebc"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/aka/tokens.txt",
+          "bytes": 258,
+          "git_blob_sha1": "aab3b15fa9effe3fc1a6617f67d9085803890c19"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/aka/sample.wav",
+          "bytes": 472108,
+          "git_blob_sha1": "53f2619e45bdff2c921d750db9647a432a8e867c"
+        }
+      }
+    },
+    "bm": {
+      "iso_code": "bam",
+      "name_uk": "Бамбара",
+      "standard": "bam",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/bam/model.onnx",
+          "bytes": 114015492,
+          "git_blob_sha1": "182658de12c144215341e2a59692680be986f447",
+          "sha256": "d14714080e3fe5d7b3add4db8167728a70149f9a48af972a5a3f442ba5d71b53"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/bam/tokens.txt",
+          "bytes": 316,
+          "git_blob_sha1": "2d4c240976fce0f45655c8e72c42f07fca9ab88f"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/bam/sample.wav",
+          "bytes": 87084,
+          "git_blob_sha1": "a344964635a352c694af9048bdbe473565eb87de"
+        }
+      }
+    },
+    "dyu": {
+      "iso_code": "dyu",
+      "name_uk": "Діула",
+      "standard": "dyu",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dyu/model.onnx",
+          "bytes": 114012420,
+          "git_blob_sha1": "ed9c5921cec39d21dcf5795383bd725d49b32312",
+          "sha256": "555773da698a074624850bda3266eb188367dd1612e40a7418afccdff62c2f63"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dyu/tokens.txt",
+          "bytes": 288,
+          "git_blob_sha1": "1b4eb627323059ff3390d1518587717ba88e4aed"
+        }
+      }
+    },
+    "mos": {
+      "iso_code": "mos",
+      "name_uk": "Мооре, або моссі",
+      "standard": "mos",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mos/model.onnx",
+          "bytes": 114014724,
+          "git_blob_sha1": "2cc2fac0fa49d6575d96de4d91e2853cc332692d",
+          "sha256": "1f7dcaa378989e4acc29223d2305e892b74992c144721fec8b97ddc19a6b93e3"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mos/tokens.txt",
+          "bytes": 321,
+          "git_blob_sha1": "852268e07bfa99c2f2597b9193465942ef725380"
+        }
+      }
+    },
+    "ts": {
+      "iso_code": "tso",
+      "name_uk": "Тсонга",
+      "standard": "tso",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tso/model.onnx",
+          "bytes": 114010884,
+          "git_blob_sha1": "a8501f7b1677e56316b101b9c3af871103fd0aae",
+          "sha256": "d88dc6c57967ed1502f4d74a941cf2358cafef92a94936db1b539bfd3e4ba848"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tso/tokens.txt",
+          "bytes": 261,
+          "git_blob_sha1": "3a3d6c3515901593d8c8833629848e6d80d17d7b"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tso/sample.wav",
+          "bytes": 111660,
+          "git_blob_sha1": "5e2ac72fc01ffda9bf3b24db7ae6bb68a7ad430e"
+        }
+      }
+    },
+    "sg": {
+      "iso_code": "sag",
+      "name_uk": "Санго",
+      "standard": "sag",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/sag/model.onnx",
+          "bytes": 114018564,
+          "git_blob_sha1": "5242aac01b08cd6125cb5691168ddd54b5dd9825",
+          "sha256": "14b958b0759e980ae249d258f6ff2220c51e706affb51c30e1676f71a4dc59fb"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/sag/tokens.txt",
+          "bytes": 376,
+          "git_blob_sha1": "5910b0f56e7aae66183977d553fe6f9ef6e9ff6f"
+        }
+      }
+    },
+    "tpi": {
+      "iso_code": "tpi",
+      "name_uk": "Ток-пісін",
+      "standard": "tpi",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tpi/model.onnx",
+          "bytes": 114016260,
+          "git_blob_sha1": "ee0737c8d4619b6c171c291d02321a8846530cc1",
+          "sha256": "1cb0f799c39ea53ddd39095e894e6b7ef8502b1fcd22439fded538c1ed3567cf"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tpi/tokens.txt",
+          "bytes": 284,
+          "git_blob_sha1": "eed336af5bd0977d3741e8472691d7d15afeb273"
+        }
+      }
+    },
+    "sm": {
+      "iso_code": "smo",
+      "name_uk": "Самоанська",
+      "standard": "smo",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/smo/model.onnx",
+          "bytes": 114007812,
+          "git_blob_sha1": "11d544be7ebd6d844f0847069aef58d35d4892f5",
+          "sha256": "c9fb1cf6d65d0c544048aa8f34c1b2603c93ba544550945f63aeee960f9c97d2"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/smo/tokens.txt",
+          "bytes": 231,
+          "git_blob_sha1": "94a81ed0c3bcb7aa25233174cccd058ee6c297c5"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/smo/sample.wav",
+          "bytes": 131628,
+          "git_blob_sha1": "4d7dae0a16fc21c7438b81c484c5f643bf1e8cdf"
+        }
+      }
+    },
+    "fj": {
+      "iso_code": "fij",
+      "name_uk": "Фіджійська",
+      "standard": "fij",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/fij/model.onnx",
+          "bytes": 114015492,
+          "git_blob_sha1": "f308ff5a9ae298652619e8855b5f9fe018b385b9",
+          "sha256": "e961adb930756d708ad4aba80370b397c289595798c4bb865f383c404dd778bc"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/fij/tokens.txt",
+          "bytes": 280,
+          "git_blob_sha1": "0de2cdbb86cd68e7e195a3f56132b78c71d4ad8e"
+        }
+      }
+    },
+    "gil": {
+      "iso_code": "gil",
+      "name_uk": "Гілбертська, або кірибаті",
+      "standard": "gil",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/gil/model.onnx",
+          "bytes": 114008580,
+          "git_blob_sha1": "869893ad2e44e0f7066b6a4a86bc9bfa1fd605f8",
+          "sha256": "eff5cff3b59cea16461d5f5d3827604401f2f95edbfafb5e90e8b32a44ff3581"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/gil/tokens.txt",
+          "bytes": 200,
+          "git_blob_sha1": "715e727bf9afaf2429493839dd7a3c1ebde058c5"
+        }
+      }
+    },
+    "kab": {
+      "iso_code": "kab",
+      "name_uk": "Кабільська (берберська; Алжир)",
+      "standard": "Kabyle (kab), Algeria; NOT Standard Moroccan Tamazight",
+      "assets": {
+        "model.onnx": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kab/model.onnx",
+          "bytes": 114017028,
+          "git_blob_sha1": "75d0f7b481ae27d02514ea0b37c018957316299d",
+          "sha256": "bec6f432ee34d56d8156282e72ba3e8da18574f8fdfb6efe723e44d7c1ef74c7"
+        },
+        "tokens.txt": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kab/tokens.txt",
+          "bytes": 370,
+          "git_blob_sha1": "2d895b8c87555a5813e82ea4c06fd787a8805260"
+        },
+        "sample.wav": {
+          "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kab/sample.wav",
+          "bytes": 246316,
+          "git_blob_sha1": "f71865ff2639386be47e927024dd75f65d64b092"
+        }
+      },
+      "selected_id": "tamazight",
+      "partial_variant": true
+    }
+  }
+}

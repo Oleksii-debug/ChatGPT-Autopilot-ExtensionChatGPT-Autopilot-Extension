@@ -1,0 +1,6422 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "so",
+  "sources": {
+    "nvda_symbols": {
+      "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/so/symbols.dic",
+      "sha256": "bc2bd9dd94897e6f2e7645a232583bb1f6a98a499af4a9c9b90dac2e4b336186",
+      "license": "GPL-2.0-or-later"
+    },
+    "nvda_descriptions": {
+      "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/so/characterDescriptions.dic",
+      "sha256": "0e9472ed5e6f8dc6e6d3a5ffd8d858e5155d4405df900332739f6e08599f2b42",
+      "license": "GPL-2.0-or-later"
+    },
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/so/annotations.json",
+      "sha256": "084a47afd6a95f10b98f92c01f462328bb4b83e1408b416a992e66c007031813",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/so/characters.json",
+      "sha256": "b4fe6a65f67a2dbd82a19a5f4231bc6b9ac0ef5df35763a44b2dfc0a8bda5ca7",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [],
+  "letter_names": {},
+  "symbol_names": {
+    "‾": "leen sare",
+    "‐": "jiitin gaaban",
+    "―": "jiitin dheer",
+    "،": "hakad ka carabida",
+    "؛": "joogsi dhiman carabi",
+    "¡": "astaan la yaab rogan",
+    "¿": "astaan su’aaleed rogan",
+    "؟": "astaan su’aaleeda carabida",
+    "‽": "calaamad su’aal layaabed",
+    "·": "dhibicda dhexdeeda",
+    "‚": "hamsada kore ee midig hoose",
+    "„": "calaamada xigashada midig",
+    "¶": "astaan sadar",
+    "‰": "tobankii kunba",
+    "†": "calaamada toorida",
+    "‡": "calaamada toorida oo labajibaaran",
+    "‧": "meesha hayfanta",
+    "′": "hamse",
+    "″": "labo hamse",
+    "‴": "tiro saddex lambar uun u qeybsama",
+    "※": "astaan tixraac",
+    "´": "lahjad degdeg ah",
+    "℗": "xuquuqda duubista codka",
+    "↚": "istarooga falaarta bidix u jeeda",
+    "↛": "istarooga falaarta midig u jeeda",
+    "↜": "fallaarta mawjada ee bidix u jeeda",
+    "↝": "fallaarta mawjada ee midig u jeeda",
+    "↞": "falaarta labada madax leh ee u jeeda bidix",
+    "↟": "falaarta labada madax leh ee u jeeda dhinaca kore",
+    "↠": "falaarta labada madax leh ee u jeeda dhinaca midig",
+    "↡": "falaarta labada madax leh ee u jeeda dhinaca hoose",
+    "↢": "seynta falaarta bidix u jeeda",
+    "↣": "seynta falaarta midig u jeeda",
+    "↤": "falaarta bidix u jeeda ee dabada ka malaasan",
+    "↥": "falaarta kor u jeeda ee dabada ka malaasan",
+    "↦": "falaarta midig u jeeda ee dabada ka malaasan",
+    "↧": "falaarta hoos u jeeda ee dabada ka malaasan",
+    "↨": "falaarta kor hoose ee salka leh",
+    "↫": "wareega falaarta bidixda u jeeda",
+    "↬": "wareega falaarta midigta u jeeda",
+    "↭": "falaarta mawjada ee bidixda iyo midigta u jeeda",
+    "↯": "falaarta sag-saga ee hoos u jeeda",
+    "↰": "falaarta kor u jeeda cirifkuna bidixda u jeedo",
+    "↱": "falaarta kor u jeeda cirifkuna midigta u jeedo",
+    "↲": "falaarta hoos u jeeda cirifkuna bidixda u jeedo",
+    "↳": "falaarta hoos u jeeda cirifkuna midigta u jeedo",
+    "↴": "falaarta midig u jeeda geeskuna hoos u jeedo",
+    "↵": "falaarta hoos u jeeda geeskuna bidix u jeedo",
+    "↶": "falaarta lidka jihada saacada ee badh wareega kore",
+    "↷": "falaarta jihada saacada ee badh wareega kore",
+    "↸": "falaar u jeeda waqooyi galbeed oo afka gabal ka leh",
+    "↹": "falaar bidix u jeeda oo afka gabal ka leh oona dul saaran falaar midig u jeeda oo afka gabal ka leh",
+    "↺": "falaarta lidka jihada saacada ee wareega furan",
+    "↻": "falaarta jihada saacada ee wareega furan",
+    "↼": "falaarta dhinaca kore kaliya madaxa ka leh ee bidixda u jeeda",
+    "↽": "falaarta dhinaca hoose kaliya madaxa ka leh ee bidixda u jeeda",
+    "↾": "falaarta dhinaca midigta kaliya madaxa ka leh ee kor u jeeda",
+    "↿": "falaarta dhinaca bidixda kaliya madaxa ka leh ee kor u jeeda",
+    "⇀": "falaarta dhinaca bidixda kaliya madaxa ka leh ee midigta u jeeda",
+    "⇁": "falaarta dhinaca midigta kaliya madaxa ka leh ee midigta u jeeda",
+    "⇂": "falaarta dhinaca midigta kaliya madaxa ka leh ee hoos u jeeda",
+    "⇃": "falaarta dhinaca bidixda kaliya madaxa ka leh ee hoos u jeeda",
+    "⇄": "falaar dhinac midig u jeeda oo dul saaran falaar dhinaca bidix u jeeda",
+    "⇅": "fallaaro kor iyo hoos ku aadan",
+    "⇆": "fallaaro bidix ku aadan oo ka sareeya kuwa midig ku aadan",
+    "⇇": "labo falaar oo bidix u wada jeeda",
+    "⇈": "labo falaar oo kor u wada jeeda",
+    "⇉": "labo falaar oo midig u wada jeeda",
+    "⇊": "labo falaar oo hoos u wada jeeda",
+    "⇋": "falaar hal gees leh oo bidix u jeeda oo dul saaran falaar hal gees leh oo midig u jeeda",
+    "⇌": "falaar hal gees leh oo midig u jeeda oo dul saaran falaar hal gees leh oo bidix u jeeda",
+    "⇐": "falaar labo jibaaran oo bidix u jeeda",
+    "⇍": "falaar labo jibaaran oo bidix u jeeda oo istalaab dhexda ku leh",
+    "⇑": "falaar labo jibaaran oo kor u jeeda",
+    "⇒": "right double arrow",
+    "⇏": "falaar labo jibaaran oo midig u jeeda oo istallaab dhexda ku leh",
+    "⇓": "falaar labo jibaaran oo hoos u jeeda",
+    "⇔": "falaar labo jibaaran oo bidix iyo midig u jeeda",
+    "⇎": "falaar labo jibaaran oo bidix iyo midig u jeeda oo istallaab dhexda ku leh",
+    "⇖": "falaar labo jibaaran oo waqooyi galbeed u jeeda",
+    "⇗": "falaar labo jibaaran oo waqooyi bari u jeeda",
+    "⇘": "falaar labo jibaaran oo koonfur bari u jeeda",
+    "⇙": "falaar labo jibaaran oo koonfur galbeed u jeeda",
+    "⇚": "falaar saddex jibaaran oo bidix u jeeda",
+    "⇛": "falaar saddex jibaaran oo midig u jeeda",
+    "⇜": "falaar bidix u jeeda oo dhexda leen laablaabmaya ka leh",
+    "⇝": "falaar midig u jeeda oo dhexda leen laablaabmaya ka leh",
+    "⇞": "falaar kor u jeeda oo labo diilmo leh",
+    "⇟": "falaar hoos u jeeda oo labo diilmo leh",
+    "⇠": "falaar kala googo’an oo bidix u jeeda",
+    "⇡": "falaar kala googo’an oo kor u jeeda",
+    "⇢": "falaar kala googo’an oo midig u jeeda",
+    "⇣": "falaar kala googo’an oo hoos u jeeda",
+    "⇤": "falaar bidix u jeeda oo gabal fidsan hor ku leh",
+    "⇥": "falaar midig u jeeda oo gabal fidsan hor ku leh",
+    "⇦": "falaar bidix u jeeda oo dhex banaan",
+    "⇧": "falaar kor u jeeda oo dhex banaan",
+    "⇩": "falaar hoos u jeeda oo dhex banaan",
+    "⇪": "falaar kor u jeeda oo dhex banaan oona gabal dhex banaan gadaal ku leh",
+    "⇵": "falaar hoos u jeeda falaar bidix oo kor u jeeda",
+    "∇": "nabla",
+    "±": "Plus or Minus",
+    "≮": "aan ka yareyn",
+    "≠": "aan la mid ahayn",
+    "≯": "aan ka weyneyn",
+    "¬": "diidmo",
+    "−": "calamada maynas",
+    "⁻": "calaamada kajar",
+    "∓": "ka-jarid-ama-ku-darid",
+    "∕": "islaashta isku qeybinta",
+    "⁄": "islaashta jajabka",
+    "∗": "calaamada xidigta",
+    "∘": "calaamda fargashiga",
+    "∙": "calaamada dhibicda",
+    "∣": "isku qeybinaya",
+    "∧": "logical and",
+    "∬": "integral laban laaban",
+    "∮": "contour integral",
+    "∼": "calaamada tilde",
+    "∽": "calaamada tilde oo rogan",
+    "∾": "s-ta caajisan ee rogan",
+    "≃": "u siman si asymptotical ah",
+    "≅": "qiyaas ahan la mid ah",
+    "≈": "ku dhawaad la mida",
+    "≌": "dhamaan isku mid ah",
+    "≒": "qiyaastii la mid ah sawirka",
+    "≖": "faraanti isku mid ah",
+    "≡": "ay mataano yihiin",
+    "≣": "si adag ugu dhigma",
+    "≤": "less- than or equal to",
+    "≦": "ka yar oo dulsaaran la mid ah",
+    "≧": "ka weyn oo dulsaaran la mid ah",
+    "≪": "aad uuga yar",
+    "≫": "aad uuga weyn",
+    "≬": "u dhaxeeya",
+    "≳": "ka weyn la mid ah",
+    "≺": "ka hor dhacaya",
+    "≻": "beddelaya",
+    "⊁": "ma beddelayo",
+    "⊕": "ku daris wareegsan",
+    "⊖": "ka jaris wareegsan",
+    "⊗": "ku dhufasho wareegsan",
+    "⊘": "islaash qeybin oo wareegsan",
+    "⊙": "calaamad dhibiceed wareegsan",
+    "⊚": "calaamada faraantiga oo wareegsan",
+    "⊛": "calaamada xidigta oo wareegsan",
+    "⊞": "afar gees dhexda ku daritaan ku leh",
+    "⊟": "afar gees dhexda ka jaris ku leh",
+    "⊥": "leen kor u jeeda oo hoosta leen fidsan ku leh",
+    "⊮": "ma qasbaayo",
+    "⊰": "ka hor dhacaya si xidhiidh hoos imaada",
+    "⊱": "beddelaya si xidhiidh hoos imaada",
+    "⋭": "kuma jiro si koox-hoosaad caadi la mid ah",
+    "⊶": "asal",
+    "⊿": "saddex xagaleed midig",
+    "⋁": "n-ary logical ama",
+    "⋂": "kala goyska n-ary",
+    "⋃": "ururka n-ary",
+    "⋅": "calamada dhibicda",
+    "⋆": "calamada xidigta",
+    "⋈": "ku biirista dabiiciga ah",
+    "⋒": "labo kala goys",
+    "⋘": "aad ugu yar",
+    "⋙": "aad ugu weyn",
+    "⋮": "seddex dhibic oo toostoos ah",
+    "⋯": "seddex dhibic oo jiifjiif ah",
+    "⋰": "geesal seddex dhibiceed midigta kore",
+    "⋱": "geesal seddex dhibiceed midigta hoose",
+    "□": "afar gees dhex banaan",
+    "▢": "afar gees dhex banaan oo geesihiina la wareejiyay",
+    "▣": "afar geesle dhex banaan oo kujira afar geesle dhexdiisa la buuxiyay",
+    "▤": "afar gees dhexda loo buuxiyay si dheer dheer ah",
+    "▥": "afar gees dhexda loo buuxiyay si toosan",
+    "▦": "afar gees dhexda loo buuxiyay si siman iyo si toosan",
+    "▧": "afar gees dhexda loo buuxiyay si bidix iyo midig ah",
+    "▨": "afar gees dhexda loo buuxiyay si midig iyo bidix ah",
+    "▩": "afar gees dhexda loo buuxiyay si isku tallaab is dhaafsi ah",
+    "▬": "leydi la buuxiyay",
+    "▭": "leydi dhex banaan",
+    "▮": "leydi toosan oo la buuxiyay",
+    "▰": "leydida barbarta u janjeerta oo la buuxiyay",
+    "▲": "saddex xagal buuxda oo kor u taagan",
+    "△": "saddex geesle dhex banaan oo kor u jeeda",
+    "▴": "saddex geesle yar oo la buuxiyay oo kor u jeeda",
+    "▵": "saddex geesle yar oo dhex banaan oo kor u jeeda",
+    "▷": "saddex geesle dhex banaan oo midig u jeeda",
+    "▸": "saddex geesle yar oo la buuxiyay oo midig u jeeda",
+    "▹": "saddex geesle yar oo dhex banaan oo midig u jeeda",
+    "►": "tilmaame la buuxiyay oo midig u jeeda",
+    "▻": "tilmaame dhex banaan oo midig u jeeda",
+    "▼": "saddex xagal hoos-u-fiiqan",
+    "▽": "seddex geesle dhex banaan oo hoos u jeeda",
+    "▾": "seddex geesle la buuxiyay oo hoos u jeeda",
+    "▿": "seddex geesle yar dhex banaan oo hoos u jeeda",
+    "◁": "seddex geesle dhex banaan oo bidix u jeeda",
+    "◂": "seddex geesle yar oo la buuxiyay oo bidix u jeeda",
+    "◃": "seddex geesle yar oo dhex banaan oo bidix u jeeda",
+    "◄": "tilmaame la buuxiyay oo bidix u jeeda",
+    "◅": "tilmaame dhex banaan oo bidix u jeeda",
+    "◆": "dheyman gudihiisa la buuxiyay",
+    "◇": "dheyman dhex banaan",
+    "◈": "dheyman dhex banaan oo uu kujiro dheyman dhexdiisa la buuxiyay",
+    "◉": "wareeg dhex banaan oo uu kujiro wareeg dhexdiisa la buuxiyay",
+    "◊": "qaab dheeman",
+    "○": "duleelka goobada",
+    "◌": "dhibic la goobaabay",
+    "◍": "wareeg dhexdiisa sida toosan loo buuxiyay",
+    "◎": "goobaabino isku dhex jiraan",
+    "◐": "goobaabin badhka bidixda la buuxiyay",
+    "◑": "goobaabin badhka midigta la buuxiyay",
+    "◒": "goobaabin badhka hoose la buuxiyay",
+    "◓": "goobaabin badhka kore la buuxiyay",
+    "◔": "goobaabin afar meelood meesha kore ee midigta laga buuxiyay",
+    "◕": "goobaabin afar meelood meesha kore ee bidix aan la buuxinin",
+    "◖": "goobaabin badhka bidixda la buxiyay",
+    "◗": "goobaabin badhka midigta la buxiyay",
+    "◘": "bulet rogan",
+    "◙": "afar gees uu ku dhex jiro goobaabin dhexda la buuxiyay",
+    "◜": "qaansada dhinaca bidix kore ee afar gees meelka goobaabinta",
+    "◝": "qaansada dhinaca midig kore ee afar gees meelka goobaabinta",
+    "◞": "qaansada dhinaca midig hoose ee afar gees meelka goobaabinta",
+    "◟": "qaansada dhinaca bidix hoose ee afar gees meelka goobaabinta",
+    "◠": "badhka kore ee goobaabinta",
+    "◡": "badhka hoose ee goobaabinta",
+    "◢": "seddex geesle midigta hoose oo la buuxiyay",
+    "◣": "seddex geesle bidixda hoose oo la buuxiyay",
+    "◤": "seddex geesle bidixda kore oo la buuxiyay",
+    "◥": "seddex geesle midigta kore oo la buuxiyay",
+    "◯": "goobad duleel weeyn",
+    "◳": "afar geesle dhex banaan oo afar geesle yar ku leh midigta kore",
+    "◷": "goobaabin dhex banaan oo afar geesle yar ku leh midigta kore",
+    "◿": "seddex geeslaha dhinaca hoose ee midig",
+    "♪": "xadhiga sideedaad",
+    "⨧": "calaamada ku darista oo labo hoos ka leh",
+    "⨯": "iskutallaab",
+    "⨼": "natiijada gudaha",
+    "⩣": "logical ama labo gabal hoos ku leh",
+    "⩽": "ka yar siman jiifsan",
+    "⪍": "ka yar oo ka sareysa siman la mid ah",
+    "⪚": "labo leen la mid ah ka weyn",
+    "⪺": "beddelid ka sareysa aan inaba la mid ahayn",
+    "♭": "fidsan",
+    "♯": "Seef ah",
+    "☺": "waji dhoolo cadeynaya",
+    "☹": "waji macbuus",
+    "☠": "laf madaxa iyo iskutallabta",
+    "❣": "claamad ujeedka wadnaha",
+    "❤": "wadno cas",
+    "✋": "gacan kor loo qaday",
+    "✌": "gacanta guusha",
+    "☝": "farta muujinta tilmaamaysa kor",
+    "✊": "kor u qaadid tantoonyo (feer)",
+    "✍": "gacan wax qoraysa",
+    "⛷": "qof alwaaxa barafka kula socda",
+    "⛹": "qof cayaaraya kubadda boodda",
+    "☘": "dhir gaaban saddex caleen leh",
+    "☕": "cabitaan kulul",
+    "⛰": "buur",
+    "⛪": "Kaniisad",
+    "⛩": "Meel Caabudaad",
+    "⛲": "tuubo biyo kor u ganta",
+    "⛺": "teendho",
+    "♨": "ilo kulul",
+    "⛽": "bamka shidaalka",
+    "⚓": "baroosinka",
+    "⛵": "doon shiraac",
+    "⛴": "rakaab qaadis",
+    "✈": "diyaarad",
+    "⌛": "dhalada saacad-beegtada ah oo dhamaysay",
+    "⏳": "dhalada saacad-beegtada ah wali ma dhamayn",
+    "⌚": "goor-sheeg",
+    "⏰": "saacadda alarmiga leh",
+    "⏱": "saacad-joojin",
+    "⏲": "saacadda goor-sheegtada ah",
+    "☀": "qorrax",
+    "⭐": "Summadda xiddigta",
+    "☁": "daruur",
+    "⛅": "qorrax ka dambaysa daruur",
+    "⛈": "daruur leh hillaac iyo roob",
+    "☂": "dallad",
+    "☔": "dallad leh dhibco roob",
+    "⛱": "daallad dhulka ka taagan",
+    "⚡": "tamar sare",
+    "❄": "baraf-qolof",
+    "☃": "baraf-naag",
+    "⛄": "baraf-naag oo naag la’aan ah",
+    "☄": "dhagax-xiddig",
+    "✨": "dhalaali",
+    "⚽": "cayaaraha kubada",
+    "⚾": "kubada usha",
+    "⛳": "calanka godka",
+    "⛸": "kan lugu socdo barafka",
+    "♠": "farshaxan",
+    "♥": "lebiska qalbiga",
+    "♟": "jarta fiyooraha",
+    "⛑": "madax-gashiga shaqaalaha badbaadinta",
+    "☎": "telefoon",
+    "⌨": "kiiboodh",
+    "✉": "baqshad",
+    "✏": "qalin qori",
+    "✒": "af-qalin madow",
+    "✂": "maqas",
+    "⛏": "madaraq",
+    "⚒": "dube iyo madaraq",
+    "⚔": "seefo isweydaarsan",
+    "⚙": "geer",
+    "⚖": "miisaan",
+    "⛓": "silsilado",
+    "⚗": "qalab nadiifin",
+    "⚰": "sanduuq",
+    "⚱": "aas",
+    "♿": "calaamadda kursiga curyaanka",
+    "⚠": "digniin",
+    "⛔": "Ma jirto gelitaan",
+    "☢": "kaah fale",
+    "☣": "halis ku ah noolaha",
+    "⬆": "fallaarta kor",
+    "↗": "fallaarta kor ee midig",
+    "➡": "fallarta midig",
+    "↘": "fallaarta hoose ee midig",
+    "⬇": "fallaarta hoose",
+    "↙": "fallaarta hoose ee bidix",
+    "⬅": "fallarta bidix",
+    "↖": "fallaarta kor ee bidix",
+    "↕": "falaadh kor u-jeeda",
+    "↔": "fallaarta bidix-midig",
+    "↮": "istarooga falaarta bidix midigta u jeeda",
+    "↩": "fallaarta midig u qalloocsan bidix",
+    "↪": "fallaarta bidix u qalloocsan midig",
+    "⤴": "fallaarta midig u qalloocsan kor",
+    "⤵": "fallaarta midig u qalloocsan hoos",
+    "⚛": "calaamadda atam",
+    "✡": "xiddigga Da’uud",
+    "☸": "diinta Hindida ee dharma",
+    "☯": "diinta Shiinaha ee yin yang",
+    "✝": "mactabka latin",
+    "☦": "mactabka diinta asal-raacnimada",
+    "☪": "bil iyo xiddig",
+    "☮": "calaamadda nabadda",
+    "♈": "laxo",
+    "♉": "dibigga Taurus",
+    "♊": "mataanaha",
+    "♋": "naaf",
+    "♌": "boqorka libaaxa",
+    "♍": "afaggaal",
+    "♎": "cutubka miisaanka",
+    "♏": "dib-qallooc",
+    "♐": "dameerajoogeen",
+    "♑": "riyaha",
+    "♒": "cutubka xiddigga biyaha",
+    "♓": "cutubka xiddiga ee kalluunka",
+    "⛎": "abeeso",
+    "▶": "badhanka cayaar",
+    "⏩": "badhanka mootinta",
+    "⏭": "badhanka muusik daarista xigga",
+    "⏯": "bdhanka cayaar ama jooji ah",
+    "◀": "badhanka dib u celinta",
+    "⏪": "badhanka dib u celinta degdegga",
+    "⏮": "badhanka daarista ugu dambeeya",
+    "⏫": "badhanka degdegga sare ah",
+    "⏬": "badhanka degdegga hoose",
+    "⏸": "badhanka hakinta",
+    "⏹": "badhanka joojinta",
+    "⏺": "badhanka duubista",
+    "⏏": "badhanka ka soo saarista",
+    "♀": "calaamad dheddig",
+    "♂": "calaamad lab",
+    "⚧": "calaamada laba dhidiga",
+    "✖": "calaamadda isku dhufashada",
+    "➕": "calaamadda isugeynta",
+    "➖": "calaamadda ka jar",
+    "➗": "calaamadda isu qaybinta",
+    "♾": "xad la’aan",
+    "‼": "laba calaamadood cajiib ah",
+    "⁉": "calaamad cajiib su’aal ah",
+    "❓": "calaamad su’aal",
+    "❔": "ccalaamad su’aal cad",
+    "❕": "calaamad cajiib cad",
+    "❗": "calaamad cajiib",
+    "⚕": "calaamad caafimaad",
+    "♻": "calaamadda dib-u-warshadaynta",
+    "⚜": "saddex midnimada quduuska",
+    "⭕": "goobo cas dalool leh",
+    "✅": "badhanka calaamadda sax",
+    "☑": "ku calaamadee sanduuqa sax",
+    "❌": "calaamadda iskutallaabta",
+    "❎": "badhanka calaamadda iskutallaabta",
+    "➰": "laaban oo sargo’an",
+    "➿": "maroogsin sargo’an oo laban-laab ah",
+    "✳": "siddeed geesood oo isku nooc u taaggan",
+    "✴": "xiddig siddeed geeslood oo tilmaama",
+    "❇": "dhalaal",
+    "©": "Copyright",
+    "™": "Trademark",
+    "Ⓜ": "M goobaysan",
+    "⚫": "goobo madow",
+    "⚪": "goobo cad",
+    "⬛": "afar gees weyn oo madow",
+    "⬜": "afar gees weyn oo cad",
+    "◼": "afar gees dhexdhexaad oo madow",
+    "◻": "afar gees dhexdhexaad oo cad",
+    "◽": "afar gees dhexdhexaad yar oo cad",
+    "▫": "afar gees yar oo cad",
+    "¢": "Cents",
+    "¥": "Yen",
+    "₩": "guulaystay",
+    "₰": "penny-ga jarmalka",
+    "₱": "beeso",
+    "₹": "Rupee",
+    "₽": "cutub lacageedka raashiya",
+    "₿": "bitkoyn",
+    "∁": "complement",
+    "∨": "logical or"
+  },
+  "phonetic_descriptions": {
+    "b": [
+      "Bariis"
+    ],
+    "t": [
+      "Tim"
+    ],
+    "j": [
+      "Jallato"
+    ],
+    "x": [
+      "Xamar"
+    ],
+    "kh": [
+      "Khamiis"
+    ],
+    "d": [
+      "Daiyax"
+    ],
+    "r": [
+      "Roob"
+    ],
+    "s": [
+      "Subax"
+    ],
+    "sh": [
+      "Shah"
+    ],
+    "dh": [
+      "Dhar"
+    ],
+    "c": [
+      "Cano"
+    ],
+    "g": [
+      "Gabar"
+    ],
+    "f": [
+      "Far"
+    ],
+    "q": [
+      "Qalim"
+    ],
+    "k": [
+      "Kabo"
+    ],
+    "l": [
+      "Lacag"
+    ],
+    "m": [
+      "Magac"
+    ],
+    "n": [
+      "Nal"
+    ],
+    "w": [
+      "Wejji"
+    ],
+    "h": [
+      "Hooyo"
+    ],
+    "y": [
+      "Yar"
+    ]
+  },
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "b",
+    "c",
+    "d",
+    "f",
+    "g",
+    "h",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "q",
+    "r",
+    "s",
+    "t",
+    "w",
+    "x",
+    "y"
+  ],
+  "missing_ordinary_letter_names": [
+    "b",
+    "c",
+    "d",
+    "f",
+    "g",
+    "h",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "q",
+    "r",
+    "s",
+    "t",
+    "w",
+    "x",
+    "y"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‾",
+      "aliases": [
+        "leen sare"
+      ],
+      "text": "leen sare",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‐",
+      "aliases": [
+        "jiitin gaaban"
+      ],
+      "text": "jiitin gaaban",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "―",
+      "aliases": [
+        "jiitin dheer"
+      ],
+      "text": "jiitin dheer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "،",
+      "aliases": [
+        "hakad ka carabida"
+      ],
+      "text": "hakad ka carabida",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "؛",
+      "aliases": [
+        "joogsi dhiman carabi"
+      ],
+      "text": "joogsi dhiman carabi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "¡",
+      "aliases": [
+        "astaan la yaab rogan"
+      ],
+      "text": "astaan la yaab rogan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "¿",
+      "aliases": [
+        "astaan su’aaleed rogan"
+      ],
+      "text": "astaan su’aaleed rogan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "؟",
+      "aliases": [
+        "astaan su’aaleeda carabida"
+      ],
+      "text": "astaan su’aaleeda carabida",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‽",
+      "aliases": [
+        "calaamad su’aal layaabed"
+      ],
+      "text": "calaamad su’aal layaabed",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "·",
+      "aliases": [
+        "dhibicda dhexdeeda"
+      ],
+      "text": "dhibicda dhexdeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‚",
+      "aliases": [
+        "hamsada kore ee midig hoose"
+      ],
+      "text": "hamsada kore ee midig hoose",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "„",
+      "aliases": [
+        "calaamada xigashada midig"
+      ],
+      "text": "calaamada xigashada midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "¶",
+      "aliases": [
+        "astaan sadar"
+      ],
+      "text": "astaan sadar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‰",
+      "aliases": [
+        "tobankii kunba"
+      ],
+      "text": "tobankii kunba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "†",
+      "aliases": [
+        "calaamada toorida"
+      ],
+      "text": "calaamada toorida",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‡",
+      "aliases": [
+        "calaamada toorida oo labajibaaran"
+      ],
+      "text": "calaamada toorida oo labajibaaran",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‧",
+      "aliases": [
+        "meesha hayfanta"
+      ],
+      "text": "meesha hayfanta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "′",
+      "aliases": [
+        "hamse"
+      ],
+      "text": "hamse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "″",
+      "aliases": [
+        "labo hamse"
+      ],
+      "text": "labo hamse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‴",
+      "aliases": [
+        "tiro saddex lambar uun u qeybsama"
+      ],
+      "text": "tiro saddex lambar uun u qeybsama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "※",
+      "aliases": [
+        "astaan tixraac"
+      ],
+      "text": "astaan tixraac",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "´",
+      "aliases": [
+        "lahjad degdeg ah"
+      ],
+      "text": "lahjad degdeg ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "℗",
+      "aliases": [
+        "xuquuqda duubista codka"
+      ],
+      "text": "xuquuqda duubista codka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↚",
+      "aliases": [
+        "istarooga falaarta bidix u jeeda"
+      ],
+      "text": "istarooga falaarta bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↛",
+      "aliases": [
+        "istarooga falaarta midig u jeeda"
+      ],
+      "text": "istarooga falaarta midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↜",
+      "aliases": [
+        "fallaarta mawjada ee bidix u jeeda"
+      ],
+      "text": "fallaarta mawjada ee bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↝",
+      "aliases": [
+        "fallaarta mawjada ee midig u jeeda"
+      ],
+      "text": "fallaarta mawjada ee midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↞",
+      "aliases": [
+        "falaarta labada madax leh ee u jeeda bidix"
+      ],
+      "text": "falaarta labada madax leh ee u jeeda bidix",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↟",
+      "aliases": [
+        "falaarta labada madax leh ee u jeeda dhinaca kore"
+      ],
+      "text": "falaarta labada madax leh ee u jeeda dhinaca kore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↠",
+      "aliases": [
+        "falaarta labada madax leh ee u jeeda dhinaca midig"
+      ],
+      "text": "falaarta labada madax leh ee u jeeda dhinaca midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↡",
+      "aliases": [
+        "falaarta labada madax leh ee u jeeda dhinaca hoose"
+      ],
+      "text": "falaarta labada madax leh ee u jeeda dhinaca hoose",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↢",
+      "aliases": [
+        "seynta falaarta bidix u jeeda"
+      ],
+      "text": "seynta falaarta bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↣",
+      "aliases": [
+        "seynta falaarta midig u jeeda"
+      ],
+      "text": "seynta falaarta midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↤",
+      "aliases": [
+        "falaarta bidix u jeeda ee dabada ka malaasan"
+      ],
+      "text": "falaarta bidix u jeeda ee dabada ka malaasan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↥",
+      "aliases": [
+        "falaarta kor u jeeda ee dabada ka malaasan"
+      ],
+      "text": "falaarta kor u jeeda ee dabada ka malaasan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↦",
+      "aliases": [
+        "falaarta midig u jeeda ee dabada ka malaasan"
+      ],
+      "text": "falaarta midig u jeeda ee dabada ka malaasan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↧",
+      "aliases": [
+        "falaarta hoos u jeeda ee dabada ka malaasan"
+      ],
+      "text": "falaarta hoos u jeeda ee dabada ka malaasan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↨",
+      "aliases": [
+        "falaarta kor hoose ee salka leh"
+      ],
+      "text": "falaarta kor hoose ee salka leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↫",
+      "aliases": [
+        "wareega falaarta bidixda u jeeda"
+      ],
+      "text": "wareega falaarta bidixda u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↬",
+      "aliases": [
+        "wareega falaarta midigta u jeeda"
+      ],
+      "text": "wareega falaarta midigta u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↭",
+      "aliases": [
+        "falaarta mawjada ee bidixda iyo midigta u jeeda"
+      ],
+      "text": "falaarta mawjada ee bidixda iyo midigta u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↯",
+      "aliases": [
+        "falaarta sag-saga ee hoos u jeeda"
+      ],
+      "text": "falaarta sag-saga ee hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↰",
+      "aliases": [
+        "falaarta kor u jeeda cirifkuna bidixda u jeedo"
+      ],
+      "text": "falaarta kor u jeeda cirifkuna bidixda u jeedo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↱",
+      "aliases": [
+        "falaarta kor u jeeda cirifkuna midigta u jeedo"
+      ],
+      "text": "falaarta kor u jeeda cirifkuna midigta u jeedo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↲",
+      "aliases": [
+        "falaarta hoos u jeeda cirifkuna bidixda u jeedo"
+      ],
+      "text": "falaarta hoos u jeeda cirifkuna bidixda u jeedo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↳",
+      "aliases": [
+        "falaarta hoos u jeeda cirifkuna midigta u jeedo"
+      ],
+      "text": "falaarta hoos u jeeda cirifkuna midigta u jeedo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↴",
+      "aliases": [
+        "falaarta midig u jeeda geeskuna hoos u jeedo"
+      ],
+      "text": "falaarta midig u jeeda geeskuna hoos u jeedo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↵",
+      "aliases": [
+        "falaarta hoos u jeeda geeskuna bidix u jeedo"
+      ],
+      "text": "falaarta hoos u jeeda geeskuna bidix u jeedo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↶",
+      "aliases": [
+        "falaarta lidka jihada saacada ee badh wareega kore"
+      ],
+      "text": "falaarta lidka jihada saacada ee badh wareega kore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↷",
+      "aliases": [
+        "falaarta jihada saacada ee badh wareega kore"
+      ],
+      "text": "falaarta jihada saacada ee badh wareega kore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↸",
+      "aliases": [
+        "falaar u jeeda waqooyi galbeed oo afka gabal ka leh"
+      ],
+      "text": "falaar u jeeda waqooyi galbeed oo afka gabal ka leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↹",
+      "aliases": [
+        "falaar bidix u jeeda oo afka gabal ka leh oona dul saaran falaar midig u jeeda oo afka gabal ka leh"
+      ],
+      "text": "falaar bidix u jeeda oo afka gabal ka leh oona dul saaran falaar midig u jeeda oo afka gabal ka leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↺",
+      "aliases": [
+        "falaarta lidka jihada saacada ee wareega furan"
+      ],
+      "text": "falaarta lidka jihada saacada ee wareega furan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↻",
+      "aliases": [
+        "falaarta jihada saacada ee wareega furan"
+      ],
+      "text": "falaarta jihada saacada ee wareega furan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↼",
+      "aliases": [
+        "falaarta dhinaca kore kaliya madaxa ka leh ee bidixda u jeeda"
+      ],
+      "text": "falaarta dhinaca kore kaliya madaxa ka leh ee bidixda u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↽",
+      "aliases": [
+        "falaarta dhinaca hoose kaliya madaxa ka leh ee bidixda u jeeda"
+      ],
+      "text": "falaarta dhinaca hoose kaliya madaxa ka leh ee bidixda u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↾",
+      "aliases": [
+        "falaarta dhinaca midigta kaliya madaxa ka leh ee kor u jeeda"
+      ],
+      "text": "falaarta dhinaca midigta kaliya madaxa ka leh ee kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↿",
+      "aliases": [
+        "falaarta dhinaca bidixda kaliya madaxa ka leh ee kor u jeeda"
+      ],
+      "text": "falaarta dhinaca bidixda kaliya madaxa ka leh ee kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇀",
+      "aliases": [
+        "falaarta dhinaca bidixda kaliya madaxa ka leh ee midigta u jeeda"
+      ],
+      "text": "falaarta dhinaca bidixda kaliya madaxa ka leh ee midigta u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇁",
+      "aliases": [
+        "falaarta dhinaca midigta kaliya madaxa ka leh ee midigta u jeeda"
+      ],
+      "text": "falaarta dhinaca midigta kaliya madaxa ka leh ee midigta u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇂",
+      "aliases": [
+        "falaarta dhinaca midigta kaliya madaxa ka leh ee hoos u jeeda"
+      ],
+      "text": "falaarta dhinaca midigta kaliya madaxa ka leh ee hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇃",
+      "aliases": [
+        "falaarta dhinaca bidixda kaliya madaxa ka leh ee hoos u jeeda"
+      ],
+      "text": "falaarta dhinaca bidixda kaliya madaxa ka leh ee hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇄",
+      "aliases": [
+        "falaar dhinac midig u jeeda oo dul saaran falaar dhinaca bidix u jeeda"
+      ],
+      "text": "falaar dhinac midig u jeeda oo dul saaran falaar dhinaca bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇅",
+      "aliases": [
+        "fallaaro kor iyo hoos ku aadan"
+      ],
+      "text": "fallaaro kor iyo hoos ku aadan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇆",
+      "aliases": [
+        "fallaaro bidix ku aadan oo ka sareeya kuwa midig ku aadan"
+      ],
+      "text": "fallaaro bidix ku aadan oo ka sareeya kuwa midig ku aadan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇇",
+      "aliases": [
+        "labo falaar oo bidix u wada jeeda"
+      ],
+      "text": "labo falaar oo bidix u wada jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇈",
+      "aliases": [
+        "labo falaar oo kor u wada jeeda"
+      ],
+      "text": "labo falaar oo kor u wada jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇉",
+      "aliases": [
+        "labo falaar oo midig u wada jeeda"
+      ],
+      "text": "labo falaar oo midig u wada jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇊",
+      "aliases": [
+        "labo falaar oo hoos u wada jeeda"
+      ],
+      "text": "labo falaar oo hoos u wada jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇋",
+      "aliases": [
+        "falaar hal gees leh oo bidix u jeeda oo dul saaran falaar hal gees leh oo midig u jeeda"
+      ],
+      "text": "falaar hal gees leh oo bidix u jeeda oo dul saaran falaar hal gees leh oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇌",
+      "aliases": [
+        "falaar hal gees leh oo midig u jeeda oo dul saaran falaar hal gees leh oo bidix u jeeda"
+      ],
+      "text": "falaar hal gees leh oo midig u jeeda oo dul saaran falaar hal gees leh oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇐",
+      "aliases": [
+        "falaar labo jibaaran oo bidix u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇍",
+      "aliases": [
+        "falaar labo jibaaran oo bidix u jeeda oo istalaab dhexda ku leh"
+      ],
+      "text": "falaar labo jibaaran oo bidix u jeeda oo istalaab dhexda ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇑",
+      "aliases": [
+        "falaar labo jibaaran oo kor u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇒",
+      "aliases": [
+        "right double arrow"
+      ],
+      "text": "right double arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇏",
+      "aliases": [
+        "falaar labo jibaaran oo midig u jeeda oo istallaab dhexda ku leh"
+      ],
+      "text": "falaar labo jibaaran oo midig u jeeda oo istallaab dhexda ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇓",
+      "aliases": [
+        "falaar labo jibaaran oo hoos u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇔",
+      "aliases": [
+        "falaar labo jibaaran oo bidix iyo midig u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo bidix iyo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇎",
+      "aliases": [
+        "falaar labo jibaaran oo bidix iyo midig u jeeda oo istallaab dhexda ku leh"
+      ],
+      "text": "falaar labo jibaaran oo bidix iyo midig u jeeda oo istallaab dhexda ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇖",
+      "aliases": [
+        "falaar labo jibaaran oo waqooyi galbeed u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo waqooyi galbeed u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇗",
+      "aliases": [
+        "falaar labo jibaaran oo waqooyi bari u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo waqooyi bari u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇘",
+      "aliases": [
+        "falaar labo jibaaran oo koonfur bari u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo koonfur bari u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇙",
+      "aliases": [
+        "falaar labo jibaaran oo koonfur galbeed u jeeda"
+      ],
+      "text": "falaar labo jibaaran oo koonfur galbeed u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇚",
+      "aliases": [
+        "falaar saddex jibaaran oo bidix u jeeda"
+      ],
+      "text": "falaar saddex jibaaran oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇛",
+      "aliases": [
+        "falaar saddex jibaaran oo midig u jeeda"
+      ],
+      "text": "falaar saddex jibaaran oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇜",
+      "aliases": [
+        "falaar bidix u jeeda oo dhexda leen laablaabmaya ka leh"
+      ],
+      "text": "falaar bidix u jeeda oo dhexda leen laablaabmaya ka leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇝",
+      "aliases": [
+        "falaar midig u jeeda oo dhexda leen laablaabmaya ka leh"
+      ],
+      "text": "falaar midig u jeeda oo dhexda leen laablaabmaya ka leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇞",
+      "aliases": [
+        "falaar kor u jeeda oo labo diilmo leh"
+      ],
+      "text": "falaar kor u jeeda oo labo diilmo leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇟",
+      "aliases": [
+        "falaar hoos u jeeda oo labo diilmo leh"
+      ],
+      "text": "falaar hoos u jeeda oo labo diilmo leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇠",
+      "aliases": [
+        "falaar kala googo’an oo bidix u jeeda"
+      ],
+      "text": "falaar kala googo’an oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇡",
+      "aliases": [
+        "falaar kala googo’an oo kor u jeeda"
+      ],
+      "text": "falaar kala googo’an oo kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇢",
+      "aliases": [
+        "falaar kala googo’an oo midig u jeeda"
+      ],
+      "text": "falaar kala googo’an oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇣",
+      "aliases": [
+        "falaar kala googo’an oo hoos u jeeda"
+      ],
+      "text": "falaar kala googo’an oo hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇤",
+      "aliases": [
+        "falaar bidix u jeeda oo gabal fidsan hor ku leh"
+      ],
+      "text": "falaar bidix u jeeda oo gabal fidsan hor ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇥",
+      "aliases": [
+        "falaar midig u jeeda oo gabal fidsan hor ku leh"
+      ],
+      "text": "falaar midig u jeeda oo gabal fidsan hor ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇦",
+      "aliases": [
+        "falaar bidix u jeeda oo dhex banaan"
+      ],
+      "text": "falaar bidix u jeeda oo dhex banaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇧",
+      "aliases": [
+        "falaar kor u jeeda oo dhex banaan"
+      ],
+      "text": "falaar kor u jeeda oo dhex banaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇩",
+      "aliases": [
+        "falaar hoos u jeeda oo dhex banaan"
+      ],
+      "text": "falaar hoos u jeeda oo dhex banaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇪",
+      "aliases": [
+        "falaar kor u jeeda oo dhex banaan oona gabal dhex banaan gadaal ku leh"
+      ],
+      "text": "falaar kor u jeeda oo dhex banaan oona gabal dhex banaan gadaal ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⇵",
+      "aliases": [
+        "falaar hoos u jeeda falaar bidix oo kor u jeeda"
+      ],
+      "text": "falaar hoos u jeeda falaar bidix oo kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∇",
+      "aliases": [
+        "nabla"
+      ],
+      "text": "nabla",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "±",
+      "aliases": [
+        "Plus or Minus"
+      ],
+      "text": "Plus or Minus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≮",
+      "aliases": [
+        "aan ka yareyn"
+      ],
+      "text": "aan ka yareyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≠",
+      "aliases": [
+        "aan la mid ahayn"
+      ],
+      "text": "aan la mid ahayn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≯",
+      "aliases": [
+        "aan ka weyneyn"
+      ],
+      "text": "aan ka weyneyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "¬",
+      "aliases": [
+        "diidmo"
+      ],
+      "text": "diidmo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "−",
+      "aliases": [
+        "calamada maynas"
+      ],
+      "text": "calamada maynas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⁻",
+      "aliases": [
+        "calaamada kajar"
+      ],
+      "text": "calaamada kajar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∓",
+      "aliases": [
+        "ka-jarid-ama-ku-darid"
+      ],
+      "text": "ka-jarid-ama-ku-darid",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∕",
+      "aliases": [
+        "islaashta isku qeybinta"
+      ],
+      "text": "islaashta isku qeybinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⁄",
+      "aliases": [
+        "islaashta jajabka"
+      ],
+      "text": "islaashta jajabka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∗",
+      "aliases": [
+        "calaamada xidigta"
+      ],
+      "text": "calaamada xidigta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∘",
+      "aliases": [
+        "calaamda fargashiga"
+      ],
+      "text": "calaamda fargashiga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∙",
+      "aliases": [
+        "calaamada dhibicda"
+      ],
+      "text": "calaamada dhibicda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∣",
+      "aliases": [
+        "isku qeybinaya"
+      ],
+      "text": "isku qeybinaya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∧",
+      "aliases": [
+        "logical and"
+      ],
+      "text": "logical and",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∬",
+      "aliases": [
+        "integral laban laaban"
+      ],
+      "text": "integral laban laaban",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∮",
+      "aliases": [
+        "contour integral"
+      ],
+      "text": "contour integral",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∼",
+      "aliases": [
+        "calaamada tilde"
+      ],
+      "text": "calaamada tilde",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∽",
+      "aliases": [
+        "calaamada tilde oo rogan"
+      ],
+      "text": "calaamada tilde oo rogan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∾",
+      "aliases": [
+        "s-ta caajisan ee rogan"
+      ],
+      "text": "s-ta caajisan ee rogan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≃",
+      "aliases": [
+        "u siman si asymptotical ah"
+      ],
+      "text": "u siman si asymptotical ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≅",
+      "aliases": [
+        "qiyaas ahan la mid ah"
+      ],
+      "text": "qiyaas ahan la mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≈",
+      "aliases": [
+        "ku dhawaad la mida"
+      ],
+      "text": "ku dhawaad la mida",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≌",
+      "aliases": [
+        "dhamaan isku mid ah"
+      ],
+      "text": "dhamaan isku mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≒",
+      "aliases": [
+        "qiyaastii la mid ah sawirka"
+      ],
+      "text": "qiyaastii la mid ah sawirka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≖",
+      "aliases": [
+        "faraanti isku mid ah"
+      ],
+      "text": "faraanti isku mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≡",
+      "aliases": [
+        "ay mataano yihiin"
+      ],
+      "text": "ay mataano yihiin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≣",
+      "aliases": [
+        "si adag ugu dhigma"
+      ],
+      "text": "si adag ugu dhigma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≤",
+      "aliases": [
+        "less- than or equal to"
+      ],
+      "text": "less- than or equal to",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≦",
+      "aliases": [
+        "ka yar oo dulsaaran la mid ah"
+      ],
+      "text": "ka yar oo dulsaaran la mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≧",
+      "aliases": [
+        "ka weyn oo dulsaaran la mid ah"
+      ],
+      "text": "ka weyn oo dulsaaran la mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≪",
+      "aliases": [
+        "aad uuga yar"
+      ],
+      "text": "aad uuga yar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≫",
+      "aliases": [
+        "aad uuga weyn"
+      ],
+      "text": "aad uuga weyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≬",
+      "aliases": [
+        "u dhaxeeya"
+      ],
+      "text": "u dhaxeeya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≳",
+      "aliases": [
+        "ka weyn la mid ah"
+      ],
+      "text": "ka weyn la mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≺",
+      "aliases": [
+        "ka hor dhacaya"
+      ],
+      "text": "ka hor dhacaya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "≻",
+      "aliases": [
+        "beddelaya"
+      ],
+      "text": "beddelaya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊁",
+      "aliases": [
+        "ma beddelayo"
+      ],
+      "text": "ma beddelayo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊕",
+      "aliases": [
+        "ku daris wareegsan"
+      ],
+      "text": "ku daris wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊖",
+      "aliases": [
+        "ka jaris wareegsan"
+      ],
+      "text": "ka jaris wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊗",
+      "aliases": [
+        "ku dhufasho wareegsan"
+      ],
+      "text": "ku dhufasho wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊘",
+      "aliases": [
+        "islaash qeybin oo wareegsan"
+      ],
+      "text": "islaash qeybin oo wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊙",
+      "aliases": [
+        "calaamad dhibiceed wareegsan"
+      ],
+      "text": "calaamad dhibiceed wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊚",
+      "aliases": [
+        "calaamada faraantiga oo wareegsan"
+      ],
+      "text": "calaamada faraantiga oo wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊛",
+      "aliases": [
+        "calaamada xidigta oo wareegsan"
+      ],
+      "text": "calaamada xidigta oo wareegsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊞",
+      "aliases": [
+        "afar gees dhexda ku daritaan ku leh"
+      ],
+      "text": "afar gees dhexda ku daritaan ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊟",
+      "aliases": [
+        "afar gees dhexda ka jaris ku leh"
+      ],
+      "text": "afar gees dhexda ka jaris ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊥",
+      "aliases": [
+        "leen kor u jeeda oo hoosta leen fidsan ku leh"
+      ],
+      "text": "leen kor u jeeda oo hoosta leen fidsan ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊮",
+      "aliases": [
+        "ma qasbaayo"
+      ],
+      "text": "ma qasbaayo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊰",
+      "aliases": [
+        "ka hor dhacaya si xidhiidh hoos imaada"
+      ],
+      "text": "ka hor dhacaya si xidhiidh hoos imaada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊱",
+      "aliases": [
+        "beddelaya si xidhiidh hoos imaada"
+      ],
+      "text": "beddelaya si xidhiidh hoos imaada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋭",
+      "aliases": [
+        "kuma jiro si koox-hoosaad caadi la mid ah"
+      ],
+      "text": "kuma jiro si koox-hoosaad caadi la mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊶",
+      "aliases": [
+        "asal"
+      ],
+      "text": "asal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⊿",
+      "aliases": [
+        "saddex xagaleed midig"
+      ],
+      "text": "saddex xagaleed midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋁",
+      "aliases": [
+        "n-ary logical ama"
+      ],
+      "text": "n-ary logical ama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋂",
+      "aliases": [
+        "kala goyska n-ary"
+      ],
+      "text": "kala goyska n-ary",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋃",
+      "aliases": [
+        "ururka n-ary"
+      ],
+      "text": "ururka n-ary",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋅",
+      "aliases": [
+        "calamada dhibicda"
+      ],
+      "text": "calamada dhibicda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋆",
+      "aliases": [
+        "calamada xidigta"
+      ],
+      "text": "calamada xidigta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋈",
+      "aliases": [
+        "ku biirista dabiiciga ah"
+      ],
+      "text": "ku biirista dabiiciga ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋒",
+      "aliases": [
+        "labo kala goys"
+      ],
+      "text": "labo kala goys",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋘",
+      "aliases": [
+        "aad ugu yar"
+      ],
+      "text": "aad ugu yar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋙",
+      "aliases": [
+        "aad ugu weyn"
+      ],
+      "text": "aad ugu weyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋮",
+      "aliases": [
+        "seddex dhibic oo toostoos ah"
+      ],
+      "text": "seddex dhibic oo toostoos ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋯",
+      "aliases": [
+        "seddex dhibic oo jiifjiif ah"
+      ],
+      "text": "seddex dhibic oo jiifjiif ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋰",
+      "aliases": [
+        "geesal seddex dhibiceed midigta kore"
+      ],
+      "text": "geesal seddex dhibiceed midigta kore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⋱",
+      "aliases": [
+        "geesal seddex dhibiceed midigta hoose"
+      ],
+      "text": "geesal seddex dhibiceed midigta hoose",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "□",
+      "aliases": [
+        "afar gees dhex banaan"
+      ],
+      "text": "afar gees dhex banaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▢",
+      "aliases": [
+        "afar gees dhex banaan oo geesihiina la wareejiyay"
+      ],
+      "text": "afar gees dhex banaan oo geesihiina la wareejiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▣",
+      "aliases": [
+        "afar geesle dhex banaan oo kujira afar geesle dhexdiisa la buuxiyay"
+      ],
+      "text": "afar geesle dhex banaan oo kujira afar geesle dhexdiisa la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▤",
+      "aliases": [
+        "afar gees dhexda loo buuxiyay si dheer dheer ah"
+      ],
+      "text": "afar gees dhexda loo buuxiyay si dheer dheer ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▥",
+      "aliases": [
+        "afar gees dhexda loo buuxiyay si toosan"
+      ],
+      "text": "afar gees dhexda loo buuxiyay si toosan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▦",
+      "aliases": [
+        "afar gees dhexda loo buuxiyay si siman iyo si toosan"
+      ],
+      "text": "afar gees dhexda loo buuxiyay si siman iyo si toosan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▧",
+      "aliases": [
+        "afar gees dhexda loo buuxiyay si bidix iyo midig ah"
+      ],
+      "text": "afar gees dhexda loo buuxiyay si bidix iyo midig ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▨",
+      "aliases": [
+        "afar gees dhexda loo buuxiyay si midig iyo bidix ah"
+      ],
+      "text": "afar gees dhexda loo buuxiyay si midig iyo bidix ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▩",
+      "aliases": [
+        "afar gees dhexda loo buuxiyay si isku tallaab is dhaafsi ah"
+      ],
+      "text": "afar gees dhexda loo buuxiyay si isku tallaab is dhaafsi ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▬",
+      "aliases": [
+        "leydi la buuxiyay"
+      ],
+      "text": "leydi la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▭",
+      "aliases": [
+        "leydi dhex banaan"
+      ],
+      "text": "leydi dhex banaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▮",
+      "aliases": [
+        "leydi toosan oo la buuxiyay"
+      ],
+      "text": "leydi toosan oo la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▰",
+      "aliases": [
+        "leydida barbarta u janjeerta oo la buuxiyay"
+      ],
+      "text": "leydida barbarta u janjeerta oo la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▲",
+      "aliases": [
+        "saddex xagal buuxda oo kor u taagan"
+      ],
+      "text": "saddex xagal buuxda oo kor u taagan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "△",
+      "aliases": [
+        "saddex geesle dhex banaan oo kor u jeeda"
+      ],
+      "text": "saddex geesle dhex banaan oo kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▴",
+      "aliases": [
+        "saddex geesle yar oo la buuxiyay oo kor u jeeda"
+      ],
+      "text": "saddex geesle yar oo la buuxiyay oo kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▵",
+      "aliases": [
+        "saddex geesle yar oo dhex banaan oo kor u jeeda"
+      ],
+      "text": "saddex geesle yar oo dhex banaan oo kor u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▷",
+      "aliases": [
+        "saddex geesle dhex banaan oo midig u jeeda"
+      ],
+      "text": "saddex geesle dhex banaan oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▸",
+      "aliases": [
+        "saddex geesle yar oo la buuxiyay oo midig u jeeda"
+      ],
+      "text": "saddex geesle yar oo la buuxiyay oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▹",
+      "aliases": [
+        "saddex geesle yar oo dhex banaan oo midig u jeeda"
+      ],
+      "text": "saddex geesle yar oo dhex banaan oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "►",
+      "aliases": [
+        "tilmaame la buuxiyay oo midig u jeeda"
+      ],
+      "text": "tilmaame la buuxiyay oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▻",
+      "aliases": [
+        "tilmaame dhex banaan oo midig u jeeda"
+      ],
+      "text": "tilmaame dhex banaan oo midig u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▼",
+      "aliases": [
+        "saddex xagal hoos-u-fiiqan"
+      ],
+      "text": "saddex xagal hoos-u-fiiqan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▽",
+      "aliases": [
+        "seddex geesle dhex banaan oo hoos u jeeda"
+      ],
+      "text": "seddex geesle dhex banaan oo hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▾",
+      "aliases": [
+        "seddex geesle la buuxiyay oo hoos u jeeda"
+      ],
+      "text": "seddex geesle la buuxiyay oo hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▿",
+      "aliases": [
+        "seddex geesle yar dhex banaan oo hoos u jeeda"
+      ],
+      "text": "seddex geesle yar dhex banaan oo hoos u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◁",
+      "aliases": [
+        "seddex geesle dhex banaan oo bidix u jeeda"
+      ],
+      "text": "seddex geesle dhex banaan oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◂",
+      "aliases": [
+        "seddex geesle yar oo la buuxiyay oo bidix u jeeda"
+      ],
+      "text": "seddex geesle yar oo la buuxiyay oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◃",
+      "aliases": [
+        "seddex geesle yar oo dhex banaan oo bidix u jeeda"
+      ],
+      "text": "seddex geesle yar oo dhex banaan oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◄",
+      "aliases": [
+        "tilmaame la buuxiyay oo bidix u jeeda"
+      ],
+      "text": "tilmaame la buuxiyay oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◅",
+      "aliases": [
+        "tilmaame dhex banaan oo bidix u jeeda"
+      ],
+      "text": "tilmaame dhex banaan oo bidix u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◆",
+      "aliases": [
+        "dheyman gudihiisa la buuxiyay"
+      ],
+      "text": "dheyman gudihiisa la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◇",
+      "aliases": [
+        "dheyman dhex banaan"
+      ],
+      "text": "dheyman dhex banaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◈",
+      "aliases": [
+        "dheyman dhex banaan oo uu kujiro dheyman dhexdiisa la buuxiyay"
+      ],
+      "text": "dheyman dhex banaan oo uu kujiro dheyman dhexdiisa la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◉",
+      "aliases": [
+        "wareeg dhex banaan oo uu kujiro wareeg dhexdiisa la buuxiyay"
+      ],
+      "text": "wareeg dhex banaan oo uu kujiro wareeg dhexdiisa la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◊",
+      "aliases": [
+        "qaab dheeman"
+      ],
+      "text": "qaab dheeman",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "○",
+      "aliases": [
+        "duleelka goobada"
+      ],
+      "text": "duleelka goobada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◌",
+      "aliases": [
+        "dhibic la goobaabay"
+      ],
+      "text": "dhibic la goobaabay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◍",
+      "aliases": [
+        "wareeg dhexdiisa sida toosan loo buuxiyay"
+      ],
+      "text": "wareeg dhexdiisa sida toosan loo buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◎",
+      "aliases": [
+        "goobaabino isku dhex jiraan"
+      ],
+      "text": "goobaabino isku dhex jiraan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◐",
+      "aliases": [
+        "goobaabin badhka bidixda la buuxiyay"
+      ],
+      "text": "goobaabin badhka bidixda la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◑",
+      "aliases": [
+        "goobaabin badhka midigta la buuxiyay"
+      ],
+      "text": "goobaabin badhka midigta la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◒",
+      "aliases": [
+        "goobaabin badhka hoose la buuxiyay"
+      ],
+      "text": "goobaabin badhka hoose la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◓",
+      "aliases": [
+        "goobaabin badhka kore la buuxiyay"
+      ],
+      "text": "goobaabin badhka kore la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◔",
+      "aliases": [
+        "goobaabin afar meelood meesha kore ee midigta laga buuxiyay"
+      ],
+      "text": "goobaabin afar meelood meesha kore ee midigta laga buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◕",
+      "aliases": [
+        "goobaabin afar meelood meesha kore ee bidix aan la buuxinin"
+      ],
+      "text": "goobaabin afar meelood meesha kore ee bidix aan la buuxinin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◖",
+      "aliases": [
+        "goobaabin badhka bidixda la buxiyay"
+      ],
+      "text": "goobaabin badhka bidixda la buxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◗",
+      "aliases": [
+        "goobaabin badhka midigta la buxiyay"
+      ],
+      "text": "goobaabin badhka midigta la buxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◘",
+      "aliases": [
+        "bulet rogan"
+      ],
+      "text": "bulet rogan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◙",
+      "aliases": [
+        "afar gees uu ku dhex jiro goobaabin dhexda la buuxiyay"
+      ],
+      "text": "afar gees uu ku dhex jiro goobaabin dhexda la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◜",
+      "aliases": [
+        "qaansada dhinaca bidix kore ee afar gees meelka goobaabinta"
+      ],
+      "text": "qaansada dhinaca bidix kore ee afar gees meelka goobaabinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◝",
+      "aliases": [
+        "qaansada dhinaca midig kore ee afar gees meelka goobaabinta"
+      ],
+      "text": "qaansada dhinaca midig kore ee afar gees meelka goobaabinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◞",
+      "aliases": [
+        "qaansada dhinaca midig hoose ee afar gees meelka goobaabinta"
+      ],
+      "text": "qaansada dhinaca midig hoose ee afar gees meelka goobaabinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◟",
+      "aliases": [
+        "qaansada dhinaca bidix hoose ee afar gees meelka goobaabinta"
+      ],
+      "text": "qaansada dhinaca bidix hoose ee afar gees meelka goobaabinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◠",
+      "aliases": [
+        "badhka kore ee goobaabinta"
+      ],
+      "text": "badhka kore ee goobaabinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◡",
+      "aliases": [
+        "badhka hoose ee goobaabinta"
+      ],
+      "text": "badhka hoose ee goobaabinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◢",
+      "aliases": [
+        "seddex geesle midigta hoose oo la buuxiyay"
+      ],
+      "text": "seddex geesle midigta hoose oo la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◣",
+      "aliases": [
+        "seddex geesle bidixda hoose oo la buuxiyay"
+      ],
+      "text": "seddex geesle bidixda hoose oo la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◤",
+      "aliases": [
+        "seddex geesle bidixda kore oo la buuxiyay"
+      ],
+      "text": "seddex geesle bidixda kore oo la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◥",
+      "aliases": [
+        "seddex geesle midigta kore oo la buuxiyay"
+      ],
+      "text": "seddex geesle midigta kore oo la buuxiyay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◯",
+      "aliases": [
+        "goobad duleel weeyn"
+      ],
+      "text": "goobad duleel weeyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◳",
+      "aliases": [
+        "afar geesle dhex banaan oo afar geesle yar ku leh midigta kore"
+      ],
+      "text": "afar geesle dhex banaan oo afar geesle yar ku leh midigta kore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◷",
+      "aliases": [
+        "goobaabin dhex banaan oo afar geesle yar ku leh midigta kore"
+      ],
+      "text": "goobaabin dhex banaan oo afar geesle yar ku leh midigta kore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◿",
+      "aliases": [
+        "seddex geeslaha dhinaca hoose ee midig"
+      ],
+      "text": "seddex geeslaha dhinaca hoose ee midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♪",
+      "aliases": [
+        "xadhiga sideedaad"
+      ],
+      "text": "xadhiga sideedaad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⨧",
+      "aliases": [
+        "calaamada ku darista oo labo hoos ka leh"
+      ],
+      "text": "calaamada ku darista oo labo hoos ka leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⨯",
+      "aliases": [
+        "iskutallaab"
+      ],
+      "text": "iskutallaab",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⨼",
+      "aliases": [
+        "natiijada gudaha"
+      ],
+      "text": "natiijada gudaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⩣",
+      "aliases": [
+        "logical ama labo gabal hoos ku leh"
+      ],
+      "text": "logical ama labo gabal hoos ku leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⩽",
+      "aliases": [
+        "ka yar siman jiifsan"
+      ],
+      "text": "ka yar siman jiifsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⪍",
+      "aliases": [
+        "ka yar oo ka sareysa siman la mid ah"
+      ],
+      "text": "ka yar oo ka sareysa siman la mid ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⪚",
+      "aliases": [
+        "labo leen la mid ah ka weyn"
+      ],
+      "text": "labo leen la mid ah ka weyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⪺",
+      "aliases": [
+        "beddelid ka sareysa aan inaba la mid ahayn"
+      ],
+      "text": "beddelid ka sareysa aan inaba la mid ahayn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♭",
+      "aliases": [
+        "fidsan"
+      ],
+      "text": "fidsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♯",
+      "aliases": [
+        "Seef ah"
+      ],
+      "text": "Seef ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☺",
+      "aliases": [
+        "waji dhoolo cadeynaya"
+      ],
+      "text": "waji dhoolo cadeynaya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☹",
+      "aliases": [
+        "waji macbuus"
+      ],
+      "text": "waji macbuus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☠",
+      "aliases": [
+        "laf madaxa iyo iskutallabta"
+      ],
+      "text": "laf madaxa iyo iskutallabta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❣",
+      "aliases": [
+        "claamad ujeedka wadnaha"
+      ],
+      "text": "claamad ujeedka wadnaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❤",
+      "aliases": [
+        "wadno cas"
+      ],
+      "text": "wadno cas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✋",
+      "aliases": [
+        "gacan kor loo qaday"
+      ],
+      "text": "gacan kor loo qaday",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✌",
+      "aliases": [
+        "gacanta guusha"
+      ],
+      "text": "gacanta guusha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☝",
+      "aliases": [
+        "farta muujinta tilmaamaysa kor"
+      ],
+      "text": "farta muujinta tilmaamaysa kor",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✊",
+      "aliases": [
+        "kor u qaadid tantoonyo (feer)"
+      ],
+      "text": "kor u qaadid tantoonyo (feer)",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✍",
+      "aliases": [
+        "gacan wax qoraysa"
+      ],
+      "text": "gacan wax qoraysa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛷",
+      "aliases": [
+        "qof alwaaxa barafka kula socda"
+      ],
+      "text": "qof alwaaxa barafka kula socda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛹",
+      "aliases": [
+        "qof cayaaraya kubadda boodda"
+      ],
+      "text": "qof cayaaraya kubadda boodda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☘",
+      "aliases": [
+        "dhir gaaban saddex caleen leh"
+      ],
+      "text": "dhir gaaban saddex caleen leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☕",
+      "aliases": [
+        "cabitaan kulul"
+      ],
+      "text": "cabitaan kulul",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛰",
+      "aliases": [
+        "buur"
+      ],
+      "text": "buur",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛪",
+      "aliases": [
+        "Kaniisad"
+      ],
+      "text": "Kaniisad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛩",
+      "aliases": [
+        "Meel Caabudaad"
+      ],
+      "text": "Meel Caabudaad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛲",
+      "aliases": [
+        "tuubo biyo kor u ganta"
+      ],
+      "text": "tuubo biyo kor u ganta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛺",
+      "aliases": [
+        "teendho"
+      ],
+      "text": "teendho",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♨",
+      "aliases": [
+        "ilo kulul"
+      ],
+      "text": "ilo kulul",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛽",
+      "aliases": [
+        "bamka shidaalka"
+      ],
+      "text": "bamka shidaalka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚓",
+      "aliases": [
+        "baroosinka"
+      ],
+      "text": "baroosinka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛵",
+      "aliases": [
+        "doon shiraac"
+      ],
+      "text": "doon shiraac",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛴",
+      "aliases": [
+        "rakaab qaadis"
+      ],
+      "text": "rakaab qaadis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✈",
+      "aliases": [
+        "diyaarad"
+      ],
+      "text": "diyaarad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⌛",
+      "aliases": [
+        "dhalada saacad-beegtada ah oo dhamaysay"
+      ],
+      "text": "dhalada saacad-beegtada ah oo dhamaysay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏳",
+      "aliases": [
+        "dhalada saacad-beegtada ah wali ma dhamayn"
+      ],
+      "text": "dhalada saacad-beegtada ah wali ma dhamayn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⌚",
+      "aliases": [
+        "goor-sheeg"
+      ],
+      "text": "goor-sheeg",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏰",
+      "aliases": [
+        "saacadda alarmiga leh"
+      ],
+      "text": "saacadda alarmiga leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏱",
+      "aliases": [
+        "saacad-joojin"
+      ],
+      "text": "saacad-joojin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏲",
+      "aliases": [
+        "saacadda goor-sheegtada ah"
+      ],
+      "text": "saacadda goor-sheegtada ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☀",
+      "aliases": [
+        "qorrax"
+      ],
+      "text": "qorrax",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⭐",
+      "aliases": [
+        "Summadda xiddigta"
+      ],
+      "text": "Summadda xiddigta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☁",
+      "aliases": [
+        "daruur"
+      ],
+      "text": "daruur",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛅",
+      "aliases": [
+        "qorrax ka dambaysa daruur"
+      ],
+      "text": "qorrax ka dambaysa daruur",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛈",
+      "aliases": [
+        "daruur leh hillaac iyo roob"
+      ],
+      "text": "daruur leh hillaac iyo roob",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☂",
+      "aliases": [
+        "dallad"
+      ],
+      "text": "dallad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☔",
+      "aliases": [
+        "dallad leh dhibco roob"
+      ],
+      "text": "dallad leh dhibco roob",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛱",
+      "aliases": [
+        "daallad dhulka ka taagan"
+      ],
+      "text": "daallad dhulka ka taagan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚡",
+      "aliases": [
+        "tamar sare"
+      ],
+      "text": "tamar sare",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❄",
+      "aliases": [
+        "baraf-qolof"
+      ],
+      "text": "baraf-qolof",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☃",
+      "aliases": [
+        "baraf-naag"
+      ],
+      "text": "baraf-naag",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛄",
+      "aliases": [
+        "baraf-naag oo naag la’aan ah"
+      ],
+      "text": "baraf-naag oo naag la’aan ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☄",
+      "aliases": [
+        "dhagax-xiddig"
+      ],
+      "text": "dhagax-xiddig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✨",
+      "aliases": [
+        "dhalaali"
+      ],
+      "text": "dhalaali",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚽",
+      "aliases": [
+        "cayaaraha kubada"
+      ],
+      "text": "cayaaraha kubada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚾",
+      "aliases": [
+        "kubada usha"
+      ],
+      "text": "kubada usha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛳",
+      "aliases": [
+        "calanka godka"
+      ],
+      "text": "calanka godka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛸",
+      "aliases": [
+        "kan lugu socdo barafka"
+      ],
+      "text": "kan lugu socdo barafka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♠",
+      "aliases": [
+        "farshaxan"
+      ],
+      "text": "farshaxan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♥",
+      "aliases": [
+        "lebiska qalbiga"
+      ],
+      "text": "lebiska qalbiga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♟",
+      "aliases": [
+        "jarta fiyooraha"
+      ],
+      "text": "jarta fiyooraha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛑",
+      "aliases": [
+        "madax-gashiga shaqaalaha badbaadinta"
+      ],
+      "text": "madax-gashiga shaqaalaha badbaadinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☎",
+      "aliases": [
+        "telefoon"
+      ],
+      "text": "telefoon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⌨",
+      "aliases": [
+        "kiiboodh"
+      ],
+      "text": "kiiboodh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✉",
+      "aliases": [
+        "baqshad"
+      ],
+      "text": "baqshad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✏",
+      "aliases": [
+        "qalin qori"
+      ],
+      "text": "qalin qori",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✒",
+      "aliases": [
+        "af-qalin madow"
+      ],
+      "text": "af-qalin madow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✂",
+      "aliases": [
+        "maqas"
+      ],
+      "text": "maqas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛏",
+      "aliases": [
+        "madaraq"
+      ],
+      "text": "madaraq",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚒",
+      "aliases": [
+        "dube iyo madaraq"
+      ],
+      "text": "dube iyo madaraq",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚔",
+      "aliases": [
+        "seefo isweydaarsan"
+      ],
+      "text": "seefo isweydaarsan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚙",
+      "aliases": [
+        "geer"
+      ],
+      "text": "geer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚖",
+      "aliases": [
+        "miisaan"
+      ],
+      "text": "miisaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛓",
+      "aliases": [
+        "silsilado"
+      ],
+      "text": "silsilado",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚗",
+      "aliases": [
+        "qalab nadiifin"
+      ],
+      "text": "qalab nadiifin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚰",
+      "aliases": [
+        "sanduuq"
+      ],
+      "text": "sanduuq",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚱",
+      "aliases": [
+        "aas"
+      ],
+      "text": "aas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♿",
+      "aliases": [
+        "calaamadda kursiga curyaanka"
+      ],
+      "text": "calaamadda kursiga curyaanka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚠",
+      "aliases": [
+        "digniin"
+      ],
+      "text": "digniin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛔",
+      "aliases": [
+        "Ma jirto gelitaan"
+      ],
+      "text": "Ma jirto gelitaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☢",
+      "aliases": [
+        "kaah fale"
+      ],
+      "text": "kaah fale",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☣",
+      "aliases": [
+        "halis ku ah noolaha"
+      ],
+      "text": "halis ku ah noolaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⬆",
+      "aliases": [
+        "fallaarta kor"
+      ],
+      "text": "fallaarta kor",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↗",
+      "aliases": [
+        "fallaarta kor ee midig"
+      ],
+      "text": "fallaarta kor ee midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "➡",
+      "aliases": [
+        "fallarta midig"
+      ],
+      "text": "fallarta midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↘",
+      "aliases": [
+        "fallaarta hoose ee midig"
+      ],
+      "text": "fallaarta hoose ee midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⬇",
+      "aliases": [
+        "fallaarta hoose"
+      ],
+      "text": "fallaarta hoose",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↙",
+      "aliases": [
+        "fallaarta hoose ee bidix"
+      ],
+      "text": "fallaarta hoose ee bidix",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⬅",
+      "aliases": [
+        "fallarta bidix"
+      ],
+      "text": "fallarta bidix",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↖",
+      "aliases": [
+        "fallaarta kor ee bidix"
+      ],
+      "text": "fallaarta kor ee bidix",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↕",
+      "aliases": [
+        "falaadh kor u-jeeda"
+      ],
+      "text": "falaadh kor u-jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↔",
+      "aliases": [
+        "fallaarta bidix-midig"
+      ],
+      "text": "fallaarta bidix-midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↮",
+      "aliases": [
+        "istarooga falaarta bidix midigta u jeeda"
+      ],
+      "text": "istarooga falaarta bidix midigta u jeeda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↩",
+      "aliases": [
+        "fallaarta midig u qalloocsan bidix"
+      ],
+      "text": "fallaarta midig u qalloocsan bidix",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "↪",
+      "aliases": [
+        "fallaarta bidix u qalloocsan midig"
+      ],
+      "text": "fallaarta bidix u qalloocsan midig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⤴",
+      "aliases": [
+        "fallaarta midig u qalloocsan kor"
+      ],
+      "text": "fallaarta midig u qalloocsan kor",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⤵",
+      "aliases": [
+        "fallaarta midig u qalloocsan hoos"
+      ],
+      "text": "fallaarta midig u qalloocsan hoos",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚛",
+      "aliases": [
+        "calaamadda atam"
+      ],
+      "text": "calaamadda atam",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✡",
+      "aliases": [
+        "xiddigga Da’uud"
+      ],
+      "text": "xiddigga Da’uud",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☸",
+      "aliases": [
+        "diinta Hindida ee dharma"
+      ],
+      "text": "diinta Hindida ee dharma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☯",
+      "aliases": [
+        "diinta Shiinaha ee yin yang"
+      ],
+      "text": "diinta Shiinaha ee yin yang",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✝",
+      "aliases": [
+        "mactabka latin"
+      ],
+      "text": "mactabka latin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☦",
+      "aliases": [
+        "mactabka diinta asal-raacnimada"
+      ],
+      "text": "mactabka diinta asal-raacnimada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☪",
+      "aliases": [
+        "bil iyo xiddig"
+      ],
+      "text": "bil iyo xiddig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☮",
+      "aliases": [
+        "calaamadda nabadda"
+      ],
+      "text": "calaamadda nabadda",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♈",
+      "aliases": [
+        "laxo"
+      ],
+      "text": "laxo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♉",
+      "aliases": [
+        "dibigga Taurus"
+      ],
+      "text": "dibigga Taurus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♊",
+      "aliases": [
+        "mataanaha"
+      ],
+      "text": "mataanaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♋",
+      "aliases": [
+        "naaf"
+      ],
+      "text": "naaf",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♌",
+      "aliases": [
+        "boqorka libaaxa"
+      ],
+      "text": "boqorka libaaxa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♍",
+      "aliases": [
+        "afaggaal"
+      ],
+      "text": "afaggaal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♎",
+      "aliases": [
+        "cutubka miisaanka"
+      ],
+      "text": "cutubka miisaanka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♏",
+      "aliases": [
+        "dib-qallooc"
+      ],
+      "text": "dib-qallooc",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♐",
+      "aliases": [
+        "dameerajoogeen"
+      ],
+      "text": "dameerajoogeen",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♑",
+      "aliases": [
+        "riyaha"
+      ],
+      "text": "riyaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♒",
+      "aliases": [
+        "cutubka xiddigga biyaha"
+      ],
+      "text": "cutubka xiddigga biyaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♓",
+      "aliases": [
+        "cutubka xiddiga ee kalluunka"
+      ],
+      "text": "cutubka xiddiga ee kalluunka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⛎",
+      "aliases": [
+        "abeeso"
+      ],
+      "text": "abeeso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▶",
+      "aliases": [
+        "badhanka cayaar"
+      ],
+      "text": "badhanka cayaar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏩",
+      "aliases": [
+        "badhanka mootinta"
+      ],
+      "text": "badhanka mootinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏭",
+      "aliases": [
+        "badhanka muusik daarista xigga"
+      ],
+      "text": "badhanka muusik daarista xigga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏯",
+      "aliases": [
+        "bdhanka cayaar ama jooji ah"
+      ],
+      "text": "bdhanka cayaar ama jooji ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◀",
+      "aliases": [
+        "badhanka dib u celinta"
+      ],
+      "text": "badhanka dib u celinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏪",
+      "aliases": [
+        "badhanka dib u celinta degdegga"
+      ],
+      "text": "badhanka dib u celinta degdegga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏮",
+      "aliases": [
+        "badhanka daarista ugu dambeeya"
+      ],
+      "text": "badhanka daarista ugu dambeeya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏫",
+      "aliases": [
+        "badhanka degdegga sare ah"
+      ],
+      "text": "badhanka degdegga sare ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏬",
+      "aliases": [
+        "badhanka degdegga hoose"
+      ],
+      "text": "badhanka degdegga hoose",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏸",
+      "aliases": [
+        "badhanka hakinta"
+      ],
+      "text": "badhanka hakinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏹",
+      "aliases": [
+        "badhanka joojinta"
+      ],
+      "text": "badhanka joojinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏺",
+      "aliases": [
+        "badhanka duubista"
+      ],
+      "text": "badhanka duubista",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⏏",
+      "aliases": [
+        "badhanka ka soo saarista"
+      ],
+      "text": "badhanka ka soo saarista",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♀",
+      "aliases": [
+        "calaamad dheddig"
+      ],
+      "text": "calaamad dheddig",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♂",
+      "aliases": [
+        "calaamad lab"
+      ],
+      "text": "calaamad lab",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚧",
+      "aliases": [
+        "calaamada laba dhidiga"
+      ],
+      "text": "calaamada laba dhidiga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✖",
+      "aliases": [
+        "calaamadda isku dhufashada"
+      ],
+      "text": "calaamadda isku dhufashada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "➕",
+      "aliases": [
+        "calaamadda isugeynta"
+      ],
+      "text": "calaamadda isugeynta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "➖",
+      "aliases": [
+        "calaamadda ka jar"
+      ],
+      "text": "calaamadda ka jar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "➗",
+      "aliases": [
+        "calaamadda isu qaybinta"
+      ],
+      "text": "calaamadda isu qaybinta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♾",
+      "aliases": [
+        "xad la’aan"
+      ],
+      "text": "xad la’aan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "‼",
+      "aliases": [
+        "laba calaamadood cajiib ah"
+      ],
+      "text": "laba calaamadood cajiib ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⁉",
+      "aliases": [
+        "calaamad cajiib su’aal ah"
+      ],
+      "text": "calaamad cajiib su’aal ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❓",
+      "aliases": [
+        "calaamad su’aal"
+      ],
+      "text": "calaamad su’aal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❔",
+      "aliases": [
+        "ccalaamad su’aal cad"
+      ],
+      "text": "ccalaamad su’aal cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❕",
+      "aliases": [
+        "calaamad cajiib cad"
+      ],
+      "text": "calaamad cajiib cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❗",
+      "aliases": [
+        "calaamad cajiib"
+      ],
+      "text": "calaamad cajiib",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚕",
+      "aliases": [
+        "calaamad caafimaad"
+      ],
+      "text": "calaamad caafimaad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "♻",
+      "aliases": [
+        "calaamadda dib-u-warshadaynta"
+      ],
+      "text": "calaamadda dib-u-warshadaynta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚜",
+      "aliases": [
+        "saddex midnimada quduuska"
+      ],
+      "text": "saddex midnimada quduuska",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⭕",
+      "aliases": [
+        "goobo cas dalool leh"
+      ],
+      "text": "goobo cas dalool leh",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✅",
+      "aliases": [
+        "badhanka calaamadda sax"
+      ],
+      "text": "badhanka calaamadda sax",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "☑",
+      "aliases": [
+        "ku calaamadee sanduuqa sax"
+      ],
+      "text": "ku calaamadee sanduuqa sax",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❌",
+      "aliases": [
+        "calaamadda iskutallaabta"
+      ],
+      "text": "calaamadda iskutallaabta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❎",
+      "aliases": [
+        "badhanka calaamadda iskutallaabta"
+      ],
+      "text": "badhanka calaamadda iskutallaabta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "➰",
+      "aliases": [
+        "laaban oo sargo’an"
+      ],
+      "text": "laaban oo sargo’an",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "➿",
+      "aliases": [
+        "maroogsin sargo’an oo laban-laab ah"
+      ],
+      "text": "maroogsin sargo’an oo laban-laab ah",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✳",
+      "aliases": [
+        "siddeed geesood oo isku nooc u taaggan"
+      ],
+      "text": "siddeed geesood oo isku nooc u taaggan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "✴",
+      "aliases": [
+        "xiddig siddeed geeslood oo tilmaama"
+      ],
+      "text": "xiddig siddeed geeslood oo tilmaama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "❇",
+      "aliases": [
+        "dhalaal"
+      ],
+      "text": "dhalaal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "©",
+      "aliases": [
+        "Copyright"
+      ],
+      "text": "Copyright",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "™",
+      "aliases": [
+        "Trademark"
+      ],
+      "text": "Trademark",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "Ⓜ",
+      "aliases": [
+        "M goobaysan"
+      ],
+      "text": "M goobaysan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚫",
+      "aliases": [
+        "goobo madow"
+      ],
+      "text": "goobo madow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⚪",
+      "aliases": [
+        "goobo cad"
+      ],
+      "text": "goobo cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⬛",
+      "aliases": [
+        "afar gees weyn oo madow"
+      ],
+      "text": "afar gees weyn oo madow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "⬜",
+      "aliases": [
+        "afar gees weyn oo cad"
+      ],
+      "text": "afar gees weyn oo cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◼",
+      "aliases": [
+        "afar gees dhexdhexaad oo madow"
+      ],
+      "text": "afar gees dhexdhexaad oo madow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◻",
+      "aliases": [
+        "afar gees dhexdhexaad oo cad"
+      ],
+      "text": "afar gees dhexdhexaad oo cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "◽",
+      "aliases": [
+        "afar gees dhexdhexaad yar oo cad"
+      ],
+      "text": "afar gees dhexdhexaad yar oo cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "▫",
+      "aliases": [
+        "afar gees yar oo cad"
+      ],
+      "text": "afar gees yar oo cad",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "¢",
+      "aliases": [
+        "Cents"
+      ],
+      "text": "Cents",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "¥",
+      "aliases": [
+        "Yen"
+      ],
+      "text": "Yen",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "₩",
+      "aliases": [
+        "guulaystay"
+      ],
+      "text": "guulaystay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "₰",
+      "aliases": [
+        "penny-ga jarmalka"
+      ],
+      "text": "penny-ga jarmalka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "₱",
+      "aliases": [
+        "beeso"
+      ],
+      "text": "beeso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "₹",
+      "aliases": [
+        "Rupee"
+      ],
+      "text": "Rupee",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "₽",
+      "aliases": [
+        "cutub lacageedka raashiya"
+      ],
+      "text": "cutub lacageedka raashiya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "₿",
+      "aliases": [
+        "bitkoyn"
+      ],
+      "text": "bitkoyn",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∁",
+      "aliases": [
+        "complement"
+      ],
+      "text": "complement",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "so",
+      "lookup_text": "∨",
+      "aliases": [
+        "logical or"
+      ],
+      "text": "logical or",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "nvda_symbols",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {
+    "{": {
+      "name": "left brace",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "_": {
+      "name": "line",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "-": {
+      "name": "dash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "–": {
+      "name": "en dash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "—": {
+      "name": "em dash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    ",": {
+      "name": "comma",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    ";": {
+      "name": "semi",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    ":": {
+      "name": "colon",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "!": {
+      "name": "bang",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "?": {
+      "name": "question",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    ".": {
+      "name": "dot",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "…": {
+      "name": "dot dot dot",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "'": {
+      "name": "tick",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‘": {
+      "name": "left tick",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "’": {
+      "name": "right tick",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "“": {
+      "name": "left quote",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "”": {
+      "name": "right quote",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "«": {
+      "name": "double left pointing angle bracket",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "»": {
+      "name": "double right pointing angle bracket",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    ")": {
+      "name": "right paren",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "[": {
+      "name": "left bracket",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "]": {
+      "name": "right bracket",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "}": {
+      "name": "right brace",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "§": {
+      "name": "section",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "@": {
+      "name": "at",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "*": {
+      "name": "star",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "/": {
+      "name": "slash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\\": {
+      "name": "backslash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "&": {
+      "name": "and",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "#": {
+      "name": "number",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "%": {
+      "name": "percent",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "•": {
+      "name": "bullet",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‸": {
+      "name": "caret",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⁂": {
+      "name": "asterism",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "`": {
+      "name": "graav",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "^": {
+      "name": "caret",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "¨": {
+      "name": "diaeresis",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "°": {
+      "name": "degrees",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "←": {
+      "name": "left arrow",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "→": {
+      "name": "right arrow",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "↑": {
+      "name": "up arrow",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "↓": {
+      "name": "down arrow",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⇨": {
+      "name": "right white arrow",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∀": {
+      "name": "for all",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∂": {
+      "name": "partial derivative",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∃": {
+      "name": "there exists",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∅": {
+      "name": "empty set",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∆": {
+      "name": "increment",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∈": {
+      "name": "element of",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∉": {
+      "name": "not an element of",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∋": {
+      "name": "contains as member",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∎": {
+      "name": "end of proof",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∏": {
+      "name": "n-ary product",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∑": {
+      "name": "n-ary summation",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "+": {
+      "name": "plus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "÷": {
+      "name": "divide by",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "×": {
+      "name": "times",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "<": {
+      "name": "less",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "=": {
+      "name": "equals",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    ">": {
+      "name": "greater",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "|": {
+      "name": "bar",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "~": {
+      "name": "tilda",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "√": {
+      "name": "square root",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∝": {
+      "name": "proportional to",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∞": {
+      "name": "infinity",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∟": {
+      "name": "right angle",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∠": {
+      "name": "angle",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∥": {
+      "name": "parallel to",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∩": {
+      "name": "intersection",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∪": {
+      "name": "union",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∫": {
+      "name": "integral",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∴": {
+      "name": "therefore",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∵": {
+      "name": "because",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∶": {
+      "name": "ratio",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∷": {
+      "name": "proportion",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "≥": {
+      "name": "greater-than or equal to",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊂": {
+      "name": "subset of",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊃": {
+      "name": "superset of",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊆": {
+      "name": "subset of or equal to",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊇": {
+      "name": "superset of or equal to",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊹": {
+      "name": "hermitian conjugate matrix",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "■": {
+      "name": "black square",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "●": {
+      "name": "circle",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "◦": {
+      "name": "white bullet",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♦": {
+      "name": "black diamond",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♣": {
+      "name": "black club",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "✔": {
+      "name": "check",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "®": {
+      "name": "registered",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "◾": {
+      "name": "black square",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "▪": {
+      "name": "black square",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "$": {
+      "name": "dollar",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "£": {
+      "name": "pound",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₢": {
+      "name": "cruzeiro",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₣": {
+      "name": "french franc",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₤": {
+      "name": "lira",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₥": {
+      "name": "mill",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "€": {
+      "name": "euro",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₳": {
+      "name": "austral",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₶": {
+      "name": "livre tournois",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₷": {
+      "name": "spesmilo",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₨": {
+      "name": "rupee",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\u0000": {
+      "name": "blank",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\t": {
+      "name": "tab",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\n": {
+      "name": "line feed",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\f": {
+      "name": "page break",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\r": {
+      "name": "carriage return",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    " ": {
+      "name": "space",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    " ": {
+      "name": "space",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\"": {
+      "name": "quote",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "(": {
+      "name": "left paren",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‎": {
+      "name": "left to right mark",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‏": {
+      "name": "right to left mark",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "➢": {
+      "name": "right arrowhead",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "❖": {
+      "name": "black diamond minus white X",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "✓": {
+      "name": "check",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∄": {
+      "name": "there does not exist",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∊": {
+      "name": "small element of",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∌": {
+      "name": "does not contain as member",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∍": {
+      "name": "small contains as member",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∛": {
+      "name": "cube root",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∜": {
+      "name": "fourth root",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∦": {
+      "name": "not parallel to",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    }
+  },
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

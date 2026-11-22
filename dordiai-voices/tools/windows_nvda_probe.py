@@ -35,8 +35,9 @@ NVDA_URL = "https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe"
 NVDA_SHA256 = "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052"
 SCOPE = "isolated-real-windows-nvda-smoke"
 
-# This code runs inside the downloaded, unmodified NVDA interpreter. It does
-# not stub wx, the synth driver, native models or Windows audio APIs.
+# This code runs inside the downloaded, unmodified NVDA interpreter. Normal
+# mode uses actual Windows audio. Explicit --headless-ui-probe substitutes
+# only the output sink, with physical/device acceptance always blocked.
 PROBE_PLUGIN = r'''
 import array
 import json
@@ -64,7 +65,15 @@ RESULT = {
         "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
         "One keyboard smoke check is not a complete accessibility assessment.",
     ],
+    "wave_player_verified": False,
+    "physical_audio_verified": False,
+    "acoustic_latency_verified": False,
+    "product_ready": False,
+    "recording_pcm_sink_test_double": bool(SETTINGS.get("headless_ui_probe")),
 }
+if SETTINGS.get("headless_ui_probe"):
+    RESULT["scope"] = "real-nvda-driver-models-gui-with-recording-sink-test-double"
+    RESULT["limitations"].append("Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked.")
 LOCK = threading.Lock()
 METRICS = {}
 STAGE = "startup"
@@ -78,6 +87,41 @@ LATENCY_STOP = threading.Event()
 DONE = threading.Event()
 SAMPLE_RATE = 24000
 SAMPLES = {}
+
+
+class RecordingPCMSink:
+    """Explicit probe-only output double; never installed in production code."""
+    _dordiai_recording_test_double = True
+
+    def __init__(self, channels, samplesPerSec, bitsPerSample, **kwargs):
+        self.channels = channels
+        self.samplesPerSec = samplesPerSec
+        self.bitsPerSample = bitsPerSample
+        self.closed = False
+        self.paused = False
+
+    def feed(self, data, onDone=None):
+        if self.closed:
+            raise OSError("Recording sink is closed")
+        if not isinstance(data, (bytes, bytearray, memoryview)) or len(data) % 2:
+            raise ValueError("Recording sink requires aligned 16-bit PCM")
+        if onDone is not None:
+            onDone()
+
+    def idle(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def pause(self, switch):
+        self.paused = bool(switch)
+
+    def close(self):
+        self.closed = True
+
+    def enableTrimmingLeadingSilence(self, enabled):
+        self.trim_leading = bool(enabled)
 
 
 def save():
@@ -115,7 +159,8 @@ def record_play(pcm, generation):
     if FINISHED:
         return ORIGINAL_PLAY(pcm, generation)
     original_result = ORIGINAL_PLAY(pcm, generation)
-    # Count only buffers whose real WavePlayer submission returned successfully.
+    # In normal mode this is the real WavePlayer. Explicit headless mode
+    # records only the probe sink boundary and cannot certify audio output.
     with LOCK:
         entry = METRICS.setdefault(stage, {"pcm_bytes": 0, "nonzero_bytes": 0, "play_calls": 0})
         entry["pcm_bytes"] += len(pcm)
@@ -163,6 +208,8 @@ def finish():
                 output.writeframes(bytes(data))
     statuses = {entry["status"] for entry in RESULT["checks"]}
     RESULT["status"] = "failed" if "failed" in statuses else "partial" if "blocked" in statuses else "passed"
+    if SETTINGS.get("headless_ui_probe") and RESULT["status"] == "passed":
+        RESULT["status"] = "partial"
     RESULT["finished_at_ns"] = time.time_ns()
     save()
     # This is the portable instance launched by the external controller only.
@@ -180,7 +227,17 @@ def begin():
     except AttributeError:
         # Direct driver requests below still work. Record possible ambient speech.
         RESULT["limitations"].append("NVDA speech-mode suppression API unavailable; desktop announcements may share the output.")
-    selected = synthDriverHandler.setSynth("kx47Preview")
+    if SETTINGS.get("headless_ui_probe"):
+        import nvwave
+        real_wave_player = nvwave.WavePlayer
+        nvwave.WavePlayer = RecordingPCMSink
+        try:
+            selected = synthDriverHandler.setSynth("kx47Preview")
+        finally:
+            nvwave.WavePlayer = real_wave_player
+        check("physical_audio_output", "blocked", reason="Explicit recording PCM sink test double; no WavePlayer/device acceptance")
+    else:
+        selected = synthDriverHandler.setSynth("kx47Preview")
     DRIVER = synthDriverHandler.getSynth()
     if not selected or DRIVER is None or getattr(DRIVER, "name", None) != "kx47Preview":
         check("select_dordiai", "failed", returned=bool(selected), actual=getattr(DRIVER, "name", None))
@@ -334,7 +391,10 @@ def wait_for_stage(stage, deadline, continuation):
     if DONE.is_set():
         error = getattr(DRIVER, "_dordiai_last_error", None)
         success = stats.get("pcm_bytes", 0) > 0 and stats.get("nonzero_bytes", 0) > 0 and not error
-        check(stage + "_pcm_submission", "passed" if success else "failed", metrics=stats, driver_error=error)
+        if success and not SETTINGS.get("headless_ui_probe"):
+            RESULT["wave_player_verified"] = True
+        check(stage + "_pcm_submission", "passed" if success else "failed", metrics=stats, driver_error=error,
+              output_boundary="recording PCM sink TEST DOUBLE" if SETTINGS.get("headless_ui_probe") else "real WavePlayer")
         later(300, continuation)
     elif time.monotonic() >= deadline:
         check(stage + "_pcm_submission", "failed", reason="Real synthesis did not complete before the watchdog", metrics=stats,
@@ -391,8 +451,8 @@ def percentiles(values):
 
 
 def observed_feed(data, *args, **kwargs):
-    # Capture the boundary before the REAL WavePlayer feed, and count the
-    # observation only after that real call returns. No audio output stub is used.
+    # Normal mode measures the real WavePlayer boundary. Explicit headless
+    # mode measures the labeled test double and never satisfies device targets.
     submitted_ns = time.perf_counter_ns()
     outcome = ORIGINAL_FEED(data, *args, **kwargs)
     if isinstance(data, (bytes, bytearray, memoryview)) and any(data):
@@ -410,7 +470,7 @@ def start_latency():
     global STAGE, ORIGINAL_FEED, LATENCY_THREAD
     STAGE = "api_latency"
     RESULT["latency_scope"] = {
-        "boundary": "driver.speak call to first nonzero PCM forwarded to real WavePlayer.feed",
+        "boundary": "driver.speak to recording PCM sink TEST DOUBLE" if SETTINGS.get("headless_ui_probe") else "driver.speak call to first nonzero PCM forwarded to real WavePlayer.feed",
         "cancel_boundary": "elapsed real driver.cancel API call",
         "physical_audible_latency": "not measured; no loopback capture",
         "switch_boundary": "alternating individual language requests, not a continuous audible gap measurement",
@@ -523,6 +583,10 @@ def latency_finished(summary):
           note="Measurement completion only; API/pre-device values do not certify physical latency acceptance")
     for name, measurements in (("warm_letter_predevice_target", summary["warm_letters"]),
                                 ("cancel_api_target", summary["cancel_api"])):
+        if SETTINGS.get("headless_ui_probe"):
+            check(name, "blocked", measurements=measurements,
+                  reason="Recording sink double: internal queue measurements cannot satisfy WavePlayer/device or acoustic acceptance")
+            continue
         complete = measurements["count"] >= 100
         passed = complete and measurements["p95_ms"] <= 20.0 and measurements["p99_ms"] <= 50.0
         check(name, "passed" if passed else "failed", measurements=measurements,
@@ -688,6 +752,8 @@ def main(argv=None):
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--installer-cache", type=Path, help="Optional cache file path for the pinned official EXE")
     parser.add_argument("--timeout", type=float, default=600.0, help="Watchdog seconds for each NVDA process")
+    parser.add_argument("--headless-ui-probe", action="store_true",
+                        help="Explicit recording output TEST DOUBLE for real NVDA/driver/model/GUI checks; never certifies WavePlayer or acoustic output")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
@@ -699,6 +765,12 @@ def main(argv=None):
               "platform": platform.platform(), "status": "running", "run_directory": str(run),
               "nvda_version": NVDA_VERSION, "installer_url": NVDA_URL, "installer_sha256": NVDA_SHA256,
               "checks": [], "limitations": ["Not a full release acceptance or acoustic/linguistic assessment"]}
+    result.update(wave_player_verified=False, physical_audio_verified=False,
+                  acoustic_latency_verified=False, product_ready=False,
+                  recording_pcm_sink_test_double=args.headless_ui_probe)
+    if args.headless_ui_probe:
+        result["scope"] = "real-nvda-driver-models-gui-with-recording-sink-test-double"
+        result["limitations"].append("Explicit headless output double: no WavePlayer/device/acoustic acceptance")
     controller_path = output / "windows-nvda-probe.json"
     process = None
     try:
@@ -749,7 +821,9 @@ def main(argv=None):
             'name = "dordiaiProbe"\nsummary = "Isolated dordiai integration probe"\n'
             'version = "1.0.0"\nauthor = "dordiai-voices"\n'
             'minimumNVDAVersion = "2026.1"\nlastTestedNVDAVersion = "2026.3.1"\n', encoding="utf-8")
-        (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__PROBE_SETTINGS__", repr({"output": str(run), "run_id": run_id})), encoding="utf-8")
+        (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__PROBE_SETTINGS__", repr({
+            "output": str(run), "run_id": run_id, "headless_ui_probe": args.headless_ui_probe,
+        })), encoding="utf-8")
         (config / "nvda.ini").write_text(
             '[general]\nshowWelcomeDialog = False\naskToExit = False\nsaveConfigurationOnExit = False\n'
             'playStartAndExitSounds = False\nlanguage = en\n'
@@ -775,6 +849,7 @@ def main(argv=None):
                     if probe.get("run_id") == run_id and probe.get("status") not in {None, "running"}:
                         result["probe"] = probe
                         result["status"] = probe["status"]
+                        result["wave_player_verified"] = bool(probe.get("wave_player_verified")) and not args.headless_ui_probe
                         if result["status"] == "passed" and any(check["status"] == "blocked" for check in result["checks"]):
                             result["status"] = "partial"
                         break

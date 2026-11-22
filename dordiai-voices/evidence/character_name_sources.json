@@ -1,0 +1,657 @@
+{
+  "format_version": 1,
+  "nvda_revision": "c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350",
+  "cldr_revision": "7d2b9cb11cec08f4d333ad73209deb3df0711c3b",
+  "scope": "Pinned-source character metadata, not generated or accepted audio banks",
+  "languages": {
+    "ay": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 69,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 69,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "ak": {
+      "status": "metadata-prepared",
+      "symbol_names": 489,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 22,
+      "bank_entries_pending_acoustic_validation": 489,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 23
+    },
+    "doi": {
+      "status": "metadata-prepared",
+      "symbol_names": 8,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 73,
+      "bank_entries_pending_acoustic_validation": 8,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "bm": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 27,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "dv": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "brx": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 62,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "dyu": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "dz": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 58,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "ff": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 27,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "fj": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "gil": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "fil": {
+      "status": "metadata-prepared",
+      "symbol_names": 429,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 28,
+      "bank_entries_pending_acoustic_validation": 429,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 83
+    },
+    "ha": {
+      "status": "metadata-prepared",
+      "symbol_names": 509,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 58,
+      "exemplar_units": 29,
+      "bank_entries_pending_acoustic_validation": 567,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 3
+    },
+    "ig": {
+      "status": "metadata-prepared",
+      "symbol_names": 483,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 36,
+      "bank_entries_pending_acoustic_validation": 483,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 29
+    },
+    "en": {
+      "status": "metadata-prepared",
+      "symbol_names": 862,
+      "phonetic_descriptions": 26,
+      "ordinary_letter_names": 52,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 914,
+      "missing_sources": [],
+      "letter_names_ready": true,
+      "english_identical_candidates_excluded": 0
+    },
+    "ks": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 46,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "kab": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 34,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "ln": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 54,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "mai": {
+      "status": "metadata-prepared",
+      "symbol_names": 4,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 49,
+      "bank_entries_pending_acoustic_validation": 4,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "km": {
+      "status": "metadata-prepared",
+      "symbol_names": 511,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 74,
+      "bank_entries_pending_acoustic_validation": 511,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 1
+    },
+    "lo": {
+      "status": "metadata-prepared",
+      "symbol_names": 512,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 55,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "mg": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 27,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "mos": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "nso": {
+      "status": "metadata-prepared",
+      "symbol_names": 149,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 25,
+      "bank_entries_pending_acoustic_validation": 149,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 13
+    },
+    "mni": {
+      "status": "metadata-prepared",
+      "symbol_names": 6,
+      "phonetic_descriptions": 42,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 62,
+      "bank_entries_pending_acoustic_validation": 6,
+      "missing_sources": [
+        "nvda_symbols"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "ny": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "rm": {
+      "status": "metadata-prepared",
+      "symbol_names": 487,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 52,
+      "exemplar_units": 32,
+      "bank_entries_pending_acoustic_validation": 539,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 25
+    },
+    "sat": {
+      "status": "metadata-prepared",
+      "symbol_names": 10,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 36,
+      "bank_entries_pending_acoustic_validation": 10,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "rn": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "rw": {
+      "status": "metadata-prepared",
+      "symbol_names": 162,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 162,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "ru": {
+      "status": "metadata-prepared",
+      "symbol_names": 879,
+      "phonetic_descriptions": 39,
+      "ordinary_letter_names": 66,
+      "exemplar_units": 33,
+      "bank_entries_pending_acoustic_validation": 945,
+      "missing_sources": [],
+      "letter_names_ready": true,
+      "english_identical_candidates_excluded": 0
+    },
+    "sm": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "sg": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 34,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "sn": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 24,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "st": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 22,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "so": {
+      "status": "metadata-prepared",
+      "symbol_names": 413,
+      "phonetic_descriptions": 21,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 18,
+      "bank_entries_pending_acoustic_validation": 413,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 122
+    },
+    "tg": {
+      "status": "metadata-prepared",
+      "symbol_names": 164,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 35,
+      "bank_entries_pending_acoustic_validation": 164,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 2
+    },
+    "tpi": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "wo": {
+      "status": "metadata-prepared",
+      "symbol_names": 161,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 29,
+      "bank_entries_pending_acoustic_validation": 161,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 5
+    },
+    "xh": {
+      "status": "metadata-prepared",
+      "symbol_names": 162,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 162,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "ts": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    },
+    "uk": {
+      "status": "metadata-prepared",
+      "symbol_names": 866,
+      "phonetic_descriptions": 32,
+      "ordinary_letter_names": 66,
+      "exemplar_units": 34,
+      "bank_entries_pending_acoustic_validation": 932,
+      "missing_sources": [],
+      "letter_names_ready": true,
+      "english_identical_candidates_excluded": 0
+    },
+    "zu": {
+      "status": "metadata-prepared",
+      "symbol_names": 376,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 60,
+      "bank_entries_pending_acoustic_validation": 376,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 136
+    },
+    "yo": {
+      "status": "metadata-prepared",
+      "symbol_names": 494,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 45,
+      "bank_entries_pending_acoustic_validation": 494,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 18
+    },
+    "nd": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 25,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0
+    }
+  },
+  "blocked_english_identical_symbol_candidates": 460
+}

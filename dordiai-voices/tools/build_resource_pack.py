@@ -13,7 +13,8 @@ import package_manager as manager
 
 
 def create_resource_pack(source, output, *, prefix, identity, name, version="1.0.0",
-                         minimum_core_version=VERSION, languages=(), engine_ids=(), dependencies=()):
+                         minimum_core_version=VERSION, languages=(), engine_ids=(), dependencies=(),
+                         dependency_versions=None, metadata_extra=None):
     """Create a generic pack without adding a per-language branch to the builder.
 
     The caller supplies the exact destination namespace expected by its adapter.
@@ -61,6 +62,16 @@ def create_resource_pack(source, output, *, prefix, identity, name, version="1.0
                 "version": version, "minimum_core_version": minimum_core_version,
                 "languages": list(dict.fromkeys(languages)), "engine_ids": list(dict.fromkeys(engine_ids)),
                 "dependencies": list(dict.fromkeys(dependencies))}
+    if dependency_versions is not None and not isinstance(dependency_versions, dict):
+        raise ValueError("Exact dependency versions must be a mapping")
+    if dependency_versions:
+        metadata["dependency_versions"] = dependency_versions
+    manager._dependency_versions(metadata)
+    if metadata_extra is not None:
+        if not isinstance(metadata_extra, dict) or set(metadata_extra) & (set(metadata) | {"files", "dependency_versions"}):
+            raise ValueError("Extra metadata cannot override the package identity or inventory")
+        json.dumps(metadata_extra)  # Fail before compressing large files.
+        metadata.update(metadata_extra)
     output.parent.mkdir(parents=True, exist_ok=True)
     record = build_archive(output, payload, metadata, PACK_MANIFEST)
     manager.inspect_pack(output)
@@ -79,8 +90,23 @@ def main():
     parser.add_argument("--language", dest="languages", action="append", default=[])
     parser.add_argument("--engine", dest="engine_ids", action="append", default=[])
     parser.add_argument("--dependency", dest="dependencies", action="append", default=[])
+    parser.add_argument("--dependency-version", action="append", default=[], metavar="ID=VERSION",
+                        help="Require an exact installed dependency version; also declare --dependency ID")
+    parser.add_argument("--metadata-json", type=Path, help="Additional provenance/quality metadata; cannot override identity/files")
     args = parser.parse_args()
-    record = create_resource_pack(**vars(args))
+    values = vars(args)
+    extra = values.pop("metadata_json")
+    exact = values.pop("dependency_version")
+    versions = {}
+    for expression in exact:
+        identity, separator, version = expression.partition("=")
+        if not separator or identity in versions:
+            parser.error("--dependency-version must be a unique ID=VERSION pair")
+        versions[identity] = version
+    values["dependency_versions"] = versions
+    if extra is not None:
+        values["metadata_extra"] = json.loads(extra.read_text(encoding="utf-8"))
+    record = create_resource_pack(**values)
     print(json.dumps(record, ensure_ascii=False), flush=True)
 
 

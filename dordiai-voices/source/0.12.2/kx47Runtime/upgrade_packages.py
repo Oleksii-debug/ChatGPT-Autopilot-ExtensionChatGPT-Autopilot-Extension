@@ -145,7 +145,7 @@ def migrate_installed_packages(old_root, new_root):
                 (provided if is_core else owned)[name] = value
                 if not is_core:
                     owners[name.casefold()] = identity
-            allowed_fields = ("format", "format_version", "id", "name", "version", "minimum_core_version", "dependencies", "languages", "engine_ids")
+            allowed_fields = ("format", "format_version", "id", "name", "version", "minimum_core_version", "dependencies", "dependency_versions", "languages", "engine_ids")
             migrated = {key: original[key] for key in allowed_fields if key in original}
             migrated.update(files=owned, provided_by_core=provided)
             pending[identity] = migrated

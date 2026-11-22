@@ -73,7 +73,7 @@ class ReleaseBuildTests(unittest.TestCase):
                     self.assertEqual(set(json.loads(archive.read("kx47Runtime/models/voices/catalog.json"))), {"oleksii", "anna"})
                     self.assertNotIn(b"inna", archive.read("kx47Runtime/models/voices/delivery.json"))
                     self.assertNotIn(b"inna", archive.read("kx47Runtime/models/english_voice_profiles.json"))
-                    self.assertIn(b"0.13.0-dev.1", archive.read("manifest.ini"))
+                    self.assertIn(build.VERSION.encode(), archive.read("manifest.ini"))
                 if a["group"] == "wide-languages":
                     self.assertEqual(archive.read("kx47Runtime/models/WideLanguages/wide_words.json"), b'{"inna":"valid-word"}')
         self.assertEqual((self.baseline / "kx47Runtime/worker.py").read_bytes(), b"ORIGINAL = True\n")
@@ -105,13 +105,16 @@ class ResourcePackageTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def make_pack(self, identity="demo", payload=None, dependencies=None, corrupt_hash=False):
+    def make_pack(self, identity="demo", payload=None, dependencies=None, corrupt_hash=False,
+                  minimum_core_version="0.13.0-dev.1", version="0.13.0-dev.1", dependency_versions=None):
         payload = payload or {"kx47Runtime/models/Test/model.bin": b"model"}
         files = {name: {"size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()} for name, data in payload.items()}
         if corrupt_hash:
             next(iter(files.values()))["sha256"] = "0" * 64
-        meta = {"format": manager.FORMAT, "format_version": 1, "id": identity, "version": "0.13.0-dev.1",
-                "minimum_core_version": "0.13.0-dev.1", "name": "Demo", "dependencies": dependencies or [], "files": files}
+        meta = {"format": manager.FORMAT, "format_version": 1, "id": identity, "version": version,
+                "minimum_core_version": minimum_core_version, "name": "Demo", "dependencies": dependencies or [], "files": files}
+        if dependency_versions is not None:
+            meta["dependency_versions"] = dependency_versions
         path = self.root / (identity + ".zip")
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(manager.MANIFEST, json.dumps(meta))
@@ -283,6 +286,51 @@ class ResourcePackageTests(unittest.TestCase):
         for name in ["kx47Runtime/models/voices/inna.npy", "kx47Runtime/models/WideLanguages/navigation/he/vira.pcm"]:
             with self.subTest(name=name), self.assertRaises(manager.PackageError):
                 manager.inspect_pack(self.make_pack(payload={name: b"voice"}))
+
+    def test_prerelease_core_gate_rejects_newer_dev_and_patch(self):
+        for version in ["0.13.0-dev.2", "0.13.1-dev.1"]:
+            with self.subTest(version=version), self.assertRaises(manager.PackageError):
+                manager.install_pack(self.make_pack(minimum_core_version=version), self.addon)
+        self.assertFalse((self.addon / "kx47Runtime/models/Test/model.bin").exists())
+
+    def test_semver_prerelease_numeric_stable_and_build_precedence(self):
+        versions = ["0.13.0-dev.1", "0.13.0-dev.2", "0.13.0-dev.10", "0.13.0", "0.13.1-dev.1"]
+        parsed = list(map(manager._version, versions))
+        self.assertEqual(parsed, sorted(parsed))
+        self.assertLess(manager._version("1.0.0-alpha"), manager._version("1.0.0-alpha.1"))
+        self.assertLess(manager._version("1.0.0-1"), manager._version("1.0.0-alpha"))
+        self.assertEqual(manager._version("1.0.0+linux.001"), manager._version("1.0.0+windows.9"))
+        for invalid in ["1.0", "01.0.0", "1.0.0-dev.01", "1.0.0-", "1.0.0-dev_1"]:
+            with self.subTest(invalid=invalid), self.assertRaises(manager.PackageError):
+                manager._version(invalid)
+
+    def test_exact_dependency_version_rejects_wrong_shared_model(self):
+        manager.install_pack(self.make_pack(version="2.0.0"), self.addon)
+        ref = self.make_pack("reference", {"kx47Runtime/models/Test/ref.bin": b"ref"}, ["demo"],
+                             dependency_versions={"demo": "1.0.0"})
+        with self.assertRaisesRegex(manager.PackageError, "точної версії"):
+            manager.install_pack(ref, self.addon)
+        self.assertFalse((self.addon / "kx47Runtime/models/Test/ref.bin").exists())
+
+    def test_shared_upgrade_cannot_break_existing_exact_dependent(self):
+        manager.install_pack(self.make_pack(version="1.0.0"), self.addon)
+        manager.install_pack(self.make_pack("reference", {"kx47Runtime/models/Test/ref.bin": b"ref"}, ["demo"],
+                                           dependency_versions={"demo": "1.0.0"}), self.addon)
+        with self.assertRaises(manager.PackageError):
+            manager.install_pack(self.make_pack(version="2.0.0", payload={"kx47Runtime/models/Test/model.bin": b"new"}), self.addon)
+        self.assertEqual(manager._state(self.addon)["packs"]["demo"]["version"], "1.0.0")
+        self.assertEqual((self.addon / "kx47Runtime/models/Test/model.bin").read_bytes(), b"model")
+
+    def test_legacy_id_only_dependencies_remain_compatible(self):
+        manager.install_pack(self.make_pack(version="1.0.0"), self.addon)
+        manager.install_pack(self.make_pack("reference", {"kx47Runtime/models/Test/ref.bin": b"ref"}, ["demo"]), self.addon)
+        manager.install_pack(self.make_pack(version="2.0.0"), self.addon)
+        self.assertEqual(manager._state(self.addon)["packs"]["demo"]["version"], "2.0.0")
+
+    def test_dependency_version_schema_rejects_undeclared_or_invalid_version(self):
+        for versions in [{"not-declared": "1.0.0"}, {"demo": "invalid"}, ["demo=1.0.0"]]:
+            with self.subTest(versions=versions), self.assertRaises(manager.PackageError):
+                manager.inspect_pack(self.make_pack("reference", dependencies=["demo"], dependency_versions=versions))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1036 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "ay",
+  "sources": {
+    "curated_primary_alphabet_names": {
+      "url": "https://www.ilcanet.org/ciberaymara/contexto/",
+      "sha256": "5e90a2dabdd65c4aa02760a13ecf709884d92e504eec5439e4a4403ddb97aeeb",
+      "sha256_scope": "original retrieved HTML bytes",
+      "title": "Ciberaymara — Contexto — El alfabeto aymara",
+      "author": "Instituto de Lengua y Cultura Aymara (ILCA); course register based on INEL/SENALEP and Juan de Dios Yapita",
+      "location": "Escritura, §3 El alfabeto aymara, NOMBRE DE LA LETRA table",
+      "role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+      "short_quote": "NOMBRE DE LA LETRA",
+      "license_note": "Individual factual names transcribed with attribution; original page/teaching prose not redistributed; no license of whole source asserted",
+      "native_pronunciation_verified": false
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions",
+    "cldr_annotations",
+    "cldr_characters"
+  ],
+  "letter_names": {
+    "a": "a",
+    "A": "a",
+    "ä": "ä",
+    "Ä": "ä",
+    "ch": "cha",
+    "CH": "cha",
+    "Ch": "cha",
+    "chh": "chha",
+    "CHH": "chha",
+    "Chh": "chha",
+    "ch'": "ch'a",
+    "CH'": "ch'a",
+    "Ch'": "ch'a",
+    "i": "i",
+    "I": "i",
+    "ï": "ï",
+    "Ï": "ï",
+    "j": "ja",
+    "J": "ja",
+    "k": "ka",
+    "K": "ka",
+    "kh": "kha",
+    "KH": "kha",
+    "Kh": "kha",
+    "k'": "k'a",
+    "K'": "k'a",
+    "l": "la",
+    "L": "la",
+    "ll": "lla",
+    "LL": "lla",
+    "Ll": "lla",
+    "m": "ma",
+    "M": "ma",
+    "n": "na",
+    "N": "na",
+    "ñ": "ña",
+    "Ñ": "ña",
+    "p": "pa",
+    "P": "pa",
+    "ph": "pha",
+    "PH": "pha",
+    "Ph": "pha",
+    "p'": "p'a",
+    "P'": "p'a",
+    "q": "qa",
+    "Q": "qa",
+    "q'": "q'a",
+    "Q'": "q'a",
+    "r": "ra",
+    "R": "ra",
+    "s": "sa",
+    "S": "sa",
+    "t": "ta",
+    "T": "ta",
+    "th": "tha",
+    "TH": "tha",
+    "Th": "tha",
+    "t'": "t'a",
+    "T'": "t'a",
+    "u": "u",
+    "U": "u",
+    "ü": "ü",
+    "Ü": "ü",
+    "w": "wa",
+    "W": "wa",
+    "x": "xa",
+    "X": "xa",
+    "y": "ya",
+    "Y": "ya"
+  },
+  "symbol_names": {},
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [],
+  "missing_ordinary_letter_names": [],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "a",
+      "aliases": [],
+      "text": "a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "A",
+      "aliases": [
+        "a"
+      ],
+      "text": "a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ä",
+      "aliases": [],
+      "text": "ä",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ä",
+      "aliases": [
+        "ä"
+      ],
+      "text": "ä",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ch",
+      "aliases": [
+        "cha"
+      ],
+      "text": "cha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "CH",
+      "aliases": [
+        "cha"
+      ],
+      "text": "cha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ch",
+      "aliases": [
+        "cha"
+      ],
+      "text": "cha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "chh",
+      "aliases": [
+        "chha"
+      ],
+      "text": "chha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "CHH",
+      "aliases": [
+        "chha"
+      ],
+      "text": "chha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Chh",
+      "aliases": [
+        "chha"
+      ],
+      "text": "chha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ch'",
+      "aliases": [
+        "ch'a"
+      ],
+      "text": "ch'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "CH'",
+      "aliases": [
+        "ch'a"
+      ],
+      "text": "ch'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ch'",
+      "aliases": [
+        "ch'a"
+      ],
+      "text": "ch'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "i",
+      "aliases": [],
+      "text": "i",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "I",
+      "aliases": [
+        "i"
+      ],
+      "text": "i",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ï",
+      "aliases": [],
+      "text": "ï",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ï",
+      "aliases": [
+        "ï"
+      ],
+      "text": "ï",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "j",
+      "aliases": [
+        "ja"
+      ],
+      "text": "ja",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "J",
+      "aliases": [
+        "ja"
+      ],
+      "text": "ja",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "k",
+      "aliases": [
+        "ka"
+      ],
+      "text": "ka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "K",
+      "aliases": [
+        "ka"
+      ],
+      "text": "ka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "kh",
+      "aliases": [
+        "kha"
+      ],
+      "text": "kha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "KH",
+      "aliases": [
+        "kha"
+      ],
+      "text": "kha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Kh",
+      "aliases": [
+        "kha"
+      ],
+      "text": "kha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "k'",
+      "aliases": [
+        "k'a"
+      ],
+      "text": "k'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "K'",
+      "aliases": [
+        "k'a"
+      ],
+      "text": "k'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "l",
+      "aliases": [
+        "la"
+      ],
+      "text": "la",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "L",
+      "aliases": [
+        "la"
+      ],
+      "text": "la",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ll",
+      "aliases": [
+        "lla"
+      ],
+      "text": "lla",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "LL",
+      "aliases": [
+        "lla"
+      ],
+      "text": "lla",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ll",
+      "aliases": [
+        "lla"
+      ],
+      "text": "lla",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "m",
+      "aliases": [
+        "ma"
+      ],
+      "text": "ma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "M",
+      "aliases": [
+        "ma"
+      ],
+      "text": "ma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "n",
+      "aliases": [
+        "na"
+      ],
+      "text": "na",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "N",
+      "aliases": [
+        "na"
+      ],
+      "text": "na",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ñ",
+      "aliases": [
+        "ña"
+      ],
+      "text": "ña",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ñ",
+      "aliases": [
+        "ña"
+      ],
+      "text": "ña",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "p",
+      "aliases": [
+        "pa"
+      ],
+      "text": "pa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "P",
+      "aliases": [
+        "pa"
+      ],
+      "text": "pa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ph",
+      "aliases": [
+        "pha"
+      ],
+      "text": "pha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "PH",
+      "aliases": [
+        "pha"
+      ],
+      "text": "pha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ph",
+      "aliases": [
+        "pha"
+      ],
+      "text": "pha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "p'",
+      "aliases": [
+        "p'a"
+      ],
+      "text": "p'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "P'",
+      "aliases": [
+        "p'a"
+      ],
+      "text": "p'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "q",
+      "aliases": [
+        "qa"
+      ],
+      "text": "qa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Q",
+      "aliases": [
+        "qa"
+      ],
+      "text": "qa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "q'",
+      "aliases": [
+        "q'a"
+      ],
+      "text": "q'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Q'",
+      "aliases": [
+        "q'a"
+      ],
+      "text": "q'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "r",
+      "aliases": [
+        "ra"
+      ],
+      "text": "ra",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "R",
+      "aliases": [
+        "ra"
+      ],
+      "text": "ra",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "s",
+      "aliases": [
+        "sa"
+      ],
+      "text": "sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "S",
+      "aliases": [
+        "sa"
+      ],
+      "text": "sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "t",
+      "aliases": [
+        "ta"
+      ],
+      "text": "ta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "T",
+      "aliases": [
+        "ta"
+      ],
+      "text": "ta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "th",
+      "aliases": [
+        "tha"
+      ],
+      "text": "tha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "TH",
+      "aliases": [
+        "tha"
+      ],
+      "text": "tha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Th",
+      "aliases": [
+        "tha"
+      ],
+      "text": "tha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "t'",
+      "aliases": [
+        "t'a"
+      ],
+      "text": "t'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "T'",
+      "aliases": [
+        "t'a"
+      ],
+      "text": "t'a",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "u",
+      "aliases": [],
+      "text": "u",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "U",
+      "aliases": [
+        "u"
+      ],
+      "text": "u",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "ü",
+      "aliases": [],
+      "text": "ü",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Ü",
+      "aliases": [
+        "ü"
+      ],
+      "text": "ü",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "w",
+      "aliases": [
+        "wa"
+      ],
+      "text": "wa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "W",
+      "aliases": [
+        "wa"
+      ],
+      "text": "wa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "x",
+      "aliases": [
+        "xa"
+      ],
+      "text": "xa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "X",
+      "aliases": [
+        "xa"
+      ],
+      "text": "xa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "y",
+      "aliases": [
+        "ya"
+      ],
+      "text": "ya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Y",
+      "aliases": [
+        "ya"
+      ],
+      "text": "ya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "source-partial-acoustic-acceptance-pending",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "curated_modifier_names": [],
+  "unreviewed_symbol_candidates": {},
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [
+    "a",
+    "ä",
+    "ch",
+    "chh",
+    "ch'",
+    "i",
+    "ï",
+    "j",
+    "k",
+    "kh",
+    "k'",
+    "l",
+    "ll",
+    "m",
+    "n",
+    "ñ",
+    "p",
+    "ph",
+    "p'",
+    "q",
+    "q'",
+    "r",
+    "s",
+    "t",
+    "th",
+    "t'",
+    "u",
+    "ü",
+    "w",
+    "x",
+    "y"
+  ],
+  "curation_exclusions": {
+    "qh": "ILCA table currently says qa for both q and qh; do not silently correct an ambiguous source"
+  },
+  "letter_names_ready": false
+}

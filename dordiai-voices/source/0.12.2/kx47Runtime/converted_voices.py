@@ -102,7 +102,10 @@ class ConvertedVoices:
 
     @cached_property
     def encoder(self):
-        return self._session(self.models / "OpenVoiceV2" / "tone_ref_encoder_q8.onnx")
+        directory = self.models / "OpenVoiceV2"
+        full_precision = directory / "tone_ref_encoder.onnx"
+        return self._session(full_precision if full_precision.is_file()
+                             else directory / "tone_ref_encoder_q8.onnx")
 
     @property
     def engine(self):

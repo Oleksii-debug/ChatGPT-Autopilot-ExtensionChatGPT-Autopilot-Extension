@@ -1,0 +1,6439 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "fil",
+  "sources": {
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/fil/annotations.json",
+      "sha256": "19f0875055c57e10f0676262b53b5dbc34634cff5738dd3c9be4b8c496c0d9be",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/fil/characters.json",
+      "sha256": "41b317292895ea90fe67ba23c9f12597bde2439fad55333f200cf00abf4164e9",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "{": "bukas na kulot na bracket",
+    "_": "mababang linya",
+    "-": "gitling- pananda ng pagbabawas",
+    "‐": "gitling",
+    "–": "maikling gatlang",
+    "—": "mahabang gatlang",
+    "―": "pahalang na bar",
+    ",": "kuwit",
+    "،": "arabic na kuwit",
+    ";": "tuldok-kuwit",
+    "؛": "arabic na tuldok-kuwit",
+    ":": "tutuldok",
+    "!": "tandang pandamdam",
+    "¡": "baligtad na tandang pandamdam",
+    "?": "tandang pananong",
+    "¿": "baligtad na tandang pananong",
+    "؟": "arabic na tandang pananong",
+    ".": "tuldok",
+    "…": "ellipsis",
+    "·": "nakagitnang tuldok",
+    "'": "makinilyang apostrope",
+    "‘": "kaliwang apostrope",
+    "’": "kanang apostrope",
+    "‚": "mababang kanan na apostrope",
+    "“": "kaliwang panipi",
+    "”": "kanang panipi",
+    "„": "mababang kanan na panipi",
+    "«": "pakaliwang guillemet",
+    "»": "pakanang guillemet",
+    ")": "pansarang panaklong",
+    "[": "bukas na kuwadradong bracket",
+    "]": "saradong kuwadradong bracket",
+    "}": "saradong kulot na braket",
+    "§": "seksyon",
+    "¶": "tandang pantalata",
+    "@": "at-sign",
+    "*": "asterisk",
+    "&": "ampersand",
+    "#": "hash sign",
+    "%": "porsiyento",
+    "†": "dagger sign",
+    "‡": "dobleng dagger sign",
+    "‧": "hyphenation na tuldok",
+    "″": "dobleng prime",
+    "‴": "tripleng prime",
+    "※": "tanda ng reference",
+    "⁂": "asterismo",
+    "`": "grave accent",
+    "´": "acute accent",
+    "^": "circumflex accent",
+    "°": "degree",
+    "℗": "copyright ng recording ng tunog",
+    "←": "arrow na nakaturo sa kaliwa",
+    "↚": "kaliwang arrow stroke",
+    "→": "arrow na nakaturo sa kanan",
+    "↛": "kanang arrow stroke",
+    "↑": "arrow na nakaturo pataas",
+    "↓": "arrow na nakaturo pababa",
+    "↜": "kaliwang maalon na arrow",
+    "↝": "kanang maalon na arrow",
+    "↞": "kaliwang dalawang ulo na arrow",
+    "↟": "paitaas na dalawang ulo na arrow",
+    "↠": "kanang dalawang ulo na arrow",
+    "↡": "pababa na dalawang ulo na arrow",
+    "↢": "kaliwang buntot ng arrow",
+    "↣": "kanang buntot ng arrow",
+    "↤": "kaliwang arrow mula sa bar",
+    "↥": "paitaas na arrow mula sa bar",
+    "↦": "kanang arrow mula sa bar",
+    "↧": "pababa na arrow mula sa bar",
+    "↨": "pataas pababa na arrow na may base",
+    "↫": "kaliwang arrow na loop",
+    "↬": "kanang arrow na loop",
+    "↭": "kaliwa’t kanang maalon na arrow",
+    "↯": "pababang zigzag na arrow",
+    "↰": "paitaas na arrow na lumiko sa kaliwa",
+    "↱": "paitaas na arrow na lumiko sa kanan",
+    "↲": "pababa na arrow na lumiko sa kaliwa",
+    "↳": "pababa na arrow na lumiko sa kanan",
+    "↴": "kanan na arrow na lumiko pababa",
+    "↵": "pababang arrow na lumiko sa kaliwa",
+    "↶": "anticlockwise na semicircle na arrow sa taas",
+    "↷": "clockwise na semicircle na arrow sa taas",
+    "↸": "hilagang kanluran na arrow na may mahabang bar",
+    "↹": "kaliwa na arrow bar sa taas ng kanan na arrow bar",
+    "↺": "anticlockwise bukas na bilog na arrow",
+    "↻": "clockwise bukas na bilog na arrow",
+    "↼": "kaliwang harpoon barb pataas",
+    "↽": "kaliwang harpoon barb pababa",
+    "↾": "pataas na harpoon barb na kanan",
+    "↿": "paitaas na harpoon barb na kaliwa",
+    "⇀": "kanang harpoon barb pataas",
+    "⇁": "kanang harpoon barb pababa",
+    "⇂": "pababang kanan na harpoon barb",
+    "⇃": "pababang kaliwa na harpoon barb",
+    "⇄": "kanang arrow sa taas ng kaliwang arrow",
+    "⇅": "pataas na arrow at pababang arrow",
+    "⇆": "pakaliwa sa ibabaw ng pakanang arrow",
+    "⇇": "dalawang kaliwa na arrow",
+    "⇈": "dalawang pataas na arrow",
+    "⇉": "dalawang kanan na arrow",
+    "⇊": "dalawang pababa na arrow",
+    "⇋": "kaliwang harpoon sa taas ng kanang harpoon",
+    "⇌": "kanang harpoon sa taas ng kaliwang harpoon",
+    "⇐": "kaliwa na dobleng arrow",
+    "⇍": "kaliwa na dobleng arrow na may stroke",
+    "⇑": "pataas na dobleng arrow",
+    "⇒": "kanan na dobleng arrow",
+    "⇏": "kanan na dobleng arrow na may stroke",
+    "⇓": "pababa na dobleng arrow",
+    "⇔": "kaliwa’t kanang doble na arrow",
+    "⇎": "kaliwa’t kanang doble na arrow na may stroke",
+    "⇖": "hilagang kanluran na dobleng arrow",
+    "⇗": "hilagang silangan na dobleng arrow",
+    "⇘": "timog silangan na dobleng arrow",
+    "⇙": "timog kanluran na dobleng arrow",
+    "⇚": "kaliwa na tripleng arrow",
+    "⇛": "kanan na tripleng arrow",
+    "⇜": "kaliwa na squiggle arrow",
+    "⇝": "kanan na squiggle arrow",
+    "⇞": "pataas na arrow na may dobleng stroke",
+    "⇟": "pababang arrow na may dobleng stroke",
+    "⇠": "kaliwang arrow na may dash",
+    "⇡": "pataas na dash na arrow",
+    "⇢": "kanan na dash na arrow",
+    "⇣": "pababang dash na arrow",
+    "⇤": "kaliwang arrow na may bar",
+    "⇥": "kanang arrow na may bar",
+    "⇦": "kaliwang walang laman na arrow",
+    "⇧": "pataas na walang laman na arrow",
+    "⇨": "kanang walang laman na arrow",
+    "⇩": "pababang arrow na walang laman",
+    "⇪": "pataas na arrow na walang laman mula sa bar",
+    "⇵": "pababa na arrow sa kaliwa pataas na arrow",
+    "∀": "para sa lahat",
+    "∂": "partial na differential",
+    "∃": "mayroon",
+    "∅": "walang laman na set",
+    "∇": "nabla",
+    "∈": "element ng",
+    "∉": "hindi elemento",
+    "∋": "naglalaman bilang miyembro",
+    "∎": "end proof",
+    "∏": "produktong n-ary",
+    "+": "tanda ng pagdaragdag",
+    "±": "dagdag-bawas",
+    "÷": "division sign",
+    "×": "multiplication sign",
+    "<": "mas mababa sa",
+    "≮": "hindi bababa sa",
+    "=": "katumbas",
+    "≠": "hindi pantay",
+    ">": "mahigit sa",
+    "≯": "hindi higit sa",
+    "¬": "negasyon",
+    "|": "patayong linya",
+    "~": "tilde",
+    "−": "pananda ng pagbabawas",
+    "∓": "minus o plus",
+    "∕": "dibisyon slash",
+    "⁄": "fraction na slash",
+    "∘": "ring operator",
+    "∙": "bullet operator",
+    "∝": "proporsyonal",
+    "∞": "infinity sign",
+    "∣": "hatiin",
+    "∥": "kahanay",
+    "∧": "lohikal at",
+    "∬": "dobleng integral",
+    "∮": "contour integral",
+    "∴": "kaya",
+    "∵": "dahil",
+    "∷": "proporsyon",
+    "∼": "tilde operator",
+    "∽": "baligtad na tilde",
+    "∾": "baligtad na s",
+    "≃": "pantay na pantay",
+    "≅": "halos pantay",
+    "≈": "halos katumbas",
+    "≌": "lahat pantay",
+    "≒": "halos pantay ang imahe",
+    "≖": "singsing sa loob ng equal",
+    "≡": "katulad ng",
+    "≣": "istriktong katumbas",
+    "≤": "mas mababa sa o katumbas",
+    "≥": "mahigit sa o katumbas",
+    "≦": "simbolo ng mas mababa sa sa taas ng simbolo ng katumbas",
+    "≧": "simbolo ng mas higit sa sa taas ng simbolo ng katumbas",
+    "≪": "higit na mas mababa sa",
+    "≫": "higit na mas higit sa",
+    "≬": "sa pagitan ng",
+    "≳": "mas higit sa katumbas",
+    "≺": "nauna",
+    "≻": "sundan",
+    "⊁": "hindi sinusundan",
+    "⊂": "subset ng",
+    "⊃": "superset",
+    "⊆": "pantay na subset",
+    "⊇": "pantay na superset",
+    "⊕": "nakabilog na plus",
+    "⊖": "nakabilog na minus",
+    "⊗": "nakabilog na times",
+    "⊘": "nakabilog na division slash",
+    "⊙": "nakabilog na tuldok na operator",
+    "⊚": "nakabilog na sing sing na operator",
+    "⊛": "nakabilog na asterisk operator",
+    "⊞": "nakakuwadrado na plus",
+    "⊟": "nakakuwadrado na minus",
+    "⊥": "pataas na tack",
+    "⊮": "hindi pinupuwersa",
+    "⊰": "nauna sa ilalim ng relasyon",
+    "⊱": "sundan sa ilalim ng relasyon",
+    "⋭": "hindi naglalaman bilang normal na pantay na subgroup",
+    "⊶": "orihinal",
+    "⋁": "n-ary lohikal o",
+    "⋂": "n-ary interseksyon",
+    "⋅": "tuldok na operator",
+    "⋆": "bituin na operator",
+    "⋈": "natural na pagsasama",
+    "⋒": "dobleng interseksyon",
+    "⋘": "sobrang higit na mas mababa sa",
+    "⋙": "sobrang higit na mas higit sa",
+    "⋮": "patayong ellipsis",
+    "⋯": "midline na pahalang na ellipsis",
+    "⋰": "pataas na kanang diagonal ellipsis",
+    "⋱": "pababang kanan na dayagonal ellipsis",
+    "■": "punong kuwadrado",
+    "□": "walang laman na kuwadrado",
+    "▢": "walang laman na kuwadrado na may pabilog na kanto",
+    "▣": "punong kuwadrado sa loob ng walang laman na kuwadrado",
+    "▤": "kuwadradong may pahalang na punan",
+    "▥": "kuwadradong may patayo na punan",
+    "▦": "kuwadradong may orthogonal crosshatch na laman",
+    "▧": "kuwadradong may itaas na kaliwa at ibabang kanan na punan",
+    "▨": "kuwadradong may itaas na kanan at ibabang kaliwa na punan",
+    "▩": "kuwadradong may dayagonal crosshatch na punan",
+    "▬": "punong rektanggulo",
+    "▭": "walang laman na rektanggulo",
+    "▮": "punong nakatayo na rektanggulo",
+    "▰": "punong parallelogram",
+    "▲": "pataas na tatsulok na may fill",
+    "△": "walang laman na up-pointing na tatsulok",
+    "▴": "punong up-pointing na maliit na tatsulok",
+    "▵": "walang laman na up-pointing na maliit na tatsulok",
+    "▷": "walang laman na right-pointing na tatsulok",
+    "▸": "punong right-pointing na maliit na tatsulok",
+    "▹": "walang laman na right-pointing na maliit na tatsulok",
+    "►": "punong right-pointing na pointer",
+    "▻": "walang laman na right-pointing na pointer",
+    "▼": "pababang tatsulok na may fill",
+    "▽": "walang laman na down-pointing na tatsulok",
+    "▾": "punong down-pointing na maliit na triangle",
+    "▿": "walang laman na down-pointing na maliit na tatsulok",
+    "◁": "walang laman na left-pointing na tatsulok",
+    "◂": "punong left-pointing na maliit na tatsulok",
+    "◃": "walang laman na left-pointing na maliit na tatsulok",
+    "◄": "punong left-pointing na pointer",
+    "◅": "walang laman na left-pointing na pointer",
+    "◆": "punong diamante",
+    "◇": "walang laman na diamante",
+    "◈": "punong diamante sa loob ng walang laman na diamante",
+    "◉": "punong bilog sa loob ng walang laman na bilog",
+    "○": "walang lamang bilog",
+    "◌": "dotted na bilog",
+    "◍": "bilog na may patayong punan",
+    "◎": "gitna ng tudlaan",
+    "●": "may fill na bilog",
+    "◐": "bilog na kalahating puno sa kaliwa",
+    "◑": "bilog na kalahating puno sa kanan",
+    "◒": "bilog na kalahating puno sa baba",
+    "◓": "bilog na kalahating puno sa taas",
+    "◔": "bilog na puno sa kanang itaas na kuwadrante",
+    "◕": "bilog na puno lahat maliban sa itaas na kaliwang kuwadrante",
+    "◖": "kalahating puno sa kaliwa na bilog",
+    "◗": "kalahating puno sa kanan na bilog",
+    "◘": "baligtad na bullet",
+    "◙": "punong kuwadrado na may walang laman na bilog sa loob",
+    "◜": "pabilog na arko sa itaas na kaliwang kuwadrante",
+    "◝": "pabilog na arko sa itaas na kanang kuwadrante",
+    "◞": "pabilog na arko sa ibabang kanan na kuwadrante",
+    "◟": "pabilog na arko sa ibabang kaliwa na kuwadrante",
+    "◠": "itaas na kalahating bilog",
+    "◡": "ibaba na kalahating bilog",
+    "◢": "punong ibabang kanan na tatsulok",
+    "◣": "punong ibabang kaliwa na tatsulok",
+    "◤": "punong itaas na kaliwang tatsulok",
+    "◥": "punong itaas na kanang tatsulok",
+    "◦": "walang laman na bullet",
+    "◯": "malaking walang lamang bilog",
+    "◳": "walang laman na kuwadrado sa itaas na kanang kuwadrante",
+    "◷": "walang laman na bilog na may itaas na kanang kuwadrante",
+    "◿": "ibabang kanan na tatsulok",
+    "♪": "ikawalong nota",
+    "⨧": "plus subscript na dalawa",
+    "⨯": "produkto ng vector cross",
+    "⨼": "produkto ng interior",
+    "⩣": "lohikal o dobleng underbar",
+    "⩽": "mas mababa sa naka-slant na equal",
+    "⪍": "mas mababa sa itaas ng similar na equal",
+    "⪚": "dobleng linya na equal na mas malaki sa",
+    "⪺": "kasunod sa itaas ng hindi halos katumbas",
+    "☺": "nakangiti",
+    "☹": "nakasimangot",
+    "☠": "bungo at crossbones",
+    "❣": "tandang padamdam na hugis-puso",
+    "❤": "pulang puso",
+    "✋": "nakataas na kamay",
+    "✌": "peace sign",
+    "☝": "hintuturo na nakaturo sa itaas",
+    "✊": "nakataas na kamao",
+    "✍": "nagsusulat na kamay",
+    "⛹": "taong naglalaro ng bola",
+    "☕": "mainit na inumin",
+    "⛰": "bundok",
+    "⛪": "simbahan",
+    "⚓": "angkla",
+    "⛵": "bangkang may layag",
+    "✈": "eroplano",
+    "⌛": "hourglass",
+    "⏳": "hourglass na may bumabagsak na buhangin",
+    "⌚": "relo",
+    "⏲": "timer",
+    "☀": "araw",
+    "⭐": "puting bituin na katamtamang-laki",
+    "☁": "ulap",
+    "⛅": "araw sa likod ng ulap",
+    "⛈": "ulap na may kidlat at ulan",
+    "☂": "payong",
+    "☔": "payong na nauulanan",
+    "⛱": "payong na nakabaon",
+    "⚡": "may mataas na boltahe",
+    "⛄": "snowman na walang niyebe",
+    "✨": "kumikinang",
+    "⚽": "bola ng soccer",
+    "⛳": "flag sa butas",
+    "♠": "spade",
+    "♥": "heart",
+    "♦": "diamond",
+    "♣": "club",
+    "⛑": "helmet ng rescue worker",
+    "☎": "telepono",
+    "✉": "sobre",
+    "✏": "lapis",
+    "✒": "itim na nib",
+    "✂": "gunting",
+    "⛏": "piko",
+    "⚒": "martilyo at piko",
+    "⚔": "magkakrus na espada",
+    "⚖": "timbangan",
+    "⛓": "kadena",
+    "⚰": "kabaong",
+    "⚱": "sisidlan ng abo",
+    "♿": "wheelchair",
+    "⚠": "babala",
+    "⛔": "hindi pwedeng pumasok",
+    "⬆": "pataas na arrow",
+    "↗": "pataas na pakanan na arrow",
+    "➡": "pakanang arrow",
+    "↘": "pababang pakanan na arrow",
+    "⬇": "pababang arrow",
+    "↙": "pababang pakaliwang arrow",
+    "⬅": "pakaliwang arrow",
+    "↖": "pataas na pakaliwang arrow",
+    "↕": "pataas-pababang arrow",
+    "↔": "pakaliwa-pakanang arrow",
+    "↮": "kaliwa’t kanang arrow stroke",
+    "↩": "pakanang arrow na kumurba pakaliwa",
+    "↪": "pakaliwang arrow na kumurba pakanan",
+    "⤴": "pakanang arrow na kumurba pataas",
+    "⤵": "pakanang arrow na kumurba pababa",
+    "⚛": "atom",
+    "✡": "star of david",
+    "☸": "gulong ng dharma",
+    "✝": "latin na krus",
+    "☦": "orthodox na krus",
+    "☮": "simbolo ng kapayapaan",
+    "▶": "button na i-play",
+    "⏩": "button na i-fast forward",
+    "⏭": "button na susunod na track",
+    "⏯": "button na i-play o i-pause",
+    "◀": "button na i-reverse",
+    "⏪": "button na i-fast reverse",
+    "⏮": "button na huling track",
+    "⏫": "button na i-fast up",
+    "⏬": "button na i-fast down",
+    "⏸": "button na i-pause",
+    "⏹": "button na itigil",
+    "⏺": "button na i-record",
+    "⏏": "button na i-eject",
+    "♀": "simbolo ng babae",
+    "♂": "simbolo ng lalaki",
+    "⚧": "simbolo ng transgender",
+    "‼": "dobleng tandang padamdam",
+    "⁉": "tandang padamdam at pananong",
+    "❓": "pulang tandang pananong",
+    "❔": "puting tandang pananong",
+    "❕": "puting tandang padamdam",
+    "❗": "tandang padamdam",
+    "⚕": "simbolong pang-medikal",
+    "♻": "simbolo ng pag-recycle",
+    "⚜": "flordelis",
+    "⭕": "malaking bilog",
+    "✅": "puting tsek",
+    "☑": "balotang may tsek",
+    "✔": "malaking tsek",
+    "❌": "ekis",
+    "❎": "button na ekis",
+    "➿": "dobleng curly loop",
+    "✳": "asterisk na may walong sulok",
+    "✴": "bituin na may walong sulok",
+    "❇": "kinang",
+    "©": "karapatang magpalathala",
+    "®": "rehistrado",
+    "™": "trade mark",
+    "Ⓜ": "binilugang M",
+    "⚫": "itim na bilog",
+    "⚪": "puting bilog",
+    "⬛": "malaking itim na parisukat",
+    "⬜": "malaking puting parisukat",
+    "◼": "katamtamang itim na parisukat",
+    "◻": "katamtamang puting parisukat",
+    "◾": "medyo maliit na itim na parisukat",
+    "◽": "medyo maliit na puting parisukat",
+    "▪": "maliit na itim na parisukat",
+    "▫": "maliit na puting parisukat",
+    "¢": "sentimo",
+    "$": "dolyar",
+    "₱": "piso",
+    "₹": "indian rupee"
+  },
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "ñ",
+    "ng",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z"
+  ],
+  "missing_ordinary_letter_names": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "ñ",
+    "ng",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "{",
+      "aliases": [
+        "bukas na kulot na bracket"
+      ],
+      "text": "bukas na kulot na bracket",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "_",
+      "aliases": [
+        "mababang linya"
+      ],
+      "text": "mababang linya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "-",
+      "aliases": [
+        "gitling- pananda ng pagbabawas"
+      ],
+      "text": "gitling- pananda ng pagbabawas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‐",
+      "aliases": [
+        "gitling"
+      ],
+      "text": "gitling",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "–",
+      "aliases": [
+        "maikling gatlang"
+      ],
+      "text": "maikling gatlang",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "—",
+      "aliases": [
+        "mahabang gatlang"
+      ],
+      "text": "mahabang gatlang",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "―",
+      "aliases": [
+        "pahalang na bar"
+      ],
+      "text": "pahalang na bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": ",",
+      "aliases": [
+        "kuwit"
+      ],
+      "text": "kuwit",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "،",
+      "aliases": [
+        "arabic na kuwit"
+      ],
+      "text": "arabic na kuwit",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": ";",
+      "aliases": [
+        "tuldok-kuwit"
+      ],
+      "text": "tuldok-kuwit",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "؛",
+      "aliases": [
+        "arabic na tuldok-kuwit"
+      ],
+      "text": "arabic na tuldok-kuwit",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": ":",
+      "aliases": [
+        "tutuldok"
+      ],
+      "text": "tutuldok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "!",
+      "aliases": [
+        "tandang pandamdam"
+      ],
+      "text": "tandang pandamdam",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "¡",
+      "aliases": [
+        "baligtad na tandang pandamdam"
+      ],
+      "text": "baligtad na tandang pandamdam",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "?",
+      "aliases": [
+        "tandang pananong"
+      ],
+      "text": "tandang pananong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "¿",
+      "aliases": [
+        "baligtad na tandang pananong"
+      ],
+      "text": "baligtad na tandang pananong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "؟",
+      "aliases": [
+        "arabic na tandang pananong"
+      ],
+      "text": "arabic na tandang pananong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": ".",
+      "aliases": [
+        "tuldok"
+      ],
+      "text": "tuldok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "…",
+      "aliases": [
+        "ellipsis"
+      ],
+      "text": "ellipsis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "·",
+      "aliases": [
+        "nakagitnang tuldok"
+      ],
+      "text": "nakagitnang tuldok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "'",
+      "aliases": [
+        "makinilyang apostrope"
+      ],
+      "text": "makinilyang apostrope",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‘",
+      "aliases": [
+        "kaliwang apostrope"
+      ],
+      "text": "kaliwang apostrope",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "’",
+      "aliases": [
+        "kanang apostrope"
+      ],
+      "text": "kanang apostrope",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‚",
+      "aliases": [
+        "mababang kanan na apostrope"
+      ],
+      "text": "mababang kanan na apostrope",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "“",
+      "aliases": [
+        "kaliwang panipi"
+      ],
+      "text": "kaliwang panipi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "”",
+      "aliases": [
+        "kanang panipi"
+      ],
+      "text": "kanang panipi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "„",
+      "aliases": [
+        "mababang kanan na panipi"
+      ],
+      "text": "mababang kanan na panipi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "«",
+      "aliases": [
+        "pakaliwang guillemet"
+      ],
+      "text": "pakaliwang guillemet",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "»",
+      "aliases": [
+        "pakanang guillemet"
+      ],
+      "text": "pakanang guillemet",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": ")",
+      "aliases": [
+        "pansarang panaklong"
+      ],
+      "text": "pansarang panaklong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "[",
+      "aliases": [
+        "bukas na kuwadradong bracket"
+      ],
+      "text": "bukas na kuwadradong bracket",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "]",
+      "aliases": [
+        "saradong kuwadradong bracket"
+      ],
+      "text": "saradong kuwadradong bracket",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "}",
+      "aliases": [
+        "saradong kulot na braket"
+      ],
+      "text": "saradong kulot na braket",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "§",
+      "aliases": [
+        "seksyon"
+      ],
+      "text": "seksyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "¶",
+      "aliases": [
+        "tandang pantalata"
+      ],
+      "text": "tandang pantalata",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "@",
+      "aliases": [
+        "at-sign"
+      ],
+      "text": "at-sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "*",
+      "aliases": [
+        "asterisk"
+      ],
+      "text": "asterisk",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "&",
+      "aliases": [
+        "ampersand"
+      ],
+      "text": "ampersand",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "#",
+      "aliases": [
+        "hash sign"
+      ],
+      "text": "hash sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "%",
+      "aliases": [
+        "porsiyento"
+      ],
+      "text": "porsiyento",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "†",
+      "aliases": [
+        "dagger sign"
+      ],
+      "text": "dagger sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‡",
+      "aliases": [
+        "dobleng dagger sign"
+      ],
+      "text": "dobleng dagger sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‧",
+      "aliases": [
+        "hyphenation na tuldok"
+      ],
+      "text": "hyphenation na tuldok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "″",
+      "aliases": [
+        "dobleng prime"
+      ],
+      "text": "dobleng prime",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‴",
+      "aliases": [
+        "tripleng prime"
+      ],
+      "text": "tripleng prime",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "※",
+      "aliases": [
+        "tanda ng reference"
+      ],
+      "text": "tanda ng reference",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⁂",
+      "aliases": [
+        "asterismo"
+      ],
+      "text": "asterismo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "`",
+      "aliases": [
+        "grave accent"
+      ],
+      "text": "grave accent",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "´",
+      "aliases": [
+        "acute accent"
+      ],
+      "text": "acute accent",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "^",
+      "aliases": [
+        "circumflex accent"
+      ],
+      "text": "circumflex accent",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "°",
+      "aliases": [
+        "degree"
+      ],
+      "text": "degree",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "℗",
+      "aliases": [
+        "copyright ng recording ng tunog"
+      ],
+      "text": "copyright ng recording ng tunog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "←",
+      "aliases": [
+        "arrow na nakaturo sa kaliwa"
+      ],
+      "text": "arrow na nakaturo sa kaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↚",
+      "aliases": [
+        "kaliwang arrow stroke"
+      ],
+      "text": "kaliwang arrow stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "→",
+      "aliases": [
+        "arrow na nakaturo sa kanan"
+      ],
+      "text": "arrow na nakaturo sa kanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↛",
+      "aliases": [
+        "kanang arrow stroke"
+      ],
+      "text": "kanang arrow stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↑",
+      "aliases": [
+        "arrow na nakaturo pataas"
+      ],
+      "text": "arrow na nakaturo pataas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↓",
+      "aliases": [
+        "arrow na nakaturo pababa"
+      ],
+      "text": "arrow na nakaturo pababa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↜",
+      "aliases": [
+        "kaliwang maalon na arrow"
+      ],
+      "text": "kaliwang maalon na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↝",
+      "aliases": [
+        "kanang maalon na arrow"
+      ],
+      "text": "kanang maalon na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↞",
+      "aliases": [
+        "kaliwang dalawang ulo na arrow"
+      ],
+      "text": "kaliwang dalawang ulo na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↟",
+      "aliases": [
+        "paitaas na dalawang ulo na arrow"
+      ],
+      "text": "paitaas na dalawang ulo na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↠",
+      "aliases": [
+        "kanang dalawang ulo na arrow"
+      ],
+      "text": "kanang dalawang ulo na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↡",
+      "aliases": [
+        "pababa na dalawang ulo na arrow"
+      ],
+      "text": "pababa na dalawang ulo na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↢",
+      "aliases": [
+        "kaliwang buntot ng arrow"
+      ],
+      "text": "kaliwang buntot ng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↣",
+      "aliases": [
+        "kanang buntot ng arrow"
+      ],
+      "text": "kanang buntot ng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↤",
+      "aliases": [
+        "kaliwang arrow mula sa bar"
+      ],
+      "text": "kaliwang arrow mula sa bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↥",
+      "aliases": [
+        "paitaas na arrow mula sa bar"
+      ],
+      "text": "paitaas na arrow mula sa bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↦",
+      "aliases": [
+        "kanang arrow mula sa bar"
+      ],
+      "text": "kanang arrow mula sa bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↧",
+      "aliases": [
+        "pababa na arrow mula sa bar"
+      ],
+      "text": "pababa na arrow mula sa bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↨",
+      "aliases": [
+        "pataas pababa na arrow na may base"
+      ],
+      "text": "pataas pababa na arrow na may base",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↫",
+      "aliases": [
+        "kaliwang arrow na loop"
+      ],
+      "text": "kaliwang arrow na loop",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↬",
+      "aliases": [
+        "kanang arrow na loop"
+      ],
+      "text": "kanang arrow na loop",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↭",
+      "aliases": [
+        "kaliwa’t kanang maalon na arrow"
+      ],
+      "text": "kaliwa’t kanang maalon na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↯",
+      "aliases": [
+        "pababang zigzag na arrow"
+      ],
+      "text": "pababang zigzag na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↰",
+      "aliases": [
+        "paitaas na arrow na lumiko sa kaliwa"
+      ],
+      "text": "paitaas na arrow na lumiko sa kaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↱",
+      "aliases": [
+        "paitaas na arrow na lumiko sa kanan"
+      ],
+      "text": "paitaas na arrow na lumiko sa kanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↲",
+      "aliases": [
+        "pababa na arrow na lumiko sa kaliwa"
+      ],
+      "text": "pababa na arrow na lumiko sa kaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↳",
+      "aliases": [
+        "pababa na arrow na lumiko sa kanan"
+      ],
+      "text": "pababa na arrow na lumiko sa kanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↴",
+      "aliases": [
+        "kanan na arrow na lumiko pababa"
+      ],
+      "text": "kanan na arrow na lumiko pababa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↵",
+      "aliases": [
+        "pababang arrow na lumiko sa kaliwa"
+      ],
+      "text": "pababang arrow na lumiko sa kaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↶",
+      "aliases": [
+        "anticlockwise na semicircle na arrow sa taas"
+      ],
+      "text": "anticlockwise na semicircle na arrow sa taas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↷",
+      "aliases": [
+        "clockwise na semicircle na arrow sa taas"
+      ],
+      "text": "clockwise na semicircle na arrow sa taas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↸",
+      "aliases": [
+        "hilagang kanluran na arrow na may mahabang bar"
+      ],
+      "text": "hilagang kanluran na arrow na may mahabang bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↹",
+      "aliases": [
+        "kaliwa na arrow bar sa taas ng kanan na arrow bar"
+      ],
+      "text": "kaliwa na arrow bar sa taas ng kanan na arrow bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↺",
+      "aliases": [
+        "anticlockwise bukas na bilog na arrow"
+      ],
+      "text": "anticlockwise bukas na bilog na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↻",
+      "aliases": [
+        "clockwise bukas na bilog na arrow"
+      ],
+      "text": "clockwise bukas na bilog na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↼",
+      "aliases": [
+        "kaliwang harpoon barb pataas"
+      ],
+      "text": "kaliwang harpoon barb pataas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↽",
+      "aliases": [
+        "kaliwang harpoon barb pababa"
+      ],
+      "text": "kaliwang harpoon barb pababa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↾",
+      "aliases": [
+        "pataas na harpoon barb na kanan"
+      ],
+      "text": "pataas na harpoon barb na kanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↿",
+      "aliases": [
+        "paitaas na harpoon barb na kaliwa"
+      ],
+      "text": "paitaas na harpoon barb na kaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇀",
+      "aliases": [
+        "kanang harpoon barb pataas"
+      ],
+      "text": "kanang harpoon barb pataas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇁",
+      "aliases": [
+        "kanang harpoon barb pababa"
+      ],
+      "text": "kanang harpoon barb pababa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇂",
+      "aliases": [
+        "pababang kanan na harpoon barb"
+      ],
+      "text": "pababang kanan na harpoon barb",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇃",
+      "aliases": [
+        "pababang kaliwa na harpoon barb"
+      ],
+      "text": "pababang kaliwa na harpoon barb",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇄",
+      "aliases": [
+        "kanang arrow sa taas ng kaliwang arrow"
+      ],
+      "text": "kanang arrow sa taas ng kaliwang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇅",
+      "aliases": [
+        "pataas na arrow at pababang arrow"
+      ],
+      "text": "pataas na arrow at pababang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇆",
+      "aliases": [
+        "pakaliwa sa ibabaw ng pakanang arrow"
+      ],
+      "text": "pakaliwa sa ibabaw ng pakanang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇇",
+      "aliases": [
+        "dalawang kaliwa na arrow"
+      ],
+      "text": "dalawang kaliwa na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇈",
+      "aliases": [
+        "dalawang pataas na arrow"
+      ],
+      "text": "dalawang pataas na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇉",
+      "aliases": [
+        "dalawang kanan na arrow"
+      ],
+      "text": "dalawang kanan na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇊",
+      "aliases": [
+        "dalawang pababa na arrow"
+      ],
+      "text": "dalawang pababa na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇋",
+      "aliases": [
+        "kaliwang harpoon sa taas ng kanang harpoon"
+      ],
+      "text": "kaliwang harpoon sa taas ng kanang harpoon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇌",
+      "aliases": [
+        "kanang harpoon sa taas ng kaliwang harpoon"
+      ],
+      "text": "kanang harpoon sa taas ng kaliwang harpoon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇐",
+      "aliases": [
+        "kaliwa na dobleng arrow"
+      ],
+      "text": "kaliwa na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇍",
+      "aliases": [
+        "kaliwa na dobleng arrow na may stroke"
+      ],
+      "text": "kaliwa na dobleng arrow na may stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇑",
+      "aliases": [
+        "pataas na dobleng arrow"
+      ],
+      "text": "pataas na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇒",
+      "aliases": [
+        "kanan na dobleng arrow"
+      ],
+      "text": "kanan na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇏",
+      "aliases": [
+        "kanan na dobleng arrow na may stroke"
+      ],
+      "text": "kanan na dobleng arrow na may stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇓",
+      "aliases": [
+        "pababa na dobleng arrow"
+      ],
+      "text": "pababa na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇔",
+      "aliases": [
+        "kaliwa’t kanang doble na arrow"
+      ],
+      "text": "kaliwa’t kanang doble na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇎",
+      "aliases": [
+        "kaliwa’t kanang doble na arrow na may stroke"
+      ],
+      "text": "kaliwa’t kanang doble na arrow na may stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇖",
+      "aliases": [
+        "hilagang kanluran na dobleng arrow"
+      ],
+      "text": "hilagang kanluran na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇗",
+      "aliases": [
+        "hilagang silangan na dobleng arrow"
+      ],
+      "text": "hilagang silangan na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇘",
+      "aliases": [
+        "timog silangan na dobleng arrow"
+      ],
+      "text": "timog silangan na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇙",
+      "aliases": [
+        "timog kanluran na dobleng arrow"
+      ],
+      "text": "timog kanluran na dobleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇚",
+      "aliases": [
+        "kaliwa na tripleng arrow"
+      ],
+      "text": "kaliwa na tripleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇛",
+      "aliases": [
+        "kanan na tripleng arrow"
+      ],
+      "text": "kanan na tripleng arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇜",
+      "aliases": [
+        "kaliwa na squiggle arrow"
+      ],
+      "text": "kaliwa na squiggle arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇝",
+      "aliases": [
+        "kanan na squiggle arrow"
+      ],
+      "text": "kanan na squiggle arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇞",
+      "aliases": [
+        "pataas na arrow na may dobleng stroke"
+      ],
+      "text": "pataas na arrow na may dobleng stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇟",
+      "aliases": [
+        "pababang arrow na may dobleng stroke"
+      ],
+      "text": "pababang arrow na may dobleng stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇠",
+      "aliases": [
+        "kaliwang arrow na may dash"
+      ],
+      "text": "kaliwang arrow na may dash",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇡",
+      "aliases": [
+        "pataas na dash na arrow"
+      ],
+      "text": "pataas na dash na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇢",
+      "aliases": [
+        "kanan na dash na arrow"
+      ],
+      "text": "kanan na dash na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇣",
+      "aliases": [
+        "pababang dash na arrow"
+      ],
+      "text": "pababang dash na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇤",
+      "aliases": [
+        "kaliwang arrow na may bar"
+      ],
+      "text": "kaliwang arrow na may bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇥",
+      "aliases": [
+        "kanang arrow na may bar"
+      ],
+      "text": "kanang arrow na may bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇦",
+      "aliases": [
+        "kaliwang walang laman na arrow"
+      ],
+      "text": "kaliwang walang laman na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇧",
+      "aliases": [
+        "pataas na walang laman na arrow"
+      ],
+      "text": "pataas na walang laman na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇨",
+      "aliases": [
+        "kanang walang laman na arrow"
+      ],
+      "text": "kanang walang laman na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇩",
+      "aliases": [
+        "pababang arrow na walang laman"
+      ],
+      "text": "pababang arrow na walang laman",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇪",
+      "aliases": [
+        "pataas na arrow na walang laman mula sa bar"
+      ],
+      "text": "pataas na arrow na walang laman mula sa bar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⇵",
+      "aliases": [
+        "pababa na arrow sa kaliwa pataas na arrow"
+      ],
+      "text": "pababa na arrow sa kaliwa pataas na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∀",
+      "aliases": [
+        "para sa lahat"
+      ],
+      "text": "para sa lahat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∂",
+      "aliases": [
+        "partial na differential"
+      ],
+      "text": "partial na differential",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∃",
+      "aliases": [
+        "mayroon"
+      ],
+      "text": "mayroon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∅",
+      "aliases": [
+        "walang laman na set"
+      ],
+      "text": "walang laman na set",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∇",
+      "aliases": [
+        "nabla"
+      ],
+      "text": "nabla",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∈",
+      "aliases": [
+        "element ng"
+      ],
+      "text": "element ng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∉",
+      "aliases": [
+        "hindi elemento"
+      ],
+      "text": "hindi elemento",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∋",
+      "aliases": [
+        "naglalaman bilang miyembro"
+      ],
+      "text": "naglalaman bilang miyembro",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∎",
+      "aliases": [
+        "end proof"
+      ],
+      "text": "end proof",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∏",
+      "aliases": [
+        "produktong n-ary"
+      ],
+      "text": "produktong n-ary",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "+",
+      "aliases": [
+        "tanda ng pagdaragdag"
+      ],
+      "text": "tanda ng pagdaragdag",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "±",
+      "aliases": [
+        "dagdag-bawas"
+      ],
+      "text": "dagdag-bawas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "÷",
+      "aliases": [
+        "division sign"
+      ],
+      "text": "division sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "×",
+      "aliases": [
+        "multiplication sign"
+      ],
+      "text": "multiplication sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "<",
+      "aliases": [
+        "mas mababa sa"
+      ],
+      "text": "mas mababa sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≮",
+      "aliases": [
+        "hindi bababa sa"
+      ],
+      "text": "hindi bababa sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "=",
+      "aliases": [
+        "katumbas"
+      ],
+      "text": "katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≠",
+      "aliases": [
+        "hindi pantay"
+      ],
+      "text": "hindi pantay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": ">",
+      "aliases": [
+        "mahigit sa"
+      ],
+      "text": "mahigit sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≯",
+      "aliases": [
+        "hindi higit sa"
+      ],
+      "text": "hindi higit sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "¬",
+      "aliases": [
+        "negasyon"
+      ],
+      "text": "negasyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "|",
+      "aliases": [
+        "patayong linya"
+      ],
+      "text": "patayong linya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "~",
+      "aliases": [
+        "tilde"
+      ],
+      "text": "tilde",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "−",
+      "aliases": [
+        "pananda ng pagbabawas"
+      ],
+      "text": "pananda ng pagbabawas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∓",
+      "aliases": [
+        "minus o plus"
+      ],
+      "text": "minus o plus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∕",
+      "aliases": [
+        "dibisyon slash"
+      ],
+      "text": "dibisyon slash",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⁄",
+      "aliases": [
+        "fraction na slash"
+      ],
+      "text": "fraction na slash",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∘",
+      "aliases": [
+        "ring operator"
+      ],
+      "text": "ring operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∙",
+      "aliases": [
+        "bullet operator"
+      ],
+      "text": "bullet operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∝",
+      "aliases": [
+        "proporsyonal"
+      ],
+      "text": "proporsyonal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∞",
+      "aliases": [
+        "infinity sign"
+      ],
+      "text": "infinity sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∣",
+      "aliases": [
+        "hatiin"
+      ],
+      "text": "hatiin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∥",
+      "aliases": [
+        "kahanay"
+      ],
+      "text": "kahanay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∧",
+      "aliases": [
+        "lohikal at"
+      ],
+      "text": "lohikal at",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∬",
+      "aliases": [
+        "dobleng integral"
+      ],
+      "text": "dobleng integral",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∮",
+      "aliases": [
+        "contour integral"
+      ],
+      "text": "contour integral",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∴",
+      "aliases": [
+        "kaya"
+      ],
+      "text": "kaya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∵",
+      "aliases": [
+        "dahil"
+      ],
+      "text": "dahil",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∷",
+      "aliases": [
+        "proporsyon"
+      ],
+      "text": "proporsyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∼",
+      "aliases": [
+        "tilde operator"
+      ],
+      "text": "tilde operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∽",
+      "aliases": [
+        "baligtad na tilde"
+      ],
+      "text": "baligtad na tilde",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "∾",
+      "aliases": [
+        "baligtad na s"
+      ],
+      "text": "baligtad na s",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≃",
+      "aliases": [
+        "pantay na pantay"
+      ],
+      "text": "pantay na pantay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≅",
+      "aliases": [
+        "halos pantay"
+      ],
+      "text": "halos pantay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≈",
+      "aliases": [
+        "halos katumbas"
+      ],
+      "text": "halos katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≌",
+      "aliases": [
+        "lahat pantay"
+      ],
+      "text": "lahat pantay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≒",
+      "aliases": [
+        "halos pantay ang imahe"
+      ],
+      "text": "halos pantay ang imahe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≖",
+      "aliases": [
+        "singsing sa loob ng equal"
+      ],
+      "text": "singsing sa loob ng equal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≡",
+      "aliases": [
+        "katulad ng"
+      ],
+      "text": "katulad ng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≣",
+      "aliases": [
+        "istriktong katumbas"
+      ],
+      "text": "istriktong katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≤",
+      "aliases": [
+        "mas mababa sa o katumbas"
+      ],
+      "text": "mas mababa sa o katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≥",
+      "aliases": [
+        "mahigit sa o katumbas"
+      ],
+      "text": "mahigit sa o katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≦",
+      "aliases": [
+        "simbolo ng mas mababa sa sa taas ng simbolo ng katumbas"
+      ],
+      "text": "simbolo ng mas mababa sa sa taas ng simbolo ng katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≧",
+      "aliases": [
+        "simbolo ng mas higit sa sa taas ng simbolo ng katumbas"
+      ],
+      "text": "simbolo ng mas higit sa sa taas ng simbolo ng katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≪",
+      "aliases": [
+        "higit na mas mababa sa"
+      ],
+      "text": "higit na mas mababa sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≫",
+      "aliases": [
+        "higit na mas higit sa"
+      ],
+      "text": "higit na mas higit sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≬",
+      "aliases": [
+        "sa pagitan ng"
+      ],
+      "text": "sa pagitan ng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≳",
+      "aliases": [
+        "mas higit sa katumbas"
+      ],
+      "text": "mas higit sa katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≺",
+      "aliases": [
+        "nauna"
+      ],
+      "text": "nauna",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "≻",
+      "aliases": [
+        "sundan"
+      ],
+      "text": "sundan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊁",
+      "aliases": [
+        "hindi sinusundan"
+      ],
+      "text": "hindi sinusundan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊂",
+      "aliases": [
+        "subset ng"
+      ],
+      "text": "subset ng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊃",
+      "aliases": [
+        "superset"
+      ],
+      "text": "superset",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊆",
+      "aliases": [
+        "pantay na subset"
+      ],
+      "text": "pantay na subset",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊇",
+      "aliases": [
+        "pantay na superset"
+      ],
+      "text": "pantay na superset",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊕",
+      "aliases": [
+        "nakabilog na plus"
+      ],
+      "text": "nakabilog na plus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊖",
+      "aliases": [
+        "nakabilog na minus"
+      ],
+      "text": "nakabilog na minus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊗",
+      "aliases": [
+        "nakabilog na times"
+      ],
+      "text": "nakabilog na times",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊘",
+      "aliases": [
+        "nakabilog na division slash"
+      ],
+      "text": "nakabilog na division slash",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊙",
+      "aliases": [
+        "nakabilog na tuldok na operator"
+      ],
+      "text": "nakabilog na tuldok na operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊚",
+      "aliases": [
+        "nakabilog na sing sing na operator"
+      ],
+      "text": "nakabilog na sing sing na operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊛",
+      "aliases": [
+        "nakabilog na asterisk operator"
+      ],
+      "text": "nakabilog na asterisk operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊞",
+      "aliases": [
+        "nakakuwadrado na plus"
+      ],
+      "text": "nakakuwadrado na plus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊟",
+      "aliases": [
+        "nakakuwadrado na minus"
+      ],
+      "text": "nakakuwadrado na minus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊥",
+      "aliases": [
+        "pataas na tack"
+      ],
+      "text": "pataas na tack",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊮",
+      "aliases": [
+        "hindi pinupuwersa"
+      ],
+      "text": "hindi pinupuwersa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊰",
+      "aliases": [
+        "nauna sa ilalim ng relasyon"
+      ],
+      "text": "nauna sa ilalim ng relasyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊱",
+      "aliases": [
+        "sundan sa ilalim ng relasyon"
+      ],
+      "text": "sundan sa ilalim ng relasyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋭",
+      "aliases": [
+        "hindi naglalaman bilang normal na pantay na subgroup"
+      ],
+      "text": "hindi naglalaman bilang normal na pantay na subgroup",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⊶",
+      "aliases": [
+        "orihinal"
+      ],
+      "text": "orihinal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋁",
+      "aliases": [
+        "n-ary lohikal o"
+      ],
+      "text": "n-ary lohikal o",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋂",
+      "aliases": [
+        "n-ary interseksyon"
+      ],
+      "text": "n-ary interseksyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋅",
+      "aliases": [
+        "tuldok na operator"
+      ],
+      "text": "tuldok na operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋆",
+      "aliases": [
+        "bituin na operator"
+      ],
+      "text": "bituin na operator",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋈",
+      "aliases": [
+        "natural na pagsasama"
+      ],
+      "text": "natural na pagsasama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋒",
+      "aliases": [
+        "dobleng interseksyon"
+      ],
+      "text": "dobleng interseksyon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋘",
+      "aliases": [
+        "sobrang higit na mas mababa sa"
+      ],
+      "text": "sobrang higit na mas mababa sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋙",
+      "aliases": [
+        "sobrang higit na mas higit sa"
+      ],
+      "text": "sobrang higit na mas higit sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋮",
+      "aliases": [
+        "patayong ellipsis"
+      ],
+      "text": "patayong ellipsis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋯",
+      "aliases": [
+        "midline na pahalang na ellipsis"
+      ],
+      "text": "midline na pahalang na ellipsis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋰",
+      "aliases": [
+        "pataas na kanang diagonal ellipsis"
+      ],
+      "text": "pataas na kanang diagonal ellipsis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⋱",
+      "aliases": [
+        "pababang kanan na dayagonal ellipsis"
+      ],
+      "text": "pababang kanan na dayagonal ellipsis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "■",
+      "aliases": [
+        "punong kuwadrado"
+      ],
+      "text": "punong kuwadrado",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "□",
+      "aliases": [
+        "walang laman na kuwadrado"
+      ],
+      "text": "walang laman na kuwadrado",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▢",
+      "aliases": [
+        "walang laman na kuwadrado na may pabilog na kanto"
+      ],
+      "text": "walang laman na kuwadrado na may pabilog na kanto",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▣",
+      "aliases": [
+        "punong kuwadrado sa loob ng walang laman na kuwadrado"
+      ],
+      "text": "punong kuwadrado sa loob ng walang laman na kuwadrado",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▤",
+      "aliases": [
+        "kuwadradong may pahalang na punan"
+      ],
+      "text": "kuwadradong may pahalang na punan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▥",
+      "aliases": [
+        "kuwadradong may patayo na punan"
+      ],
+      "text": "kuwadradong may patayo na punan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▦",
+      "aliases": [
+        "kuwadradong may orthogonal crosshatch na laman"
+      ],
+      "text": "kuwadradong may orthogonal crosshatch na laman",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▧",
+      "aliases": [
+        "kuwadradong may itaas na kaliwa at ibabang kanan na punan"
+      ],
+      "text": "kuwadradong may itaas na kaliwa at ibabang kanan na punan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▨",
+      "aliases": [
+        "kuwadradong may itaas na kanan at ibabang kaliwa na punan"
+      ],
+      "text": "kuwadradong may itaas na kanan at ibabang kaliwa na punan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▩",
+      "aliases": [
+        "kuwadradong may dayagonal crosshatch na punan"
+      ],
+      "text": "kuwadradong may dayagonal crosshatch na punan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▬",
+      "aliases": [
+        "punong rektanggulo"
+      ],
+      "text": "punong rektanggulo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▭",
+      "aliases": [
+        "walang laman na rektanggulo"
+      ],
+      "text": "walang laman na rektanggulo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▮",
+      "aliases": [
+        "punong nakatayo na rektanggulo"
+      ],
+      "text": "punong nakatayo na rektanggulo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▰",
+      "aliases": [
+        "punong parallelogram"
+      ],
+      "text": "punong parallelogram",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▲",
+      "aliases": [
+        "pataas na tatsulok na may fill"
+      ],
+      "text": "pataas na tatsulok na may fill",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "△",
+      "aliases": [
+        "walang laman na up-pointing na tatsulok"
+      ],
+      "text": "walang laman na up-pointing na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▴",
+      "aliases": [
+        "punong up-pointing na maliit na tatsulok"
+      ],
+      "text": "punong up-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▵",
+      "aliases": [
+        "walang laman na up-pointing na maliit na tatsulok"
+      ],
+      "text": "walang laman na up-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▷",
+      "aliases": [
+        "walang laman na right-pointing na tatsulok"
+      ],
+      "text": "walang laman na right-pointing na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▸",
+      "aliases": [
+        "punong right-pointing na maliit na tatsulok"
+      ],
+      "text": "punong right-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▹",
+      "aliases": [
+        "walang laman na right-pointing na maliit na tatsulok"
+      ],
+      "text": "walang laman na right-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "►",
+      "aliases": [
+        "punong right-pointing na pointer"
+      ],
+      "text": "punong right-pointing na pointer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▻",
+      "aliases": [
+        "walang laman na right-pointing na pointer"
+      ],
+      "text": "walang laman na right-pointing na pointer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▼",
+      "aliases": [
+        "pababang tatsulok na may fill"
+      ],
+      "text": "pababang tatsulok na may fill",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▽",
+      "aliases": [
+        "walang laman na down-pointing na tatsulok"
+      ],
+      "text": "walang laman na down-pointing na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▾",
+      "aliases": [
+        "punong down-pointing na maliit na triangle"
+      ],
+      "text": "punong down-pointing na maliit na triangle",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▿",
+      "aliases": [
+        "walang laman na down-pointing na maliit na tatsulok"
+      ],
+      "text": "walang laman na down-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◁",
+      "aliases": [
+        "walang laman na left-pointing na tatsulok"
+      ],
+      "text": "walang laman na left-pointing na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◂",
+      "aliases": [
+        "punong left-pointing na maliit na tatsulok"
+      ],
+      "text": "punong left-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◃",
+      "aliases": [
+        "walang laman na left-pointing na maliit na tatsulok"
+      ],
+      "text": "walang laman na left-pointing na maliit na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◄",
+      "aliases": [
+        "punong left-pointing na pointer"
+      ],
+      "text": "punong left-pointing na pointer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◅",
+      "aliases": [
+        "walang laman na left-pointing na pointer"
+      ],
+      "text": "walang laman na left-pointing na pointer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◆",
+      "aliases": [
+        "punong diamante"
+      ],
+      "text": "punong diamante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◇",
+      "aliases": [
+        "walang laman na diamante"
+      ],
+      "text": "walang laman na diamante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◈",
+      "aliases": [
+        "punong diamante sa loob ng walang laman na diamante"
+      ],
+      "text": "punong diamante sa loob ng walang laman na diamante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◉",
+      "aliases": [
+        "punong bilog sa loob ng walang laman na bilog"
+      ],
+      "text": "punong bilog sa loob ng walang laman na bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "○",
+      "aliases": [
+        "walang lamang bilog"
+      ],
+      "text": "walang lamang bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◌",
+      "aliases": [
+        "dotted na bilog"
+      ],
+      "text": "dotted na bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◍",
+      "aliases": [
+        "bilog na may patayong punan"
+      ],
+      "text": "bilog na may patayong punan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◎",
+      "aliases": [
+        "gitna ng tudlaan"
+      ],
+      "text": "gitna ng tudlaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "●",
+      "aliases": [
+        "may fill na bilog"
+      ],
+      "text": "may fill na bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◐",
+      "aliases": [
+        "bilog na kalahating puno sa kaliwa"
+      ],
+      "text": "bilog na kalahating puno sa kaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◑",
+      "aliases": [
+        "bilog na kalahating puno sa kanan"
+      ],
+      "text": "bilog na kalahating puno sa kanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◒",
+      "aliases": [
+        "bilog na kalahating puno sa baba"
+      ],
+      "text": "bilog na kalahating puno sa baba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◓",
+      "aliases": [
+        "bilog na kalahating puno sa taas"
+      ],
+      "text": "bilog na kalahating puno sa taas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◔",
+      "aliases": [
+        "bilog na puno sa kanang itaas na kuwadrante"
+      ],
+      "text": "bilog na puno sa kanang itaas na kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◕",
+      "aliases": [
+        "bilog na puno lahat maliban sa itaas na kaliwang kuwadrante"
+      ],
+      "text": "bilog na puno lahat maliban sa itaas na kaliwang kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◖",
+      "aliases": [
+        "kalahating puno sa kaliwa na bilog"
+      ],
+      "text": "kalahating puno sa kaliwa na bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◗",
+      "aliases": [
+        "kalahating puno sa kanan na bilog"
+      ],
+      "text": "kalahating puno sa kanan na bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◘",
+      "aliases": [
+        "baligtad na bullet"
+      ],
+      "text": "baligtad na bullet",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◙",
+      "aliases": [
+        "punong kuwadrado na may walang laman na bilog sa loob"
+      ],
+      "text": "punong kuwadrado na may walang laman na bilog sa loob",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◜",
+      "aliases": [
+        "pabilog na arko sa itaas na kaliwang kuwadrante"
+      ],
+      "text": "pabilog na arko sa itaas na kaliwang kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◝",
+      "aliases": [
+        "pabilog na arko sa itaas na kanang kuwadrante"
+      ],
+      "text": "pabilog na arko sa itaas na kanang kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◞",
+      "aliases": [
+        "pabilog na arko sa ibabang kanan na kuwadrante"
+      ],
+      "text": "pabilog na arko sa ibabang kanan na kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◟",
+      "aliases": [
+        "pabilog na arko sa ibabang kaliwa na kuwadrante"
+      ],
+      "text": "pabilog na arko sa ibabang kaliwa na kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◠",
+      "aliases": [
+        "itaas na kalahating bilog"
+      ],
+      "text": "itaas na kalahating bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◡",
+      "aliases": [
+        "ibaba na kalahating bilog"
+      ],
+      "text": "ibaba na kalahating bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◢",
+      "aliases": [
+        "punong ibabang kanan na tatsulok"
+      ],
+      "text": "punong ibabang kanan na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◣",
+      "aliases": [
+        "punong ibabang kaliwa na tatsulok"
+      ],
+      "text": "punong ibabang kaliwa na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◤",
+      "aliases": [
+        "punong itaas na kaliwang tatsulok"
+      ],
+      "text": "punong itaas na kaliwang tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◥",
+      "aliases": [
+        "punong itaas na kanang tatsulok"
+      ],
+      "text": "punong itaas na kanang tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◦",
+      "aliases": [
+        "walang laman na bullet"
+      ],
+      "text": "walang laman na bullet",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◯",
+      "aliases": [
+        "malaking walang lamang bilog"
+      ],
+      "text": "malaking walang lamang bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◳",
+      "aliases": [
+        "walang laman na kuwadrado sa itaas na kanang kuwadrante"
+      ],
+      "text": "walang laman na kuwadrado sa itaas na kanang kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◷",
+      "aliases": [
+        "walang laman na bilog na may itaas na kanang kuwadrante"
+      ],
+      "text": "walang laman na bilog na may itaas na kanang kuwadrante",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◿",
+      "aliases": [
+        "ibabang kanan na tatsulok"
+      ],
+      "text": "ibabang kanan na tatsulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♪",
+      "aliases": [
+        "ikawalong nota"
+      ],
+      "text": "ikawalong nota",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⨧",
+      "aliases": [
+        "plus subscript na dalawa"
+      ],
+      "text": "plus subscript na dalawa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⨯",
+      "aliases": [
+        "produkto ng vector cross"
+      ],
+      "text": "produkto ng vector cross",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⨼",
+      "aliases": [
+        "produkto ng interior"
+      ],
+      "text": "produkto ng interior",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⩣",
+      "aliases": [
+        "lohikal o dobleng underbar"
+      ],
+      "text": "lohikal o dobleng underbar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⩽",
+      "aliases": [
+        "mas mababa sa naka-slant na equal"
+      ],
+      "text": "mas mababa sa naka-slant na equal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⪍",
+      "aliases": [
+        "mas mababa sa itaas ng similar na equal"
+      ],
+      "text": "mas mababa sa itaas ng similar na equal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⪚",
+      "aliases": [
+        "dobleng linya na equal na mas malaki sa"
+      ],
+      "text": "dobleng linya na equal na mas malaki sa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⪺",
+      "aliases": [
+        "kasunod sa itaas ng hindi halos katumbas"
+      ],
+      "text": "kasunod sa itaas ng hindi halos katumbas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☺",
+      "aliases": [
+        "nakangiti"
+      ],
+      "text": "nakangiti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☹",
+      "aliases": [
+        "nakasimangot"
+      ],
+      "text": "nakasimangot",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☠",
+      "aliases": [
+        "bungo at crossbones"
+      ],
+      "text": "bungo at crossbones",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❣",
+      "aliases": [
+        "tandang padamdam na hugis-puso"
+      ],
+      "text": "tandang padamdam na hugis-puso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❤",
+      "aliases": [
+        "pulang puso"
+      ],
+      "text": "pulang puso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✋",
+      "aliases": [
+        "nakataas na kamay"
+      ],
+      "text": "nakataas na kamay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✌",
+      "aliases": [
+        "peace sign"
+      ],
+      "text": "peace sign",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☝",
+      "aliases": [
+        "hintuturo na nakaturo sa itaas"
+      ],
+      "text": "hintuturo na nakaturo sa itaas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✊",
+      "aliases": [
+        "nakataas na kamao"
+      ],
+      "text": "nakataas na kamao",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✍",
+      "aliases": [
+        "nagsusulat na kamay"
+      ],
+      "text": "nagsusulat na kamay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛹",
+      "aliases": [
+        "taong naglalaro ng bola"
+      ],
+      "text": "taong naglalaro ng bola",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☕",
+      "aliases": [
+        "mainit na inumin"
+      ],
+      "text": "mainit na inumin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛰",
+      "aliases": [
+        "bundok"
+      ],
+      "text": "bundok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛪",
+      "aliases": [
+        "simbahan"
+      ],
+      "text": "simbahan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚓",
+      "aliases": [
+        "angkla"
+      ],
+      "text": "angkla",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛵",
+      "aliases": [
+        "bangkang may layag"
+      ],
+      "text": "bangkang may layag",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✈",
+      "aliases": [
+        "eroplano"
+      ],
+      "text": "eroplano",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⌛",
+      "aliases": [
+        "hourglass"
+      ],
+      "text": "hourglass",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏳",
+      "aliases": [
+        "hourglass na may bumabagsak na buhangin"
+      ],
+      "text": "hourglass na may bumabagsak na buhangin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⌚",
+      "aliases": [
+        "relo"
+      ],
+      "text": "relo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏲",
+      "aliases": [
+        "timer"
+      ],
+      "text": "timer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☀",
+      "aliases": [
+        "araw"
+      ],
+      "text": "araw",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⭐",
+      "aliases": [
+        "puting bituin na katamtamang-laki"
+      ],
+      "text": "puting bituin na katamtamang-laki",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☁",
+      "aliases": [
+        "ulap"
+      ],
+      "text": "ulap",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛅",
+      "aliases": [
+        "araw sa likod ng ulap"
+      ],
+      "text": "araw sa likod ng ulap",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛈",
+      "aliases": [
+        "ulap na may kidlat at ulan"
+      ],
+      "text": "ulap na may kidlat at ulan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☂",
+      "aliases": [
+        "payong"
+      ],
+      "text": "payong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☔",
+      "aliases": [
+        "payong na nauulanan"
+      ],
+      "text": "payong na nauulanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛱",
+      "aliases": [
+        "payong na nakabaon"
+      ],
+      "text": "payong na nakabaon",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚡",
+      "aliases": [
+        "may mataas na boltahe"
+      ],
+      "text": "may mataas na boltahe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛄",
+      "aliases": [
+        "snowman na walang niyebe"
+      ],
+      "text": "snowman na walang niyebe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✨",
+      "aliases": [
+        "kumikinang"
+      ],
+      "text": "kumikinang",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚽",
+      "aliases": [
+        "bola ng soccer"
+      ],
+      "text": "bola ng soccer",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛳",
+      "aliases": [
+        "flag sa butas"
+      ],
+      "text": "flag sa butas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♠",
+      "aliases": [
+        "spade"
+      ],
+      "text": "spade",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♥",
+      "aliases": [
+        "heart"
+      ],
+      "text": "heart",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♦",
+      "aliases": [
+        "diamond"
+      ],
+      "text": "diamond",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♣",
+      "aliases": [
+        "club"
+      ],
+      "text": "club",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛑",
+      "aliases": [
+        "helmet ng rescue worker"
+      ],
+      "text": "helmet ng rescue worker",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☎",
+      "aliases": [
+        "telepono"
+      ],
+      "text": "telepono",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✉",
+      "aliases": [
+        "sobre"
+      ],
+      "text": "sobre",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✏",
+      "aliases": [
+        "lapis"
+      ],
+      "text": "lapis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✒",
+      "aliases": [
+        "itim na nib"
+      ],
+      "text": "itim na nib",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✂",
+      "aliases": [
+        "gunting"
+      ],
+      "text": "gunting",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛏",
+      "aliases": [
+        "piko"
+      ],
+      "text": "piko",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚒",
+      "aliases": [
+        "martilyo at piko"
+      ],
+      "text": "martilyo at piko",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚔",
+      "aliases": [
+        "magkakrus na espada"
+      ],
+      "text": "magkakrus na espada",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚖",
+      "aliases": [
+        "timbangan"
+      ],
+      "text": "timbangan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛓",
+      "aliases": [
+        "kadena"
+      ],
+      "text": "kadena",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚰",
+      "aliases": [
+        "kabaong"
+      ],
+      "text": "kabaong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚱",
+      "aliases": [
+        "sisidlan ng abo"
+      ],
+      "text": "sisidlan ng abo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♿",
+      "aliases": [
+        "wheelchair"
+      ],
+      "text": "wheelchair",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚠",
+      "aliases": [
+        "babala"
+      ],
+      "text": "babala",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⛔",
+      "aliases": [
+        "hindi pwedeng pumasok"
+      ],
+      "text": "hindi pwedeng pumasok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⬆",
+      "aliases": [
+        "pataas na arrow"
+      ],
+      "text": "pataas na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↗",
+      "aliases": [
+        "pataas na pakanan na arrow"
+      ],
+      "text": "pataas na pakanan na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "➡",
+      "aliases": [
+        "pakanang arrow"
+      ],
+      "text": "pakanang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↘",
+      "aliases": [
+        "pababang pakanan na arrow"
+      ],
+      "text": "pababang pakanan na arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⬇",
+      "aliases": [
+        "pababang arrow"
+      ],
+      "text": "pababang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↙",
+      "aliases": [
+        "pababang pakaliwang arrow"
+      ],
+      "text": "pababang pakaliwang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⬅",
+      "aliases": [
+        "pakaliwang arrow"
+      ],
+      "text": "pakaliwang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↖",
+      "aliases": [
+        "pataas na pakaliwang arrow"
+      ],
+      "text": "pataas na pakaliwang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↕",
+      "aliases": [
+        "pataas-pababang arrow"
+      ],
+      "text": "pataas-pababang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↔",
+      "aliases": [
+        "pakaliwa-pakanang arrow"
+      ],
+      "text": "pakaliwa-pakanang arrow",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↮",
+      "aliases": [
+        "kaliwa’t kanang arrow stroke"
+      ],
+      "text": "kaliwa’t kanang arrow stroke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↩",
+      "aliases": [
+        "pakanang arrow na kumurba pakaliwa"
+      ],
+      "text": "pakanang arrow na kumurba pakaliwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "↪",
+      "aliases": [
+        "pakaliwang arrow na kumurba pakanan"
+      ],
+      "text": "pakaliwang arrow na kumurba pakanan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⤴",
+      "aliases": [
+        "pakanang arrow na kumurba pataas"
+      ],
+      "text": "pakanang arrow na kumurba pataas",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⤵",
+      "aliases": [
+        "pakanang arrow na kumurba pababa"
+      ],
+      "text": "pakanang arrow na kumurba pababa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚛",
+      "aliases": [
+        "atom"
+      ],
+      "text": "atom",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✡",
+      "aliases": [
+        "star of david"
+      ],
+      "text": "star of david",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☸",
+      "aliases": [
+        "gulong ng dharma"
+      ],
+      "text": "gulong ng dharma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✝",
+      "aliases": [
+        "latin na krus"
+      ],
+      "text": "latin na krus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☦",
+      "aliases": [
+        "orthodox na krus"
+      ],
+      "text": "orthodox na krus",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☮",
+      "aliases": [
+        "simbolo ng kapayapaan"
+      ],
+      "text": "simbolo ng kapayapaan",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▶",
+      "aliases": [
+        "button na i-play"
+      ],
+      "text": "button na i-play",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏩",
+      "aliases": [
+        "button na i-fast forward"
+      ],
+      "text": "button na i-fast forward",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏭",
+      "aliases": [
+        "button na susunod na track"
+      ],
+      "text": "button na susunod na track",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏯",
+      "aliases": [
+        "button na i-play o i-pause"
+      ],
+      "text": "button na i-play o i-pause",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◀",
+      "aliases": [
+        "button na i-reverse"
+      ],
+      "text": "button na i-reverse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏪",
+      "aliases": [
+        "button na i-fast reverse"
+      ],
+      "text": "button na i-fast reverse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏮",
+      "aliases": [
+        "button na huling track"
+      ],
+      "text": "button na huling track",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏫",
+      "aliases": [
+        "button na i-fast up"
+      ],
+      "text": "button na i-fast up",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏬",
+      "aliases": [
+        "button na i-fast down"
+      ],
+      "text": "button na i-fast down",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏸",
+      "aliases": [
+        "button na i-pause"
+      ],
+      "text": "button na i-pause",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏹",
+      "aliases": [
+        "button na itigil"
+      ],
+      "text": "button na itigil",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏺",
+      "aliases": [
+        "button na i-record"
+      ],
+      "text": "button na i-record",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⏏",
+      "aliases": [
+        "button na i-eject"
+      ],
+      "text": "button na i-eject",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♀",
+      "aliases": [
+        "simbolo ng babae"
+      ],
+      "text": "simbolo ng babae",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♂",
+      "aliases": [
+        "simbolo ng lalaki"
+      ],
+      "text": "simbolo ng lalaki",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚧",
+      "aliases": [
+        "simbolo ng transgender"
+      ],
+      "text": "simbolo ng transgender",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "‼",
+      "aliases": [
+        "dobleng tandang padamdam"
+      ],
+      "text": "dobleng tandang padamdam",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⁉",
+      "aliases": [
+        "tandang padamdam at pananong"
+      ],
+      "text": "tandang padamdam at pananong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❓",
+      "aliases": [
+        "pulang tandang pananong"
+      ],
+      "text": "pulang tandang pananong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❔",
+      "aliases": [
+        "puting tandang pananong"
+      ],
+      "text": "puting tandang pananong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❕",
+      "aliases": [
+        "puting tandang padamdam"
+      ],
+      "text": "puting tandang padamdam",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❗",
+      "aliases": [
+        "tandang padamdam"
+      ],
+      "text": "tandang padamdam",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚕",
+      "aliases": [
+        "simbolong pang-medikal"
+      ],
+      "text": "simbolong pang-medikal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "♻",
+      "aliases": [
+        "simbolo ng pag-recycle"
+      ],
+      "text": "simbolo ng pag-recycle",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚜",
+      "aliases": [
+        "flordelis"
+      ],
+      "text": "flordelis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⭕",
+      "aliases": [
+        "malaking bilog"
+      ],
+      "text": "malaking bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✅",
+      "aliases": [
+        "puting tsek"
+      ],
+      "text": "puting tsek",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "☑",
+      "aliases": [
+        "balotang may tsek"
+      ],
+      "text": "balotang may tsek",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✔",
+      "aliases": [
+        "malaking tsek"
+      ],
+      "text": "malaking tsek",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❌",
+      "aliases": [
+        "ekis"
+      ],
+      "text": "ekis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❎",
+      "aliases": [
+        "button na ekis"
+      ],
+      "text": "button na ekis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "➿",
+      "aliases": [
+        "dobleng curly loop"
+      ],
+      "text": "dobleng curly loop",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✳",
+      "aliases": [
+        "asterisk na may walong sulok"
+      ],
+      "text": "asterisk na may walong sulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "✴",
+      "aliases": [
+        "bituin na may walong sulok"
+      ],
+      "text": "bituin na may walong sulok",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "❇",
+      "aliases": [
+        "kinang"
+      ],
+      "text": "kinang",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "©",
+      "aliases": [
+        "karapatang magpalathala"
+      ],
+      "text": "karapatang magpalathala",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "®",
+      "aliases": [
+        "rehistrado"
+      ],
+      "text": "rehistrado",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "™",
+      "aliases": [
+        "trade mark"
+      ],
+      "text": "trade mark",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "Ⓜ",
+      "aliases": [
+        "binilugang M"
+      ],
+      "text": "binilugang M",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚫",
+      "aliases": [
+        "itim na bilog"
+      ],
+      "text": "itim na bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⚪",
+      "aliases": [
+        "puting bilog"
+      ],
+      "text": "puting bilog",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⬛",
+      "aliases": [
+        "malaking itim na parisukat"
+      ],
+      "text": "malaking itim na parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "⬜",
+      "aliases": [
+        "malaking puting parisukat"
+      ],
+      "text": "malaking puting parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◼",
+      "aliases": [
+        "katamtamang itim na parisukat"
+      ],
+      "text": "katamtamang itim na parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◻",
+      "aliases": [
+        "katamtamang puting parisukat"
+      ],
+      "text": "katamtamang puting parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◾",
+      "aliases": [
+        "medyo maliit na itim na parisukat"
+      ],
+      "text": "medyo maliit na itim na parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "◽",
+      "aliases": [
+        "medyo maliit na puting parisukat"
+      ],
+      "text": "medyo maliit na puting parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▪",
+      "aliases": [
+        "maliit na itim na parisukat"
+      ],
+      "text": "maliit na itim na parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "▫",
+      "aliases": [
+        "maliit na puting parisukat"
+      ],
+      "text": "maliit na puting parisukat",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "¢",
+      "aliases": [
+        "sentimo"
+      ],
+      "text": "sentimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "$",
+      "aliases": [
+        "dolyar"
+      ],
+      "text": "dolyar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "₱",
+      "aliases": [
+        "piso"
+      ],
+      "text": "piso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "₹",
+      "aliases": [
+        "indian rupee"
+      ],
+      "text": "indian rupee",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {
+    "‾": {
+      "name": "overline",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‽": {
+      "name": "interrobang",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "/": {
+      "name": "slash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "\\": {
+      "name": "backslash",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‰": {
+      "name": "per mille",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "•": {
+      "name": "bullet",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "′": {
+      "name": "prime",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "‸": {
+      "name": "caret",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "¨": {
+      "name": "diaeresis",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∆": {
+      "name": "increment",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∑": {
+      "name": "n-ary summation",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⁻": {
+      "name": "superscript minus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∗": {
+      "name": "asterisk operator",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "√": {
+      "name": "square root",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∟": {
+      "name": "right angle",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∠": {
+      "name": "angle",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∩": {
+      "name": "intersection",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∪": {
+      "name": "union",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∫": {
+      "name": "integral",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "∶": {
+      "name": "ratio",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊹": {
+      "name": "hermitian conjugate matrix",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⊿": {
+      "name": "right triangle",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⋃": {
+      "name": "n-ary union",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "◊": {
+      "name": "lozenge",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♭": {
+      "name": "flat",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♯": {
+      "name": "sharp",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛷": {
+      "name": "skier",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☘": {
+      "name": "shamrock",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛩": {
+      "name": "shinto shrine",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛲": {
+      "name": "fountain",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛺": {
+      "name": "tent",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♨": {
+      "name": "hot springs",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛽": {
+      "name": "fuel pump",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛴": {
+      "name": "ferry",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⏰": {
+      "name": "alarm clock",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⏱": {
+      "name": "stopwatch",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "❄": {
+      "name": "snowflake",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☃": {
+      "name": "snowman",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☄": {
+      "name": "comet",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⚾": {
+      "name": "baseball",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛸": {
+      "name": "ice skate",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♟": {
+      "name": "chess pawn",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⌨": {
+      "name": "keyboard",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⚙": {
+      "name": "gear",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⚗": {
+      "name": "alembic",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☢": {
+      "name": "radioactive",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☣": {
+      "name": "biohazard",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☯": {
+      "name": "yin yang",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "☪": {
+      "name": "star and crescent",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♈": {
+      "name": "Aries",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♉": {
+      "name": "Taurus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♊": {
+      "name": "Gemini",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♋": {
+      "name": "Cancer",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♌": {
+      "name": "Leo",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♍": {
+      "name": "Virgo",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♎": {
+      "name": "Libra",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♏": {
+      "name": "Scorpio",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♐": {
+      "name": "Sagittarius",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♑": {
+      "name": "Capricorn",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♒": {
+      "name": "Aquarius",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♓": {
+      "name": "Pisces",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛎": {
+      "name": "Ophiuchus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "✖": {
+      "name": "multiply",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "➕": {
+      "name": "plus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "➖": {
+      "name": "minus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "➗": {
+      "name": "divide",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♾": {
+      "name": "infinity",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "➰": {
+      "name": "curly loop",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "£": {
+      "name": "pound",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "¥": {
+      "name": "yen",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₢": {
+      "name": "cruzeiro",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₣": {
+      "name": "french franc",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₤": {
+      "name": "lira",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₥": {
+      "name": "mill",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₩": {
+      "name": "won",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "€": {
+      "name": "euro",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₰": {
+      "name": "german penny",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₳": {
+      "name": "austral",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₶": {
+      "name": "livre tournois",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₷": {
+      "name": "spesmilo",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₽": {
+      "name": "ruble",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₿": {
+      "name": "bitcoin",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "₨": {
+      "name": "rupee",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    }
+  },
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

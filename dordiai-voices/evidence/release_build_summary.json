@@ -1,0 +1,85 @@
+{
+  "format": "dordiai-release-verification-summary",
+  "format_version": 1,
+  "version": "0.13.0-dev.1",
+  "baseline": "0.12.2",
+  "source_snapshot": "evidence/dev1_source_snapshot.json.gz",
+  "source_snapshot_sha256": "5ef4d08f4bd508c614047fa85108b0ba3e395bf68a0e0ab958973231848068b2",
+  "source_tree_sha256": "d35c2996fe60f21cbee7c63f7b2d0b4431c1af4f3c8e162430d9e9e9693d1a32",
+  "source_files": 105,
+  "voice_count": 45,
+  "excluded_voice_count": 8,
+  "excluded_resource_files": 1424,
+  "core_under_2GB": true,
+  "core_under_3GB": true,
+  "artifacts": [
+    {
+      "filename": "dordiai-voices-0.13.0-dev.1.nvda-addon",
+      "group": "core",
+      "size_bytes": 1766123061,
+      "sha256": "d53622eb43af439d6bef92068324bed8e0ca53951a9fae96903b13ec3177acae",
+      "payload_files": 10149,
+      "installed_bytes": 2121321621
+    },
+    {
+      "filename": "dordiai-european-piper-0.13.0-dev.1.zip",
+      "group": "european-piper",
+      "size_bytes": 409761032,
+      "sha256": "29a101cd0f2918840dc8deeb989136e96b8e135be1d21dd1b47d1c49fc71a9a8",
+      "payload_files": 23,
+      "installed_bytes": 443948917
+    },
+    {
+      "filename": "dordiai-slovak-rhvoice-0.13.0-dev.1.zip",
+      "group": "slovak-rhvoice",
+      "size_bytes": 11682357,
+      "sha256": "7c57bceb50d911a09f9f8cba1d2e5fbaf8f155eb2daf11139e28fcb167e8c416",
+      "payload_files": 33,
+      "installed_bytes": 44961310
+    },
+    {
+      "filename": "dordiai-wide-languages-0.13.0-dev.1.zip",
+      "group": "wide-languages",
+      "size_bytes": 552777602,
+      "sha256": "9d474bb4dcfddc3e37a7b39b36005cae1eff34220cfa442f190ed190aa45c771",
+      "payload_files": 760,
+      "installed_bytes": 652862862
+    }
+  ],
+  "verification": [
+    {
+      "filename": "dordiai-voices-0.13.0-dev.1.nvda-addon",
+      "verified_files": 10149,
+      "installed_bytes": 2121321621,
+      "download_bytes": 1766123061,
+      "voice_count": 45,
+      "windows_nvda_validation": "not_performed_by_packaging_verifier"
+    },
+    {
+      "filename": "dordiai-european-piper-0.13.0-dev.1.zip",
+      "verified_files": 23,
+      "installed_bytes": 443948917,
+      "download_bytes": 409761032,
+      "voice_count": null,
+      "windows_nvda_validation": "not_performed_by_packaging_verifier"
+    },
+    {
+      "filename": "dordiai-slovak-rhvoice-0.13.0-dev.1.zip",
+      "verified_files": 33,
+      "installed_bytes": 44961310,
+      "download_bytes": 11682357,
+      "voice_count": null,
+      "windows_nvda_validation": "not_performed_by_packaging_verifier"
+    },
+    {
+      "filename": "dordiai-wide-languages-0.13.0-dev.1.zip",
+      "verified_files": 760,
+      "installed_bytes": 652862862,
+      "download_bytes": 552777602,
+      "voice_count": null,
+      "windows_nvda_validation": "not_performed_by_packaging_verifier"
+    }
+  ],
+  "windows_nvda_validation": "not_performed_by_packaging_verifier",
+  "complete_product": false
+}

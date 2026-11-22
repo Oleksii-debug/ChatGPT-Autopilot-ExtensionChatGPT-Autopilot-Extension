@@ -10,14 +10,15 @@ import importlib.util
 from pathlib import Path
 import unicodedata
 
-ALIASES = {"iw": "he", "in": "id", "no": "nb", "zh": "cmn", "zh-cmn": "cmn",
-           "zh-yue": "yue", "mo": "ro", "gom": "kok"}
+_code_spec = importlib.util.spec_from_file_location("_dordiai_shared_language_codes", Path(__file__).with_name("language_codes.py"))
+_codes = importlib.util.module_from_spec(_code_spec)
+_code_spec.loader.exec_module(_codes)
+ALIASES = _codes.ALIASES
 WordDecision = namedtuple("WordDecision", "language candidates ambiguous source confidence")
 
 
 def language_key(value):
-    value = (value or "").strip().lower().replace("_", "-")
-    return ALIASES.get(value, ALIASES.get(value.partition("-")[0], value.partition("-")[0]))
+    return _codes.canonical_language(value)
 
 
 def normalize_word(word):
@@ -106,3 +107,9 @@ def classify_word(word, enabled_languages=None):
 
 def has_word_classifier():
     return classifier_module().model() is not None
+
+
+def classifier_languages():
+    """Labels actually learned by the bundled word model, not the full catalogue."""
+    model = classifier_module().model()
+    return frozenset(model.codes) if model is not None else frozenset()

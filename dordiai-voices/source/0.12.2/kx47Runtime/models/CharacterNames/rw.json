@@ -1,0 +1,2364 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "rw",
+  "sources": {
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/rw/annotations.json",
+      "sha256": "bbff95f0d48878ea0e868d3ec258efc933d6e48a5a36f537d37817927f4eba29",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/rw/characters.json",
+      "sha256": "cd47df4bb9d3c8c248d3650f132927f5856785a65a9791be9656be46dea36bef",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "☺": "Indoro imwenyura",
+    "☹": "isura irakaye",
+    "☠": "igihanga n’amagufamusaraba",
+    "❣": "akamenyetso k’umutima gatangara",
+    "❤": "umutima utukura",
+    "✋": "ikiganza kizamuye",
+    "✌": "Ikiganza cy’intsinzi",
+    "☝": "gutunga mukubitarukoko hejuru",
+    "✊": "igipfunsi kizamuye",
+    "✍": "ikiganza cyandika",
+    "⛷": "ugendera kuri siki",
+    "⛹": "umuntu uri gutera umupira",
+    "☘": "ubwoko bw’ikibabi",
+    "☕": "ikinyobwa gishyushye",
+    "⛰": "umusozi",
+    "⛪": "kiliziya",
+    "⛩": "aho bashengerera h’idini ya shinto",
+    "⛲": "umugezi",
+    "⛺": "ihema",
+    "♨": "amashyuza",
+    "⛽": "ipompe ya lisansi",
+    "⚓": "inshyigikizi",
+    "⛵": "ubwato bwo gutembera",
+    "⛴": "Ubwato butwara abantu",
+    "✈": "indege",
+    "⌛": "impimasaha",
+    "⏳": "impimasaha n’umucanga umeneka",
+    "⌚": "reba",
+    "⏰": "isaha yo kubyutsa",
+    "⏱": "koronometere",
+    "⏲": "isaha y’imbaragihe",
+    "☀": "cyu",
+    "⭐": "inyenyeri iringaniye y’umweru",
+    "☁": "karawudi",
+    "⛅": "izuba ryihishe inyuma y’igicu",
+    "⛈": "ibicu byiganjemo imirabyo n’imvura",
+    "☂": "umuyaga",
+    "☔": "umutaka uriho ibitonyanga by’imvura",
+    "⛱": "umutaka ku butaka",
+    "⚡": "tansiyo y’umuriro yo hejuru",
+    "❄": "akabumbe k’urubura",
+    "☃": "umugabo wo mu rubura",
+    "⛄": "umuntu ukoze mu rubura udafite urubura",
+    "☄": "komete",
+    "✨": "ibishashi",
+    "⚽": "umupira w’amaguru",
+    "⚾": "beziboro",
+    "⛳": "ibendera riri mu mwobo",
+    "⛸": "sketi yo ku rubura",
+    "♠": "ikimenyeso cy’ipiki",
+    "♥": "ikimenyetso cy’umutima",
+    "♦": "ikimenyetso cya diyama",
+    "♣": "ikimenyetso cyo ku ikarita cy’umusaraba",
+    "⛑": "kasike itabara abakozi",
+    "☎": "telefone",
+    "⌨": "mwandikisho",
+    "✉": "ibahasha",
+    "✏": "ikaramu y’igiti",
+    "✒": "umutwe w’ikaramu y’umukara",
+    "✂": "Imakasi",
+    "⛏": "ipiki",
+    "⚒": "inyundo n’ipiki",
+    "⚔": "inkota zisobekeranye",
+    "⚙": "ishusho ringi",
+    "⚖": "umunzani",
+    "⛓": "umunyururu",
+    "⚗": "agacupa bayungururisha",
+    "⚰": "isanduku y’umupfu",
+    "⚱": "agasanduku kabikwamo ivu ry’umurambo watwitswe",
+    "♿": "ikimenyetso cy’akagare k’abafite ubumuga",
+    "⚠": "iburira",
+    "⛔": "nta nzira ihari",
+    "☢": "gyanduza",
+    "☣": "gifite ingaruka ku buzima",
+    "⬆": "akambi kazamuka",
+    "↗": "umwambi w’ahagana ejuru iburyo",
+    "➡": "akambi k’iburyo",
+    "↘": "umwambi wo hasi ugana iburyo",
+    "⬇": "akambi kamanura",
+    "↙": "umwambi wo hasi ahagana ibumoso",
+    "⬅": "akambi k’ibumoso",
+    "↖": "umwambi wo hejuru ugana ibumoso",
+    "↕": "akambi kazamuka-kamanuka",
+    "↔": "akambi kava ibumoso kajya iburyo",
+    "↩": "umwambi w’iburyo uhetamiye ibumoso",
+    "↪": "umwambi w’ibumoso uhetamiye iburyo",
+    "⤴": "umwambi w’iburyo uhetamiye hejuru",
+    "⤵": "umwambi w’iburyo uhetamiye hasi",
+    "⚛": "ikimenyetso cya atome",
+    "✡": "Inyenyeri ya Dawudi",
+    "☸": "uruziga rwa daharama",
+    "☯": "yini yangi",
+    "✝": "umusaraba w’abalatini",
+    "☦": "umusaraba w’aba-orthodox",
+    "☪": "inyenyeri n’ukwezi kw’imboneka",
+    "☮": "ikimenyetso cy’amahoro",
+    "♈": "Isekurume y’intama",
+    "♉": "ikimenyesto cya Torisi",
+    "♊": "Jemini",
+    "♋": "Kanseri",
+    "♌": "Lewo",
+    "♍": "Virigo",
+    "♎": "Libura",
+    "♏": "Sikorupiyusi",
+    "♐": "sajitariyusi",
+    "♑": "Kapurikorune",
+    "♒": "akwariyusi",
+    "♓": "Pisikesi",
+    "⛎": "Ofiyukusi",
+    "▶": "buto yo gukina",
+    "⏩": "buto yo kwihutisha cyane",
+    "⏭": "buto y’indirimbo ikurikira",
+    "⏯": "buto yo gukina cyangwa guhagarika gato",
+    "◀": "ibuto yo gusubiza inyuma",
+    "⏪": "buto yo gusubiza inyuma cyane",
+    "⏮": "ibuto y’indirimbo ya nyuma",
+    "⏫": "buto yo kuzamura cyane",
+    "⏬": "buto yo hasi cyane",
+    "⏸": "buto yo guhagarika gato",
+    "⏹": "buto yo guhagarika",
+    "⏺": "buto yo gufata amajwi",
+    "⏏": "buto yo gusohora",
+    "♀": "ikimenyetso cy’umugore",
+    "♂": "ikimenyetso cy’umugabo",
+    "✖": "Ikimenyetso cya x kinini cyo gukuba",
+    "➕": "ikimenyetso kinini cyo guteranya",
+    "➖": "ikimenyetso kinini cyo gukuramo",
+    "➗": "ikimenyetso kinini cyo kugabanya",
+    "‼": "udutangaro tubiri",
+    "⁉": "agatangaro n’akabazo",
+    "❓": "akabazo gacuritse",
+    "❔": "ikimenyetso cy’akabazo k’umweru",
+    "❕": "ikimenyetso cy’agatangaro k’umweru",
+    "❗": "agatangaro gacuritse",
+    "⚕": "ikimenyetso cy’ubuvuzi",
+    "♻": "ikimenyetso cyo kongera gutunganywa",
+    "⚜": "ururabo rwa lili",
+    "⭕": "uruziga runini rutsitse",
+    "✅": "ikimenyetso kinini cy’umweru cyo kuvivura",
+    "☑": "Agasanduku k’amatora bifashisha mu kubara amajwi",
+    "✔": "Ikimenyetso kinini cya bihwanye",
+    "❌": "akamenyetso k’umusaraba",
+    "❎": "buto y’akamenyetso y’umusaraba",
+    "➰": "uruziga rutsitse",
+    "➿": "inziga ebyiri zitsitse",
+    "✳": "akanyenyeri kagizwe n’imitwe umunani",
+    "✴": "inyenyeri igizwe n’imitwe umunani",
+    "❇": "igishashi",
+    "©": "kipirayiti",
+    "®": "ibaruwe",
+    "™": "ikirango",
+    "Ⓜ": "M iri mu ruziga",
+    "⚫": "uruziga rw’umukara",
+    "⚪": "uruziga rw’umweru",
+    "⬛": "kare nini y’umukara",
+    "⬜": "kare nini y’umweru",
+    "◼": "kare y’umukara iringaniye",
+    "◻": "kare y’umweru iringaniye",
+    "◾": "kare ntoya iringaniye y’umukara",
+    "◽": "kare ntoya iringaniye y’umweru",
+    "▪": "kare ntoya y’umukara",
+    "▫": "kare ntoya y’umweru"
+  },
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z"
+  ],
+  "missing_ordinary_letter_names": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☺",
+      "aliases": [
+        "Indoro imwenyura"
+      ],
+      "text": "Indoro imwenyura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☹",
+      "aliases": [
+        "isura irakaye"
+      ],
+      "text": "isura irakaye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☠",
+      "aliases": [
+        "igihanga n’amagufamusaraba"
+      ],
+      "text": "igihanga n’amagufamusaraba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❣",
+      "aliases": [
+        "akamenyetso k’umutima gatangara"
+      ],
+      "text": "akamenyetso k’umutima gatangara",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❤",
+      "aliases": [
+        "umutima utukura"
+      ],
+      "text": "umutima utukura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✋",
+      "aliases": [
+        "ikiganza kizamuye"
+      ],
+      "text": "ikiganza kizamuye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✌",
+      "aliases": [
+        "Ikiganza cy’intsinzi"
+      ],
+      "text": "Ikiganza cy’intsinzi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☝",
+      "aliases": [
+        "gutunga mukubitarukoko hejuru"
+      ],
+      "text": "gutunga mukubitarukoko hejuru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✊",
+      "aliases": [
+        "igipfunsi kizamuye"
+      ],
+      "text": "igipfunsi kizamuye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✍",
+      "aliases": [
+        "ikiganza cyandika"
+      ],
+      "text": "ikiganza cyandika",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛷",
+      "aliases": [
+        "ugendera kuri siki"
+      ],
+      "text": "ugendera kuri siki",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛹",
+      "aliases": [
+        "umuntu uri gutera umupira"
+      ],
+      "text": "umuntu uri gutera umupira",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☘",
+      "aliases": [
+        "ubwoko bw’ikibabi"
+      ],
+      "text": "ubwoko bw’ikibabi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☕",
+      "aliases": [
+        "ikinyobwa gishyushye"
+      ],
+      "text": "ikinyobwa gishyushye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛰",
+      "aliases": [
+        "umusozi"
+      ],
+      "text": "umusozi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛪",
+      "aliases": [
+        "kiliziya"
+      ],
+      "text": "kiliziya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛩",
+      "aliases": [
+        "aho bashengerera h’idini ya shinto"
+      ],
+      "text": "aho bashengerera h’idini ya shinto",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛲",
+      "aliases": [
+        "umugezi"
+      ],
+      "text": "umugezi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛺",
+      "aliases": [
+        "ihema"
+      ],
+      "text": "ihema",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♨",
+      "aliases": [
+        "amashyuza"
+      ],
+      "text": "amashyuza",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛽",
+      "aliases": [
+        "ipompe ya lisansi"
+      ],
+      "text": "ipompe ya lisansi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚓",
+      "aliases": [
+        "inshyigikizi"
+      ],
+      "text": "inshyigikizi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛵",
+      "aliases": [
+        "ubwato bwo gutembera"
+      ],
+      "text": "ubwato bwo gutembera",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛴",
+      "aliases": [
+        "Ubwato butwara abantu"
+      ],
+      "text": "Ubwato butwara abantu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✈",
+      "aliases": [
+        "indege"
+      ],
+      "text": "indege",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⌛",
+      "aliases": [
+        "impimasaha"
+      ],
+      "text": "impimasaha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏳",
+      "aliases": [
+        "impimasaha n’umucanga umeneka"
+      ],
+      "text": "impimasaha n’umucanga umeneka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⌚",
+      "aliases": [
+        "reba"
+      ],
+      "text": "reba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏰",
+      "aliases": [
+        "isaha yo kubyutsa"
+      ],
+      "text": "isaha yo kubyutsa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏱",
+      "aliases": [
+        "koronometere"
+      ],
+      "text": "koronometere",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏲",
+      "aliases": [
+        "isaha y’imbaragihe"
+      ],
+      "text": "isaha y’imbaragihe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☀",
+      "aliases": [
+        "cyu"
+      ],
+      "text": "cyu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⭐",
+      "aliases": [
+        "inyenyeri iringaniye y’umweru"
+      ],
+      "text": "inyenyeri iringaniye y’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☁",
+      "aliases": [
+        "karawudi"
+      ],
+      "text": "karawudi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛅",
+      "aliases": [
+        "izuba ryihishe inyuma y’igicu"
+      ],
+      "text": "izuba ryihishe inyuma y’igicu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛈",
+      "aliases": [
+        "ibicu byiganjemo imirabyo n’imvura"
+      ],
+      "text": "ibicu byiganjemo imirabyo n’imvura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☂",
+      "aliases": [
+        "umuyaga"
+      ],
+      "text": "umuyaga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☔",
+      "aliases": [
+        "umutaka uriho ibitonyanga by’imvura"
+      ],
+      "text": "umutaka uriho ibitonyanga by’imvura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛱",
+      "aliases": [
+        "umutaka ku butaka"
+      ],
+      "text": "umutaka ku butaka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚡",
+      "aliases": [
+        "tansiyo y’umuriro yo hejuru"
+      ],
+      "text": "tansiyo y’umuriro yo hejuru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❄",
+      "aliases": [
+        "akabumbe k’urubura"
+      ],
+      "text": "akabumbe k’urubura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☃",
+      "aliases": [
+        "umugabo wo mu rubura"
+      ],
+      "text": "umugabo wo mu rubura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛄",
+      "aliases": [
+        "umuntu ukoze mu rubura udafite urubura"
+      ],
+      "text": "umuntu ukoze mu rubura udafite urubura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☄",
+      "aliases": [
+        "komete"
+      ],
+      "text": "komete",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✨",
+      "aliases": [
+        "ibishashi"
+      ],
+      "text": "ibishashi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚽",
+      "aliases": [
+        "umupira w’amaguru"
+      ],
+      "text": "umupira w’amaguru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚾",
+      "aliases": [
+        "beziboro"
+      ],
+      "text": "beziboro",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛳",
+      "aliases": [
+        "ibendera riri mu mwobo"
+      ],
+      "text": "ibendera riri mu mwobo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛸",
+      "aliases": [
+        "sketi yo ku rubura"
+      ],
+      "text": "sketi yo ku rubura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♠",
+      "aliases": [
+        "ikimenyeso cy’ipiki"
+      ],
+      "text": "ikimenyeso cy’ipiki",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♥",
+      "aliases": [
+        "ikimenyetso cy’umutima"
+      ],
+      "text": "ikimenyetso cy’umutima",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♦",
+      "aliases": [
+        "ikimenyetso cya diyama"
+      ],
+      "text": "ikimenyetso cya diyama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♣",
+      "aliases": [
+        "ikimenyetso cyo ku ikarita cy’umusaraba"
+      ],
+      "text": "ikimenyetso cyo ku ikarita cy’umusaraba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛑",
+      "aliases": [
+        "kasike itabara abakozi"
+      ],
+      "text": "kasike itabara abakozi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☎",
+      "aliases": [
+        "telefone"
+      ],
+      "text": "telefone",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⌨",
+      "aliases": [
+        "mwandikisho"
+      ],
+      "text": "mwandikisho",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✉",
+      "aliases": [
+        "ibahasha"
+      ],
+      "text": "ibahasha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✏",
+      "aliases": [
+        "ikaramu y’igiti"
+      ],
+      "text": "ikaramu y’igiti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✒",
+      "aliases": [
+        "umutwe w’ikaramu y’umukara"
+      ],
+      "text": "umutwe w’ikaramu y’umukara",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✂",
+      "aliases": [
+        "Imakasi"
+      ],
+      "text": "Imakasi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛏",
+      "aliases": [
+        "ipiki"
+      ],
+      "text": "ipiki",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚒",
+      "aliases": [
+        "inyundo n’ipiki"
+      ],
+      "text": "inyundo n’ipiki",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚔",
+      "aliases": [
+        "inkota zisobekeranye"
+      ],
+      "text": "inkota zisobekeranye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚙",
+      "aliases": [
+        "ishusho ringi"
+      ],
+      "text": "ishusho ringi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚖",
+      "aliases": [
+        "umunzani"
+      ],
+      "text": "umunzani",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛓",
+      "aliases": [
+        "umunyururu"
+      ],
+      "text": "umunyururu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚗",
+      "aliases": [
+        "agacupa bayungururisha"
+      ],
+      "text": "agacupa bayungururisha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚰",
+      "aliases": [
+        "isanduku y’umupfu"
+      ],
+      "text": "isanduku y’umupfu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚱",
+      "aliases": [
+        "agasanduku kabikwamo ivu ry’umurambo watwitswe"
+      ],
+      "text": "agasanduku kabikwamo ivu ry’umurambo watwitswe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♿",
+      "aliases": [
+        "ikimenyetso cy’akagare k’abafite ubumuga"
+      ],
+      "text": "ikimenyetso cy’akagare k’abafite ubumuga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚠",
+      "aliases": [
+        "iburira"
+      ],
+      "text": "iburira",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛔",
+      "aliases": [
+        "nta nzira ihari"
+      ],
+      "text": "nta nzira ihari",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☢",
+      "aliases": [
+        "gyanduza"
+      ],
+      "text": "gyanduza",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☣",
+      "aliases": [
+        "gifite ingaruka ku buzima"
+      ],
+      "text": "gifite ingaruka ku buzima",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⬆",
+      "aliases": [
+        "akambi kazamuka"
+      ],
+      "text": "akambi kazamuka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↗",
+      "aliases": [
+        "umwambi w’ahagana ejuru iburyo"
+      ],
+      "text": "umwambi w’ahagana ejuru iburyo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "➡",
+      "aliases": [
+        "akambi k’iburyo"
+      ],
+      "text": "akambi k’iburyo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↘",
+      "aliases": [
+        "umwambi wo hasi ugana iburyo"
+      ],
+      "text": "umwambi wo hasi ugana iburyo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⬇",
+      "aliases": [
+        "akambi kamanura"
+      ],
+      "text": "akambi kamanura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↙",
+      "aliases": [
+        "umwambi wo hasi ahagana ibumoso"
+      ],
+      "text": "umwambi wo hasi ahagana ibumoso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⬅",
+      "aliases": [
+        "akambi k’ibumoso"
+      ],
+      "text": "akambi k’ibumoso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↖",
+      "aliases": [
+        "umwambi wo hejuru ugana ibumoso"
+      ],
+      "text": "umwambi wo hejuru ugana ibumoso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↕",
+      "aliases": [
+        "akambi kazamuka-kamanuka"
+      ],
+      "text": "akambi kazamuka-kamanuka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↔",
+      "aliases": [
+        "akambi kava ibumoso kajya iburyo"
+      ],
+      "text": "akambi kava ibumoso kajya iburyo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↩",
+      "aliases": [
+        "umwambi w’iburyo uhetamiye ibumoso"
+      ],
+      "text": "umwambi w’iburyo uhetamiye ibumoso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "↪",
+      "aliases": [
+        "umwambi w’ibumoso uhetamiye iburyo"
+      ],
+      "text": "umwambi w’ibumoso uhetamiye iburyo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⤴",
+      "aliases": [
+        "umwambi w’iburyo uhetamiye hejuru"
+      ],
+      "text": "umwambi w’iburyo uhetamiye hejuru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⤵",
+      "aliases": [
+        "umwambi w’iburyo uhetamiye hasi"
+      ],
+      "text": "umwambi w’iburyo uhetamiye hasi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚛",
+      "aliases": [
+        "ikimenyetso cya atome"
+      ],
+      "text": "ikimenyetso cya atome",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✡",
+      "aliases": [
+        "Inyenyeri ya Dawudi"
+      ],
+      "text": "Inyenyeri ya Dawudi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☸",
+      "aliases": [
+        "uruziga rwa daharama"
+      ],
+      "text": "uruziga rwa daharama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☯",
+      "aliases": [
+        "yini yangi"
+      ],
+      "text": "yini yangi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✝",
+      "aliases": [
+        "umusaraba w’abalatini"
+      ],
+      "text": "umusaraba w’abalatini",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☦",
+      "aliases": [
+        "umusaraba w’aba-orthodox"
+      ],
+      "text": "umusaraba w’aba-orthodox",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☪",
+      "aliases": [
+        "inyenyeri n’ukwezi kw’imboneka"
+      ],
+      "text": "inyenyeri n’ukwezi kw’imboneka",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☮",
+      "aliases": [
+        "ikimenyetso cy’amahoro"
+      ],
+      "text": "ikimenyetso cy’amahoro",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♈",
+      "aliases": [
+        "Isekurume y’intama"
+      ],
+      "text": "Isekurume y’intama",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♉",
+      "aliases": [
+        "ikimenyesto cya Torisi"
+      ],
+      "text": "ikimenyesto cya Torisi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♊",
+      "aliases": [
+        "Jemini"
+      ],
+      "text": "Jemini",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♋",
+      "aliases": [
+        "Kanseri"
+      ],
+      "text": "Kanseri",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♌",
+      "aliases": [
+        "Lewo"
+      ],
+      "text": "Lewo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♍",
+      "aliases": [
+        "Virigo"
+      ],
+      "text": "Virigo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♎",
+      "aliases": [
+        "Libura"
+      ],
+      "text": "Libura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♏",
+      "aliases": [
+        "Sikorupiyusi"
+      ],
+      "text": "Sikorupiyusi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♐",
+      "aliases": [
+        "sajitariyusi"
+      ],
+      "text": "sajitariyusi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♑",
+      "aliases": [
+        "Kapurikorune"
+      ],
+      "text": "Kapurikorune",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♒",
+      "aliases": [
+        "akwariyusi"
+      ],
+      "text": "akwariyusi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♓",
+      "aliases": [
+        "Pisikesi"
+      ],
+      "text": "Pisikesi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⛎",
+      "aliases": [
+        "Ofiyukusi"
+      ],
+      "text": "Ofiyukusi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "▶",
+      "aliases": [
+        "buto yo gukina"
+      ],
+      "text": "buto yo gukina",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏩",
+      "aliases": [
+        "buto yo kwihutisha cyane"
+      ],
+      "text": "buto yo kwihutisha cyane",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏭",
+      "aliases": [
+        "buto y’indirimbo ikurikira"
+      ],
+      "text": "buto y’indirimbo ikurikira",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏯",
+      "aliases": [
+        "buto yo gukina cyangwa guhagarika gato"
+      ],
+      "text": "buto yo gukina cyangwa guhagarika gato",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "◀",
+      "aliases": [
+        "ibuto yo gusubiza inyuma"
+      ],
+      "text": "ibuto yo gusubiza inyuma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏪",
+      "aliases": [
+        "buto yo gusubiza inyuma cyane"
+      ],
+      "text": "buto yo gusubiza inyuma cyane",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏮",
+      "aliases": [
+        "ibuto y’indirimbo ya nyuma"
+      ],
+      "text": "ibuto y’indirimbo ya nyuma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏫",
+      "aliases": [
+        "buto yo kuzamura cyane"
+      ],
+      "text": "buto yo kuzamura cyane",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏬",
+      "aliases": [
+        "buto yo hasi cyane"
+      ],
+      "text": "buto yo hasi cyane",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏸",
+      "aliases": [
+        "buto yo guhagarika gato"
+      ],
+      "text": "buto yo guhagarika gato",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏹",
+      "aliases": [
+        "buto yo guhagarika"
+      ],
+      "text": "buto yo guhagarika",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏺",
+      "aliases": [
+        "buto yo gufata amajwi"
+      ],
+      "text": "buto yo gufata amajwi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⏏",
+      "aliases": [
+        "buto yo gusohora"
+      ],
+      "text": "buto yo gusohora",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♀",
+      "aliases": [
+        "ikimenyetso cy’umugore"
+      ],
+      "text": "ikimenyetso cy’umugore",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♂",
+      "aliases": [
+        "ikimenyetso cy’umugabo"
+      ],
+      "text": "ikimenyetso cy’umugabo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✖",
+      "aliases": [
+        "Ikimenyetso cya x kinini cyo gukuba"
+      ],
+      "text": "Ikimenyetso cya x kinini cyo gukuba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "➕",
+      "aliases": [
+        "ikimenyetso kinini cyo guteranya"
+      ],
+      "text": "ikimenyetso kinini cyo guteranya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "➖",
+      "aliases": [
+        "ikimenyetso kinini cyo gukuramo"
+      ],
+      "text": "ikimenyetso kinini cyo gukuramo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "➗",
+      "aliases": [
+        "ikimenyetso kinini cyo kugabanya"
+      ],
+      "text": "ikimenyetso kinini cyo kugabanya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "‼",
+      "aliases": [
+        "udutangaro tubiri"
+      ],
+      "text": "udutangaro tubiri",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⁉",
+      "aliases": [
+        "agatangaro n’akabazo"
+      ],
+      "text": "agatangaro n’akabazo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❓",
+      "aliases": [
+        "akabazo gacuritse"
+      ],
+      "text": "akabazo gacuritse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❔",
+      "aliases": [
+        "ikimenyetso cy’akabazo k’umweru"
+      ],
+      "text": "ikimenyetso cy’akabazo k’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❕",
+      "aliases": [
+        "ikimenyetso cy’agatangaro k’umweru"
+      ],
+      "text": "ikimenyetso cy’agatangaro k’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❗",
+      "aliases": [
+        "agatangaro gacuritse"
+      ],
+      "text": "agatangaro gacuritse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚕",
+      "aliases": [
+        "ikimenyetso cy’ubuvuzi"
+      ],
+      "text": "ikimenyetso cy’ubuvuzi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "♻",
+      "aliases": [
+        "ikimenyetso cyo kongera gutunganywa"
+      ],
+      "text": "ikimenyetso cyo kongera gutunganywa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚜",
+      "aliases": [
+        "ururabo rwa lili"
+      ],
+      "text": "ururabo rwa lili",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⭕",
+      "aliases": [
+        "uruziga runini rutsitse"
+      ],
+      "text": "uruziga runini rutsitse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✅",
+      "aliases": [
+        "ikimenyetso kinini cy’umweru cyo kuvivura"
+      ],
+      "text": "ikimenyetso kinini cy’umweru cyo kuvivura",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "☑",
+      "aliases": [
+        "Agasanduku k’amatora bifashisha mu kubara amajwi"
+      ],
+      "text": "Agasanduku k’amatora bifashisha mu kubara amajwi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✔",
+      "aliases": [
+        "Ikimenyetso kinini cya bihwanye"
+      ],
+      "text": "Ikimenyetso kinini cya bihwanye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❌",
+      "aliases": [
+        "akamenyetso k’umusaraba"
+      ],
+      "text": "akamenyetso k’umusaraba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❎",
+      "aliases": [
+        "buto y’akamenyetso y’umusaraba"
+      ],
+      "text": "buto y’akamenyetso y’umusaraba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "➰",
+      "aliases": [
+        "uruziga rutsitse"
+      ],
+      "text": "uruziga rutsitse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "➿",
+      "aliases": [
+        "inziga ebyiri zitsitse"
+      ],
+      "text": "inziga ebyiri zitsitse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✳",
+      "aliases": [
+        "akanyenyeri kagizwe n’imitwe umunani"
+      ],
+      "text": "akanyenyeri kagizwe n’imitwe umunani",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "✴",
+      "aliases": [
+        "inyenyeri igizwe n’imitwe umunani"
+      ],
+      "text": "inyenyeri igizwe n’imitwe umunani",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "❇",
+      "aliases": [
+        "igishashi"
+      ],
+      "text": "igishashi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "©",
+      "aliases": [
+        "kipirayiti"
+      ],
+      "text": "kipirayiti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "®",
+      "aliases": [
+        "ibaruwe"
+      ],
+      "text": "ibaruwe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "™",
+      "aliases": [
+        "ikirango"
+      ],
+      "text": "ikirango",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "Ⓜ",
+      "aliases": [
+        "M iri mu ruziga"
+      ],
+      "text": "M iri mu ruziga",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚫",
+      "aliases": [
+        "uruziga rw’umukara"
+      ],
+      "text": "uruziga rw’umukara",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⚪",
+      "aliases": [
+        "uruziga rw’umweru"
+      ],
+      "text": "uruziga rw’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⬛",
+      "aliases": [
+        "kare nini y’umukara"
+      ],
+      "text": "kare nini y’umukara",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "⬜",
+      "aliases": [
+        "kare nini y’umweru"
+      ],
+      "text": "kare nini y’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "◼",
+      "aliases": [
+        "kare y’umukara iringaniye"
+      ],
+      "text": "kare y’umukara iringaniye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "◻",
+      "aliases": [
+        "kare y’umweru iringaniye"
+      ],
+      "text": "kare y’umweru iringaniye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "◾",
+      "aliases": [
+        "kare ntoya iringaniye y’umukara"
+      ],
+      "text": "kare ntoya iringaniye y’umukara",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "◽",
+      "aliases": [
+        "kare ntoya iringaniye y’umweru"
+      ],
+      "text": "kare ntoya iringaniye y’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "▪",
+      "aliases": [
+        "kare ntoya y’umukara"
+      ],
+      "text": "kare ntoya y’umukara",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "rw",
+      "lookup_text": "▫",
+      "aliases": [
+        "kare ntoya y’umweru"
+      ],
+      "text": "kare ntoya y’umweru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {},
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

@@ -1,0 +1,38 @@
+{
+  "format": "dordiai-audio-endpoint-candidate-review",
+  "format_version": 1,
+  "reviewed_date": "2026-11-22",
+  "actual_failure": "Real Windows NVDA WavePlayer construction failed with WinError -2147023728 Element not found; waveOutGetNumDevs returned zero.",
+  "candidate": {
+    "vendor_page": "https://vb-audio.com/Cable/",
+    "manual": "https://vb-audio.com/Cable/VBCABLE_ReferenceManual.pdf",
+    "licensing": "https://vb-audio.com/Services/licensing.htm",
+    "download_url": "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip",
+    "observed_download_bytes": 1324680,
+    "observed_archive_sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
+    "x64_installer_sha256": "734c35dfa6d98f48782a451633ceb471166ec70d60482fd89a1123d0ee3c4f41",
+    "windows10_catalog_sha256": "5d24c17858b49ad83bb856c66c24c5c2aecdb89cbaae2f8179c15d351124fa9f",
+    "authenticode_checked_on_windows": false,
+    "driver_installed": false,
+    "decision": "Not installed. Both vendor manual and downloaded package README explicitly require reboot; no officially supported reboot-free installation was established.",
+    "reboot_statement": "To finalize installation, you must reboot your computer.",
+    "distribution": "No driver or installer is shipped with dordiai-voices.",
+    "license_observation": "Vendor allows installing/testing first; professional deployment has separate paid-license conditions. This review does not claim blanket free production redistribution."
+  },
+  "implemented_alternative": {
+    "existing_services": [
+      "AudioEndpointBuilder",
+      "Audiosrv"
+    ],
+    "service_changes_restricted_to": "Explicit --ephemeral-ci, GITHUB_ACTIONS=true and RUNNER_OS=Windows",
+    "no_certificate_or_boot_security_changes": true,
+    "headless_flag": "--headless-ui-probe",
+    "headless_scope": "Real NVDA, driver, acoustic models and wx UI with explicitly labeled recording PCM sink TEST DOUBLE only",
+    "wave_player_verified": false,
+    "physical_audio_verified": false,
+    "acoustic_latency_verified": false,
+    "product_ready": false,
+    "headless_final_status": "partial or failed; never passed",
+    "headless_partial_exit_code": 2
+  }
+}

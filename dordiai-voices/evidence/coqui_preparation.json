@@ -1,0 +1,147 @@
+{
+  "format": "dordiai-coqui-preparation-v1",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "mode": "offline-verification",
+  "models": {
+    "ig": {
+      "format": "dordiai-coqui-onnx-v1",
+      "backend": "extra-onnx",
+      "code": "ig",
+      "iso_code": "ibo",
+      "sample_rate": 22050,
+      "repo_id": "Phoonnx/vits-ig-openbible-graphemes",
+      "revision": "eeb9ba146287c20f46bcd76c31e28c1f534c0ce0",
+      "license": "cc-by-sa-4.0",
+      "model_sha256": "b05b68d00c2715710cb3d8f72df76761475fcbf29896380b66226ec6c61a9df3",
+      "config_sha256": "58acab6568408f4506c0716a24fd7e7941163e2ccb3ec02a321a17b2329dfd1a",
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false,
+      "source_identity": {
+        "source_sha256": "0234907515ff500c9d1af66e198ddc4c0463912bdec20a22b50bc83275a88223",
+        "reference_wav_sha256": "0b769a8e34373b3e0c8cc97e328a5f18eae95402d01f8b915eb01416639edda9",
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "basis": "actual-same-native-coqui-carrier-pcm16-waveform",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_dtype": "float32",
+        "source_norm": 11.846927642822266,
+        "unit_normalized": false
+      },
+      "technical_onnx_inference_verified": true,
+      "status": "prepared-real-onnx-carrier",
+      "model_bytes": 114250165,
+      "probe": {
+        "text": "Ndị obodo niile nke Obodo Vatican bụ Roman Katọlik.",
+        "kind": "publisher-native-sentence",
+        "audio_seconds": 5.201269841269841,
+        "samples": 114688,
+        "peak": 0.6537719964981079,
+        "rms": 0.10620351135730743,
+        "graph_load_seconds": 1.4000808250002592,
+        "graph_inference_seconds": 1.362075315999391,
+        "real_time_factor": 0.2618736111693165,
+        "inputs": [
+          {
+            "name": "input",
+            "type": "tensor(int64)",
+            "shape": [
+              "b",
+              "t"
+            ]
+          },
+          {
+            "name": "input_lengths",
+            "type": "tensor(int64)",
+            "shape": [
+              "b"
+            ]
+          },
+          {
+            "name": "scales",
+            "type": "tensor(float)",
+            "shape": [
+              3
+            ]
+          }
+        ]
+      }
+    },
+    "ln": {
+      "format": "dordiai-coqui-onnx-v1",
+      "backend": "extra-onnx",
+      "code": "ln",
+      "iso_code": "lin",
+      "sample_rate": 22050,
+      "repo_id": "Phoonnx/vits-ln-openbible-graphemes",
+      "revision": "46d471ee11714d0a36990cb0bba93fa609ec1e35",
+      "license": "cc-by-sa-4.0",
+      "model_sha256": "9a53fb4b1d875ff8335bf8d36b00f83893b4db2c93776b1f3132b9b54818edd7",
+      "config_sha256": "5b8f40a4aef225c3d093cd142241adee3636a835a339a77c8a3a858a230f3648",
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false,
+      "source_identity": {
+        "source_sha256": "e2195964480f8cf43569d9d8a8637509574b74d500d2fe3349e71cca55f26431",
+        "reference_wav_sha256": "dd6c7a604c442059ccdf8cf9e53744a77de57b568e4eda989ccac4bdee795d3b",
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "basis": "actual-same-native-coqui-carrier-pcm16-waveform",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_dtype": "float32",
+        "source_norm": 10.840895652770996,
+        "unit_normalized": false
+      },
+      "technical_onnx_inference_verified": true,
+      "status": "prepared-real-onnx-carrier",
+      "model_bytes": 114253237,
+      "probe": {
+        "text": "a b c d e f g h i j k l m n o p r s t u u t s r p o n m l k j i h g f e d c b a",
+        "kind": "native-grapheme-smoke-test",
+        "audio_seconds": 6.698956916099773,
+        "samples": 147712,
+        "peak": 0.5831142663955688,
+        "rms": 0.1144915446639061,
+        "graph_load_seconds": 0.822324368999034,
+        "graph_inference_seconds": 1.6265304739990825,
+        "real_time_factor": 0.24280354305459118,
+        "inputs": [
+          {
+            "name": "input",
+            "type": "tensor(int64)",
+            "shape": [
+              "b",
+              "t"
+            ]
+          },
+          {
+            "name": "input_lengths",
+            "type": "tensor(int64)",
+            "shape": [
+              "b"
+            ]
+          },
+          {
+            "name": "scales",
+            "type": "tensor(float)",
+            "shape": [
+              3
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "windows_nvda_verified": false,
+  "onnxruntime_version": "1.27.0",
+  "onnxruntime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+  "ort_telemetry_disabled": true,
+  "model_downloads_made": false,
+  "all_selected_prepared": true
+}

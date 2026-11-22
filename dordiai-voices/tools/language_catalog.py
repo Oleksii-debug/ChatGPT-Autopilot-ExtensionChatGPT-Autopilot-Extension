@@ -38,6 +38,8 @@ def report(runtime):
     all_rows = module.coverage(runtime / "models", selected_only=False)
     summary = {"selected_catalogue_entries": len(rows),
                "registered_with_resources_present": sum(row["resources_present"] for row in rows),
+               "complete_selected_entries_with_resources": sum(row["resources_present"] and not row.get("partial_variant") for row in rows),
+               "partial_variant_resources_present": sum(row["resources_present"] and bool(row.get("partial_variant")) for row in rows),
                "registered_with_missing_resources": sum(row["registered"] and not row["resources_present"] for row in rows),
                "not_registered": sum(not row["registered"] for row in rows),
                "windows_audio_verified": 0,
@@ -56,21 +58,23 @@ def report(runtime):
             "summary": summary, "regions": regional, "languages": rows,
             "scope_notes_uk": [
                 "135 пунктів є вибраним каталогом, а не 135 доведеними акустичними можливостями.",
-                "83 позитивні записи — наявні зареєстровані файли; вимову, запуск Windows/NVDA й затримки цей аудит не перевіряє.",
+                f"{summary['registered_with_resources_present']} позитивних записів — наявні зареєстровані файли; вимову, запуск Windows/NVDA й затримки цей аудит не перевіряє.",
                 "Норвезьку зіставлено з nb; існуючий nn залишається окремим необов’язковим варіантом ресурсу, а не додатковою вибраною мовою.",
-                "Коморська і Тамазигхт — групові назви; до підбору моделей потрібно визначити точний стандарт.",
+                "Коморська і Тамазигхт — групові назви. Кабільський ресурс позначається власним кодом kab і частковим варіантом вибраної берберської групи; це не стандартна марокканська тамазигхт (zgh/tzm).",
                 "Для групових записів на кшталт кечуа, фула чи курдської потрібна перевірка конкретного стандарту: один готовий ресурс не доводить покриття всіх різновидів.",
                 "Мандаринську не замінено всіма китайськими мовами; філіппінську та чорногорську не підмінено іншими ресурсами через близькість назв.",
-                "Наявні 38 записів поза вибором не збільшують виконання цільового каталогу."]}
+                f"Наявні {summary['existing_unselected_registry_entries']} записів поза вибором не збільшують виконання цільового каталогу."]}
 
 
 def markdown(data):
     summary = data["summary"]
     lines = ["# Покриття вибраного мовного каталогу", "",
-             "Це відтворювана перевірка реальних файлів основного пакета 0.12.2. Вона не запускає синтез мовлення.", "",
+             "Це відтворювана перевірка реальних файлів указаного runtime. Вона не запускає синтез мовлення.", "",
              f"Вибрано {summary['selected_catalogue_entries']} пунктів. Для {summary['registered_with_resources_present']} є реєстрація та необхідні непорожні файли. "
              f"Для {summary['not_registered']} немає зареєстрованого мовного рушія/ресурсів. "
              f"Ще {summary['registered_with_missing_resources']} зареєстрованих пунктів мають відсутні залежності.", "",
+             f"З них ресурсів для повних вибраних пунктів: {summary['complete_selected_entries_with_resources']}; "
+             f"явно позначених часткових варіантів груп: {summary['partial_variant_resources_present']}. Частковий варіант не закриває всю групу.", "",
              "Позитивний результат інвентаризації не означає перевірену правильність вимови. "
              "Кількість підтверджених цим звітом акустичних перевірок Windows/NVDA: 0.", "",
              "## Наявні типи ресурсів", ""]
@@ -79,7 +83,10 @@ def markdown(data):
              "rhvoice-statistical+voice-conversion": "RHVoice: статистичний синтез з перетворенням тембру",
              "shared-neural+voice-conversion": "Спільна багатомовна нейромодель з перетворенням тембру",
              "espeak+voice-conversion": "eSpeak: синтез за правилами з нейронним перетворенням тембру",
-             "hebrew-neural+voice-conversion": "Спеціалізована нейромодель з перетворенням тембру"}
+             "hebrew-neural+voice-conversion": "Спеціалізована нейромодель з перетворенням тембру",
+             "mms-neural+voice-conversion": "MMS: окремі нейромоделі з перетворенням тембру",
+             "dedicated-neural+voice-conversion": "Додаткові спеціалізовані нейромоделі з перетворенням тембру",
+             "shared-diffusion-neural+voice-conversion": "Спільна дифузійна нейромодель з перетворенням тембру; інтерактивні затримки NVDA не прийняті"}
     for backend, count in summary["backend_counts_resources_present"].items():
         lines.append(f"- {names.get(backend, backend)}: {count} пунктів.")
     lines += ["", "eSpeak з перетворенням тембру не позначається як нативна нейромодель вимови. "

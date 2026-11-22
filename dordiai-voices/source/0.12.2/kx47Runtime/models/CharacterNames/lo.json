@@ -1,0 +1,7322 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "lo",
+  "sources": {
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/lo/annotations.json",
+      "sha256": "d36c853ec3b546ad38acafd3d4d411397e0373840c4f8dc3da5b78b7a2839d5f",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/lo/characters.json",
+      "sha256": "bdb39abb46b03891b0edd47f3ac23a2c89f85a19f33bc5c785aa93da05ac057e",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "{": "ເປີດວົງປີກກາ",
+    "‾": "ຂີດເທິງ",
+    "_": "ໝາຍຂີດກ້ອງ",
+    "-": "ຂີດຕໍ່-ລົບ",
+    "‐": "ໝາຍຂີດຕໍ່",
+    "–": "ເຄື່ອງໝາຍຂີດຕໍ່ [en]",
+    "—": "ເຄື່ອງໝາຍຂີດຕໍ່ [em]",
+    "―": "ແຖບນອນ",
+    ",": "ຈຸດ",
+    "،": "ຈຸດອາຣາບິກ",
+    ";": "ຈ້ຳຈຸດ",
+    "؛": "ເຄື່ອງໝາຍເຊມິໂຄໂລນອາຣັບ",
+    ":": "ສອງຈ້ຳ",
+    "!": "ໝາຍທ້ວງ",
+    "¡": "ໝາຍທ້ວງທາງປີ້ນ",
+    "?": "ໝາຍຖາມ",
+    "¿": "ໝາຍຖາມທາງປີ້ນ",
+    "؟": "ໝາຍຖາມອາຣັບ",
+    "‽": "ໝາຍຖາມທ້ວງ",
+    ".": "ຈ້ຳເມັດ",
+    "…": "ຈ້ຳສາມເມັດ",
+    "·": "ເຄື່ອງໝາຍຈຸດຂັ້ນກາງ",
+    "'": "ເຄື່ອງໝາຍວັກໃນເຄື່ອງພິມດີດ",
+    "‘": "ເຄື່ອງໝາຍວັກຕອນເບື້ອງຊ້າຍ",
+    "’": "ເຄື່ອງໝາຍວັກຕອນເບື້ອງຂວາ",
+    "‚": "ເຄື່ອງໝາຍວັກຕອນລຸ່ມຂວາ",
+    "“": "ໝາຍຢືມເບື້ອງຊ້າຍ",
+    "”": "ໝາຍຢືມເບື້ອງຂວາ",
+    "„": "ໝາຍຢືມລຸ່ມຂວາ",
+    "«": "ເຄື່ອງໝາຍເປີດວົງຢືມ",
+    "»": "ເຄື່ອງໝາຍປິດວົງຢືມ",
+    ")": "ປິດວົງເລັບ",
+    "[": "ເປີດວົງຂໍ",
+    "]": "ປິດວົງຂໍ",
+    "}": "ປິດວົງປີກກາ",
+    "§": "ເຄື່ອງໝາຍພາກສ່ວນ",
+    "¶": "ໝາຍວັກ",
+    "@": "ເຄື່ອງໝາຍແອັດ",
+    "*": "ເຄື່ອງໝາຍດາວ",
+    "/": "ເຄື່ອງໝາຍສະແດງການເລືອກ",
+    "\\": "ເຄື່ອງໝາຍທັບຂວາ",
+    "&": "ເຄື່ອງໝາຍແລະ",
+    "#": "ເຄື່ອງໝາຍສີ່ຫຼ່ຽມ",
+    "%": "ເປີເຊັນ",
+    "‰": "ເຄື່ອງໝາຍສ່ວນພັນ",
+    "†": "ເຄື່ອງໝາຍດາບ",
+    "‡": "ເຄື່ອງໝາຍສອງດາບ",
+    "•": "ເຄື່ອງໝາຍຈ້ຳວົງມົນ",
+    "‧": "ຈໍ້າຍະຕິພັງ",
+    "′": "ວົງຢືມໜຶ່ງຂີດ",
+    "″": "ວົງຢືມສອງຂີດ",
+    "‴": "ວົງຢືມສາມຂີດ",
+    "‸": "ເຄື່ອງໝາຍຕົກ",
+    "※": "ໝາຍອ້າງອີງ",
+    "⁂": "ເຄື່ອງໝາຍກຸ່ມດາວ",
+    "`": "ສຽງຕໍ່າ",
+    "´": "ສຽງແຫຼມ",
+    "^": "ເຄື່ອງໝາຍຄວບຄຸມສຽງຮູບກຸບ",
+    "¨": "ສັນຍາລັກແຍກສຽງສະຫຼະ",
+    "°": "ເຄື່ອງໝາຍອົງສາ",
+    "℗": "ລິ​ຂະ​ສິດ​ການ​ບັນ​ທຶກ​ສຽງ",
+    "←": "ລູກສອນຊີ້ໄປທາງຊ້າຍ",
+    "↚": "ໝາຍຍ້າຍລູກສອນໄປຊ້າຍ",
+    "→": "ລູກສອງຊີ້ໄປທາງຂວາ",
+    "↛": "ໝາຍຍ້າຍລູກສອນໄປຂວາ",
+    "↑": "ລູກສອນຊີ້ຂຶ້ນເທິງ",
+    "↓": "ລູກສອນຊີ້ລົງລຸ່ມ",
+    "↜": "ໝາຍລູກສອນເປັນຄື້ນໄປທາງຊ້າຍ",
+    "↝": "ໝາຍລູກສອນເປັນຄື້ນໄປທາງຂວາ",
+    "↞": "ໝາຍລູກສອນສອງຫົວໄປທາງຊ້າຍ",
+    "↟": "ໝາຍລູກສອນສອງຫົວຊີ້ຂຶ້ນເທິງ",
+    "↠": "ໝາຍລູກສອນສອງຫົວໄປທາງຂວາ",
+    "↡": "ໝາຍລູກສອນສອງຫົວຊີ້ລົງລຸ່ມ",
+    "↢": "ລູກສອນມີຫາງຊີ້ໄປຊ້າຍ",
+    "↣": "ລູກສອນມີຫາງຊີ້ໄປຂວາ",
+    "↤": "ລູກສອນຕັດກົ້ນຊີ້ໄປຊ້າຍ",
+    "↥": "ລູກສອນຕັດກົ້ນຊີ້ຂຶ້ນເທິງ",
+    "↦": "ລູກສອນຕັດກົ້ນຊີ້ໄປຂວາ",
+    "↧": "ລູກສອນຕັດກົ້ນຊີ້ລົງລຸ່ມ",
+    "↨": "ລູກສອນຊີ້ຂຶ້ນລົງມີຖານ",
+    "↫": "ລູກສອນກ້ຽວໄປຊ້າຍ",
+    "↬": "ລູກສອນກ້ຽວໄປຂວາ",
+    "↭": "ລູກສອນຄື້ນຊ້າຍຂວາ",
+    "↯": "ລູກສອນຊິກແຊັກຊີ້ລົງລຸ່ມ",
+    "↰": "ລູກສອນຂຶ້ນເທິງລ້ຽວຊ້າຍ",
+    "↱": "ລູກສອນຂຶ້ນເທິງລ້ຽວຂວາ",
+    "↲": "ລູກສອນລົງລຸ່ມລ້ຽວຊ້າຍ",
+    "↳": "ລູກສອນລົງລຸ່ມລ້ຽວຂວາ",
+    "↴": "ລູກສອນຊີ້ໄປຂວາຫັກມຸມລຸ່ມ",
+    "↵": "ລູກສອນຊີ້ໄປຊ້າຍຫັກມຸມລຸ່ມ",
+    "↶": "ລູກສອນໂຄ້ງໄປທິດກົງກັນຂ້າມກັບເຂັມໂມງ",
+    "↷": "ລູກສອນໂຄ້ງໄປທິດດຽວກັບເຂັມໂມງ",
+    "↸": "ແຖບຂັ້ນລູກສອນຊີ້ໄປທິດຕາເວັນຕົກສຽງເໜືອ",
+    "↹": "ແຖບຂັ້ນລູກສອນຊີ້ໄປຊ້າຍຢູ່ເທິງແຖບຂັ້ນລູກສອນຊີ້ໄປຂວາ",
+    "↺": "ລູກສອນວົງກົມເປີດຊີ້ໄປທາງກົງກັນຂ້າມກັບເຂັມໂມງ",
+    "↻": "ລູກສອນວົງກົມເປີດຊີ້ໄປທາງດຽວກັບເຂັມໂມງ",
+    "↼": "ສະໝວກຊີ້ໄປຊ້າຍງ່ຽງຂຶ້ນເທິງ",
+    "↽": "ສະໝວກຊີ້ໄປຊ້າຍງ່ຽງລົງລຸ່ມ",
+    "↾": "ສະໝວກຊີ້ຂຶ້ນເທິງງ່ຽງໄປຂວາ",
+    "↿": "ສະໝວກຊີ້ຂຶ້ນເທິງງ່ຽງໄປຊ້າຍ",
+    "⇀": "ສະໝວກຊີ້ໄປຂວາງ່ຽງຂຶ້ນເທິງ",
+    "⇁": "ສະໝວກຊີ້ໄປຂວາງ່ຽງລົງລຸ່ມ",
+    "⇂": "ສະໝວກຊີ້ລົງລຸ່ມງ່ຽງໄປຂວາ",
+    "⇃": "ສະໝວກຊີ້ລົງລຸ່ມງ່ຽງໄປຊ້າຍ",
+    "⇄": "ລູກສອນຊີ້ໄປຊ້າຍຢູ່ເທິງລູກສອນຊີ້ໄປຂວາ",
+    "⇅": "ລູກສອນຊີ້ຂຶ້ນ ແລະ ລູກສອນຊີ້ລົງ",
+    "⇆": "ລູກສອນຊີ້ໄປທາງຊ້າຍເທິງລູກສອນຊີ້ໄປທາງຂວາ",
+    "⇇": "ລູກສອນສອງອັນຊີ້ໄປຊ້າຍ",
+    "⇈": "ລູກສອນສອງອັນຊີ້ຂຶ້ນເທິງ",
+    "⇉": "ລູກສອນສອງອັນຊີ້ໄປຂວາ",
+    "⇊": "ລູກສອນສອງອັນຊີ້ລົງລຸ່ມ",
+    "⇋": "ສະໝວກຊີ້ໄປຊ້າຍຢູ່ເທິງສະໝວກຊີ້ໄປຂວາ",
+    "⇌": "ສະໝວກຊີ້ໄປຂວາຢູ່ເທິງສະໝວກຊີ້ໄປຊ້າຍ",
+    "⇐": "ລູກສອນຄູ່ຊີ້ໄປຊ້າຍ",
+    "⇍": "ລູກສອນຄູ່ຕັດຊີ້ໄປຊ້າຍ",
+    "⇑": "ລູກສອນຄູ່ຊີ້ຂຶ້ນເທິງ",
+    "⇒": "ລູກສອນຄູ່ຊີ້ໄປຂວາ",
+    "⇏": "ລູກສອນຄູ່ຕັດຊີ້ໄປຂວາ",
+    "⇓": "ລູກສອນຄູ່ຊີ້ລົງລຸ່ມ",
+    "⇔": "ລູກສອນຄູ່ຊີ້ໄປຊ້າຍຂວາ",
+    "⇎": "ລູກສອນຄູ່ຕັດຊີ້ໄປຊ້າຍຂວາ",
+    "⇖": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນຕົກສຽງເໜືອ",
+    "⇗": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນອອກສຽງເໜືອ",
+    "⇘": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນອອກສຽງໄຕ້",
+    "⇙": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນຕົກສຽງໄຕ້",
+    "⇚": "ລູກສອນສາມເສັ້ນຊີ້ໄປຊ້າຍ",
+    "⇛": "ລູກສອນສາມເສັ້ນຊີ້ໄປຂວາ",
+    "⇜": "ລູກສອນຮູບກະແສໄຟຊີ້ໄປຊ້າຍ",
+    "⇝": "ລູກສອນຮູບກະແສໄຟຊີ້ໄປຂວາ",
+    "⇞": "ລູກສອນຕັດຄູ່ຊີ້ຂຶ້ນເທິງ",
+    "⇟": "ລູກສອນຕັດຄູ່ຊີ້ລົງລຸ່ມ",
+    "⇠": "ລູກສອນຂີດຂາດຊີ້ໄປຊ້າຍ",
+    "⇡": "ລູກສອນຂີດຂາດຊີ້ຂຶ້ນເທິງ",
+    "⇢": "ລູກສອນຂີດຂາດຊີ້ໄປຂວາ",
+    "⇣": "ລູກສອນຂີດຂາດຊີ້ລົງລຸ່ມ",
+    "⇤": "ແຖບລູກສອນຊີ້ໄປຊ້າຍ",
+    "⇥": "ແຖບລູກສອນຊີ້ໄປຂວາ",
+    "⇦": "ລູກສອນໂປ່ງຊີ້ໄປຊ້າຍ",
+    "⇧": "ລູກສອນໂປ່ງຊີ້ຂຶ້ນເທິງ",
+    "⇨": "ລູກສອນໂປ່ງຊີ້ໄປຂວາ",
+    "⇩": "ລູກສອນໂປ່ງຊີ້ລົງລຸ່ມ",
+    "⇪": "ລູກສອນໂປ່ງຂາດຊີ້ຂຶ້ນເທິງ",
+    "⇵": "ລູກສອນຊີ້ລົງລຸ່ມຢູ່ເບື້ອງຊ້າຍລູກສອນຊີ້ຂຶ້ນເທິງ",
+    "∀": "ເຄື່ອງໝາຍທັງໝົດ",
+    "∂": "ເຄື່ອງໝາຍຕ່າງ",
+    "∃": "ເຄື່ອງໝາຍມີຢູ່",
+    "∅": "ກຸ່ມເປົ່າ",
+    "∆": "ເຄື່ອງໝາຍເພີ່ມ",
+    "∇": "ເຄື່ອງໝາຍນາບຣາ",
+    "∈": "ເຄື່ອງໝາຍຢູ່ໃນກຸ່ມ",
+    "∉": "ບໍ່ແມ່ນອົງປະກອບ",
+    "∋": "ນອນໃນ",
+    "∎": "ສິ້ນສຸດການພິສູດ",
+    "∏": "ເຄື່ອງໝາຍຜົນທະວີຄູນ",
+    "∑": "ເຄື່ອງໝາຍຜົນຮວມ",
+    "+": "ໝາຍບວກ",
+    "±": "ບວກລົບ",
+    "÷": "ເຄື່ອງໝາຍຫານ",
+    "×": "ສັນ​ຍາ​ລັກຄູນ",
+    "<": "ນ້ອຍກວ່າ",
+    "≮": "ບໍ່ນ້ອຍກວ່າ",
+    "=": "ເທົ່າກັບ",
+    "≠": "ບໍ່ເທົ່າກັບ",
+    ">": "ໃຫຍ່ກວ່າ",
+    "≯": "ບໍ່ໃຫຍ່ກວ່າ",
+    "¬": "ປະຕິເສດ",
+    "|": "ເສັ້ນຕັ້ງ",
+    "~": "ເຄື່ອງໝາຍເທິງອັກສອນສະແດງສຽງທາງດັງ",
+    "−": "ໝາຍລົບ",
+    "⁻": "ເຄື່ອງໝາຍກຳລັງລົບ",
+    "∓": "ເຄື່ອງໝາຍບວກລົບ",
+    "∕": "ໝາຍຫານ",
+    "⁄": "ຂີດແບ່ງສ່ວນ",
+    "∗": "ໝາຍດາວ",
+    "∘": "ໝາຍຈໍ້າວົງແຫວນ",
+    "∙": "ເຄື່ອງໝາຍຈໍ້າເມັດ",
+    "√": "ຮາກຂັ້ນສອງ",
+    "∝": "ສັດສ່ວນ",
+    "∞": "ເຄື່ອງໝາຍອະນັນ",
+    "∟": "ມຸມຂວາ",
+    "∠": "ມຸມ",
+    "∣": "ເຄື່ອງໝາຍແບ່ງ",
+    "∥": "ເສັ້ນຂະໜານ",
+    "∧": "ແລະ",
+    "∩": "ເຄື່ອງໝາຍຕັດ",
+    "∪": "ເຄື່ອງໝາຍຮວມ",
+    "∫": "ເຄື່ອງໝາຍສັງຄະນິດ",
+    "∬": "ເຄື່ອງໝາຍສັງຄະນິດຄູ່",
+    "∮": "ເສັ້ນສະແດງສັງຄະນິດ",
+    "∴": "ດັ່ງນັ້ນ",
+    "∵": "ຍ້ອນວ່າ",
+    "∶": "ອັດຕາສ່ວນ",
+    "∷": "ຄວາມໄດ້ສ່ວນ",
+    "∼": "ເຄື່ອງໝາຍປະມານ",
+    "∽": "ເຄື່ອງໝາຍປະມານລວງປີ້ນ",
+    "∾": "ເຄື່ອງໝາຍຄ້າຍຄືກັນ",
+    "≃": "ເກືອບເທົ່າກັບ",
+    "≅": "ຄາດຄະເນ",
+    "≈": "ທຽບເທົ່າ",
+    "≌": "ເທົ່າກັນທັງໝົດ",
+    "≒": "ຮູບປະມານເກືອບເທົ່າກັນ",
+    "≖": "ວົງແຫວນເທົ່າກັນ",
+    "≡": "ເຄື່ອງໝາຍລະບຸເປັນ",
+    "≣": "ເທົ່າກັນແນ່ນອນ",
+    "≤": "ນ້ອຍກວ່າ ຫຼື ເທົ່າກັບ",
+    "≥": "ໃຫຍ່ກວ່າ ຫຼື ເທົ່າກັບ",
+    "≦": "ໝາຍນ້ອຍກວ່າຢູ່ເທິງໝາຍເທົ່າກັບ",
+    "≧": "ໝາຍໃຫຍ່ກວ່າຢູ່ເທິງໝາຍເທົ່າກັບ",
+    "≪": "ນ້ອຍກວ່າຫຼາຍ",
+    "≫": "ໃຫຍ່ກວ່າຫຼາຍ",
+    "≬": "ລະຫວ່າງ",
+    "≳": "ໃຫຍ່ກວ່າເທົ່າກັບ",
+    "≺": "ເຄື່ອງໝາຍຢູ່ທາງໜ້າ",
+    "≻": "ເຄື່ອງໝາຍຕາມຫຼັງ",
+    "⊁": "ບໍ່ຢູ່ທາງຫຼັງ",
+    "⊂": "ເຄື່ອງໝາຍກຸ່ມຍ່ອຍ",
+    "⊃": "ກຸ່ມພາກສ່ວນ",
+    "⊆": "ເທົ່າກັບອານຸກຸ່ມ",
+    "⊇": "ເທົ່າກັບກຸ່ມພາກສ່ວນ",
+    "⊕": "ໝາຍບວກວົງມົນ",
+    "⊖": "ໝາຍລົບວົງມົນ",
+    "⊗": "ໝາຍຄູນວົງມົນ",
+    "⊘": "ຂີດຫານໃນວົງມົນ",
+    "⊙": "ຈໍ້າເມັດໃນວົງມົນ",
+    "⊚": "ຕົວຄໍານວນວົງແຫວນໃນວົງມົນ",
+    "⊛": "ຕົວຄໍານວນໝາຍດາວໃນວົງມົນ",
+    "⊞": "ໝາຍບວກໃນຮູບສີ່ຫຼ່ຽມ",
+    "⊟": "ໝາຍລົບໃນຮູບສີ່ຫຼ່ຽມ",
+    "⊥": "ເຄື່ອງໝາຍຂໍເທິງ",
+    "⊮": "ບໍ່ບັງຄັບ",
+    "⊰": "ເຄື່ອງໝາຍທາງໜ້າຢູ່ພາຍໃຕ້ຄວາມສໍາພັນ",
+    "⊱": "ເຄື່ອງໝາຍທາງຫຼັງຢູ່ພາຍໃຕ້ຄວາມສໍາພັນ",
+    "⋭": "ບໍ່ໄດ້ປະກອບເປັນອານຸກຸ່ມທີ່ເທົ່າກັນ",
+    "⊶": "ກົກເຄົ້າ",
+    "⊹": "ມາຕຣິສສັບປ່ຽນສັງຄະຍຸດ",
+    "⊿": "ສາມຫຼ່ຽມເບື້ອງຂວາ",
+    "⋁": "ຫຼື",
+    "⋂": "ຕັດ",
+    "⋃": "ການຮວມ",
+    "⋅": "ຕົວຄໍານວນຈໍ້າເມັດ",
+    "⋆": "ຕົວຄໍານວນດາວ",
+    "⋈": "ຕົວເຊື່ອມຕໍ່ໂດຍທໍາມະຊາດ",
+    "⋒": "ຕົວຕັດຄູ່",
+    "⋘": "ນ້ອຍກວ່າຫຼາຍເທົ່າ",
+    "⋙": "ໃຫຍ່ກວ່າຫຼາຍເທົ່າ",
+    "⋮": "ສາມຈໍ້າແນວຕັ້ງ",
+    "⋯": "ສາມຈໍ້າແນວນອນ",
+    "⋰": "ສາມຈໍ້າສະຫຼຽງຂຶ້ນຂວາ",
+    "⋱": "ສາມຈໍ້າສະຫຼຽງລົງຂວາ",
+    "■": "ຈັດຕຸລັດຕັນ",
+    "□": "ຈັດຕຸລັດໂປ່ງ",
+    "▢": "ຈັດຕຸລັດໂປ່ງແຈມົນ",
+    "▣": "ຈັດຕຸລັດຕັນຢູ່ໃນສີ່ຫຼ່ຽມໂປ່ງ",
+    "▤": "ຈັດຕຸລັດຂີດຂວາງ",
+    "▥": "ຈັດຕຸລັດຂີດຕັ້ງ",
+    "▦": "ຈັດຕຸລັດຂີດຕັດ",
+    "▧": "ຈັດຕຸລັດຂີດສະຫຼຽງເທິງຊ້າຍຫາລຸ່ມຂວາ",
+    "▨": "ຈັດຕຸລັດຂີດສະຫຼຽງເທິງຂວາຫາລຸ່ມຊ້າຍ",
+    "▩": "ຈັດຕຸລັດຂີດໄຂວ່",
+    "▬": "ສີ່ແຈຕັນ",
+    "▭": "ສີ່ແຈໂປ່ງ",
+    "▮": "ສີ່ແຈຕັນລວງຕັ້ງ",
+    "▰": "ສີ່ແຈຕັນສະຫຼຽງ",
+    "▲": "ສາມຫຼ່ຽມຊິ້ຂຶ້ນ",
+    "△": "ສາມແຈໂປ່ງຈອມຊີ້ຂຶ້ນເທິງ",
+    "▴": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ຂຶ້ນເທິງ",
+    "▵": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ຂຶ້ນເທິງ",
+    "▷": "ສາມແຈໂປ່ງຈອມຊີ້ໄປຂວາ",
+    "▸": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ໄປຂວາ",
+    "▹": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ໄປຂວາ",
+    "►": "ເມັດສາມແຈຕັນຈອມຊີ້ໄປຂວາ",
+    "▻": "ເມັດສາມແຈໂປ່ງຈອມຊີ້ໄປຂວາ",
+    "▼": "ສາມຫຼ່ຽມຊີ້ລົງ",
+    "▽": "ສາມແຈໂປ່ງຈອມຊີ້ລົງລຸ່ມ",
+    "▾": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ລົງລຸ່ມ",
+    "▿": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ລົງລຸ່ມ",
+    "◁": "ສາມແຈໂປ່ງຈອມຊີ້ໄປຊ້າຍ",
+    "◂": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ໄປຊ້າຍ",
+    "◃": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ໄປຊ້າຍ",
+    "◄": "ເມັດສາມແຈຕັນຈອມຊີ້ໄປຊ້າຍ",
+    "◅": "ເມັດສາມແຈໂປ່ງຈອມຊີ້ໄປຊ້າຍ",
+    "◆": "ສີ່ຫຼ່ຽມເພັດຕັນ",
+    "◇": "ສີ່ຫຼ່ຽມເພັດໂປ່ງ",
+    "◈": "ສີ່ຫຼ່ຽມເພັດຕັນຢູ່ໃນສີ່ຫຼ່ຽມເພັດໂປ່ງ",
+    "◉": "ວົງມົນຕັນຢູ່ໃນວົງມົນໂປ່ງ",
+    "◊": "ເຄື່ອງໝາຍສີ່ຫຼ່ຽມດອກຈັນ",
+    "○": "ວົງມົນເປົ່າ",
+    "◌": "ວົງມົນເສັ້ນຂາດ",
+    "◍": "ວົງມົນຂີດເສັ້ນຕັ້ງ",
+    "◎": "ວົງມົນຊ້ອນ",
+    "●": "ວົງມົນແບບທຶບ",
+    "◐": "ວົງມົນຕັນເຄິ່ງຊ້າຍ",
+    "◑": "ວົງມົນຕັນເຄິ່ງຂວາ",
+    "◒": "ວົງມົນຕັນເຄິ່ງລຸ່ມ",
+    "◓": "ວົງມົນຕັນເຄິ່ງເທິງ",
+    "◔": "ວົງມົນຕັນໜຶ່ງສ່ວນສີ່ເທິງເບື້ອງຂວາ",
+    "◕": "ວົງມົນໂປ່ງໜຶ່ງສ່ວນສີ່ເບື້ອງເທິງຊ້າຍ",
+    "◖": "ເຄິ່ງວົງມົນຕັນເບື້ອງຊ້າຍ",
+    "◗": "ເຄິ່ງວົງມົນຕັນເບື້ອງຂວາ",
+    "◘": "ຈໍ້າເມັດໂປ່ງໃນສີ່ແຈຕັນ",
+    "◙": "ວົງມົນໂປ່ງໃນຈັດຕຸລັດຕັນ",
+    "◜": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນເທິງເບື້ອງຊ້າຍ",
+    "◝": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນເທິງເບື້ອງຂວາ",
+    "◞": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນລຸ່ມເບື້ອງຂວາ",
+    "◟": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນລຸ່ມເບື້ອງຊ້າຍ",
+    "◠": "ເສັ້ນໂຄ້ງເຄິ່ງວົງມົນເບື້ອງເທິງ",
+    "◡": "ເສັ້ນໂຄ້ງເຄິ່ງວົງມົນເບື້ອງລຸ່ມ",
+    "◢": "ສາມແຈຕັນຈອມຊີ້ໄປທາງລຸ່ມຂວາ",
+    "◣": "ສາມແຈຕັນຈອມຊີ້ໄປທາງລຸ່ມຊ້າຍ",
+    "◤": "ສາມແຈຕັນຈອມຊີ້ໄປທາງເທິງຊ້າຍ",
+    "◥": "ສາມແຈຕັນຈອມຊີ້ໄປທາງເທິງຂວາ",
+    "◦": "ຈໍ້າເມັດໂປ່ງ",
+    "◯": "ວົງເປົ່າແບບກວ້າງ",
+    "◳": "ໜຶ່ງສ່ວນສີ່ຈັດຕຸລັດໂປ່ງເບື້ອງເທິງຂວາ",
+    "◷": "ໜຶ່ງສ່ວນສີ່ວົງມົນໂປ່ງເບື້ອງເທິງຂວາ",
+    "◿": "ສາມແຈໂປ່ງຈອມຊີ້ໄປທາງລຸ່ມຂວາ",
+    "♪": "ໂນດໂຕທີແປດ",
+    "⨧": "ໝາຍບວກຫ້ອຍສອງ",
+    "⨯": "ຜົນຄູນເວັກເຕີ",
+    "⨼": "ຜົນພາຍໃນ",
+    "⩣": "ເຫດຜົນ ຫຼື ເສັ້ນຄູ່ກ້ອງຮູບວີ",
+    "⩽": "ນ້ອຍກວ່າຫຼືເທົ່າກັບສະຫຼຽງ",
+    "⪍": "ເຄື່ອງໝາຍນ້ອຍກວ່າຢູ່ເທິງເຄື່ອງໝາຍເກືອບເທົ່າກັບ",
+    "⪚": "ເສັ້ນຄູ່ເທົ່າກັບໃຫຍ່ກວ່າ",
+    "⪺": "ເຄື່ອງໝາຍທາງຫຼັງຢູ່ເທິງເຄື່ອງໝາຍບໍ່ເກືອບເທົ່າກັບ",
+    "♭": "ໂນດຕໍ່າ",
+    "♯": "ໂນດແຫຼມ",
+    "☺": "ໜ້າຍິ້ມ",
+    "☹": "ໜ້າຫຍຸ້ງ",
+    "☠": "ກະໂຫຼກຫົວ ແລະກະດູກກາກະບາດ",
+    "❣": "ເຄື່ອງໝາຍທ້ວງເປັນຮູບຫົວໃຈໃຫຍ່",
+    "❤": "ຫົວໃຈສີແດງ",
+    "✋": "ຍົກມືຂຶ້ນ",
+    "✌": "ຊູສອງນິ້ວ",
+    "☝": "ຝ່າມືນີ້ວຊີ້ຂຶ້ນ",
+    "✊": "ຊູກຳປັ້ນ",
+    "✍": "ມືກຳລັງຂຽນ",
+    "⛷": "ນັກຫຼິ້ນສະກີ",
+    "⛹": "ຄົນຫຼິ້ນບານ",
+    "☘": "ດອກແຊມຣັອກ",
+    "☕": "ເຄື່ອງດື່ມຮ້ອນ",
+    "⛰": "ພູ",
+    "⛪": "ໂບດ",
+    "⛩": "ສານເຈົ້າຊິນໂຕ",
+    "⛲": "ນໍ້າພຸ",
+    "⛺": "ເຕັນ",
+    "♨": "ນໍ້າພຸຮ້ອນ",
+    "⛽": "ປໍ້ານໍ້າມັນ",
+    "⚓": "ສະໝໍ",
+    "⛵": "ເຮືອໃບ",
+    "⛴": "ເຮືອເຟີຣີ",
+    "✈": "ເຮືອບິນ",
+    "⌛": "ໂມງຂີ້ຊາຍ",
+    "⏳": "ໂມງຂີ້ຊາຍຈັບເວລາ",
+    "⌚": "ໂມງ",
+    "⏰": "ໂມງປຸກ",
+    "⏱": "ໂມງຈັບເວລາ",
+    "⏲": "ໂມງນັບຖອຍຫຼັງ",
+    "☀": "ຕາເວັນ",
+    "⭐": "ດາວຂາວປານກາງ",
+    "☁": "ເມກ",
+    "⛅": "ຕາເວັນຢູ່ຫຼັງເມກ",
+    "⛈": "ຝົນຟ້າຄະນອງ",
+    "☂": "ຄັນຮົ່ມ",
+    "☔": "ຄັນຮົ່ມກັບເມັດຝົນ",
+    "⛱": "ຄັນຮົ່ມຢູ່ເທິງພື້ນດິນ",
+    "⚡": "ໄຟຟ້າແຮງສູງ",
+    "❄": "ເກັດຫິມະ",
+    "☃": "ຮູບປັ້ນມະນຸດຫິມະ",
+    "⛄": "ຮູບປັ້ນມະນຸດຫິມະທີ່ບໍ່ມີຫິມະ",
+    "☄": "ດາວຫາງ",
+    "✨": "ປະກາຍໄຟ",
+    "⚽": "ໝາກບານເຕະ",
+    "⚾": "ເບສບອລ",
+    "⛳": "ທຸງໃນຫຼຸມ",
+    "⛸": "ສະເກດນໍ້າແຂງ",
+    "♠": "ໂພດຳ",
+    "♥": "ເກີ",
+    "♦": "ໂລ",
+    "♣": "ຈ່ວນ",
+    "♟": "ໝາກລຸກ",
+    "⛑": "ໝວກກັນກະທົບທີ່ມີກາກະບາດສີຂາວ",
+    "☎": "ໂທລະສັບ",
+    "⌨": "ແປ້ນພິມ",
+    "✉": "ຊອງຈົດໝາຍ",
+    "✏": "ສໍ",
+    "✒": "ປາກກາດຳ",
+    "✂": "ມີດຕັດ",
+    "⛏": "ເຫຼັກສັບຂຸດ",
+    "⚒": "ໄມ້ຄ້ອນ ແລະ ເຫຼັກສັບຂຸດ",
+    "⚔": "ດາບໄຂວ່ກັນ",
+    "⚙": "ເຟືອງເກຍ",
+    "⚖": "ຕາຊິງ",
+    "⛓": "ໂສ້",
+    "⚗": "ພາຊະນະກັ່ນ",
+    "⚰": "ໂລງສົບ",
+    "⚱": "ໂຖໃສ່ກະດູກ",
+    "♿": "ລົດນັ່ງຄົນພິການ",
+    "⚠": "ລະວັງ",
+    "⛔": "ຫ້າມເຂົ້າ",
+    "☢": "ກຳມັນຕະພາບລັງສີ",
+    "☣": "ເຊື້ອພະຍາດອັນຕະລາຍ",
+    "⬆": "ລູກສອນຂຶ້ນ",
+    "↗": "ລູກສອນຂຶ້ນມຸມຂວາ",
+    "➡": "ລູກສອນຂວາ",
+    "↘": "ລູກສອນລົງມຸມຂວາ",
+    "⬇": "ລູກສອນລົງ",
+    "↙": "ລູກສອນລົງມຸມຊ້າຍ",
+    "⬅": "ລູກສອນຊ້າຍ",
+    "↖": "ລູກສອນຂຶ້ນມຸມຊ້າຍ",
+    "↕": "ລູກສອນຂຶ້ນແລະລົງ",
+    "↔": "ລູກສອນຊ້າຍຂວາ",
+    "↮": "ໝາຍຍ້າຍລູກສອນຊ້າຍຂວາ",
+    "↩": "ລູກສອນໂຄ້ງຂວາໄປຊ້າຍ",
+    "↪": "ລູກສອນໂຄ້ງຊ້າຍໄປຂວາ",
+    "⤴": "ລູກສອນໂຄ້ງຂວາຂຶ້ນເທິງ",
+    "⤵": "ລູກສອນໂຄ້ງຂວາລົງລຸ່ມ",
+    "⚛": "ສັນຍາລັກອາຕອມ",
+    "✡": "ຮູບດາວຫຼົກຫຼ່ຽມ",
+    "☸": "ກົງລໍ້ແຫ່ງທຳມະ",
+    "☯": "ຢິນຢາງ",
+    "✝": "ໄມ້ກາງເຂນ",
+    "☦": "ໄມ້ກາງເຂນໂອທໍດັອກ",
+    "☪": "ພະຈັນສ້ຽວ ແລະ ດາວ",
+    "☮": "ສັນຍາລັກສັນຕິພາບ",
+    "♈": "ລາສີເມກ",
+    "♉": "ລາສີງົວ",
+    "♊": "ລາສີເມຖຸນ",
+    "♋": "ລາສີກົດ",
+    "♌": "ລາສີສິງ",
+    "♍": "ລາສີກັນ",
+    "♎": "ລາສີຕຸລາ",
+    "♏": "ລາສີພະຈິກ",
+    "♐": "ລາສີທະນູ",
+    "♑": "ລາສີມັງກອນ",
+    "♒": "ລາສີກຸມ",
+    "♓": "ລາສີມີນ",
+    "⛎": "ລາສີງູ",
+    "▶": "ປຸ່ມຫຼິ້ນ",
+    "⏩": "ປຸ່ມໄປໜ້າໄວ",
+    "⏭": "ປຸ່ມໄປຫາແທຣັກຕໍ່ໄປ",
+    "⏯": "ປຸ່ມຫຼິ້ນ ຫຼືຢຸດຊົ່ວຄາວ",
+    "◀": "ປຸ່ມຖອຍຫຼັງ",
+    "⏪": "ປຸ່ມຖອຍຫຼັງໄວ",
+    "⏮": "ປຸ່ມໄປຫາແທຣັກກ່ອນນີ້",
+    "⏫": "ປຸ່ມຂຶ້ນໄວ",
+    "⏬": "ປຸ່ມລົງໄວ",
+    "⏸": "ປຸ່ມຢຸດໄວ້",
+    "⏹": "ປຸ່ມຢຸດ",
+    "⏺": "ປຸ່ມບັນທຶກ",
+    "⏏": "ປຸ່ມດີດອອກ",
+    "♀": "ສັນຍາລັກຜູ້ຍິງ",
+    "♂": "ສັນຍາລັກຜູ້ຊາຍ",
+    "⚧": "ສັນຍາລັກຄົນ​ຂ້າມ​ເພດ",
+    "✖": "ເຄື່ອງໝາຍຄູນ",
+    "➕": "ເຄື່ອງໝາຍບວກ",
+    "➖": "ເຄື່ອງໝາຍລົບ",
+    "➗": "ຫານ",
+    "♾": "ອະສົງໄຂ",
+    "‼": "ເຄື່ອງໝາຍທ້ວງຄູ່",
+    "⁉": "ເຄື່ອງໝາຍທ້ວງກັບໝາຍຖາມ",
+    "❓": "ເຄື່ອງໝາຍຖາມ",
+    "❔": "ເຄື່ອງໝາຍຖາມສີຂາວ",
+    "❕": "ເຄື່ອງໝາຍທ້ວງສີຂາວ",
+    "❗": "ເຄື່ອງໝາຍທ້ວງ",
+    "⚕": "ສັນຍາລັກການຢາ",
+    "♻": "ສັນຍາລັກການນຳກັບມາໃຊ້ໃໝ່",
+    "⚜": "ດອກໄອລິສ",
+    "⭕": "ວົງມົນເປັ​ນ​ຮູ​ສີ​ແດງ",
+    "✅": "ເຄື່ອງໝາຍຕິກ",
+    "☑": "ປ່ອງມີເຄື່ອງໝາຍຖືກ",
+    "✔": "ເຄື່ອງໝາຍຕິກໃຫຍ່ໜາ",
+    "❌": "ເຄື່ອງໝາຍກາກະບາດ",
+    "❎": "ປຸ່ມເຄື່ອງໝາຍກາກະບາດ",
+    "➰": "ຫ່ວງ",
+    "➿": "ຫ່ວງຄູ່",
+    "✳": "ເຄື່ອງໝາຍດອກຈັນ",
+    "✴": "ດາວແປດແຈ",
+    "❇": "ປະກາຍ",
+    "©": "ເຄື່ອງໝາຍລິຂະສິດ",
+    "®": "ເຄື່ອງໝາຍຈົດທະບຽນ",
+    "™": "ເຄື່ອງໝາຍການຄ້າ",
+    "Ⓜ": "ໂຕ m ໃນວົງມົນ",
+    "⚫": "ວົງມົນດຳ",
+    "⚪": "ວົງມົນຂາວ",
+    "⬛": "ສີ່ຫຼ່ຽມໃຫຍ່ສີດຳ",
+    "⬜": "ສີ່ຫຼ່ຽມໃຫຍ່ສີຂາວ",
+    "◼": "ສີ່ຫຼ່ຽມປານກາງສີດຳ",
+    "◻": "ສີ່ຫຼ່ຽມປານກາງສີຂາວ",
+    "◾": "ສີ່ຫຼ່ຽມນ້ອຍ-ປານກາງສີດຳ",
+    "◽": "ສີ່ຫຼ່ຽມນ້ອຍ-ປານກາງສີຂາວ",
+    "▪": "ສີ່ຫຼ່ຽມນ້ອຍສີດໍາ",
+    "▫": "ສີ່ຫຼ່ຽມນ້ອຍສີຂາວ",
+    "¢": "ເຊັນ",
+    "$": "ໂດລາ",
+    "£": "ປອນ",
+    "¥": "ເຢນ",
+    "₢": "ສະກຸນເງິນຄຣູເຊໂຣ",
+    "₣": "ເງິນຝລັ່ງ",
+    "₤": "ເງິນລີຣາ",
+    "₥": "ມິວ",
+    "₩": "ວອນ",
+    "€": "ເອີ​ໂຣ",
+    "₰": "ເງິນຫຼຽນເຢຍລະມັນ",
+    "₱": "ເປໂຊ",
+    "₳": "ເງິນອັອສໂຕຣ",
+    "₶": "ເງິນ livre tournois",
+    "₷": "ສະເປສມິໂລ",
+    "₹": "ອິນ​ເດຍ ຣູ​ປີ",
+    "₽": "ຣູ​ເບິນ",
+    "₿": "ບິດຄອຍ",
+    "₨": "ຣູປີ"
+  },
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "່",
+    "້",
+    "໊",
+    "໋",
+    "໌",
+    "ໍ",
+    "ໆ",
+    "ກ",
+    "ຂ",
+    "ຄ",
+    "ງ",
+    "ຈ",
+    "ສ",
+    "ຊ",
+    "ຍ",
+    "ດ",
+    "ຕ",
+    "ຖ",
+    "ທ",
+    "ນ",
+    "ບ",
+    "ປ",
+    "ຜ",
+    "ຝ",
+    "ພ",
+    "ຟ",
+    "ມ",
+    "ຢ",
+    "ຣ",
+    "ລ",
+    "ວ",
+    "ຫ",
+    "ໜ",
+    "ໝ",
+    "ອ",
+    "ຮ",
+    "ຯ",
+    "ະ",
+    "ັ",
+    "າ",
+    "ຳ",
+    "ິ",
+    "ີ",
+    "ຶ",
+    "ື",
+    "ຸ",
+    "ູ",
+    "ົ",
+    "ຼ",
+    "ຽ",
+    "ເ",
+    "ແ",
+    "ໂ",
+    "ໃ",
+    "ໄ"
+  ],
+  "missing_ordinary_letter_names": [
+    "່",
+    "້",
+    "໊",
+    "໋",
+    "໌",
+    "ໍ",
+    "ໆ",
+    "ກ",
+    "ຂ",
+    "ຄ",
+    "ງ",
+    "ຈ",
+    "ສ",
+    "ຊ",
+    "ຍ",
+    "ດ",
+    "ຕ",
+    "ຖ",
+    "ທ",
+    "ນ",
+    "ບ",
+    "ປ",
+    "ຜ",
+    "ຝ",
+    "ພ",
+    "ຟ",
+    "ມ",
+    "ຢ",
+    "ຣ",
+    "ລ",
+    "ວ",
+    "ຫ",
+    "ໜ",
+    "ໝ",
+    "ອ",
+    "ຮ",
+    "ຯ",
+    "ະ",
+    "ັ",
+    "າ",
+    "ຳ",
+    "ິ",
+    "ີ",
+    "ຶ",
+    "ື",
+    "ຸ",
+    "ູ",
+    "ົ",
+    "ຼ",
+    "ຽ",
+    "ເ",
+    "ແ",
+    "ໂ",
+    "ໃ",
+    "ໄ"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "{",
+      "aliases": [
+        "ເປີດວົງປີກກາ"
+      ],
+      "text": "ເປີດວົງປີກກາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‾",
+      "aliases": [
+        "ຂີດເທິງ"
+      ],
+      "text": "ຂີດເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "_",
+      "aliases": [
+        "ໝາຍຂີດກ້ອງ"
+      ],
+      "text": "ໝາຍຂີດກ້ອງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "-",
+      "aliases": [
+        "ຂີດຕໍ່-ລົບ"
+      ],
+      "text": "ຂີດຕໍ່-ລົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‐",
+      "aliases": [
+        "ໝາຍຂີດຕໍ່"
+      ],
+      "text": "ໝາຍຂີດຕໍ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "–",
+      "aliases": [
+        "ເຄື່ອງໝາຍຂີດຕໍ່ [en]"
+      ],
+      "text": "ເຄື່ອງໝາຍຂີດຕໍ່ [en]",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "—",
+      "aliases": [
+        "ເຄື່ອງໝາຍຂີດຕໍ່ [em]"
+      ],
+      "text": "ເຄື່ອງໝາຍຂີດຕໍ່ [em]",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "―",
+      "aliases": [
+        "ແຖບນອນ"
+      ],
+      "text": "ແຖບນອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": ",",
+      "aliases": [
+        "ຈຸດ"
+      ],
+      "text": "ຈຸດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "،",
+      "aliases": [
+        "ຈຸດອາຣາບິກ"
+      ],
+      "text": "ຈຸດອາຣາບິກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": ";",
+      "aliases": [
+        "ຈ້ຳຈຸດ"
+      ],
+      "text": "ຈ້ຳຈຸດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "؛",
+      "aliases": [
+        "ເຄື່ອງໝາຍເຊມິໂຄໂລນອາຣັບ"
+      ],
+      "text": "ເຄື່ອງໝາຍເຊມິໂຄໂລນອາຣັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": ":",
+      "aliases": [
+        "ສອງຈ້ຳ"
+      ],
+      "text": "ສອງຈ້ຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "!",
+      "aliases": [
+        "ໝາຍທ້ວງ"
+      ],
+      "text": "ໝາຍທ້ວງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¡",
+      "aliases": [
+        "ໝາຍທ້ວງທາງປີ້ນ"
+      ],
+      "text": "ໝາຍທ້ວງທາງປີ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "?",
+      "aliases": [
+        "ໝາຍຖາມ"
+      ],
+      "text": "ໝາຍຖາມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¿",
+      "aliases": [
+        "ໝາຍຖາມທາງປີ້ນ"
+      ],
+      "text": "ໝາຍຖາມທາງປີ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "؟",
+      "aliases": [
+        "ໝາຍຖາມອາຣັບ"
+      ],
+      "text": "ໝາຍຖາມອາຣັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‽",
+      "aliases": [
+        "ໝາຍຖາມທ້ວງ"
+      ],
+      "text": "ໝາຍຖາມທ້ວງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": ".",
+      "aliases": [
+        "ຈ້ຳເມັດ"
+      ],
+      "text": "ຈ້ຳເມັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "…",
+      "aliases": [
+        "ຈ້ຳສາມເມັດ"
+      ],
+      "text": "ຈ້ຳສາມເມັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "·",
+      "aliases": [
+        "ເຄື່ອງໝາຍຈຸດຂັ້ນກາງ"
+      ],
+      "text": "ເຄື່ອງໝາຍຈຸດຂັ້ນກາງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "'",
+      "aliases": [
+        "ເຄື່ອງໝາຍວັກໃນເຄື່ອງພິມດີດ"
+      ],
+      "text": "ເຄື່ອງໝາຍວັກໃນເຄື່ອງພິມດີດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‘",
+      "aliases": [
+        "ເຄື່ອງໝາຍວັກຕອນເບື້ອງຊ້າຍ"
+      ],
+      "text": "ເຄື່ອງໝາຍວັກຕອນເບື້ອງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "’",
+      "aliases": [
+        "ເຄື່ອງໝາຍວັກຕອນເບື້ອງຂວາ"
+      ],
+      "text": "ເຄື່ອງໝາຍວັກຕອນເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‚",
+      "aliases": [
+        "ເຄື່ອງໝາຍວັກຕອນລຸ່ມຂວາ"
+      ],
+      "text": "ເຄື່ອງໝາຍວັກຕອນລຸ່ມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "“",
+      "aliases": [
+        "ໝາຍຢືມເບື້ອງຊ້າຍ"
+      ],
+      "text": "ໝາຍຢືມເບື້ອງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "”",
+      "aliases": [
+        "ໝາຍຢືມເບື້ອງຂວາ"
+      ],
+      "text": "ໝາຍຢືມເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "„",
+      "aliases": [
+        "ໝາຍຢືມລຸ່ມຂວາ"
+      ],
+      "text": "ໝາຍຢືມລຸ່ມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "«",
+      "aliases": [
+        "ເຄື່ອງໝາຍເປີດວົງຢືມ"
+      ],
+      "text": "ເຄື່ອງໝາຍເປີດວົງຢືມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "»",
+      "aliases": [
+        "ເຄື່ອງໝາຍປິດວົງຢືມ"
+      ],
+      "text": "ເຄື່ອງໝາຍປິດວົງຢືມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": ")",
+      "aliases": [
+        "ປິດວົງເລັບ"
+      ],
+      "text": "ປິດວົງເລັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "[",
+      "aliases": [
+        "ເປີດວົງຂໍ"
+      ],
+      "text": "ເປີດວົງຂໍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "]",
+      "aliases": [
+        "ປິດວົງຂໍ"
+      ],
+      "text": "ປິດວົງຂໍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "}",
+      "aliases": [
+        "ປິດວົງປີກກາ"
+      ],
+      "text": "ປິດວົງປີກກາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "§",
+      "aliases": [
+        "ເຄື່ອງໝາຍພາກສ່ວນ"
+      ],
+      "text": "ເຄື່ອງໝາຍພາກສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¶",
+      "aliases": [
+        "ໝາຍວັກ"
+      ],
+      "text": "ໝາຍວັກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "@",
+      "aliases": [
+        "ເຄື່ອງໝາຍແອັດ"
+      ],
+      "text": "ເຄື່ອງໝາຍແອັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "*",
+      "aliases": [
+        "ເຄື່ອງໝາຍດາວ"
+      ],
+      "text": "ເຄື່ອງໝາຍດາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "/",
+      "aliases": [
+        "ເຄື່ອງໝາຍສະແດງການເລືອກ"
+      ],
+      "text": "ເຄື່ອງໝາຍສະແດງການເລືອກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "\\",
+      "aliases": [
+        "ເຄື່ອງໝາຍທັບຂວາ"
+      ],
+      "text": "ເຄື່ອງໝາຍທັບຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "&",
+      "aliases": [
+        "ເຄື່ອງໝາຍແລະ"
+      ],
+      "text": "ເຄື່ອງໝາຍແລະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "#",
+      "aliases": [
+        "ເຄື່ອງໝາຍສີ່ຫຼ່ຽມ"
+      ],
+      "text": "ເຄື່ອງໝາຍສີ່ຫຼ່ຽມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "%",
+      "aliases": [
+        "ເປີເຊັນ"
+      ],
+      "text": "ເປີເຊັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‰",
+      "aliases": [
+        "ເຄື່ອງໝາຍສ່ວນພັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍສ່ວນພັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "†",
+      "aliases": [
+        "ເຄື່ອງໝາຍດາບ"
+      ],
+      "text": "ເຄື່ອງໝາຍດາບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‡",
+      "aliases": [
+        "ເຄື່ອງໝາຍສອງດາບ"
+      ],
+      "text": "ເຄື່ອງໝາຍສອງດາບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "•",
+      "aliases": [
+        "ເຄື່ອງໝາຍຈ້ຳວົງມົນ"
+      ],
+      "text": "ເຄື່ອງໝາຍຈ້ຳວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‧",
+      "aliases": [
+        "ຈໍ້າຍະຕິພັງ"
+      ],
+      "text": "ຈໍ້າຍະຕິພັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "′",
+      "aliases": [
+        "ວົງຢືມໜຶ່ງຂີດ"
+      ],
+      "text": "ວົງຢືມໜຶ່ງຂີດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "″",
+      "aliases": [
+        "ວົງຢືມສອງຂີດ"
+      ],
+      "text": "ວົງຢືມສອງຂີດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‴",
+      "aliases": [
+        "ວົງຢືມສາມຂີດ"
+      ],
+      "text": "ວົງຢືມສາມຂີດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‸",
+      "aliases": [
+        "ເຄື່ອງໝາຍຕົກ"
+      ],
+      "text": "ເຄື່ອງໝາຍຕົກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "※",
+      "aliases": [
+        "ໝາຍອ້າງອີງ"
+      ],
+      "text": "ໝາຍອ້າງອີງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⁂",
+      "aliases": [
+        "ເຄື່ອງໝາຍກຸ່ມດາວ"
+      ],
+      "text": "ເຄື່ອງໝາຍກຸ່ມດາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "`",
+      "aliases": [
+        "ສຽງຕໍ່າ"
+      ],
+      "text": "ສຽງຕໍ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "´",
+      "aliases": [
+        "ສຽງແຫຼມ"
+      ],
+      "text": "ສຽງແຫຼມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "^",
+      "aliases": [
+        "ເຄື່ອງໝາຍຄວບຄຸມສຽງຮູບກຸບ"
+      ],
+      "text": "ເຄື່ອງໝາຍຄວບຄຸມສຽງຮູບກຸບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¨",
+      "aliases": [
+        "ສັນຍາລັກແຍກສຽງສະຫຼະ"
+      ],
+      "text": "ສັນຍາລັກແຍກສຽງສະຫຼະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "°",
+      "aliases": [
+        "ເຄື່ອງໝາຍອົງສາ"
+      ],
+      "text": "ເຄື່ອງໝາຍອົງສາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "℗",
+      "aliases": [
+        "ລິ​ຂະ​ສິດ​ການ​ບັນ​ທຶກ​ສຽງ"
+      ],
+      "text": "ລິ​ຂະ​ສິດ​ການ​ບັນ​ທຶກ​ສຽງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "←",
+      "aliases": [
+        "ລູກສອນຊີ້ໄປທາງຊ້າຍ"
+      ],
+      "text": "ລູກສອນຊີ້ໄປທາງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↚",
+      "aliases": [
+        "ໝາຍຍ້າຍລູກສອນໄປຊ້າຍ"
+      ],
+      "text": "ໝາຍຍ້າຍລູກສອນໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "→",
+      "aliases": [
+        "ລູກສອງຊີ້ໄປທາງຂວາ"
+      ],
+      "text": "ລູກສອງຊີ້ໄປທາງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↛",
+      "aliases": [
+        "ໝາຍຍ້າຍລູກສອນໄປຂວາ"
+      ],
+      "text": "ໝາຍຍ້າຍລູກສອນໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↑",
+      "aliases": [
+        "ລູກສອນຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↓",
+      "aliases": [
+        "ລູກສອນຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↜",
+      "aliases": [
+        "ໝາຍລູກສອນເປັນຄື້ນໄປທາງຊ້າຍ"
+      ],
+      "text": "ໝາຍລູກສອນເປັນຄື້ນໄປທາງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↝",
+      "aliases": [
+        "ໝາຍລູກສອນເປັນຄື້ນໄປທາງຂວາ"
+      ],
+      "text": "ໝາຍລູກສອນເປັນຄື້ນໄປທາງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↞",
+      "aliases": [
+        "ໝາຍລູກສອນສອງຫົວໄປທາງຊ້າຍ"
+      ],
+      "text": "ໝາຍລູກສອນສອງຫົວໄປທາງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↟",
+      "aliases": [
+        "ໝາຍລູກສອນສອງຫົວຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ໝາຍລູກສອນສອງຫົວຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↠",
+      "aliases": [
+        "ໝາຍລູກສອນສອງຫົວໄປທາງຂວາ"
+      ],
+      "text": "ໝາຍລູກສອນສອງຫົວໄປທາງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↡",
+      "aliases": [
+        "ໝາຍລູກສອນສອງຫົວຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ໝາຍລູກສອນສອງຫົວຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↢",
+      "aliases": [
+        "ລູກສອນມີຫາງຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນມີຫາງຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↣",
+      "aliases": [
+        "ລູກສອນມີຫາງຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນມີຫາງຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↤",
+      "aliases": [
+        "ລູກສອນຕັດກົ້ນຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນຕັດກົ້ນຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↥",
+      "aliases": [
+        "ລູກສອນຕັດກົ້ນຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນຕັດກົ້ນຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↦",
+      "aliases": [
+        "ລູກສອນຕັດກົ້ນຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນຕັດກົ້ນຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↧",
+      "aliases": [
+        "ລູກສອນຕັດກົ້ນຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນຕັດກົ້ນຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↨",
+      "aliases": [
+        "ລູກສອນຊີ້ຂຶ້ນລົງມີຖານ"
+      ],
+      "text": "ລູກສອນຊີ້ຂຶ້ນລົງມີຖານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↫",
+      "aliases": [
+        "ລູກສອນກ້ຽວໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນກ້ຽວໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↬",
+      "aliases": [
+        "ລູກສອນກ້ຽວໄປຂວາ"
+      ],
+      "text": "ລູກສອນກ້ຽວໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↭",
+      "aliases": [
+        "ລູກສອນຄື້ນຊ້າຍຂວາ"
+      ],
+      "text": "ລູກສອນຄື້ນຊ້າຍຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↯",
+      "aliases": [
+        "ລູກສອນຊິກແຊັກຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນຊິກແຊັກຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↰",
+      "aliases": [
+        "ລູກສອນຂຶ້ນເທິງລ້ຽວຊ້າຍ"
+      ],
+      "text": "ລູກສອນຂຶ້ນເທິງລ້ຽວຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↱",
+      "aliases": [
+        "ລູກສອນຂຶ້ນເທິງລ້ຽວຂວາ"
+      ],
+      "text": "ລູກສອນຂຶ້ນເທິງລ້ຽວຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↲",
+      "aliases": [
+        "ລູກສອນລົງລຸ່ມລ້ຽວຊ້າຍ"
+      ],
+      "text": "ລູກສອນລົງລຸ່ມລ້ຽວຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↳",
+      "aliases": [
+        "ລູກສອນລົງລຸ່ມລ້ຽວຂວາ"
+      ],
+      "text": "ລູກສອນລົງລຸ່ມລ້ຽວຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↴",
+      "aliases": [
+        "ລູກສອນຊີ້ໄປຂວາຫັກມຸມລຸ່ມ"
+      ],
+      "text": "ລູກສອນຊີ້ໄປຂວາຫັກມຸມລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↵",
+      "aliases": [
+        "ລູກສອນຊີ້ໄປຊ້າຍຫັກມຸມລຸ່ມ"
+      ],
+      "text": "ລູກສອນຊີ້ໄປຊ້າຍຫັກມຸມລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↶",
+      "aliases": [
+        "ລູກສອນໂຄ້ງໄປທິດກົງກັນຂ້າມກັບເຂັມໂມງ"
+      ],
+      "text": "ລູກສອນໂຄ້ງໄປທິດກົງກັນຂ້າມກັບເຂັມໂມງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↷",
+      "aliases": [
+        "ລູກສອນໂຄ້ງໄປທິດດຽວກັບເຂັມໂມງ"
+      ],
+      "text": "ລູກສອນໂຄ້ງໄປທິດດຽວກັບເຂັມໂມງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↸",
+      "aliases": [
+        "ແຖບຂັ້ນລູກສອນຊີ້ໄປທິດຕາເວັນຕົກສຽງເໜືອ"
+      ],
+      "text": "ແຖບຂັ້ນລູກສອນຊີ້ໄປທິດຕາເວັນຕົກສຽງເໜືອ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↹",
+      "aliases": [
+        "ແຖບຂັ້ນລູກສອນຊີ້ໄປຊ້າຍຢູ່ເທິງແຖບຂັ້ນລູກສອນຊີ້ໄປຂວາ"
+      ],
+      "text": "ແຖບຂັ້ນລູກສອນຊີ້ໄປຊ້າຍຢູ່ເທິງແຖບຂັ້ນລູກສອນຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↺",
+      "aliases": [
+        "ລູກສອນວົງກົມເປີດຊີ້ໄປທາງກົງກັນຂ້າມກັບເຂັມໂມງ"
+      ],
+      "text": "ລູກສອນວົງກົມເປີດຊີ້ໄປທາງກົງກັນຂ້າມກັບເຂັມໂມງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↻",
+      "aliases": [
+        "ລູກສອນວົງກົມເປີດຊີ້ໄປທາງດຽວກັບເຂັມໂມງ"
+      ],
+      "text": "ລູກສອນວົງກົມເປີດຊີ້ໄປທາງດຽວກັບເຂັມໂມງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↼",
+      "aliases": [
+        "ສະໝວກຊີ້ໄປຊ້າຍງ່ຽງຂຶ້ນເທິງ"
+      ],
+      "text": "ສະໝວກຊີ້ໄປຊ້າຍງ່ຽງຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↽",
+      "aliases": [
+        "ສະໝວກຊີ້ໄປຊ້າຍງ່ຽງລົງລຸ່ມ"
+      ],
+      "text": "ສະໝວກຊີ້ໄປຊ້າຍງ່ຽງລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↾",
+      "aliases": [
+        "ສະໝວກຊີ້ຂຶ້ນເທິງງ່ຽງໄປຂວາ"
+      ],
+      "text": "ສະໝວກຊີ້ຂຶ້ນເທິງງ່ຽງໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↿",
+      "aliases": [
+        "ສະໝວກຊີ້ຂຶ້ນເທິງງ່ຽງໄປຊ້າຍ"
+      ],
+      "text": "ສະໝວກຊີ້ຂຶ້ນເທິງງ່ຽງໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇀",
+      "aliases": [
+        "ສະໝວກຊີ້ໄປຂວາງ່ຽງຂຶ້ນເທິງ"
+      ],
+      "text": "ສະໝວກຊີ້ໄປຂວາງ່ຽງຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇁",
+      "aliases": [
+        "ສະໝວກຊີ້ໄປຂວາງ່ຽງລົງລຸ່ມ"
+      ],
+      "text": "ສະໝວກຊີ້ໄປຂວາງ່ຽງລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇂",
+      "aliases": [
+        "ສະໝວກຊີ້ລົງລຸ່ມງ່ຽງໄປຂວາ"
+      ],
+      "text": "ສະໝວກຊີ້ລົງລຸ່ມງ່ຽງໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇃",
+      "aliases": [
+        "ສະໝວກຊີ້ລົງລຸ່ມງ່ຽງໄປຊ້າຍ"
+      ],
+      "text": "ສະໝວກຊີ້ລົງລຸ່ມງ່ຽງໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇄",
+      "aliases": [
+        "ລູກສອນຊີ້ໄປຊ້າຍຢູ່ເທິງລູກສອນຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນຊີ້ໄປຊ້າຍຢູ່ເທິງລູກສອນຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇅",
+      "aliases": [
+        "ລູກສອນຊີ້ຂຶ້ນ ແລະ ລູກສອນຊີ້ລົງ"
+      ],
+      "text": "ລູກສອນຊີ້ຂຶ້ນ ແລະ ລູກສອນຊີ້ລົງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇆",
+      "aliases": [
+        "ລູກສອນຊີ້ໄປທາງຊ້າຍເທິງລູກສອນຊີ້ໄປທາງຂວາ"
+      ],
+      "text": "ລູກສອນຊີ້ໄປທາງຊ້າຍເທິງລູກສອນຊີ້ໄປທາງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇇",
+      "aliases": [
+        "ລູກສອນສອງອັນຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນສອງອັນຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇈",
+      "aliases": [
+        "ລູກສອນສອງອັນຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນສອງອັນຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇉",
+      "aliases": [
+        "ລູກສອນສອງອັນຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນສອງອັນຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇊",
+      "aliases": [
+        "ລູກສອນສອງອັນຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນສອງອັນຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇋",
+      "aliases": [
+        "ສະໝວກຊີ້ໄປຊ້າຍຢູ່ເທິງສະໝວກຊີ້ໄປຂວາ"
+      ],
+      "text": "ສະໝວກຊີ້ໄປຊ້າຍຢູ່ເທິງສະໝວກຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇌",
+      "aliases": [
+        "ສະໝວກຊີ້ໄປຂວາຢູ່ເທິງສະໝວກຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ສະໝວກຊີ້ໄປຂວາຢູ່ເທິງສະໝວກຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇐",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇍",
+      "aliases": [
+        "ລູກສອນຄູ່ຕັດຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນຄູ່ຕັດຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇑",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇒",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇏",
+      "aliases": [
+        "ລູກສອນຄູ່ຕັດຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນຄູ່ຕັດຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇓",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇔",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປຊ້າຍຂວາ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປຊ້າຍຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇎",
+      "aliases": [
+        "ລູກສອນຄູ່ຕັດຊີ້ໄປຊ້າຍຂວາ"
+      ],
+      "text": "ລູກສອນຄູ່ຕັດຊີ້ໄປຊ້າຍຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇖",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນຕົກສຽງເໜືອ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນຕົກສຽງເໜືອ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇗",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນອອກສຽງເໜືອ"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນອອກສຽງເໜືອ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇘",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນອອກສຽງໄຕ້"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນອອກສຽງໄຕ້",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇙",
+      "aliases": [
+        "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນຕົກສຽງໄຕ້"
+      ],
+      "text": "ລູກສອນຄູ່ຊີ້ໄປທາງຕາເວັນຕົກສຽງໄຕ້",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇚",
+      "aliases": [
+        "ລູກສອນສາມເສັ້ນຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນສາມເສັ້ນຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇛",
+      "aliases": [
+        "ລູກສອນສາມເສັ້ນຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນສາມເສັ້ນຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇜",
+      "aliases": [
+        "ລູກສອນຮູບກະແສໄຟຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນຮູບກະແສໄຟຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇝",
+      "aliases": [
+        "ລູກສອນຮູບກະແສໄຟຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນຮູບກະແສໄຟຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇞",
+      "aliases": [
+        "ລູກສອນຕັດຄູ່ຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນຕັດຄູ່ຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇟",
+      "aliases": [
+        "ລູກສອນຕັດຄູ່ຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນຕັດຄູ່ຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇠",
+      "aliases": [
+        "ລູກສອນຂີດຂາດຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນຂີດຂາດຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇡",
+      "aliases": [
+        "ລູກສອນຂີດຂາດຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນຂີດຂາດຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇢",
+      "aliases": [
+        "ລູກສອນຂີດຂາດຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນຂີດຂາດຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇣",
+      "aliases": [
+        "ລູກສອນຂີດຂາດຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນຂີດຂາດຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇤",
+      "aliases": [
+        "ແຖບລູກສອນຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ແຖບລູກສອນຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇥",
+      "aliases": [
+        "ແຖບລູກສອນຊີ້ໄປຂວາ"
+      ],
+      "text": "ແຖບລູກສອນຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇦",
+      "aliases": [
+        "ລູກສອນໂປ່ງຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນໂປ່ງຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇧",
+      "aliases": [
+        "ລູກສອນໂປ່ງຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນໂປ່ງຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇨",
+      "aliases": [
+        "ລູກສອນໂປ່ງຊີ້ໄປຂວາ"
+      ],
+      "text": "ລູກສອນໂປ່ງຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇩",
+      "aliases": [
+        "ລູກສອນໂປ່ງຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນໂປ່ງຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇪",
+      "aliases": [
+        "ລູກສອນໂປ່ງຂາດຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນໂປ່ງຂາດຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⇵",
+      "aliases": [
+        "ລູກສອນຊີ້ລົງລຸ່ມຢູ່ເບື້ອງຊ້າຍລູກສອນຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນຊີ້ລົງລຸ່ມຢູ່ເບື້ອງຊ້າຍລູກສອນຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∀",
+      "aliases": [
+        "ເຄື່ອງໝາຍທັງໝົດ"
+      ],
+      "text": "ເຄື່ອງໝາຍທັງໝົດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∂",
+      "aliases": [
+        "ເຄື່ອງໝາຍຕ່າງ"
+      ],
+      "text": "ເຄື່ອງໝາຍຕ່າງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∃",
+      "aliases": [
+        "ເຄື່ອງໝາຍມີຢູ່"
+      ],
+      "text": "ເຄື່ອງໝາຍມີຢູ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∅",
+      "aliases": [
+        "ກຸ່ມເປົ່າ"
+      ],
+      "text": "ກຸ່ມເປົ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∆",
+      "aliases": [
+        "ເຄື່ອງໝາຍເພີ່ມ"
+      ],
+      "text": "ເຄື່ອງໝາຍເພີ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∇",
+      "aliases": [
+        "ເຄື່ອງໝາຍນາບຣາ"
+      ],
+      "text": "ເຄື່ອງໝາຍນາບຣາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∈",
+      "aliases": [
+        "ເຄື່ອງໝາຍຢູ່ໃນກຸ່ມ"
+      ],
+      "text": "ເຄື່ອງໝາຍຢູ່ໃນກຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∉",
+      "aliases": [
+        "ບໍ່ແມ່ນອົງປະກອບ"
+      ],
+      "text": "ບໍ່ແມ່ນອົງປະກອບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∋",
+      "aliases": [
+        "ນອນໃນ"
+      ],
+      "text": "ນອນໃນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∎",
+      "aliases": [
+        "ສິ້ນສຸດການພິສູດ"
+      ],
+      "text": "ສິ້ນສຸດການພິສູດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∏",
+      "aliases": [
+        "ເຄື່ອງໝາຍຜົນທະວີຄູນ"
+      ],
+      "text": "ເຄື່ອງໝາຍຜົນທະວີຄູນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∑",
+      "aliases": [
+        "ເຄື່ອງໝາຍຜົນຮວມ"
+      ],
+      "text": "ເຄື່ອງໝາຍຜົນຮວມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "+",
+      "aliases": [
+        "ໝາຍບວກ"
+      ],
+      "text": "ໝາຍບວກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "±",
+      "aliases": [
+        "ບວກລົບ"
+      ],
+      "text": "ບວກລົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "÷",
+      "aliases": [
+        "ເຄື່ອງໝາຍຫານ"
+      ],
+      "text": "ເຄື່ອງໝາຍຫານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "×",
+      "aliases": [
+        "ສັນ​ຍາ​ລັກຄູນ"
+      ],
+      "text": "ສັນ​ຍາ​ລັກຄູນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "<",
+      "aliases": [
+        "ນ້ອຍກວ່າ"
+      ],
+      "text": "ນ້ອຍກວ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≮",
+      "aliases": [
+        "ບໍ່ນ້ອຍກວ່າ"
+      ],
+      "text": "ບໍ່ນ້ອຍກວ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "=",
+      "aliases": [
+        "ເທົ່າກັບ"
+      ],
+      "text": "ເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≠",
+      "aliases": [
+        "ບໍ່ເທົ່າກັບ"
+      ],
+      "text": "ບໍ່ເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": ">",
+      "aliases": [
+        "ໃຫຍ່ກວ່າ"
+      ],
+      "text": "ໃຫຍ່ກວ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≯",
+      "aliases": [
+        "ບໍ່ໃຫຍ່ກວ່າ"
+      ],
+      "text": "ບໍ່ໃຫຍ່ກວ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¬",
+      "aliases": [
+        "ປະຕິເສດ"
+      ],
+      "text": "ປະຕິເສດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "|",
+      "aliases": [
+        "ເສັ້ນຕັ້ງ"
+      ],
+      "text": "ເສັ້ນຕັ້ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "~",
+      "aliases": [
+        "ເຄື່ອງໝາຍເທິງອັກສອນສະແດງສຽງທາງດັງ"
+      ],
+      "text": "ເຄື່ອງໝາຍເທິງອັກສອນສະແດງສຽງທາງດັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "−",
+      "aliases": [
+        "ໝາຍລົບ"
+      ],
+      "text": "ໝາຍລົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⁻",
+      "aliases": [
+        "ເຄື່ອງໝາຍກຳລັງລົບ"
+      ],
+      "text": "ເຄື່ອງໝາຍກຳລັງລົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∓",
+      "aliases": [
+        "ເຄື່ອງໝາຍບວກລົບ"
+      ],
+      "text": "ເຄື່ອງໝາຍບວກລົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∕",
+      "aliases": [
+        "ໝາຍຫານ"
+      ],
+      "text": "ໝາຍຫານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⁄",
+      "aliases": [
+        "ຂີດແບ່ງສ່ວນ"
+      ],
+      "text": "ຂີດແບ່ງສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∗",
+      "aliases": [
+        "ໝາຍດາວ"
+      ],
+      "text": "ໝາຍດາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∘",
+      "aliases": [
+        "ໝາຍຈໍ້າວົງແຫວນ"
+      ],
+      "text": "ໝາຍຈໍ້າວົງແຫວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∙",
+      "aliases": [
+        "ເຄື່ອງໝາຍຈໍ້າເມັດ"
+      ],
+      "text": "ເຄື່ອງໝາຍຈໍ້າເມັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "√",
+      "aliases": [
+        "ຮາກຂັ້ນສອງ"
+      ],
+      "text": "ຮາກຂັ້ນສອງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∝",
+      "aliases": [
+        "ສັດສ່ວນ"
+      ],
+      "text": "ສັດສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∞",
+      "aliases": [
+        "ເຄື່ອງໝາຍອະນັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍອະນັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∟",
+      "aliases": [
+        "ມຸມຂວາ"
+      ],
+      "text": "ມຸມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∠",
+      "aliases": [
+        "ມຸມ"
+      ],
+      "text": "ມຸມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∣",
+      "aliases": [
+        "ເຄື່ອງໝາຍແບ່ງ"
+      ],
+      "text": "ເຄື່ອງໝາຍແບ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∥",
+      "aliases": [
+        "ເສັ້ນຂະໜານ"
+      ],
+      "text": "ເສັ້ນຂະໜານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∧",
+      "aliases": [
+        "ແລະ"
+      ],
+      "text": "ແລະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∩",
+      "aliases": [
+        "ເຄື່ອງໝາຍຕັດ"
+      ],
+      "text": "ເຄື່ອງໝາຍຕັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∪",
+      "aliases": [
+        "ເຄື່ອງໝາຍຮວມ"
+      ],
+      "text": "ເຄື່ອງໝາຍຮວມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∫",
+      "aliases": [
+        "ເຄື່ອງໝາຍສັງຄະນິດ"
+      ],
+      "text": "ເຄື່ອງໝາຍສັງຄະນິດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∬",
+      "aliases": [
+        "ເຄື່ອງໝາຍສັງຄະນິດຄູ່"
+      ],
+      "text": "ເຄື່ອງໝາຍສັງຄະນິດຄູ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∮",
+      "aliases": [
+        "ເສັ້ນສະແດງສັງຄະນິດ"
+      ],
+      "text": "ເສັ້ນສະແດງສັງຄະນິດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∴",
+      "aliases": [
+        "ດັ່ງນັ້ນ"
+      ],
+      "text": "ດັ່ງນັ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∵",
+      "aliases": [
+        "ຍ້ອນວ່າ"
+      ],
+      "text": "ຍ້ອນວ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∶",
+      "aliases": [
+        "ອັດຕາສ່ວນ"
+      ],
+      "text": "ອັດຕາສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∷",
+      "aliases": [
+        "ຄວາມໄດ້ສ່ວນ"
+      ],
+      "text": "ຄວາມໄດ້ສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∼",
+      "aliases": [
+        "ເຄື່ອງໝາຍປະມານ"
+      ],
+      "text": "ເຄື່ອງໝາຍປະມານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∽",
+      "aliases": [
+        "ເຄື່ອງໝາຍປະມານລວງປີ້ນ"
+      ],
+      "text": "ເຄື່ອງໝາຍປະມານລວງປີ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "∾",
+      "aliases": [
+        "ເຄື່ອງໝາຍຄ້າຍຄືກັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍຄ້າຍຄືກັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≃",
+      "aliases": [
+        "ເກືອບເທົ່າກັບ"
+      ],
+      "text": "ເກືອບເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≅",
+      "aliases": [
+        "ຄາດຄະເນ"
+      ],
+      "text": "ຄາດຄະເນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≈",
+      "aliases": [
+        "ທຽບເທົ່າ"
+      ],
+      "text": "ທຽບເທົ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≌",
+      "aliases": [
+        "ເທົ່າກັນທັງໝົດ"
+      ],
+      "text": "ເທົ່າກັນທັງໝົດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≒",
+      "aliases": [
+        "ຮູບປະມານເກືອບເທົ່າກັນ"
+      ],
+      "text": "ຮູບປະມານເກືອບເທົ່າກັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≖",
+      "aliases": [
+        "ວົງແຫວນເທົ່າກັນ"
+      ],
+      "text": "ວົງແຫວນເທົ່າກັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≡",
+      "aliases": [
+        "ເຄື່ອງໝາຍລະບຸເປັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍລະບຸເປັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≣",
+      "aliases": [
+        "ເທົ່າກັນແນ່ນອນ"
+      ],
+      "text": "ເທົ່າກັນແນ່ນອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≤",
+      "aliases": [
+        "ນ້ອຍກວ່າ ຫຼື ເທົ່າກັບ"
+      ],
+      "text": "ນ້ອຍກວ່າ ຫຼື ເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≥",
+      "aliases": [
+        "ໃຫຍ່ກວ່າ ຫຼື ເທົ່າກັບ"
+      ],
+      "text": "ໃຫຍ່ກວ່າ ຫຼື ເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≦",
+      "aliases": [
+        "ໝາຍນ້ອຍກວ່າຢູ່ເທິງໝາຍເທົ່າກັບ"
+      ],
+      "text": "ໝາຍນ້ອຍກວ່າຢູ່ເທິງໝາຍເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≧",
+      "aliases": [
+        "ໝາຍໃຫຍ່ກວ່າຢູ່ເທິງໝາຍເທົ່າກັບ"
+      ],
+      "text": "ໝາຍໃຫຍ່ກວ່າຢູ່ເທິງໝາຍເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≪",
+      "aliases": [
+        "ນ້ອຍກວ່າຫຼາຍ"
+      ],
+      "text": "ນ້ອຍກວ່າຫຼາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≫",
+      "aliases": [
+        "ໃຫຍ່ກວ່າຫຼາຍ"
+      ],
+      "text": "ໃຫຍ່ກວ່າຫຼາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≬",
+      "aliases": [
+        "ລະຫວ່າງ"
+      ],
+      "text": "ລະຫວ່າງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≳",
+      "aliases": [
+        "ໃຫຍ່ກວ່າເທົ່າກັບ"
+      ],
+      "text": "ໃຫຍ່ກວ່າເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≺",
+      "aliases": [
+        "ເຄື່ອງໝາຍຢູ່ທາງໜ້າ"
+      ],
+      "text": "ເຄື່ອງໝາຍຢູ່ທາງໜ້າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "≻",
+      "aliases": [
+        "ເຄື່ອງໝາຍຕາມຫຼັງ"
+      ],
+      "text": "ເຄື່ອງໝາຍຕາມຫຼັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊁",
+      "aliases": [
+        "ບໍ່ຢູ່ທາງຫຼັງ"
+      ],
+      "text": "ບໍ່ຢູ່ທາງຫຼັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊂",
+      "aliases": [
+        "ເຄື່ອງໝາຍກຸ່ມຍ່ອຍ"
+      ],
+      "text": "ເຄື່ອງໝາຍກຸ່ມຍ່ອຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊃",
+      "aliases": [
+        "ກຸ່ມພາກສ່ວນ"
+      ],
+      "text": "ກຸ່ມພາກສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊆",
+      "aliases": [
+        "ເທົ່າກັບອານຸກຸ່ມ"
+      ],
+      "text": "ເທົ່າກັບອານຸກຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊇",
+      "aliases": [
+        "ເທົ່າກັບກຸ່ມພາກສ່ວນ"
+      ],
+      "text": "ເທົ່າກັບກຸ່ມພາກສ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊕",
+      "aliases": [
+        "ໝາຍບວກວົງມົນ"
+      ],
+      "text": "ໝາຍບວກວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊖",
+      "aliases": [
+        "ໝາຍລົບວົງມົນ"
+      ],
+      "text": "ໝາຍລົບວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊗",
+      "aliases": [
+        "ໝາຍຄູນວົງມົນ"
+      ],
+      "text": "ໝາຍຄູນວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊘",
+      "aliases": [
+        "ຂີດຫານໃນວົງມົນ"
+      ],
+      "text": "ຂີດຫານໃນວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊙",
+      "aliases": [
+        "ຈໍ້າເມັດໃນວົງມົນ"
+      ],
+      "text": "ຈໍ້າເມັດໃນວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊚",
+      "aliases": [
+        "ຕົວຄໍານວນວົງແຫວນໃນວົງມົນ"
+      ],
+      "text": "ຕົວຄໍານວນວົງແຫວນໃນວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊛",
+      "aliases": [
+        "ຕົວຄໍານວນໝາຍດາວໃນວົງມົນ"
+      ],
+      "text": "ຕົວຄໍານວນໝາຍດາວໃນວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊞",
+      "aliases": [
+        "ໝາຍບວກໃນຮູບສີ່ຫຼ່ຽມ"
+      ],
+      "text": "ໝາຍບວກໃນຮູບສີ່ຫຼ່ຽມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊟",
+      "aliases": [
+        "ໝາຍລົບໃນຮູບສີ່ຫຼ່ຽມ"
+      ],
+      "text": "ໝາຍລົບໃນຮູບສີ່ຫຼ່ຽມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊥",
+      "aliases": [
+        "ເຄື່ອງໝາຍຂໍເທິງ"
+      ],
+      "text": "ເຄື່ອງໝາຍຂໍເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊮",
+      "aliases": [
+        "ບໍ່ບັງຄັບ"
+      ],
+      "text": "ບໍ່ບັງຄັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊰",
+      "aliases": [
+        "ເຄື່ອງໝາຍທາງໜ້າຢູ່ພາຍໃຕ້ຄວາມສໍາພັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍທາງໜ້າຢູ່ພາຍໃຕ້ຄວາມສໍາພັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊱",
+      "aliases": [
+        "ເຄື່ອງໝາຍທາງຫຼັງຢູ່ພາຍໃຕ້ຄວາມສໍາພັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍທາງຫຼັງຢູ່ພາຍໃຕ້ຄວາມສໍາພັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋭",
+      "aliases": [
+        "ບໍ່ໄດ້ປະກອບເປັນອານຸກຸ່ມທີ່ເທົ່າກັນ"
+      ],
+      "text": "ບໍ່ໄດ້ປະກອບເປັນອານຸກຸ່ມທີ່ເທົ່າກັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊶",
+      "aliases": [
+        "ກົກເຄົ້າ"
+      ],
+      "text": "ກົກເຄົ້າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊹",
+      "aliases": [
+        "ມາຕຣິສສັບປ່ຽນສັງຄະຍຸດ"
+      ],
+      "text": "ມາຕຣິສສັບປ່ຽນສັງຄະຍຸດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⊿",
+      "aliases": [
+        "ສາມຫຼ່ຽມເບື້ອງຂວາ"
+      ],
+      "text": "ສາມຫຼ່ຽມເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋁",
+      "aliases": [
+        "ຫຼື"
+      ],
+      "text": "ຫຼື",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋂",
+      "aliases": [
+        "ຕັດ"
+      ],
+      "text": "ຕັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋃",
+      "aliases": [
+        "ການຮວມ"
+      ],
+      "text": "ການຮວມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋅",
+      "aliases": [
+        "ຕົວຄໍານວນຈໍ້າເມັດ"
+      ],
+      "text": "ຕົວຄໍານວນຈໍ້າເມັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋆",
+      "aliases": [
+        "ຕົວຄໍານວນດາວ"
+      ],
+      "text": "ຕົວຄໍານວນດາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋈",
+      "aliases": [
+        "ຕົວເຊື່ອມຕໍ່ໂດຍທໍາມະຊາດ"
+      ],
+      "text": "ຕົວເຊື່ອມຕໍ່ໂດຍທໍາມະຊາດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋒",
+      "aliases": [
+        "ຕົວຕັດຄູ່"
+      ],
+      "text": "ຕົວຕັດຄູ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋘",
+      "aliases": [
+        "ນ້ອຍກວ່າຫຼາຍເທົ່າ"
+      ],
+      "text": "ນ້ອຍກວ່າຫຼາຍເທົ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋙",
+      "aliases": [
+        "ໃຫຍ່ກວ່າຫຼາຍເທົ່າ"
+      ],
+      "text": "ໃຫຍ່ກວ່າຫຼາຍເທົ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋮",
+      "aliases": [
+        "ສາມຈໍ້າແນວຕັ້ງ"
+      ],
+      "text": "ສາມຈໍ້າແນວຕັ້ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋯",
+      "aliases": [
+        "ສາມຈໍ້າແນວນອນ"
+      ],
+      "text": "ສາມຈໍ້າແນວນອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋰",
+      "aliases": [
+        "ສາມຈໍ້າສະຫຼຽງຂຶ້ນຂວາ"
+      ],
+      "text": "ສາມຈໍ້າສະຫຼຽງຂຶ້ນຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⋱",
+      "aliases": [
+        "ສາມຈໍ້າສະຫຼຽງລົງຂວາ"
+      ],
+      "text": "ສາມຈໍ້າສະຫຼຽງລົງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "■",
+      "aliases": [
+        "ຈັດຕຸລັດຕັນ"
+      ],
+      "text": "ຈັດຕຸລັດຕັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "□",
+      "aliases": [
+        "ຈັດຕຸລັດໂປ່ງ"
+      ],
+      "text": "ຈັດຕຸລັດໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▢",
+      "aliases": [
+        "ຈັດຕຸລັດໂປ່ງແຈມົນ"
+      ],
+      "text": "ຈັດຕຸລັດໂປ່ງແຈມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▣",
+      "aliases": [
+        "ຈັດຕຸລັດຕັນຢູ່ໃນສີ່ຫຼ່ຽມໂປ່ງ"
+      ],
+      "text": "ຈັດຕຸລັດຕັນຢູ່ໃນສີ່ຫຼ່ຽມໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▤",
+      "aliases": [
+        "ຈັດຕຸລັດຂີດຂວາງ"
+      ],
+      "text": "ຈັດຕຸລັດຂີດຂວາງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▥",
+      "aliases": [
+        "ຈັດຕຸລັດຂີດຕັ້ງ"
+      ],
+      "text": "ຈັດຕຸລັດຂີດຕັ້ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▦",
+      "aliases": [
+        "ຈັດຕຸລັດຂີດຕັດ"
+      ],
+      "text": "ຈັດຕຸລັດຂີດຕັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▧",
+      "aliases": [
+        "ຈັດຕຸລັດຂີດສະຫຼຽງເທິງຊ້າຍຫາລຸ່ມຂວາ"
+      ],
+      "text": "ຈັດຕຸລັດຂີດສະຫຼຽງເທິງຊ້າຍຫາລຸ່ມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▨",
+      "aliases": [
+        "ຈັດຕຸລັດຂີດສະຫຼຽງເທິງຂວາຫາລຸ່ມຊ້າຍ"
+      ],
+      "text": "ຈັດຕຸລັດຂີດສະຫຼຽງເທິງຂວາຫາລຸ່ມຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▩",
+      "aliases": [
+        "ຈັດຕຸລັດຂີດໄຂວ່"
+      ],
+      "text": "ຈັດຕຸລັດຂີດໄຂວ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▬",
+      "aliases": [
+        "ສີ່ແຈຕັນ"
+      ],
+      "text": "ສີ່ແຈຕັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▭",
+      "aliases": [
+        "ສີ່ແຈໂປ່ງ"
+      ],
+      "text": "ສີ່ແຈໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▮",
+      "aliases": [
+        "ສີ່ແຈຕັນລວງຕັ້ງ"
+      ],
+      "text": "ສີ່ແຈຕັນລວງຕັ້ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▰",
+      "aliases": [
+        "ສີ່ແຈຕັນສະຫຼຽງ"
+      ],
+      "text": "ສີ່ແຈຕັນສະຫຼຽງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▲",
+      "aliases": [
+        "ສາມຫຼ່ຽມຊິ້ຂຶ້ນ"
+      ],
+      "text": "ສາມຫຼ່ຽມຊິ້ຂຶ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "△",
+      "aliases": [
+        "ສາມແຈໂປ່ງຈອມຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ສາມແຈໂປ່ງຈອມຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▴",
+      "aliases": [
+        "ສາມແຈຕັນນ້ອຍຈອມຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▵",
+      "aliases": [
+        "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ຂຶ້ນເທິງ"
+      ],
+      "text": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▷",
+      "aliases": [
+        "ສາມແຈໂປ່ງຈອມຊີ້ໄປຂວາ"
+      ],
+      "text": "ສາມແຈໂປ່ງຈອມຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▸",
+      "aliases": [
+        "ສາມແຈຕັນນ້ອຍຈອມຊີ້ໄປຂວາ"
+      ],
+      "text": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▹",
+      "aliases": [
+        "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ໄປຂວາ"
+      ],
+      "text": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "►",
+      "aliases": [
+        "ເມັດສາມແຈຕັນຈອມຊີ້ໄປຂວາ"
+      ],
+      "text": "ເມັດສາມແຈຕັນຈອມຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▻",
+      "aliases": [
+        "ເມັດສາມແຈໂປ່ງຈອມຊີ້ໄປຂວາ"
+      ],
+      "text": "ເມັດສາມແຈໂປ່ງຈອມຊີ້ໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▼",
+      "aliases": [
+        "ສາມຫຼ່ຽມຊີ້ລົງ"
+      ],
+      "text": "ສາມຫຼ່ຽມຊີ້ລົງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▽",
+      "aliases": [
+        "ສາມແຈໂປ່ງຈອມຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ສາມແຈໂປ່ງຈອມຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▾",
+      "aliases": [
+        "ສາມແຈຕັນນ້ອຍຈອມຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▿",
+      "aliases": [
+        "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ລົງລຸ່ມ"
+      ],
+      "text": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◁",
+      "aliases": [
+        "ສາມແຈໂປ່ງຈອມຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ສາມແຈໂປ່ງຈອມຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◂",
+      "aliases": [
+        "ສາມແຈຕັນນ້ອຍຈອມຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ສາມແຈຕັນນ້ອຍຈອມຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◃",
+      "aliases": [
+        "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ສາມແຈໂປ່ງນ້ອຍຈອມຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◄",
+      "aliases": [
+        "ເມັດສາມແຈຕັນຈອມຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ເມັດສາມແຈຕັນຈອມຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◅",
+      "aliases": [
+        "ເມັດສາມແຈໂປ່ງຈອມຊີ້ໄປຊ້າຍ"
+      ],
+      "text": "ເມັດສາມແຈໂປ່ງຈອມຊີ້ໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◆",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມເພັດຕັນ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມເພັດຕັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◇",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມເພັດໂປ່ງ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມເພັດໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◈",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມເພັດຕັນຢູ່ໃນສີ່ຫຼ່ຽມເພັດໂປ່ງ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມເພັດຕັນຢູ່ໃນສີ່ຫຼ່ຽມເພັດໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◉",
+      "aliases": [
+        "ວົງມົນຕັນຢູ່ໃນວົງມົນໂປ່ງ"
+      ],
+      "text": "ວົງມົນຕັນຢູ່ໃນວົງມົນໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◊",
+      "aliases": [
+        "ເຄື່ອງໝາຍສີ່ຫຼ່ຽມດອກຈັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍສີ່ຫຼ່ຽມດອກຈັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "○",
+      "aliases": [
+        "ວົງມົນເປົ່າ"
+      ],
+      "text": "ວົງມົນເປົ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◌",
+      "aliases": [
+        "ວົງມົນເສັ້ນຂາດ"
+      ],
+      "text": "ວົງມົນເສັ້ນຂາດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◍",
+      "aliases": [
+        "ວົງມົນຂີດເສັ້ນຕັ້ງ"
+      ],
+      "text": "ວົງມົນຂີດເສັ້ນຕັ້ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◎",
+      "aliases": [
+        "ວົງມົນຊ້ອນ"
+      ],
+      "text": "ວົງມົນຊ້ອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "●",
+      "aliases": [
+        "ວົງມົນແບບທຶບ"
+      ],
+      "text": "ວົງມົນແບບທຶບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◐",
+      "aliases": [
+        "ວົງມົນຕັນເຄິ່ງຊ້າຍ"
+      ],
+      "text": "ວົງມົນຕັນເຄິ່ງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◑",
+      "aliases": [
+        "ວົງມົນຕັນເຄິ່ງຂວາ"
+      ],
+      "text": "ວົງມົນຕັນເຄິ່ງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◒",
+      "aliases": [
+        "ວົງມົນຕັນເຄິ່ງລຸ່ມ"
+      ],
+      "text": "ວົງມົນຕັນເຄິ່ງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◓",
+      "aliases": [
+        "ວົງມົນຕັນເຄິ່ງເທິງ"
+      ],
+      "text": "ວົງມົນຕັນເຄິ່ງເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◔",
+      "aliases": [
+        "ວົງມົນຕັນໜຶ່ງສ່ວນສີ່ເທິງເບື້ອງຂວາ"
+      ],
+      "text": "ວົງມົນຕັນໜຶ່ງສ່ວນສີ່ເທິງເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◕",
+      "aliases": [
+        "ວົງມົນໂປ່ງໜຶ່ງສ່ວນສີ່ເບື້ອງເທິງຊ້າຍ"
+      ],
+      "text": "ວົງມົນໂປ່ງໜຶ່ງສ່ວນສີ່ເບື້ອງເທິງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◖",
+      "aliases": [
+        "ເຄິ່ງວົງມົນຕັນເບື້ອງຊ້າຍ"
+      ],
+      "text": "ເຄິ່ງວົງມົນຕັນເບື້ອງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◗",
+      "aliases": [
+        "ເຄິ່ງວົງມົນຕັນເບື້ອງຂວາ"
+      ],
+      "text": "ເຄິ່ງວົງມົນຕັນເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◘",
+      "aliases": [
+        "ຈໍ້າເມັດໂປ່ງໃນສີ່ແຈຕັນ"
+      ],
+      "text": "ຈໍ້າເມັດໂປ່ງໃນສີ່ແຈຕັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◙",
+      "aliases": [
+        "ວົງມົນໂປ່ງໃນຈັດຕຸລັດຕັນ"
+      ],
+      "text": "ວົງມົນໂປ່ງໃນຈັດຕຸລັດຕັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◜",
+      "aliases": [
+        "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນເທິງເບື້ອງຊ້າຍ"
+      ],
+      "text": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນເທິງເບື້ອງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◝",
+      "aliases": [
+        "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນເທິງເບື້ອງຂວາ"
+      ],
+      "text": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນເທິງເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◞",
+      "aliases": [
+        "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນລຸ່ມເບື້ອງຂວາ"
+      ],
+      "text": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນລຸ່ມເບື້ອງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◟",
+      "aliases": [
+        "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນລຸ່ມເບື້ອງຊ້າຍ"
+      ],
+      "text": "ເສັ້ນໂຄ້ງໜຶ່ງສ່ວນສີ່ວົງມົນລຸ່ມເບື້ອງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◠",
+      "aliases": [
+        "ເສັ້ນໂຄ້ງເຄິ່ງວົງມົນເບື້ອງເທິງ"
+      ],
+      "text": "ເສັ້ນໂຄ້ງເຄິ່ງວົງມົນເບື້ອງເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◡",
+      "aliases": [
+        "ເສັ້ນໂຄ້ງເຄິ່ງວົງມົນເບື້ອງລຸ່ມ"
+      ],
+      "text": "ເສັ້ນໂຄ້ງເຄິ່ງວົງມົນເບື້ອງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◢",
+      "aliases": [
+        "ສາມແຈຕັນຈອມຊີ້ໄປທາງລຸ່ມຂວາ"
+      ],
+      "text": "ສາມແຈຕັນຈອມຊີ້ໄປທາງລຸ່ມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◣",
+      "aliases": [
+        "ສາມແຈຕັນຈອມຊີ້ໄປທາງລຸ່ມຊ້າຍ"
+      ],
+      "text": "ສາມແຈຕັນຈອມຊີ້ໄປທາງລຸ່ມຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◤",
+      "aliases": [
+        "ສາມແຈຕັນຈອມຊີ້ໄປທາງເທິງຊ້າຍ"
+      ],
+      "text": "ສາມແຈຕັນຈອມຊີ້ໄປທາງເທິງຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◥",
+      "aliases": [
+        "ສາມແຈຕັນຈອມຊີ້ໄປທາງເທິງຂວາ"
+      ],
+      "text": "ສາມແຈຕັນຈອມຊີ້ໄປທາງເທິງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◦",
+      "aliases": [
+        "ຈໍ້າເມັດໂປ່ງ"
+      ],
+      "text": "ຈໍ້າເມັດໂປ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◯",
+      "aliases": [
+        "ວົງເປົ່າແບບກວ້າງ"
+      ],
+      "text": "ວົງເປົ່າແບບກວ້າງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◳",
+      "aliases": [
+        "ໜຶ່ງສ່ວນສີ່ຈັດຕຸລັດໂປ່ງເບື້ອງເທິງຂວາ"
+      ],
+      "text": "ໜຶ່ງສ່ວນສີ່ຈັດຕຸລັດໂປ່ງເບື້ອງເທິງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◷",
+      "aliases": [
+        "ໜຶ່ງສ່ວນສີ່ວົງມົນໂປ່ງເບື້ອງເທິງຂວາ"
+      ],
+      "text": "ໜຶ່ງສ່ວນສີ່ວົງມົນໂປ່ງເບື້ອງເທິງຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◿",
+      "aliases": [
+        "ສາມແຈໂປ່ງຈອມຊີ້ໄປທາງລຸ່ມຂວາ"
+      ],
+      "text": "ສາມແຈໂປ່ງຈອມຊີ້ໄປທາງລຸ່ມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♪",
+      "aliases": [
+        "ໂນດໂຕທີແປດ"
+      ],
+      "text": "ໂນດໂຕທີແປດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⨧",
+      "aliases": [
+        "ໝາຍບວກຫ້ອຍສອງ"
+      ],
+      "text": "ໝາຍບວກຫ້ອຍສອງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⨯",
+      "aliases": [
+        "ຜົນຄູນເວັກເຕີ"
+      ],
+      "text": "ຜົນຄູນເວັກເຕີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⨼",
+      "aliases": [
+        "ຜົນພາຍໃນ"
+      ],
+      "text": "ຜົນພາຍໃນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⩣",
+      "aliases": [
+        "ເຫດຜົນ ຫຼື ເສັ້ນຄູ່ກ້ອງຮູບວີ"
+      ],
+      "text": "ເຫດຜົນ ຫຼື ເສັ້ນຄູ່ກ້ອງຮູບວີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⩽",
+      "aliases": [
+        "ນ້ອຍກວ່າຫຼືເທົ່າກັບສະຫຼຽງ"
+      ],
+      "text": "ນ້ອຍກວ່າຫຼືເທົ່າກັບສະຫຼຽງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⪍",
+      "aliases": [
+        "ເຄື່ອງໝາຍນ້ອຍກວ່າຢູ່ເທິງເຄື່ອງໝາຍເກືອບເທົ່າກັບ"
+      ],
+      "text": "ເຄື່ອງໝາຍນ້ອຍກວ່າຢູ່ເທິງເຄື່ອງໝາຍເກືອບເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⪚",
+      "aliases": [
+        "ເສັ້ນຄູ່ເທົ່າກັບໃຫຍ່ກວ່າ"
+      ],
+      "text": "ເສັ້ນຄູ່ເທົ່າກັບໃຫຍ່ກວ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⪺",
+      "aliases": [
+        "ເຄື່ອງໝາຍທາງຫຼັງຢູ່ເທິງເຄື່ອງໝາຍບໍ່ເກືອບເທົ່າກັບ"
+      ],
+      "text": "ເຄື່ອງໝາຍທາງຫຼັງຢູ່ເທິງເຄື່ອງໝາຍບໍ່ເກືອບເທົ່າກັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♭",
+      "aliases": [
+        "ໂນດຕໍ່າ"
+      ],
+      "text": "ໂນດຕໍ່າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♯",
+      "aliases": [
+        "ໂນດແຫຼມ"
+      ],
+      "text": "ໂນດແຫຼມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☺",
+      "aliases": [
+        "ໜ້າຍິ້ມ"
+      ],
+      "text": "ໜ້າຍິ້ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☹",
+      "aliases": [
+        "ໜ້າຫຍຸ້ງ"
+      ],
+      "text": "ໜ້າຫຍຸ້ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☠",
+      "aliases": [
+        "ກະໂຫຼກຫົວ ແລະກະດູກກາກະບາດ"
+      ],
+      "text": "ກະໂຫຼກຫົວ ແລະກະດູກກາກະບາດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❣",
+      "aliases": [
+        "ເຄື່ອງໝາຍທ້ວງເປັນຮູບຫົວໃຈໃຫຍ່"
+      ],
+      "text": "ເຄື່ອງໝາຍທ້ວງເປັນຮູບຫົວໃຈໃຫຍ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❤",
+      "aliases": [
+        "ຫົວໃຈສີແດງ"
+      ],
+      "text": "ຫົວໃຈສີແດງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✋",
+      "aliases": [
+        "ຍົກມືຂຶ້ນ"
+      ],
+      "text": "ຍົກມືຂຶ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✌",
+      "aliases": [
+        "ຊູສອງນິ້ວ"
+      ],
+      "text": "ຊູສອງນິ້ວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☝",
+      "aliases": [
+        "ຝ່າມືນີ້ວຊີ້ຂຶ້ນ"
+      ],
+      "text": "ຝ່າມືນີ້ວຊີ້ຂຶ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✊",
+      "aliases": [
+        "ຊູກຳປັ້ນ"
+      ],
+      "text": "ຊູກຳປັ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✍",
+      "aliases": [
+        "ມືກຳລັງຂຽນ"
+      ],
+      "text": "ມືກຳລັງຂຽນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛷",
+      "aliases": [
+        "ນັກຫຼິ້ນສະກີ"
+      ],
+      "text": "ນັກຫຼິ້ນສະກີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛹",
+      "aliases": [
+        "ຄົນຫຼິ້ນບານ"
+      ],
+      "text": "ຄົນຫຼິ້ນບານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☘",
+      "aliases": [
+        "ດອກແຊມຣັອກ"
+      ],
+      "text": "ດອກແຊມຣັອກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☕",
+      "aliases": [
+        "ເຄື່ອງດື່ມຮ້ອນ"
+      ],
+      "text": "ເຄື່ອງດື່ມຮ້ອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛰",
+      "aliases": [
+        "ພູ"
+      ],
+      "text": "ພູ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛪",
+      "aliases": [
+        "ໂບດ"
+      ],
+      "text": "ໂບດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛩",
+      "aliases": [
+        "ສານເຈົ້າຊິນໂຕ"
+      ],
+      "text": "ສານເຈົ້າຊິນໂຕ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛲",
+      "aliases": [
+        "ນໍ້າພຸ"
+      ],
+      "text": "ນໍ້າພຸ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛺",
+      "aliases": [
+        "ເຕັນ"
+      ],
+      "text": "ເຕັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♨",
+      "aliases": [
+        "ນໍ້າພຸຮ້ອນ"
+      ],
+      "text": "ນໍ້າພຸຮ້ອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛽",
+      "aliases": [
+        "ປໍ້ານໍ້າມັນ"
+      ],
+      "text": "ປໍ້ານໍ້າມັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚓",
+      "aliases": [
+        "ສະໝໍ"
+      ],
+      "text": "ສະໝໍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛵",
+      "aliases": [
+        "ເຮືອໃບ"
+      ],
+      "text": "ເຮືອໃບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛴",
+      "aliases": [
+        "ເຮືອເຟີຣີ"
+      ],
+      "text": "ເຮືອເຟີຣີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✈",
+      "aliases": [
+        "ເຮືອບິນ"
+      ],
+      "text": "ເຮືອບິນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⌛",
+      "aliases": [
+        "ໂມງຂີ້ຊາຍ"
+      ],
+      "text": "ໂມງຂີ້ຊາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏳",
+      "aliases": [
+        "ໂມງຂີ້ຊາຍຈັບເວລາ"
+      ],
+      "text": "ໂມງຂີ້ຊາຍຈັບເວລາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⌚",
+      "aliases": [
+        "ໂມງ"
+      ],
+      "text": "ໂມງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏰",
+      "aliases": [
+        "ໂມງປຸກ"
+      ],
+      "text": "ໂມງປຸກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏱",
+      "aliases": [
+        "ໂມງຈັບເວລາ"
+      ],
+      "text": "ໂມງຈັບເວລາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏲",
+      "aliases": [
+        "ໂມງນັບຖອຍຫຼັງ"
+      ],
+      "text": "ໂມງນັບຖອຍຫຼັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☀",
+      "aliases": [
+        "ຕາເວັນ"
+      ],
+      "text": "ຕາເວັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⭐",
+      "aliases": [
+        "ດາວຂາວປານກາງ"
+      ],
+      "text": "ດາວຂາວປານກາງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☁",
+      "aliases": [
+        "ເມກ"
+      ],
+      "text": "ເມກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛅",
+      "aliases": [
+        "ຕາເວັນຢູ່ຫຼັງເມກ"
+      ],
+      "text": "ຕາເວັນຢູ່ຫຼັງເມກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛈",
+      "aliases": [
+        "ຝົນຟ້າຄະນອງ"
+      ],
+      "text": "ຝົນຟ້າຄະນອງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☂",
+      "aliases": [
+        "ຄັນຮົ່ມ"
+      ],
+      "text": "ຄັນຮົ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☔",
+      "aliases": [
+        "ຄັນຮົ່ມກັບເມັດຝົນ"
+      ],
+      "text": "ຄັນຮົ່ມກັບເມັດຝົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛱",
+      "aliases": [
+        "ຄັນຮົ່ມຢູ່ເທິງພື້ນດິນ"
+      ],
+      "text": "ຄັນຮົ່ມຢູ່ເທິງພື້ນດິນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚡",
+      "aliases": [
+        "ໄຟຟ້າແຮງສູງ"
+      ],
+      "text": "ໄຟຟ້າແຮງສູງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❄",
+      "aliases": [
+        "ເກັດຫິມະ"
+      ],
+      "text": "ເກັດຫິມະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☃",
+      "aliases": [
+        "ຮູບປັ້ນມະນຸດຫິມະ"
+      ],
+      "text": "ຮູບປັ້ນມະນຸດຫິມະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛄",
+      "aliases": [
+        "ຮູບປັ້ນມະນຸດຫິມະທີ່ບໍ່ມີຫິມະ"
+      ],
+      "text": "ຮູບປັ້ນມະນຸດຫິມະທີ່ບໍ່ມີຫິມະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☄",
+      "aliases": [
+        "ດາວຫາງ"
+      ],
+      "text": "ດາວຫາງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✨",
+      "aliases": [
+        "ປະກາຍໄຟ"
+      ],
+      "text": "ປະກາຍໄຟ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚽",
+      "aliases": [
+        "ໝາກບານເຕະ"
+      ],
+      "text": "ໝາກບານເຕະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚾",
+      "aliases": [
+        "ເບສບອລ"
+      ],
+      "text": "ເບສບອລ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛳",
+      "aliases": [
+        "ທຸງໃນຫຼຸມ"
+      ],
+      "text": "ທຸງໃນຫຼຸມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛸",
+      "aliases": [
+        "ສະເກດນໍ້າແຂງ"
+      ],
+      "text": "ສະເກດນໍ້າແຂງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♠",
+      "aliases": [
+        "ໂພດຳ"
+      ],
+      "text": "ໂພດຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♥",
+      "aliases": [
+        "ເກີ"
+      ],
+      "text": "ເກີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♦",
+      "aliases": [
+        "ໂລ"
+      ],
+      "text": "ໂລ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♣",
+      "aliases": [
+        "ຈ່ວນ"
+      ],
+      "text": "ຈ່ວນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♟",
+      "aliases": [
+        "ໝາກລຸກ"
+      ],
+      "text": "ໝາກລຸກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛑",
+      "aliases": [
+        "ໝວກກັນກະທົບທີ່ມີກາກະບາດສີຂາວ"
+      ],
+      "text": "ໝວກກັນກະທົບທີ່ມີກາກະບາດສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☎",
+      "aliases": [
+        "ໂທລະສັບ"
+      ],
+      "text": "ໂທລະສັບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⌨",
+      "aliases": [
+        "ແປ້ນພິມ"
+      ],
+      "text": "ແປ້ນພິມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✉",
+      "aliases": [
+        "ຊອງຈົດໝາຍ"
+      ],
+      "text": "ຊອງຈົດໝາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✏",
+      "aliases": [
+        "ສໍ"
+      ],
+      "text": "ສໍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✒",
+      "aliases": [
+        "ປາກກາດຳ"
+      ],
+      "text": "ປາກກາດຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✂",
+      "aliases": [
+        "ມີດຕັດ"
+      ],
+      "text": "ມີດຕັດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛏",
+      "aliases": [
+        "ເຫຼັກສັບຂຸດ"
+      ],
+      "text": "ເຫຼັກສັບຂຸດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚒",
+      "aliases": [
+        "ໄມ້ຄ້ອນ ແລະ ເຫຼັກສັບຂຸດ"
+      ],
+      "text": "ໄມ້ຄ້ອນ ແລະ ເຫຼັກສັບຂຸດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚔",
+      "aliases": [
+        "ດາບໄຂວ່ກັນ"
+      ],
+      "text": "ດາບໄຂວ່ກັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚙",
+      "aliases": [
+        "ເຟືອງເກຍ"
+      ],
+      "text": "ເຟືອງເກຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚖",
+      "aliases": [
+        "ຕາຊິງ"
+      ],
+      "text": "ຕາຊິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛓",
+      "aliases": [
+        "ໂສ້"
+      ],
+      "text": "ໂສ້",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚗",
+      "aliases": [
+        "ພາຊະນະກັ່ນ"
+      ],
+      "text": "ພາຊະນະກັ່ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚰",
+      "aliases": [
+        "ໂລງສົບ"
+      ],
+      "text": "ໂລງສົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚱",
+      "aliases": [
+        "ໂຖໃສ່ກະດູກ"
+      ],
+      "text": "ໂຖໃສ່ກະດູກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♿",
+      "aliases": [
+        "ລົດນັ່ງຄົນພິການ"
+      ],
+      "text": "ລົດນັ່ງຄົນພິການ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚠",
+      "aliases": [
+        "ລະວັງ"
+      ],
+      "text": "ລະວັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛔",
+      "aliases": [
+        "ຫ້າມເຂົ້າ"
+      ],
+      "text": "ຫ້າມເຂົ້າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☢",
+      "aliases": [
+        "ກຳມັນຕະພາບລັງສີ"
+      ],
+      "text": "ກຳມັນຕະພາບລັງສີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☣",
+      "aliases": [
+        "ເຊື້ອພະຍາດອັນຕະລາຍ"
+      ],
+      "text": "ເຊື້ອພະຍາດອັນຕະລາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⬆",
+      "aliases": [
+        "ລູກສອນຂຶ້ນ"
+      ],
+      "text": "ລູກສອນຂຶ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↗",
+      "aliases": [
+        "ລູກສອນຂຶ້ນມຸມຂວາ"
+      ],
+      "text": "ລູກສອນຂຶ້ນມຸມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "➡",
+      "aliases": [
+        "ລູກສອນຂວາ"
+      ],
+      "text": "ລູກສອນຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↘",
+      "aliases": [
+        "ລູກສອນລົງມຸມຂວາ"
+      ],
+      "text": "ລູກສອນລົງມຸມຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⬇",
+      "aliases": [
+        "ລູກສອນລົງ"
+      ],
+      "text": "ລູກສອນລົງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↙",
+      "aliases": [
+        "ລູກສອນລົງມຸມຊ້າຍ"
+      ],
+      "text": "ລູກສອນລົງມຸມຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⬅",
+      "aliases": [
+        "ລູກສອນຊ້າຍ"
+      ],
+      "text": "ລູກສອນຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↖",
+      "aliases": [
+        "ລູກສອນຂຶ້ນມຸມຊ້າຍ"
+      ],
+      "text": "ລູກສອນຂຶ້ນມຸມຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↕",
+      "aliases": [
+        "ລູກສອນຂຶ້ນແລະລົງ"
+      ],
+      "text": "ລູກສອນຂຶ້ນແລະລົງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↔",
+      "aliases": [
+        "ລູກສອນຊ້າຍຂວາ"
+      ],
+      "text": "ລູກສອນຊ້າຍຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↮",
+      "aliases": [
+        "ໝາຍຍ້າຍລູກສອນຊ້າຍຂວາ"
+      ],
+      "text": "ໝາຍຍ້າຍລູກສອນຊ້າຍຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↩",
+      "aliases": [
+        "ລູກສອນໂຄ້ງຂວາໄປຊ້າຍ"
+      ],
+      "text": "ລູກສອນໂຄ້ງຂວາໄປຊ້າຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "↪",
+      "aliases": [
+        "ລູກສອນໂຄ້ງຊ້າຍໄປຂວາ"
+      ],
+      "text": "ລູກສອນໂຄ້ງຊ້າຍໄປຂວາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⤴",
+      "aliases": [
+        "ລູກສອນໂຄ້ງຂວາຂຶ້ນເທິງ"
+      ],
+      "text": "ລູກສອນໂຄ້ງຂວາຂຶ້ນເທິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⤵",
+      "aliases": [
+        "ລູກສອນໂຄ້ງຂວາລົງລຸ່ມ"
+      ],
+      "text": "ລູກສອນໂຄ້ງຂວາລົງລຸ່ມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚛",
+      "aliases": [
+        "ສັນຍາລັກອາຕອມ"
+      ],
+      "text": "ສັນຍາລັກອາຕອມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✡",
+      "aliases": [
+        "ຮູບດາວຫຼົກຫຼ່ຽມ"
+      ],
+      "text": "ຮູບດາວຫຼົກຫຼ່ຽມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☸",
+      "aliases": [
+        "ກົງລໍ້ແຫ່ງທຳມະ"
+      ],
+      "text": "ກົງລໍ້ແຫ່ງທຳມະ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☯",
+      "aliases": [
+        "ຢິນຢາງ"
+      ],
+      "text": "ຢິນຢາງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✝",
+      "aliases": [
+        "ໄມ້ກາງເຂນ"
+      ],
+      "text": "ໄມ້ກາງເຂນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☦",
+      "aliases": [
+        "ໄມ້ກາງເຂນໂອທໍດັອກ"
+      ],
+      "text": "ໄມ້ກາງເຂນໂອທໍດັອກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☪",
+      "aliases": [
+        "ພະຈັນສ້ຽວ ແລະ ດາວ"
+      ],
+      "text": "ພະຈັນສ້ຽວ ແລະ ດາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☮",
+      "aliases": [
+        "ສັນຍາລັກສັນຕິພາບ"
+      ],
+      "text": "ສັນຍາລັກສັນຕິພາບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♈",
+      "aliases": [
+        "ລາສີເມກ"
+      ],
+      "text": "ລາສີເມກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♉",
+      "aliases": [
+        "ລາສີງົວ"
+      ],
+      "text": "ລາສີງົວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♊",
+      "aliases": [
+        "ລາສີເມຖຸນ"
+      ],
+      "text": "ລາສີເມຖຸນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♋",
+      "aliases": [
+        "ລາສີກົດ"
+      ],
+      "text": "ລາສີກົດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♌",
+      "aliases": [
+        "ລາສີສິງ"
+      ],
+      "text": "ລາສີສິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♍",
+      "aliases": [
+        "ລາສີກັນ"
+      ],
+      "text": "ລາສີກັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♎",
+      "aliases": [
+        "ລາສີຕຸລາ"
+      ],
+      "text": "ລາສີຕຸລາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♏",
+      "aliases": [
+        "ລາສີພະຈິກ"
+      ],
+      "text": "ລາສີພະຈິກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♐",
+      "aliases": [
+        "ລາສີທະນູ"
+      ],
+      "text": "ລາສີທະນູ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♑",
+      "aliases": [
+        "ລາສີມັງກອນ"
+      ],
+      "text": "ລາສີມັງກອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♒",
+      "aliases": [
+        "ລາສີກຸມ"
+      ],
+      "text": "ລາສີກຸມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♓",
+      "aliases": [
+        "ລາສີມີນ"
+      ],
+      "text": "ລາສີມີນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⛎",
+      "aliases": [
+        "ລາສີງູ"
+      ],
+      "text": "ລາສີງູ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▶",
+      "aliases": [
+        "ປຸ່ມຫຼິ້ນ"
+      ],
+      "text": "ປຸ່ມຫຼິ້ນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏩",
+      "aliases": [
+        "ປຸ່ມໄປໜ້າໄວ"
+      ],
+      "text": "ປຸ່ມໄປໜ້າໄວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏭",
+      "aliases": [
+        "ປຸ່ມໄປຫາແທຣັກຕໍ່ໄປ"
+      ],
+      "text": "ປຸ່ມໄປຫາແທຣັກຕໍ່ໄປ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏯",
+      "aliases": [
+        "ປຸ່ມຫຼິ້ນ ຫຼືຢຸດຊົ່ວຄາວ"
+      ],
+      "text": "ປຸ່ມຫຼິ້ນ ຫຼືຢຸດຊົ່ວຄາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◀",
+      "aliases": [
+        "ປຸ່ມຖອຍຫຼັງ"
+      ],
+      "text": "ປຸ່ມຖອຍຫຼັງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏪",
+      "aliases": [
+        "ປຸ່ມຖອຍຫຼັງໄວ"
+      ],
+      "text": "ປຸ່ມຖອຍຫຼັງໄວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏮",
+      "aliases": [
+        "ປຸ່ມໄປຫາແທຣັກກ່ອນນີ້"
+      ],
+      "text": "ປຸ່ມໄປຫາແທຣັກກ່ອນນີ້",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏫",
+      "aliases": [
+        "ປຸ່ມຂຶ້ນໄວ"
+      ],
+      "text": "ປຸ່ມຂຶ້ນໄວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏬",
+      "aliases": [
+        "ປຸ່ມລົງໄວ"
+      ],
+      "text": "ປຸ່ມລົງໄວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏸",
+      "aliases": [
+        "ປຸ່ມຢຸດໄວ້"
+      ],
+      "text": "ປຸ່ມຢຸດໄວ້",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏹",
+      "aliases": [
+        "ປຸ່ມຢຸດ"
+      ],
+      "text": "ປຸ່ມຢຸດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏺",
+      "aliases": [
+        "ປຸ່ມບັນທຶກ"
+      ],
+      "text": "ປຸ່ມບັນທຶກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⏏",
+      "aliases": [
+        "ປຸ່ມດີດອອກ"
+      ],
+      "text": "ປຸ່ມດີດອອກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♀",
+      "aliases": [
+        "ສັນຍາລັກຜູ້ຍິງ"
+      ],
+      "text": "ສັນຍາລັກຜູ້ຍິງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♂",
+      "aliases": [
+        "ສັນຍາລັກຜູ້ຊາຍ"
+      ],
+      "text": "ສັນຍາລັກຜູ້ຊາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚧",
+      "aliases": [
+        "ສັນຍາລັກຄົນ​ຂ້າມ​ເພດ"
+      ],
+      "text": "ສັນຍາລັກຄົນ​ຂ້າມ​ເພດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✖",
+      "aliases": [
+        "ເຄື່ອງໝາຍຄູນ"
+      ],
+      "text": "ເຄື່ອງໝາຍຄູນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "➕",
+      "aliases": [
+        "ເຄື່ອງໝາຍບວກ"
+      ],
+      "text": "ເຄື່ອງໝາຍບວກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "➖",
+      "aliases": [
+        "ເຄື່ອງໝາຍລົບ"
+      ],
+      "text": "ເຄື່ອງໝາຍລົບ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "➗",
+      "aliases": [
+        "ຫານ"
+      ],
+      "text": "ຫານ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♾",
+      "aliases": [
+        "ອະສົງໄຂ"
+      ],
+      "text": "ອະສົງໄຂ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "‼",
+      "aliases": [
+        "ເຄື່ອງໝາຍທ້ວງຄູ່"
+      ],
+      "text": "ເຄື່ອງໝາຍທ້ວງຄູ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⁉",
+      "aliases": [
+        "ເຄື່ອງໝາຍທ້ວງກັບໝາຍຖາມ"
+      ],
+      "text": "ເຄື່ອງໝາຍທ້ວງກັບໝາຍຖາມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❓",
+      "aliases": [
+        "ເຄື່ອງໝາຍຖາມ"
+      ],
+      "text": "ເຄື່ອງໝາຍຖາມ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❔",
+      "aliases": [
+        "ເຄື່ອງໝາຍຖາມສີຂາວ"
+      ],
+      "text": "ເຄື່ອງໝາຍຖາມສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❕",
+      "aliases": [
+        "ເຄື່ອງໝາຍທ້ວງສີຂາວ"
+      ],
+      "text": "ເຄື່ອງໝາຍທ້ວງສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❗",
+      "aliases": [
+        "ເຄື່ອງໝາຍທ້ວງ"
+      ],
+      "text": "ເຄື່ອງໝາຍທ້ວງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚕",
+      "aliases": [
+        "ສັນຍາລັກການຢາ"
+      ],
+      "text": "ສັນຍາລັກການຢາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "♻",
+      "aliases": [
+        "ສັນຍາລັກການນຳກັບມາໃຊ້ໃໝ່"
+      ],
+      "text": "ສັນຍາລັກການນຳກັບມາໃຊ້ໃໝ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚜",
+      "aliases": [
+        "ດອກໄອລິສ"
+      ],
+      "text": "ດອກໄອລິສ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⭕",
+      "aliases": [
+        "ວົງມົນເປັ​ນ​ຮູ​ສີ​ແດງ"
+      ],
+      "text": "ວົງມົນເປັ​ນ​ຮູ​ສີ​ແດງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✅",
+      "aliases": [
+        "ເຄື່ອງໝາຍຕິກ"
+      ],
+      "text": "ເຄື່ອງໝາຍຕິກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "☑",
+      "aliases": [
+        "ປ່ອງມີເຄື່ອງໝາຍຖືກ"
+      ],
+      "text": "ປ່ອງມີເຄື່ອງໝາຍຖືກ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✔",
+      "aliases": [
+        "ເຄື່ອງໝາຍຕິກໃຫຍ່ໜາ"
+      ],
+      "text": "ເຄື່ອງໝາຍຕິກໃຫຍ່ໜາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❌",
+      "aliases": [
+        "ເຄື່ອງໝາຍກາກະບາດ"
+      ],
+      "text": "ເຄື່ອງໝາຍກາກະບາດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❎",
+      "aliases": [
+        "ປຸ່ມເຄື່ອງໝາຍກາກະບາດ"
+      ],
+      "text": "ປຸ່ມເຄື່ອງໝາຍກາກະບາດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "➰",
+      "aliases": [
+        "ຫ່ວງ"
+      ],
+      "text": "ຫ່ວງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "➿",
+      "aliases": [
+        "ຫ່ວງຄູ່"
+      ],
+      "text": "ຫ່ວງຄູ່",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✳",
+      "aliases": [
+        "ເຄື່ອງໝາຍດອກຈັນ"
+      ],
+      "text": "ເຄື່ອງໝາຍດອກຈັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "✴",
+      "aliases": [
+        "ດາວແປດແຈ"
+      ],
+      "text": "ດາວແປດແຈ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "❇",
+      "aliases": [
+        "ປະກາຍ"
+      ],
+      "text": "ປະກາຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "©",
+      "aliases": [
+        "ເຄື່ອງໝາຍລິຂະສິດ"
+      ],
+      "text": "ເຄື່ອງໝາຍລິຂະສິດ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "®",
+      "aliases": [
+        "ເຄື່ອງໝາຍຈົດທະບຽນ"
+      ],
+      "text": "ເຄື່ອງໝາຍຈົດທະບຽນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "™",
+      "aliases": [
+        "ເຄື່ອງໝາຍການຄ້າ"
+      ],
+      "text": "ເຄື່ອງໝາຍການຄ້າ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "Ⓜ",
+      "aliases": [
+        "ໂຕ m ໃນວົງມົນ"
+      ],
+      "text": "ໂຕ m ໃນວົງມົນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚫",
+      "aliases": [
+        "ວົງມົນດຳ"
+      ],
+      "text": "ວົງມົນດຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⚪",
+      "aliases": [
+        "ວົງມົນຂາວ"
+      ],
+      "text": "ວົງມົນຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⬛",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມໃຫຍ່ສີດຳ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມໃຫຍ່ສີດຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "⬜",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມໃຫຍ່ສີຂາວ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມໃຫຍ່ສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◼",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມປານກາງສີດຳ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມປານກາງສີດຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◻",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມປານກາງສີຂາວ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມປານກາງສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◾",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມນ້ອຍ-ປານກາງສີດຳ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມນ້ອຍ-ປານກາງສີດຳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "◽",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມນ້ອຍ-ປານກາງສີຂາວ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມນ້ອຍ-ປານກາງສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▪",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມນ້ອຍສີດໍາ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມນ້ອຍສີດໍາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "▫",
+      "aliases": [
+        "ສີ່ຫຼ່ຽມນ້ອຍສີຂາວ"
+      ],
+      "text": "ສີ່ຫຼ່ຽມນ້ອຍສີຂາວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¢",
+      "aliases": [
+        "ເຊັນ"
+      ],
+      "text": "ເຊັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "$",
+      "aliases": [
+        "ໂດລາ"
+      ],
+      "text": "ໂດລາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "£",
+      "aliases": [
+        "ປອນ"
+      ],
+      "text": "ປອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "¥",
+      "aliases": [
+        "ເຢນ"
+      ],
+      "text": "ເຢນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₢",
+      "aliases": [
+        "ສະກຸນເງິນຄຣູເຊໂຣ"
+      ],
+      "text": "ສະກຸນເງິນຄຣູເຊໂຣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₣",
+      "aliases": [
+        "ເງິນຝລັ່ງ"
+      ],
+      "text": "ເງິນຝລັ່ງ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₤",
+      "aliases": [
+        "ເງິນລີຣາ"
+      ],
+      "text": "ເງິນລີຣາ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₥",
+      "aliases": [
+        "ມິວ"
+      ],
+      "text": "ມິວ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₩",
+      "aliases": [
+        "ວອນ"
+      ],
+      "text": "ວອນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "€",
+      "aliases": [
+        "ເອີ​ໂຣ"
+      ],
+      "text": "ເອີ​ໂຣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₰",
+      "aliases": [
+        "ເງິນຫຼຽນເຢຍລະມັນ"
+      ],
+      "text": "ເງິນຫຼຽນເຢຍລະມັນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₱",
+      "aliases": [
+        "ເປໂຊ"
+      ],
+      "text": "ເປໂຊ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₳",
+      "aliases": [
+        "ເງິນອັອສໂຕຣ"
+      ],
+      "text": "ເງິນອັອສໂຕຣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₶",
+      "aliases": [
+        "ເງິນ livre tournois"
+      ],
+      "text": "ເງິນ livre tournois",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₷",
+      "aliases": [
+        "ສະເປສມິໂລ"
+      ],
+      "text": "ສະເປສມິໂລ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₹",
+      "aliases": [
+        "ອິນ​ເດຍ ຣູ​ປີ"
+      ],
+      "text": "ອິນ​ເດຍ ຣູ​ປີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₽",
+      "aliases": [
+        "ຣູ​ເບິນ"
+      ],
+      "text": "ຣູ​ເບິນ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₿",
+      "aliases": [
+        "ບິດຄອຍ"
+      ],
+      "text": "ບິດຄອຍ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "lo",
+      "lookup_text": "₨",
+      "aliases": [
+        "ຣູປີ"
+      ],
+      "text": "ຣູປີ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {},
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

@@ -1,0 +1,150 @@
+{
+  "format": "dordiai-simba-onnx-sources-v1",
+  "preferred_precision": "fp32",
+  "models": {
+    "st": {
+      "code": "st",
+      "iso_code": "sot",
+      "name_uk": "Сесото",
+      "conversion": {
+        "repository": "Phoonnx/vits-st-simba-graphemes",
+        "revision": "60dd86db98a6fb7ad07f8a6665667b6ef9c8c2cf",
+        "files": {
+          "README.md": {
+            "size_bytes": 4499,
+            "git_blob": "c290ffabf847b718bf8a1c65f0f37ef5479457bd"
+          },
+          "config.json": {
+            "size_bytes": 1120,
+            "git_blob": "ecbcdb311d82845593ef585a6707d2355d8d69a0"
+          },
+          "model.onnx": {
+            "size_bytes": 114306211,
+            "sha256": "a4c30c2226cd00cfb46c673855e095f6dcdfd817e29e93bded9279d9a8b4c95c"
+          },
+          "model_int8.onnx": {
+            "size_bytes": 38473179,
+            "sha256": "445867d31332da007966603d56a8feb441797da7e74378f46fffbfa61fa16d85"
+          }
+        }
+      },
+      "upstream": {
+        "repository": "UBC-NLP/Simba-TTS-sot",
+        "revision": "4cf607a7d28f3125272d80643d2769af7bf33772",
+        "files": {
+          "README.md": {
+            "size_bytes": 6371,
+            "git_blob": "5155399041d59b839883fb1815a3b7f7e502a7de"
+          },
+          "added_tokens.json": {
+            "size_bytes": 18,
+            "git_blob": "a500857c36f49a43f768725e60d52e3a34283ed8"
+          },
+          "config.json": {
+            "size_bytes": 2025,
+            "git_blob": "02e23256131d627c6910830c7809e95130c9df89"
+          },
+          "special_tokens_map.json": {
+            "size_bytes": 275,
+            "git_blob": "c3a378d26c6676f4f6b793f333368f0948f485d7"
+          },
+          "tokenizer_config.json": {
+            "size_bytes": 670,
+            "git_blob": "6913701eadaf4f97b51a12970fffcb1e1e6c8c2a"
+          },
+          "vocab.json": {
+            "size_bytes": 323,
+            "git_blob": "b081e3a05c7720b362b379fdf7380a3de5fb491e"
+          }
+        }
+      },
+      "license": {
+        "declared_upstream": "CC-BY-4.0",
+        "base_checkpoint": "facebook/mms-tts CC-BY-NC-4.0",
+        "converter_notice": "Converted model card explicitly forbids commercial use because the UBC fine-tune derives from MMS. Preserve non-commercial condition even though the model tag says CC-BY-4.0."
+      },
+      "tokenizer_port": {
+        "source": "https://github.com/huggingface/transformers/blob/v4.45.1/src/transformers/models/vits/tokenization_vits.py",
+        "license": "Apache-2.0",
+        "important": "pad_token h is also a special token. Reproduce tokenizer splitting rather than blindly interspersing 0 around every h; preserve in-vocabulary hyphens/apostrophes; semicolon does not split the text into separate model requests."
+      },
+      "acceptance": {
+        "pronunciation_verified": false,
+        "navigation_verified": false,
+        "windows_nvda_verified": false
+      }
+    },
+    "xh": {
+      "code": "xh",
+      "iso_code": "xho",
+      "name_uk": "Коса",
+      "conversion": {
+        "repository": "Phoonnx/vits-xh-simba-graphemes",
+        "revision": "2d63a910144ec90e0e053a9a0bafe94eeabbed2b",
+        "files": {
+          "README.md": {
+            "size_bytes": 4284,
+            "git_blob": "33019a6bb81767b5c9530aa021c4a9d4b5524600"
+          },
+          "config.json": {
+            "size_bytes": 1120,
+            "git_blob": "0d425d67abfc9e6ee9ac1beb071f60145360e452"
+          },
+          "model.onnx": {
+            "size_bytes": 114306211,
+            "sha256": "70f52bf621fd540971693cb31a6fdda61b921123850e4b0973ec1726bf4156da"
+          },
+          "model_int8.onnx": {
+            "size_bytes": 38473179,
+            "sha256": "03495321a04309caa894e616f16088c075d6c592182b00d872698bd523999bc2"
+          }
+        }
+      },
+      "upstream": {
+        "repository": "UBC-NLP/Simba-TTS-xho",
+        "revision": "1bd104d6fe7a687bbc1e9b36031ab51d605e151c",
+        "files": {
+          "README.md": {
+            "size_bytes": 6362,
+            "git_blob": "6993dfa0668f3ee862d37230160c52a78757b7d7"
+          },
+          "added_tokens.json": {
+            "size_bytes": 18,
+            "git_blob": "a500857c36f49a43f768725e60d52e3a34283ed8"
+          },
+          "config.json": {
+            "size_bytes": 2025,
+            "git_blob": "4652d9e8552298374fdce003aa3bf9da065ee323"
+          },
+          "special_tokens_map.json": {
+            "size_bytes": 275,
+            "git_blob": "c3a378d26c6676f4f6b793f333368f0948f485d7"
+          },
+          "tokenizer_config.json": {
+            "size_bytes": 670,
+            "git_blob": "6913701eadaf4f97b51a12970fffcb1e1e6c8c2a"
+          },
+          "vocab.json": {
+            "size_bytes": 323,
+            "git_blob": "b081e3a05c7720b362b379fdf7380a3de5fb491e"
+          }
+        }
+      },
+      "license": {
+        "declared_upstream": "CC-BY-4.0",
+        "base_checkpoint": "facebook/mms-tts CC-BY-NC-4.0",
+        "converter_notice": "Converted model card explicitly forbids commercial use because the UBC fine-tune derives from MMS. Preserve non-commercial condition even though the model tag says CC-BY-4.0."
+      },
+      "tokenizer_port": {
+        "source": "https://github.com/huggingface/transformers/blob/v4.45.1/src/transformers/models/vits/tokenization_vits.py",
+        "license": "Apache-2.0",
+        "important": "pad_token h is also a special token. Reproduce tokenizer splitting rather than blindly interspersing 0 around every h; preserve in-vocabulary hyphens/apostrophes; semicolon does not split the text into separate model requests."
+      },
+      "acceptance": {
+        "pronunciation_verified": false,
+        "navigation_verified": false,
+        "windows_nvda_verified": false
+      }
+    }
+  }
+}

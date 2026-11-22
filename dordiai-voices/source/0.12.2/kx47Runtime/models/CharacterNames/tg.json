@@ -1,0 +1,2419 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "tg",
+  "sources": {
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/tg/annotations.json",
+      "sha256": "7e6a192d3d2f84eb14f40a3bd7619c7ce047d6c604f302b6a3bf563ac2632376",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/tg/characters.json",
+      "sha256": "a9b4b4a55b9252fb5b876c0714c9d8142e03b9800aaf33cf0d960dae287b3836",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "‾": "барзиёд",
+    "‸": "карате",
+    "⁂": "астеризм",
+    "☺": "рӯи табассумкунанда",
+    "☹": "рӯи қавоқандохта",
+    "☠": "косахонаи сар ва устухонҳо дар шакли салиб",
+    "❣": "хитоби дили вазнин",
+    "❤": "дили сурх",
+    "✋": "дасти бардошта",
+    "✌": "дасти зафар",
+    "☝": "ангушти ишорат ба боло ишора карда истода",
+    "✊": "мушти бардошта",
+    "✍": "дасти навишта истода",
+    "⛷": "лижарон",
+    "⛹": "шахсе, ки тӯбро ба замин зада истодааст",
+    "☘": "себарга",
+    "☕": "нӯшокии гарм",
+    "⛰": "куҳ",
+    "⛪": "калисо",
+    "⛩": "ҷои муқаддаси синто",
+    "⛲": "фаввора",
+    "⛺": "хайма",
+    "♨": "чашмаҳои гарм",
+    "⛽": "насоси сӯзишворӣ",
+    "⚓": "лангар",
+    "⛵": "заврақи бодбондор",
+    "⛴": "киштии гузора",
+    "✈": "тайёра",
+    "⌛": "соати регӣ",
+    "⏳": "соати регӣ бо ҷорӣ шудани рег",
+    "⌚": "соати дастӣ",
+    "⏰": "соати зангдор",
+    "⏱": "сониясанҷ",
+    "⏲": "соати вақтсанҷ",
+    "☀": "офтоб",
+    "⭐": "ситораи миёнаи сафед",
+    "☁": "абр",
+    "⛅": "офтоб паси абр",
+    "⛈": "абр бо чароғак ва борон",
+    "☂": "чатр",
+    "☔": "чатр бо қатраҳои борон",
+    "⛱": "чатр дар замин",
+    "⚡": "шиддати баланд",
+    "❄": "зарраи барф",
+    "☃": "одами барфӣ",
+    "⛄": "одами барфӣ бе барф",
+    "☄": "комета",
+    "✨": "шарора",
+    "⚽": "тӯби футбол",
+    "⚾": "бейсбол",
+    "⛳": "байрақ дар сӯрохӣ",
+    "⛸": "яхмолак",
+    "♠": "қарамашшоқ",
+    "♥": "таппон",
+    "♦": "хиштхол",
+    "♣": "чилликхол",
+    "⛑": "тоскулоҳи корманди наҷотдиҳӣ",
+    "☎": "телефон",
+    "⌨": "клавиатура",
+    "✉": "лифофа",
+    "✏": "қалам",
+    "✒": "нӯги сиёҳ",
+    "✂": "қайчӣ",
+    "⛏": "зоғнӯл",
+    "⚒": "болға ва зоғнӯл",
+    "⚔": "шамшерҳои ба ҳам гузошташуда",
+    "⚙": "чархи дандонадор",
+    "⚖": "тарозу",
+    "⛓": "занҷирҳо",
+    "⚗": "аламбик",
+    "⚰": "тобут",
+    "⚱": "устадони ҷаноза",
+    "♿": "аломати \"Курсии чархдор\"",
+    "⚠": "огоҳӣ",
+    "⛔": "ворид шудан манъ аст",
+    "☢": "радиоактивӣ",
+    "☣": "хатари биологӣ",
+    "⬆": "тири \"боло\"",
+    "↗": "тири болову рост",
+    "➡": "тири рост",
+    "↘": "тири поёну рост",
+    "⬇": "тири поён",
+    "↙": "тири поёну чап",
+    "⬅": "тири чап",
+    "↖": "тири болову чап",
+    "↕": "тири поёну боло",
+    "↔": "тири чапу рост",
+    "↩": "тири рости ба тарафи чап каҷшаванда",
+    "↪": "тири чапи ба тарафи рост каҷшаванда",
+    "⤴": "тири рости ба тарафи боло каҷшаванда",
+    "⤵": "тири рости ба тарафи поён каҷшаванда",
+    "⚛": "аломати \"атом\"",
+    "✡": "ситораи Дейвид",
+    "☸": "чархи дарма",
+    "☯": "йин янг",
+    "✝": "салиби лотинӣ",
+    "☦": "салиби православӣ",
+    "☪": "ситора ва салиб",
+    "☮": "аломати \"сулҳ\"",
+    "♈": "Ҳамал",
+    "♉": "Савр",
+    "♊": "Ҷавзо",
+    "♋": "Саратон",
+    "♌": "Асад",
+    "♍": "Сунбула",
+    "♎": "Мизон",
+    "♏": "Ақраб",
+    "♐": "Қавс",
+    "♑": "Ҷадӣ",
+    "♒": "Далв",
+    "♓": "Ҳут",
+    "▶": "тугмаи \"пахш\"",
+    "⏩": "тугмаи \"Гузариш ба пеш\"",
+    "⏭": "тугмаи \"Суруди навбатӣ\"",
+    "⏯": "тугмаи \"Пахш ё таваққуф\"",
+    "◀": "тугмаи \"Гузариш ба қафо\"",
+    "⏪": "тугмаи \"Гузариши зуд ба қафо\"",
+    "⏮": "тугмаи \"Суруди охирин\"",
+    "⏫": "тугмаи \"Зуд ба боло\"",
+    "⏬": "тугмаи \"Зуд ба поён\"",
+    "⏸": "Тугмаи \"Таваққуф\"",
+    "⏹": "тугмаи \"Ист\"",
+    "⏺": "тугмаи \"Сабт\"",
+    "⏏": "тугмаи \"Баровардан\"",
+    "♀": "аломати зан",
+    "♂": "аломати мард",
+    "✖": "зарбзании вазнин х",
+    "➕": "аломати вазнини ҷамъ",
+    "➖": "аломати вазнини тарҳ",
+    "➗": "аломати вазнини тақсим",
+    "‼": "аломати хитоби дукарата",
+    "⁉": "аломати хитобу савол",
+    "❓": "аломати савол",
+    "❔": "аломати саволи сафед",
+    "❕": "аломати хитоби сафед",
+    "❗": "аломати хитоб",
+    "⚕": "аломати тиббӣ",
+    "♻": "аломати \"азнавкоркардкунӣ\"",
+    "⚜": "савсан",
+    "⭕": "давраи калони вазнин",
+    "✅": "аломати вазнини қайди сафед",
+    "☑": "қуттии бюллетенҳо бо қайд",
+    "✔": "аломати вазнини қайд",
+    "❌": "аломати салиб",
+    "❎": "тугмаи \"Аломати салиб\"",
+    "➰": "ҳалқаи пурпечутоб",
+    "➿": "ҳалқаи дутарафа пурпечутоб",
+    "✳": "ситорачаи ҳашт паррадор",
+    "✴": "ситораи ҳашт нӯгдор",
+    "❇": "ялаққос задан",
+    "©": "ҳуқуқи муааллиф",
+    "®": "ба қайд гирифташуда",
+    "™": "тамғаи савдо",
+    "Ⓜ": "М бо давра қайд шуд",
+    "⚫": "доираи сиёҳ",
+    "⚪": "доираи сафед",
+    "⬛": "чоркунҷаи калони сиёҳ",
+    "⬜": "чоркунҷаи калони сафед",
+    "◼": "чоркунҷаи миёнаи сиёҳ",
+    "◻": "чоркунҷаи миёнаи сафед",
+    "◾": "чоркунҷаи хурди миёнаи сиёҳ",
+    "◽": "чоркунҷаи хурди миёнаи сафед",
+    "▪": "чоркунҷаи хурди сиёҳ",
+    "▫": "чоркунҷаи хурди сафед"
+  },
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "а",
+    "б",
+    "в",
+    "г",
+    "ғ",
+    "д",
+    "е",
+    "ё",
+    "ж",
+    "з",
+    "и",
+    "ӣ",
+    "й",
+    "к",
+    "қ",
+    "л",
+    "м",
+    "н",
+    "о",
+    "п",
+    "р",
+    "с",
+    "т",
+    "у",
+    "ӯ",
+    "ф",
+    "х",
+    "ҳ",
+    "ч",
+    "ҷ",
+    "ш",
+    "ъ",
+    "э",
+    "ю",
+    "я"
+  ],
+  "missing_ordinary_letter_names": [
+    "а",
+    "б",
+    "в",
+    "г",
+    "ғ",
+    "д",
+    "е",
+    "ё",
+    "ж",
+    "з",
+    "и",
+    "ӣ",
+    "й",
+    "к",
+    "қ",
+    "л",
+    "м",
+    "н",
+    "о",
+    "п",
+    "р",
+    "с",
+    "т",
+    "у",
+    "ӯ",
+    "ф",
+    "х",
+    "ҳ",
+    "ч",
+    "ҷ",
+    "ш",
+    "ъ",
+    "э",
+    "ю",
+    "я"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "‾",
+      "aliases": [
+        "барзиёд"
+      ],
+      "text": "барзиёд",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "‸",
+      "aliases": [
+        "карате"
+      ],
+      "text": "карате",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⁂",
+      "aliases": [
+        "астеризм"
+      ],
+      "text": "астеризм",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☺",
+      "aliases": [
+        "рӯи табассумкунанда"
+      ],
+      "text": "рӯи табассумкунанда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☹",
+      "aliases": [
+        "рӯи қавоқандохта"
+      ],
+      "text": "рӯи қавоқандохта",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☠",
+      "aliases": [
+        "косахонаи сар ва устухонҳо дар шакли салиб"
+      ],
+      "text": "косахонаи сар ва устухонҳо дар шакли салиб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❣",
+      "aliases": [
+        "хитоби дили вазнин"
+      ],
+      "text": "хитоби дили вазнин",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❤",
+      "aliases": [
+        "дили сурх"
+      ],
+      "text": "дили сурх",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✋",
+      "aliases": [
+        "дасти бардошта"
+      ],
+      "text": "дасти бардошта",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✌",
+      "aliases": [
+        "дасти зафар"
+      ],
+      "text": "дасти зафар",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☝",
+      "aliases": [
+        "ангушти ишорат ба боло ишора карда истода"
+      ],
+      "text": "ангушти ишорат ба боло ишора карда истода",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✊",
+      "aliases": [
+        "мушти бардошта"
+      ],
+      "text": "мушти бардошта",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✍",
+      "aliases": [
+        "дасти навишта истода"
+      ],
+      "text": "дасти навишта истода",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛷",
+      "aliases": [
+        "лижарон"
+      ],
+      "text": "лижарон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛹",
+      "aliases": [
+        "шахсе, ки тӯбро ба замин зада истодааст"
+      ],
+      "text": "шахсе, ки тӯбро ба замин зада истодааст",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☘",
+      "aliases": [
+        "себарга"
+      ],
+      "text": "себарга",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☕",
+      "aliases": [
+        "нӯшокии гарм"
+      ],
+      "text": "нӯшокии гарм",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛰",
+      "aliases": [
+        "куҳ"
+      ],
+      "text": "куҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛪",
+      "aliases": [
+        "калисо"
+      ],
+      "text": "калисо",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛩",
+      "aliases": [
+        "ҷои муқаддаси синто"
+      ],
+      "text": "ҷои муқаддаси синто",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛲",
+      "aliases": [
+        "фаввора"
+      ],
+      "text": "фаввора",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛺",
+      "aliases": [
+        "хайма"
+      ],
+      "text": "хайма",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♨",
+      "aliases": [
+        "чашмаҳои гарм"
+      ],
+      "text": "чашмаҳои гарм",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛽",
+      "aliases": [
+        "насоси сӯзишворӣ"
+      ],
+      "text": "насоси сӯзишворӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚓",
+      "aliases": [
+        "лангар"
+      ],
+      "text": "лангар",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛵",
+      "aliases": [
+        "заврақи бодбондор"
+      ],
+      "text": "заврақи бодбондор",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛴",
+      "aliases": [
+        "киштии гузора"
+      ],
+      "text": "киштии гузора",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✈",
+      "aliases": [
+        "тайёра"
+      ],
+      "text": "тайёра",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⌛",
+      "aliases": [
+        "соати регӣ"
+      ],
+      "text": "соати регӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏳",
+      "aliases": [
+        "соати регӣ бо ҷорӣ шудани рег"
+      ],
+      "text": "соати регӣ бо ҷорӣ шудани рег",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⌚",
+      "aliases": [
+        "соати дастӣ"
+      ],
+      "text": "соати дастӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏰",
+      "aliases": [
+        "соати зангдор"
+      ],
+      "text": "соати зангдор",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏱",
+      "aliases": [
+        "сониясанҷ"
+      ],
+      "text": "сониясанҷ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏲",
+      "aliases": [
+        "соати вақтсанҷ"
+      ],
+      "text": "соати вақтсанҷ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☀",
+      "aliases": [
+        "офтоб"
+      ],
+      "text": "офтоб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⭐",
+      "aliases": [
+        "ситораи миёнаи сафед"
+      ],
+      "text": "ситораи миёнаи сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☁",
+      "aliases": [
+        "абр"
+      ],
+      "text": "абр",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛅",
+      "aliases": [
+        "офтоб паси абр"
+      ],
+      "text": "офтоб паси абр",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛈",
+      "aliases": [
+        "абр бо чароғак ва борон"
+      ],
+      "text": "абр бо чароғак ва борон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☂",
+      "aliases": [
+        "чатр"
+      ],
+      "text": "чатр",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☔",
+      "aliases": [
+        "чатр бо қатраҳои борон"
+      ],
+      "text": "чатр бо қатраҳои борон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛱",
+      "aliases": [
+        "чатр дар замин"
+      ],
+      "text": "чатр дар замин",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚡",
+      "aliases": [
+        "шиддати баланд"
+      ],
+      "text": "шиддати баланд",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❄",
+      "aliases": [
+        "зарраи барф"
+      ],
+      "text": "зарраи барф",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☃",
+      "aliases": [
+        "одами барфӣ"
+      ],
+      "text": "одами барфӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛄",
+      "aliases": [
+        "одами барфӣ бе барф"
+      ],
+      "text": "одами барфӣ бе барф",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☄",
+      "aliases": [
+        "комета"
+      ],
+      "text": "комета",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✨",
+      "aliases": [
+        "шарора"
+      ],
+      "text": "шарора",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚽",
+      "aliases": [
+        "тӯби футбол"
+      ],
+      "text": "тӯби футбол",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚾",
+      "aliases": [
+        "бейсбол"
+      ],
+      "text": "бейсбол",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛳",
+      "aliases": [
+        "байрақ дар сӯрохӣ"
+      ],
+      "text": "байрақ дар сӯрохӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛸",
+      "aliases": [
+        "яхмолак"
+      ],
+      "text": "яхмолак",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♠",
+      "aliases": [
+        "қарамашшоқ"
+      ],
+      "text": "қарамашшоқ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♥",
+      "aliases": [
+        "таппон"
+      ],
+      "text": "таппон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♦",
+      "aliases": [
+        "хиштхол"
+      ],
+      "text": "хиштхол",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♣",
+      "aliases": [
+        "чилликхол"
+      ],
+      "text": "чилликхол",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛑",
+      "aliases": [
+        "тоскулоҳи корманди наҷотдиҳӣ"
+      ],
+      "text": "тоскулоҳи корманди наҷотдиҳӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☎",
+      "aliases": [
+        "телефон"
+      ],
+      "text": "телефон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⌨",
+      "aliases": [
+        "клавиатура"
+      ],
+      "text": "клавиатура",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✉",
+      "aliases": [
+        "лифофа"
+      ],
+      "text": "лифофа",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✏",
+      "aliases": [
+        "қалам"
+      ],
+      "text": "қалам",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✒",
+      "aliases": [
+        "нӯги сиёҳ"
+      ],
+      "text": "нӯги сиёҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✂",
+      "aliases": [
+        "қайчӣ"
+      ],
+      "text": "қайчӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛏",
+      "aliases": [
+        "зоғнӯл"
+      ],
+      "text": "зоғнӯл",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚒",
+      "aliases": [
+        "болға ва зоғнӯл"
+      ],
+      "text": "болға ва зоғнӯл",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚔",
+      "aliases": [
+        "шамшерҳои ба ҳам гузошташуда"
+      ],
+      "text": "шамшерҳои ба ҳам гузошташуда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚙",
+      "aliases": [
+        "чархи дандонадор"
+      ],
+      "text": "чархи дандонадор",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚖",
+      "aliases": [
+        "тарозу"
+      ],
+      "text": "тарозу",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛓",
+      "aliases": [
+        "занҷирҳо"
+      ],
+      "text": "занҷирҳо",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚗",
+      "aliases": [
+        "аламбик"
+      ],
+      "text": "аламбик",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚰",
+      "aliases": [
+        "тобут"
+      ],
+      "text": "тобут",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚱",
+      "aliases": [
+        "устадони ҷаноза"
+      ],
+      "text": "устадони ҷаноза",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♿",
+      "aliases": [
+        "аломати \"Курсии чархдор\""
+      ],
+      "text": "аломати \"Курсии чархдор\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚠",
+      "aliases": [
+        "огоҳӣ"
+      ],
+      "text": "огоҳӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⛔",
+      "aliases": [
+        "ворид шудан манъ аст"
+      ],
+      "text": "ворид шудан манъ аст",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☢",
+      "aliases": [
+        "радиоактивӣ"
+      ],
+      "text": "радиоактивӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☣",
+      "aliases": [
+        "хатари биологӣ"
+      ],
+      "text": "хатари биологӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⬆",
+      "aliases": [
+        "тири \"боло\""
+      ],
+      "text": "тири \"боло\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↗",
+      "aliases": [
+        "тири болову рост"
+      ],
+      "text": "тири болову рост",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "➡",
+      "aliases": [
+        "тири рост"
+      ],
+      "text": "тири рост",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↘",
+      "aliases": [
+        "тири поёну рост"
+      ],
+      "text": "тири поёну рост",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⬇",
+      "aliases": [
+        "тири поён"
+      ],
+      "text": "тири поён",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↙",
+      "aliases": [
+        "тири поёну чап"
+      ],
+      "text": "тири поёну чап",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⬅",
+      "aliases": [
+        "тири чап"
+      ],
+      "text": "тири чап",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↖",
+      "aliases": [
+        "тири болову чап"
+      ],
+      "text": "тири болову чап",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↕",
+      "aliases": [
+        "тири поёну боло"
+      ],
+      "text": "тири поёну боло",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↔",
+      "aliases": [
+        "тири чапу рост"
+      ],
+      "text": "тири чапу рост",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↩",
+      "aliases": [
+        "тири рости ба тарафи чап каҷшаванда"
+      ],
+      "text": "тири рости ба тарафи чап каҷшаванда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "↪",
+      "aliases": [
+        "тири чапи ба тарафи рост каҷшаванда"
+      ],
+      "text": "тири чапи ба тарафи рост каҷшаванда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⤴",
+      "aliases": [
+        "тири рости ба тарафи боло каҷшаванда"
+      ],
+      "text": "тири рости ба тарафи боло каҷшаванда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⤵",
+      "aliases": [
+        "тири рости ба тарафи поён каҷшаванда"
+      ],
+      "text": "тири рости ба тарафи поён каҷшаванда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚛",
+      "aliases": [
+        "аломати \"атом\""
+      ],
+      "text": "аломати \"атом\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✡",
+      "aliases": [
+        "ситораи Дейвид"
+      ],
+      "text": "ситораи Дейвид",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☸",
+      "aliases": [
+        "чархи дарма"
+      ],
+      "text": "чархи дарма",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☯",
+      "aliases": [
+        "йин янг"
+      ],
+      "text": "йин янг",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✝",
+      "aliases": [
+        "салиби лотинӣ"
+      ],
+      "text": "салиби лотинӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☦",
+      "aliases": [
+        "салиби православӣ"
+      ],
+      "text": "салиби православӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☪",
+      "aliases": [
+        "ситора ва салиб"
+      ],
+      "text": "ситора ва салиб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☮",
+      "aliases": [
+        "аломати \"сулҳ\""
+      ],
+      "text": "аломати \"сулҳ\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♈",
+      "aliases": [
+        "Ҳамал"
+      ],
+      "text": "Ҳамал",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♉",
+      "aliases": [
+        "Савр"
+      ],
+      "text": "Савр",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♊",
+      "aliases": [
+        "Ҷавзо"
+      ],
+      "text": "Ҷавзо",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♋",
+      "aliases": [
+        "Саратон"
+      ],
+      "text": "Саратон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♌",
+      "aliases": [
+        "Асад"
+      ],
+      "text": "Асад",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♍",
+      "aliases": [
+        "Сунбула"
+      ],
+      "text": "Сунбула",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♎",
+      "aliases": [
+        "Мизон"
+      ],
+      "text": "Мизон",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♏",
+      "aliases": [
+        "Ақраб"
+      ],
+      "text": "Ақраб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♐",
+      "aliases": [
+        "Қавс"
+      ],
+      "text": "Қавс",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♑",
+      "aliases": [
+        "Ҷадӣ"
+      ],
+      "text": "Ҷадӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♒",
+      "aliases": [
+        "Далв"
+      ],
+      "text": "Далв",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♓",
+      "aliases": [
+        "Ҳут"
+      ],
+      "text": "Ҳут",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "▶",
+      "aliases": [
+        "тугмаи \"пахш\""
+      ],
+      "text": "тугмаи \"пахш\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏩",
+      "aliases": [
+        "тугмаи \"Гузариш ба пеш\""
+      ],
+      "text": "тугмаи \"Гузариш ба пеш\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏭",
+      "aliases": [
+        "тугмаи \"Суруди навбатӣ\""
+      ],
+      "text": "тугмаи \"Суруди навбатӣ\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏯",
+      "aliases": [
+        "тугмаи \"Пахш ё таваққуф\""
+      ],
+      "text": "тугмаи \"Пахш ё таваққуф\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "◀",
+      "aliases": [
+        "тугмаи \"Гузариш ба қафо\""
+      ],
+      "text": "тугмаи \"Гузариш ба қафо\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏪",
+      "aliases": [
+        "тугмаи \"Гузариши зуд ба қафо\""
+      ],
+      "text": "тугмаи \"Гузариши зуд ба қафо\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏮",
+      "aliases": [
+        "тугмаи \"Суруди охирин\""
+      ],
+      "text": "тугмаи \"Суруди охирин\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏫",
+      "aliases": [
+        "тугмаи \"Зуд ба боло\""
+      ],
+      "text": "тугмаи \"Зуд ба боло\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏬",
+      "aliases": [
+        "тугмаи \"Зуд ба поён\""
+      ],
+      "text": "тугмаи \"Зуд ба поён\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏸",
+      "aliases": [
+        "Тугмаи \"Таваққуф\""
+      ],
+      "text": "Тугмаи \"Таваққуф\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏹",
+      "aliases": [
+        "тугмаи \"Ист\""
+      ],
+      "text": "тугмаи \"Ист\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏺",
+      "aliases": [
+        "тугмаи \"Сабт\""
+      ],
+      "text": "тугмаи \"Сабт\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⏏",
+      "aliases": [
+        "тугмаи \"Баровардан\""
+      ],
+      "text": "тугмаи \"Баровардан\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♀",
+      "aliases": [
+        "аломати зан"
+      ],
+      "text": "аломати зан",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♂",
+      "aliases": [
+        "аломати мард"
+      ],
+      "text": "аломати мард",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✖",
+      "aliases": [
+        "зарбзании вазнин х"
+      ],
+      "text": "зарбзании вазнин х",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "➕",
+      "aliases": [
+        "аломати вазнини ҷамъ"
+      ],
+      "text": "аломати вазнини ҷамъ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "➖",
+      "aliases": [
+        "аломати вазнини тарҳ"
+      ],
+      "text": "аломати вазнини тарҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "➗",
+      "aliases": [
+        "аломати вазнини тақсим"
+      ],
+      "text": "аломати вазнини тақсим",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "‼",
+      "aliases": [
+        "аломати хитоби дукарата"
+      ],
+      "text": "аломати хитоби дукарата",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⁉",
+      "aliases": [
+        "аломати хитобу савол"
+      ],
+      "text": "аломати хитобу савол",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❓",
+      "aliases": [
+        "аломати савол"
+      ],
+      "text": "аломати савол",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❔",
+      "aliases": [
+        "аломати саволи сафед"
+      ],
+      "text": "аломати саволи сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❕",
+      "aliases": [
+        "аломати хитоби сафед"
+      ],
+      "text": "аломати хитоби сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❗",
+      "aliases": [
+        "аломати хитоб"
+      ],
+      "text": "аломати хитоб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚕",
+      "aliases": [
+        "аломати тиббӣ"
+      ],
+      "text": "аломати тиббӣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "♻",
+      "aliases": [
+        "аломати \"азнавкоркардкунӣ\""
+      ],
+      "text": "аломати \"азнавкоркардкунӣ\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚜",
+      "aliases": [
+        "савсан"
+      ],
+      "text": "савсан",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⭕",
+      "aliases": [
+        "давраи калони вазнин"
+      ],
+      "text": "давраи калони вазнин",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✅",
+      "aliases": [
+        "аломати вазнини қайди сафед"
+      ],
+      "text": "аломати вазнини қайди сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "☑",
+      "aliases": [
+        "қуттии бюллетенҳо бо қайд"
+      ],
+      "text": "қуттии бюллетенҳо бо қайд",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✔",
+      "aliases": [
+        "аломати вазнини қайд"
+      ],
+      "text": "аломати вазнини қайд",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❌",
+      "aliases": [
+        "аломати салиб"
+      ],
+      "text": "аломати салиб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❎",
+      "aliases": [
+        "тугмаи \"Аломати салиб\""
+      ],
+      "text": "тугмаи \"Аломати салиб\"",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "➰",
+      "aliases": [
+        "ҳалқаи пурпечутоб"
+      ],
+      "text": "ҳалқаи пурпечутоб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "➿",
+      "aliases": [
+        "ҳалқаи дутарафа пурпечутоб"
+      ],
+      "text": "ҳалқаи дутарафа пурпечутоб",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✳",
+      "aliases": [
+        "ситорачаи ҳашт паррадор"
+      ],
+      "text": "ситорачаи ҳашт паррадор",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "✴",
+      "aliases": [
+        "ситораи ҳашт нӯгдор"
+      ],
+      "text": "ситораи ҳашт нӯгдор",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "❇",
+      "aliases": [
+        "ялаққос задан"
+      ],
+      "text": "ялаққос задан",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "©",
+      "aliases": [
+        "ҳуқуқи муааллиф"
+      ],
+      "text": "ҳуқуқи муааллиф",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "®",
+      "aliases": [
+        "ба қайд гирифташуда"
+      ],
+      "text": "ба қайд гирифташуда",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "™",
+      "aliases": [
+        "тамғаи савдо"
+      ],
+      "text": "тамғаи савдо",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "Ⓜ",
+      "aliases": [
+        "М бо давра қайд шуд"
+      ],
+      "text": "М бо давра қайд шуд",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚫",
+      "aliases": [
+        "доираи сиёҳ"
+      ],
+      "text": "доираи сиёҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⚪",
+      "aliases": [
+        "доираи сафед"
+      ],
+      "text": "доираи сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⬛",
+      "aliases": [
+        "чоркунҷаи калони сиёҳ"
+      ],
+      "text": "чоркунҷаи калони сиёҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "⬜",
+      "aliases": [
+        "чоркунҷаи калони сафед"
+      ],
+      "text": "чоркунҷаи калони сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "◼",
+      "aliases": [
+        "чоркунҷаи миёнаи сиёҳ"
+      ],
+      "text": "чоркунҷаи миёнаи сиёҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "◻",
+      "aliases": [
+        "чоркунҷаи миёнаи сафед"
+      ],
+      "text": "чоркунҷаи миёнаи сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "◾",
+      "aliases": [
+        "чоркунҷаи хурди миёнаи сиёҳ"
+      ],
+      "text": "чоркунҷаи хурди миёнаи сиёҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "◽",
+      "aliases": [
+        "чоркунҷаи хурди миёнаи сафед"
+      ],
+      "text": "чоркунҷаи хурди миёнаи сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "▪",
+      "aliases": [
+        "чоркунҷаи хурди сиёҳ"
+      ],
+      "text": "чоркунҷаи хурди сиёҳ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "tg",
+      "lookup_text": "▫",
+      "aliases": [
+        "чоркунҷаи хурди сафед"
+      ],
+      "text": "чоркунҷаи хурди сафед",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {
+    "‽": {
+      "name": "interrobang",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛎": {
+      "name": "Ophiuchus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    }
+  },
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

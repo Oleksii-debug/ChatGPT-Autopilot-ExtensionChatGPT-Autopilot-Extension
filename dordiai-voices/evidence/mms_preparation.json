@@ -1,0 +1,1380 @@
+{
+  "format": "dordiai-mms-preparation-v1",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "repo_id": "willwade/mms-tts-multilingual-models-onnx",
+  "revision": "4f49fc254f11ddb0e35fbf25b6e48b04463a6779",
+  "license": "CC-BY-NC-4.0",
+  "models": {
+    "km": {
+      "code": "km",
+      "iso_code": "khm",
+      "standard": "khm",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/km",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "70acf4f024df6d6e742b6056d6e22e7632ebba8e11eab4e35a0d6f33bbf47189",
+      "model_bytes": 114044676,
+      "tokens_sha256": "b15954d9cc8eb2aad3eb564dce826c1361152ef4b83ac5e784f5ee86929ec317",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "យ អ ឆ គ ង ធ ឃ ឌ ឥ ប ឈ q ផ ជ ឧ ល ឱ ទ រ ឭ ឭ រ ទ ឱ ល ឧ ជ ផ q ឈ ប ឥ ឌ ឃ ធ ង គ ឆ អ យ",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.376,
+        "samples": 54016,
+        "peak": 0.7627400755882263,
+        "rms": 0.1367507129907608,
+        "wave_sha256": "bc0b9151e2d72ed0fc0088f6f9af3d609a9225cd7995fecb40ef1b069d9ca833",
+        "graph_load_seconds": 0.926320095999472,
+        "graph_inference_seconds": 1.0669779189993278,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/khm/sample.wav",
+        "reference_wav_sha256": "d15f05a17952ec9017ef8876ef354ba57645a81b2d5eec742ff29d533335ffd6",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "b1b7c454a3836884a200602e2c1277e3f1ba6f5dfc204fff3f09a80ab862604c",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.69305419921875,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "ay": {
+      "code": "ay",
+      "iso_code": "ayr",
+      "standard": "Central Aymara (ayr)",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ay",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "06f7525be81f95b4879569b0c7174ca5945df96791f60b444d8d87e51250a687",
+      "model_bytes": 114019332,
+      "tokens_sha256": "de3335300658158d6aea823953b8748a8d86382ed9dc480c08138bd0c070502d",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a i t k n u s p r m j x h w y q c l ä ñ ñ ä l c q y w h x j m r p s u n k t i a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.16,
+        "samples": 66560,
+        "peak": 0.18508118391036987,
+        "rms": 0.03305212780833244,
+        "wave_sha256": "d26b30080f7a15de9db1464a83a2950b6a34b1fa4d24844d884628a17214d1b2",
+        "graph_load_seconds": 1.003630504999819,
+        "graph_inference_seconds": 1.239181943999938,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/ayr/sample.wav",
+        "reference_wav_sha256": "e2a3608b3991cfa57acaf5be97551c0978b53bb4af605bb6fcd13ad44017c9a9",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "fed930102519a94edc6bcdbf8921b86412b22adc7d094ccb17768c14f1de7f61",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.114648818969727,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "fil": {
+      "code": "fil",
+      "iso_code": "tgl",
+      "standard": "Tagalog (tgl), basis of Filipino standard",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/fil",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "f0594f259f7016a0ff00d5e72886f946e6ed6ae8edf1d9e78649f24d59c83ffb",
+      "model_bytes": 114020868,
+      "tokens_sha256": "5f4883ec7ba2128b7467cda01aa875d02bee8d600dc5822843216d8a14224ab0",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a ʼ x g o m s i u e z v n y f c p r j q q j r p c f y n v z e u i s m o g x ʼ a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 5.264,
+        "samples": 84224,
+        "peak": 0.43212464451789856,
+        "rms": 0.08072632551193237,
+        "wave_sha256": "e3ba6764d6f42de4864f726e5e88a3b6ef97ef3ec350eff508b6fcf89930bbda",
+        "graph_load_seconds": 1.1198096250009257,
+        "graph_inference_seconds": 1.997725019000427,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgl/sample.wav",
+        "reference_wav_sha256": "be305274de530418374875d7dcf6510f7b02f73b1380a972cec90fbf10ae6244",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "a735b5e15dc29875bc4bb94c1e4789c6aaf03ba737266ab7b1984278e8339647",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.481313705444336,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "tg": {
+      "code": "tg",
+      "iso_code": "tgk",
+      "standard": "tgk",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/tg",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "45cc7aecb4b7dae96a8ace8a72e09b00eaf311e2f1bb69f44da7013eb275cfeb",
+      "model_bytes": 114019332,
+      "tokens_sha256": "16f3918b85b7ba3c9346dd0934acc415697ed22dcc9d7793dc80034b2f8abf0d",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "о ҷ б к я т у ҳ ӯ ч е ю ц з м в п ь ф ш ш ф ь п в м з ц ю е ч ӯ ҳ у т я к б ҷ о",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.816,
+        "samples": 77056,
+        "peak": 0.6644402742385864,
+        "rms": 0.08145667612552643,
+        "wave_sha256": "3cd6a9d78d27ae3e683c17f7ccbecf2cc11dbd22cba53bc19eb390bdb745dfa9",
+        "graph_load_seconds": 0.43415492399981304,
+        "graph_inference_seconds": 2.1288726679995307,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgk/sample.wav",
+        "reference_wav_sha256": "d2c49d420c6a1b395c1359c92bb16997eda5cc3aa5483e3a4a0c8c77a4d20683",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "43cb01c431b3ba38c7068ee8ae3c097f272583bdbc6549ae1b9b409d29ce2cb7",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.057038307189941,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "lo": {
+      "code": "lo",
+      "iso_code": "lao",
+      "standard": "lao",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/lo",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "4fe7b25f40804781e1f91340ce1183bba637f47d20a77a27aeff8eb3efbe77e5",
+      "model_bytes": 114027012,
+      "tokens_sha256": "2efa143e564d865e23290e645adccecd3fc68cf880441f7276c34083da74891b",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "ດ ແ ຝ ໃ ຍ ຈ ສ ະ ຣ ບ ຄ ນ ປ ຜ ງ ຂ ຖ າ ທ ໂ ໂ ທ າ ຖ ຂ ງ ຜ ປ ນ ຄ ບ ຣ ະ ສ ຈ ຍ ໃ ຝ ແ ດ",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.568,
+        "samples": 57088,
+        "peak": 0.3829553425312042,
+        "rms": 0.08972065895795822,
+        "wave_sha256": "b6209b6e96527514d1e7561ab03fc3c4a32897c62b5bf186f9951848aafbfe71",
+        "graph_load_seconds": 0.4434664939999493,
+        "graph_inference_seconds": 1.0831897999996727,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/lao/sample.wav",
+        "reference_wav_sha256": "ce0fb7323c72411562e6a2e8c75028f7b2f61be1189a6e984b74a3e2bfad9b9b",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "e0ed9f8a7b5d756a76800773d941f706b4599d23a86a6e8064fed8b1aaae44f8",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.025583267211914,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "mai": {
+      "code": "mai",
+      "iso_code": "mai",
+      "standard": "mai",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/mai",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "a4b628a1ecf177effd82de4f46af51eb0e711a05b17643e2afb2522354e8b29a",
+      "model_bytes": 114038532,
+      "tokens_sha256": "1a2a8966d9c889496118dce0b1f80f83eee2c1533fc027a9d16cddba43cdb6fa",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "क र ह स न त ल म प भ ज अ य ब द व छ श ग आ आ ग श छ व द ब य अ ज भ प म ल त न स ह र क",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 8.352,
+        "samples": 133632,
+        "peak": 0.18643595278263092,
+        "rms": 0.038579024374485016,
+        "wave_sha256": "4ab09d922b681421d18e03e2029e95f988cbe0142d50255a0c11b89f499f3c0b",
+        "graph_load_seconds": 0.7025788940009079,
+        "graph_inference_seconds": 2.3673213880010735,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mai/sample.wav",
+        "reference_wav_sha256": "ad4c52030318ace78b211bcc51ab1615ab9b28bd8d48268824562ea6cac5d1a3",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "996b6f611adde7d1237f83eb9f026f12fce3b7ff8e255a20e90073bcebbee16a",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.875835418701172,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "doi": {
+      "code": "doi",
+      "iso_code": "dgo",
+      "standard": "Dogri (dgo)",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/doi",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "e61748a8d40d91668f84c4fbd5244a63a846e7989bc1d17da833e3a35f44e9dd",
+      "model_bytes": 114036996,
+      "tokens_sha256": "0b86dc24d5e14c22472296c91c9f92a8dcc2cf15fad43d3b71142ad5186981e9",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "न र क द त स ल प म य ग ज ब च ओ आ ई ड ख उ उ ख ड ई आ ओ च ब ज ग य म प ल स त द क र न",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 5.792,
+        "samples": 92672,
+        "peak": 0.2629062235355377,
+        "rms": 0.04911861941218376,
+        "wave_sha256": "b6049aed93b3872a2c96133ac073f9150c490241ad6633b2e61ffb7ecf02059f",
+        "graph_load_seconds": 0.6753614709996327,
+        "graph_inference_seconds": 1.6575311029992008,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/dgo/sample.wav",
+        "reference_wav_sha256": "748e76601cef0c35e98363c350ad7d465da2acd2d8818d396fbc2a50238a034e",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "0f8f0012dece79080c48ee7aef837a821a4f5a515a77c556e4769a20c9a04653",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.047026634216309,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "dv": {
+      "code": "dv",
+      "iso_code": "div",
+      "standard": "div",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/dv",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "02ca7770c5a73937de5244c57bb9ab49172d10a3f86bce903a9775952ac6c634",
+      "model_bytes": 114028548,
+      "tokens_sha256": "1b034159a9076e69438ff296984bd56746f9f8f6eb628964940ea171683a5ad1",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "އ ނ ކ ވ ގ މ ރ ހ ތ ދ ފ ބ ސ ލ ށ ޅ ޔ ޑ ޖ ޙ ޙ ޖ ޑ ޔ ޅ ށ ލ ސ ބ ފ ދ ތ ހ ރ މ ގ ވ ކ ނ އ",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.152,
+        "samples": 50432,
+        "peak": 0.10204929858446121,
+        "rms": 0.029292922466993332,
+        "wave_sha256": "6ac492e5b6586ead1460696480923f22433b5bda0518217dfead7d1648ed3145",
+        "graph_load_seconds": 0.6265478879995499,
+        "graph_inference_seconds": 1.368370860000141,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/div/sample.wav",
+        "reference_wav_sha256": "551bc0478c1fbfab30371c1256554326e823bae0d769bbc3e8bcc668f55927a4",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "c39af4bdf730950a0d55ac030d997a6efcc664f192ba7ff01cb9262377d8ed2a",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.460003852844238,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "dz": {
+      "code": "dz",
+      "iso_code": "dzo",
+      "standard": "dzo",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/dz",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "3ec4468d456460ee802093db8adb20927fbbe9cca3f38a331588c3ac6593649c",
+      "model_bytes": 114032388,
+      "tokens_sha256": "8a7654094293bb4d6e96e86a31671323349d54308788b90ad664cf0c29f7e195",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "ས ག ད བ ན ང མ ལ ར འ ཁ པ ཅ ཀ ཡ ཚ ཟ ཨ ཏ ཆ ཆ ཏ ཨ ཟ ཚ ཡ ཀ ཅ པ ཁ འ ར ལ མ ང ན བ ད ག ས",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.352,
+        "samples": 69632,
+        "peak": 0.17324106395244598,
+        "rms": 0.043366774916648865,
+        "wave_sha256": "772999a34243eb4d6dfd7be1f38d53e27083ebb511b5128f95493d8534006a12",
+        "graph_load_seconds": 0.48246826399918064,
+        "graph_inference_seconds": 0.9218804159991123,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "772999a34243eb4d6dfd7be1f38d53e27083ebb511b5128f95493d8534006a12",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "cd037c60b2010159eb78241d6834d2db62e25e9a0303841321f27fffe5310bf5",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.038811683654785,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "yo": {
+      "code": "yo",
+      "iso_code": "yor",
+      "standard": "yor",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/yo",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "1daf1b837dfb032995a9afdfd1b974d07fd69fd42c91765fc551969ba6d4c183",
+      "model_bytes": 114020868,
+      "tokens_sha256": "3fca3219266d24915a05e358f16fc57e7f748150cf25d1ffe5b8b6e530f915f0",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "n í ọ i à ẹ t a r b ì w l k á s ú o g m m g o ú s á k l w ì b r a t ẹ à i ọ í n",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.496,
+        "samples": 71936,
+        "peak": 0.17205709218978882,
+        "rms": 0.04773236811161041,
+        "wave_sha256": "06c2f927624878134a97563e6c642304ee6f8a86c94ed4192ca0337b0a5a1932",
+        "graph_load_seconds": 0.4343268149987125,
+        "graph_inference_seconds": 1.287458181999682,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/yor/sample.wav",
+        "reference_wav_sha256": "fb20ecfbf04d783c6e459c6f79ac04b1967578877169f0c5ea8652c0efe54ff9",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "a800558c7113fea46b9e15fcd202c9fb7127cea338a2ecc8e011025f6724cc21",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.8287992477417,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "ha": {
+      "code": "ha",
+      "iso_code": "hau",
+      "standard": "hau",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ha",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32",
+      "model_bytes": 114013956,
+      "tokens_sha256": "78b39313ddfc60be59cc12a957f11bf0f5dd4d1cdd3d5c16fe0bf3fae165d0c9",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "d ɗ s g t o y r a u ā i ū c n j b ɓ l e e l ɓ b j n c ū i ā u a r y o t g s ɗ d",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 5.36,
+        "samples": 85760,
+        "peak": 0.6974564790725708,
+        "rms": 0.07261835783720016,
+        "wave_sha256": "f2203f8b2b1f117c73e6db062a5a4bcb751140d6657c4d2bb1d26ffd3ba1264b",
+        "graph_load_seconds": 0.8202419930003089,
+        "graph_inference_seconds": 1.6217787229998066,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/sample.wav",
+        "reference_wav_sha256": "a164ed01dc2548802fdd466600c05d98afbcdbceaa6d27850a10924700c9b0e6",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.689874649047852,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "ff": {
+      "code": "ff",
+      "iso_code": "ful",
+      "standard": "Fula/Fulfulde (ful), exact checkpoint variety requires listening",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ff",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "ea4d68f2c6e4abca462eb258c939997b8b43f4d4e1be17d4109a0da546ecf578",
+      "model_bytes": 114019332,
+      "tokens_sha256": "b34fca4aa77eee1b64b709eed4b83252dc25ea9132fea1b1d6e938d6bf1d753e",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a o i e n m u ɗ k d l r y ɓ w t g h s b b s h g t w ɓ y r l d k ɗ u m n e i o a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.504,
+        "samples": 56064,
+        "peak": 0.1756143569946289,
+        "rms": 0.0300306249409914,
+        "wave_sha256": "716a45f8d604a9bb776b49006666263bdac729bf2583123f6cccb19d4de5c981",
+        "graph_load_seconds": 0.6723340730004566,
+        "graph_inference_seconds": 1.0811573720002343,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "716a45f8d604a9bb776b49006666263bdac729bf2583123f6cccb19d4de5c981",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "03e714c525b35bbfa57fb3090a9246829712807d12716af96c78fd2c45ca7ecd",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 10.99113941192627,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "mg": {
+      "code": "mg",
+      "iso_code": "mlg",
+      "standard": "Malagasy (mlg), checkpoint standard",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/mg",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "14b608ff71fd2c2203f024782c1b65a977a75c8744f8a209807513cbb89a9f6d",
+      "model_bytes": 114010884,
+      "tokens_sha256": "3820c57711dd3efd606524206de79451726b39e7c643179960e13d926c873321",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a n i y o r t m e h s k f z d l v p b j j b p v l d z f k s h e m t r o y i n a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.36,
+        "samples": 53760,
+        "peak": 0.17413868010044098,
+        "rms": 0.03841960057616234,
+        "wave_sha256": "791506b8cdfbc18c7c5520aabee5b1d1a68e3832774ae6b14d1f67e82f6100bc",
+        "graph_load_seconds": 0.42894673599948874,
+        "graph_inference_seconds": 0.9309294710001268,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/mlg/sample.wav",
+        "reference_wav_sha256": "d91f302b4c8d49e154d0b0a06a5b9bd1f25f40df324b1b1cf866926ac120d0bd",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "58161c072f3c7ae869abbc5f58fcf0f7be9f5cc1eee21e5c807759d2facd8fca",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.193621635437012,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "sn": {
+      "code": "sn",
+      "iso_code": "sna",
+      "standard": "sna",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/sn",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "4d419c2c53b674f8d7cb72c0f52ed571db4043d465797ec1a1031c53483094de",
+      "model_bytes": 114013188,
+      "tokens_sha256": "98391f18dc3ba8db4876b75abe253a0053d49c02b85c4295f1db8c6af646f443",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "w a m t b v y c n z g o r q j ʼ l i k e e k i l ʼ j q r o g z n c y v b t m a w",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.312,
+        "samples": 52992,
+        "peak": 0.8147715330123901,
+        "rms": 0.11770278215408325,
+        "wave_sha256": "63e9b3992abb417a102340746a4a8f41b942427f585e505fce9f3aea375a651f",
+        "graph_load_seconds": 0.7065217640010815,
+        "graph_inference_seconds": 0.9181613609998749,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/sna/sample.wav",
+        "reference_wav_sha256": "8d92efa6c14a4f6d47283cf178bca0f57bcf44c6854939986a3b71b3c87aac30",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "fb30ffbcb0171ae56884c60fee3ec6bcde2533701d719b73a7856dc6f0b089a2",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.381162643432617,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "rw": {
+      "code": "rw",
+      "iso_code": "kin",
+      "standard": "kin",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/rw",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "531563be608dc805fce34d2a979d42a67a757735631544d09ed841faf3ecc055",
+      "model_bytes": 114021636,
+      "tokens_sha256": "2ab58191eec47a2cf944503c11ce307a05b13bc9e908a3c29c1e06d2881b4ee4",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a i u e n b r m o y k w g t s h z d f c c f d z h s t g w k y o m r b n e u i a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 2.544,
+        "samples": 40704,
+        "peak": 0.13309982419013977,
+        "rms": 0.034993380308151245,
+        "wave_sha256": "e87701b51f30ebe9ea9661959b4b6ec74b51652af8ae63a2ff45dab8d31727ec",
+        "graph_load_seconds": 0.6197713520014076,
+        "graph_inference_seconds": 1.042649701999835,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kin/sample.wav",
+        "reference_wav_sha256": "24cd832095ec179e301a702ff175294b1f88b64ebf3df30cb389d0cfb2b82945",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "b1a76f74e94af0288bad8cfbfae2d3ff83a4d60ac32ffe01f78fe5ff8fb3b7be",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.562165260314941,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "so": {
+      "code": "so",
+      "iso_code": "som",
+      "standard": "som",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/so",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "0199dd00b919d345110a04a7d3c96f621834afcce4bff396afd493c3e10de0c1",
+      "model_bytes": 114008580,
+      "tokens_sha256": "7735b35bace882ce0116589b5243f4072d7ff26f76903353bf879e3501c9b088",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "u b e c f w l j d n r i g q m t k y o x x o y k t m q g i r n d j l w f c e b u",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 5.344,
+        "samples": 85504,
+        "peak": 0.5594459176063538,
+        "rms": 0.09073144942522049,
+        "wave_sha256": "070b1cbf95487caa48c1db9b3f2cdc175fe1f91e54cd4195eff57079de5d0acc",
+        "graph_load_seconds": 0.7730616810003994,
+        "graph_inference_seconds": 1.9128558430002158,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/som/sample.wav",
+        "reference_wav_sha256": "051b0cd8e8c3715c2609ae88875e47ec52cecf4a432e003f44de01055d91476a",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "fd1f6005a2abea5a101ded57951464c903d9cc7a73d43efa2c3aac105d86e0b2",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.97891902923584,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "rn": {
+      "code": "rn",
+      "iso_code": "run",
+      "standard": "run",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/rn",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "264de636f66e2c46da9dae929db73bdb4cb01afaa313ee5ef45a63422a8b70fb",
+      "model_bytes": 114010116,
+      "tokens_sha256": "f8aef360a3fcd3b367721d8a1ad571ada76818d075dda2015302ac06609ae4ba",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a i u n e r o b m k w y g t s h z d v c c v d z h s t g y w k m b o r e n u i a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.184,
+        "samples": 50944,
+        "peak": 0.17898429930210114,
+        "rms": 0.04796222224831581,
+        "wave_sha256": "4182ba2ce179d6b33c035e3f2dbb0c8ed17af3c2e0fff29e2180cbe3d0cad83a",
+        "graph_load_seconds": 0.7382117670003936,
+        "graph_inference_seconds": 1.3978762759998062,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "4182ba2ce179d6b33c035e3f2dbb0c8ed17af3c2e0fff29e2180cbe3d0cad83a",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "46ddd9cb077dcf0a7d76d9c0f6e07826a148b8824f29f45420558223f2107c1c",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.909562110900879,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "ny": {
+      "code": "ny",
+      "iso_code": "nya",
+      "standard": "nya",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ny",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "16035b60edbc0d2736191e6d6828856e9d8dafc8755e940732a3ac52ff88d944",
+      "model_bytes": 114017796,
+      "tokens_sha256": "e6868455fdd5ee56329d9a51512f7a0902911cc36ecdcd6cf5c05498563b7e2c",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "m w i u d z b q p o g v e c y t ʼ k a s s a k ʼ t y c e v g o p q b z d u i w m",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.296,
+        "samples": 52736,
+        "peak": 0.263187438249588,
+        "rms": 0.04265131428837776,
+        "wave_sha256": "401d3ea23d58896f8cd03f39ad8d0dad190495de4cf1f0af0385e84c4989de3f",
+        "graph_load_seconds": 0.42791489500086755,
+        "graph_inference_seconds": 0.9928479680002056,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/nya/sample.wav",
+        "reference_wav_sha256": "1d89cfd8af8d6734d103011f47278045c8a91f527cd51f148e2976a14fd790e5",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "907a147adc68b735906deffbf411de0c840ea65b9919c1eaf0114988071c6e11",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.896844863891602,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "ak": {
+      "code": "ak",
+      "iso_code": "aka",
+      "standard": "Akan (aka), checkpoint standard",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ak",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "6667cf7efbc9deeef0ad37f1ff36bf06b9e167fe355cda1e90e09124068c6ebc",
+      "model_bytes": 114010884,
+      "tokens_sha256": "e45ba292dd337d7dd2a83bd81aed813c706412d6e6887c91329d943e02abd300",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a ʼ t n p m á w y ɛ f o g u k h l s e r r e s l h k u g o f ɛ y w á m p n t ʼ a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.64,
+        "samples": 74240,
+        "peak": 0.7755889296531677,
+        "rms": 0.1649000495672226,
+        "wave_sha256": "ae49923fda6b1a9096fc4df7d479e440c8db363fdc9100ed50b3d8a4073defe5",
+        "graph_load_seconds": 0.7737155960003292,
+        "graph_inference_seconds": 1.5565254709999863,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/aka/sample.wav",
+        "reference_wav_sha256": "c69bd045675d0330800955e8e95fe69cf7fe82077e709b33959b797bd9bf6b15",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "e0fc83d9c4905fc321dca4e5deae99f86358674cf8039ccab07519d8fb57204d",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.23978042602539,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "bm": {
+      "code": "bm",
+      "iso_code": "bam",
+      "standard": "bam",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/bm",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "d14714080e3fe5d7b3add4db8167728a70149f9a48af972a5a3f442ba5d71b53",
+      "model_bytes": 114015492,
+      "tokens_sha256": "1aac384d1a5f612b7c123066cb736bf661ae4a304a62667ca24af005cd36e962",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a n i k ɛ e ɔ l u o y m b s w t r d g f f g d r t w s b m y o u l ɔ e ɛ k i n a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 6.656,
+        "samples": 106496,
+        "peak": 0.22809481620788574,
+        "rms": 0.038509171456098557,
+        "wave_sha256": "4e3bde37cc8fafb42fedd56a4a4a2eb24e0cbce30bb2a25d96afba808e1e336e",
+        "graph_load_seconds": 0.675312297000346,
+        "graph_inference_seconds": 1.8792771080006787,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/bam/sample.wav",
+        "reference_wav_sha256": "4baaffe26f6b65414a39179f1e495aa5ebf04aeb054f4bf7b3a77bc001afa0bb",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "b0a0b4c29c8382e61d28b7a41de79b867ff5fd676a4a7ad6a4a52a43f2e55c15",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.078582763671875,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "dyu": {
+      "code": "dyu",
+      "iso_code": "dyu",
+      "standard": "dyu",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/dyu",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "555773da698a074624850bda3266eb188367dd1612e40a7418afccdff62c2f63",
+      "model_bytes": 114012420,
+      "tokens_sha256": "071d7d538666142ebadf44b45829c719b135a2fe16cb5d939abd5fd320c29a37",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "t y b u j ɲ p o s w m h i l f g n z ɛ a a ɛ z n g f l i h m w s o p ɲ j u b y t",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.88,
+        "samples": 78080,
+        "peak": 0.7642976641654968,
+        "rms": 0.11033350229263306,
+        "wave_sha256": "425edb2e40aad67c2aca5757841ace9fc93abc1b3622b085863bb29529857067",
+        "graph_load_seconds": 0.4436603419999301,
+        "graph_inference_seconds": 2.1381941359995835,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "425edb2e40aad67c2aca5757841ace9fc93abc1b3622b085863bb29529857067",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "3096f843218ea9e8e6f1099d1542e4b2c9530d68545f0efc4cd0df067b474970",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.64974594116211,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "mos": {
+      "code": "mos",
+      "iso_code": "mos",
+      "standard": "mos",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/mos",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "1f7dcaa378989e4acc29223d2305e892b74992c144721fec8b97ddc19a6b93e3",
+      "model_bytes": 114014724,
+      "tokens_sha256": "785218808f07e80b9007543b261c207d49ba0875bb1f95abd3c6d99f638eaf0e",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a n e b m g s o y d l t ẽ i k ã r ɩ ʋ w w ʋ ɩ r ã k i ẽ t l d y o s g m b e n a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 6.512,
+        "samples": 104192,
+        "peak": 0.2659282088279724,
+        "rms": 0.03593946993350983,
+        "wave_sha256": "81e168e4b0bf41c07d8f60689b6f240731b679c96b33d21fda0fdfe7a86a9cb7",
+        "graph_load_seconds": 0.7678247719995852,
+        "graph_inference_seconds": 1.8733558880012424,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "81e168e4b0bf41c07d8f60689b6f240731b679c96b33d21fda0fdfe7a86a9cb7",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "bef6a620bc076485fe377e52fcf207679bed177b8c78a255a6f49d0240ff6bb7",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.715048789978027,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "ts": {
+      "code": "ts",
+      "iso_code": "tso",
+      "standard": "tso",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/ts",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "d88dc6c57967ed1502f4d74a941cf2358cafef92a94936db1b539bfd3e4ba848",
+      "model_bytes": 114010884,
+      "tokens_sha256": "4143f8eb55eb417e38b8aff7c9efd2c874b6beefff0357957649e72694c7bb73",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "h z w s l r m o p v k j g n d i t f a x x a f t i d n g j k v p o m r l s w z h",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.632,
+        "samples": 58112,
+        "peak": 0.6436135768890381,
+        "rms": 0.15175631642341614,
+        "wave_sha256": "0c0d6e5cba6c906dd5b9a367be4ea54ccf3924b1c7ac3ed21ff6e6e1a55dd236",
+        "graph_load_seconds": 0.6575630079987604,
+        "graph_inference_seconds": 0.9883010519988602,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tso/sample.wav",
+        "reference_wav_sha256": "dc9e9fef114c6248491a234034703e0b033de8353b74b534b7718b35b392309d",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "d2330ab8148a7e84954207c0cc2b824ffaf3ecc20782d1ccf2b9ffcc97ee8ed7",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.684991836547852,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "sg": {
+      "code": "sg",
+      "iso_code": "sag",
+      "standard": "sag",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/sg",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "14b958b0759e980ae249d258f6ff2220c51e706affb51c30e1676f71a4dc59fb",
+      "model_bytes": 114018564,
+      "tokens_sha256": "79a6e4e39028178cfb281d4ef846ef56ee63902fae46f27d4acd6538e437eab4",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a i e n o t l g s k b m y u z p r d ë w w ë d r p z u y m b k s g l t o n e i a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.184,
+        "samples": 50944,
+        "peak": 0.21682631969451904,
+        "rms": 0.04441704601049423,
+        "wave_sha256": "747cd6eede1f7bb38e257b6740a3e3747f26c63ff862d5908b5f34edd69211f8",
+        "graph_load_seconds": 0.5848313599999528,
+        "graph_inference_seconds": 1.1364773339992098,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "747cd6eede1f7bb38e257b6740a3e3747f26c63ff862d5908b5f34edd69211f8",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "f6e1265a532769a6401ff07708902c1ae1b52f305ce7df5efa3432eb3949ecc0",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.539952278137207,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "tpi": {
+      "code": "tpi",
+      "iso_code": "tpi",
+      "standard": "tpi",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/tpi",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "1cb0f799c39ea53ddd39095e894e6b7ef8502b1fcd22439fded538c1ed3567cf",
+      "model_bytes": 114016260,
+      "tokens_sha256": "b8b5e19bcd0ecb08559454283b5fad293666b92620698b0c001f3e8cf888e56f",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "l o e s r f n u q k i j v h w p t d m y y m d t p w h v j i k q u n f r s e o l",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 4.176,
+        "samples": 66816,
+        "peak": 0.7040863633155823,
+        "rms": 0.1439189612865448,
+        "wave_sha256": "64b5def2469675d2b840f7498f3548bfdc9d92b4937df1e40444f5c0b9fca275",
+        "graph_load_seconds": 0.783133822000309,
+        "graph_inference_seconds": 1.2274924739995186,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "64b5def2469675d2b840f7498f3548bfdc9d92b4937df1e40444f5c0b9fca275",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "ce2fe70ad1ae652881f8130968ac60e076b91c7bdd9ad41b5ee7cd1175c4bfc3",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.44056510925293,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "sm": {
+      "code": "sm",
+      "iso_code": "smo",
+      "standard": "smo",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/sm",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "c9fb1cf6d65d0c544048aa8f34c1b2603c93ba544550945f63aeee960f9c97d2",
+      "model_bytes": 114007812,
+      "tokens_sha256": "d20e8db7cfac406165243b0c90e405d1b6db57d8454240d9a9a51bd01212b0a1",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "o g ē ō v u m p r i f l e t ā h a n k ī ī k n a h ā t e l f i r p m u v ō ē g o",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 7.168,
+        "samples": 114688,
+        "peak": 0.8174067139625549,
+        "rms": 0.14389275014400482,
+        "wave_sha256": "1368036f7364cc49ffc9b056be51d38090f8658a0ec7d26fd02780ce2b83a9b4",
+        "graph_load_seconds": 0.442505256000004,
+        "graph_inference_seconds": 2.227811400000064,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/smo/sample.wav",
+        "reference_wav_sha256": "ce51d91b17dbe823806dd9604677631849af0e527941ade8076f0104a1e473d0",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "50306dc64c489e8df6ddfbf00e5ff638f1271a11aca8f2f4fbed8a78687f3ad6",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.280620574951172,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "fj": {
+      "code": "fj",
+      "iso_code": "fij",
+      "standard": "fij",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/fj",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "e961adb930756d708ad4aba80370b397c289595798c4bb865f383c404dd778bc",
+      "model_bytes": 114015492,
+      "tokens_sha256": "3a14414d6370fa58cf9c57cc595d4863aee5b07a7e9b7213c778cbc7bcf0e2bb",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a i k n e u o v t s l r m d g y c q b w w b q c y g d m r l s t v o u e n k i a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.856,
+        "samples": 61696,
+        "peak": 0.17131748795509338,
+        "rms": 0.034544438123703,
+        "wave_sha256": "e898533aa692d34a2b366c38bb1ff900a51964190b9fb1985e3638825ef2be39",
+        "graph_load_seconds": 0.6477196890009509,
+        "graph_inference_seconds": 1.401483442999961,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "e898533aa692d34a2b366c38bb1ff900a51964190b9fb1985e3638825ef2be39",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "a11bbdb436f12dde8771ca64d1220a64aca0fc955e7f5f358fb85605e26ce518",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 12.335124015808105,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "gil": {
+      "code": "gil",
+      "iso_code": "gil",
+      "standard": "gil",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/gil",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "eff5cff3b59cea16461d5f5d3827604401f2f95edbfafb5e90e8b32a44ff3581",
+      "model_bytes": 114008580,
+      "tokens_sha256": "32f991d3813a25090b431b1a076f296adbfeb69a2af802abe25481a2dc029931",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "b p t w u a k q g s r n m o e i i e o m n r s g q k a u w t p b",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 3.152,
+        "samples": 50432,
+        "peak": 0.716008722782135,
+        "rms": 0.11289948225021362,
+        "wave_sha256": "2b9174bb702ac4faad721c777362a882b4283b6df259310c22b8e62748fb6be3",
+        "graph_load_seconds": 0.8005937289999565,
+        "graph_inference_seconds": 0.9209228290001192,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "actual-native-carrier-grapheme-probe-no-published-reference",
+        "reference_url": null,
+        "reference_wav_sha256": "2b9174bb702ac4faad721c777362a882b4283b6df259310c22b8e62748fb6be3",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "f4fd87d20da143c436a2fa85c295c5289d13bfb7a2e73ba047b11e28c393ef73",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.123502731323242,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    },
+    "kab": {
+      "code": "kab",
+      "iso_code": "kab",
+      "standard": "Kabyle (kab), Algeria; NOT Standard Moroccan Tamazight",
+      "directory": "/workspace/scratch/eb1194a9e557/dordiai-workspace/dordiai-voices/model-packs/mms/kx47Runtime/models/MMS/kab",
+      "status": "prepared-real-onnx-carrier",
+      "model_sha256": "bec6f432ee34d56d8156282e72ba3e8da18574f8fdfb6efe723e44d7c1ef74c7",
+      "model_bytes": 114017028,
+      "tokens_sha256": "865a6bafa6a7261d8c548142ac79c5a0e8ab7deacbdb3757680d53ce6e664758",
+      "sample_rate": 16000,
+      "probe": {
+        "text": "a e i n d t l s m r u y w k ɣ b g ṛ ɛ f f ɛ ṛ g b ɣ k w y u r m s l t d n i e a",
+        "kind": "native-grapheme-smoke-test",
+        "seconds": 2.8,
+        "samples": 44800,
+        "peak": 0.21051588654518127,
+        "rms": 0.04262128099799156,
+        "wave_sha256": "86d267c2c34be908986ae8edaf95aba87662f036785d9b1294e0e56e32bdca31",
+        "graph_load_seconds": 0.44279510600063077,
+        "graph_inference_seconds": 0.8864580069985095,
+        "providers": [
+          "CPUExecutionProvider"
+        ],
+        "applied_speed": 1.0
+      },
+      "source_identity": {
+        "basis": "publisher-sample-from-same-pinned-checkpoint",
+        "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/kab/sample.wav",
+        "reference_wav_sha256": "caa2dca3cf122c68f7c69f11f66e98aacb0bad942c2d1ceab50e7e7fa5be8510",
+        "reference_sample_rate": 16000,
+        "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+        "source_sha256": "2963dac42a14d3490ce4f36d3a8efa8607ae276bff4bc22f562ed45e266e4177",
+        "source_shape": [
+          1,
+          256,
+          1
+        ],
+        "source_norm": 11.888399124145508,
+        "source_dtype": "float32",
+        "unit_normalized": false,
+        "generated_calibration_noise_scale": 0.0,
+        "generated_calibration_noise_scale_w": 0.0
+      },
+      "navigation_verified": false,
+      "native_pronunciation_verified": false,
+      "windows_nvda_verified": false
+    }
+  },
+  "all_selected_prepared": true,
+  "windows_nvda_verified": false,
+  "mode": "offline-verification",
+  "onnxruntime_version": "1.27.0",
+  "onnxruntime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+  "ort_telemetry_disabled": true,
+  "model_downloads_made": false,
+  "model_bytes": 3306552180
+}

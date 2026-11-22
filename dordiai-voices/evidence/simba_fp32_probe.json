@@ -1,0 +1,26 @@
+{
+  "precision": "fp32",
+  "load_seconds": 1.7901807700000063,
+  "probes": [
+    {
+      "speed": 1.0,
+      "samples": 79616,
+      "seconds": 4.976,
+      "render_seconds": 0.9154906230014603,
+      "real_time_factor": 0.18398123452601695,
+      "finite": true,
+      "peak": 0.24388079345226288
+    },
+    {
+      "speed": 2.0,
+      "samples": 44544,
+      "seconds": 2.784,
+      "render_seconds": 0.46627926399924036,
+      "real_time_factor": 0.1674853678158191,
+      "finite": true,
+      "peak": 0.1798521876335144
+    }
+  ],
+  "onnxruntime": "1.27.0",
+  "status": "historical-precision-comparison-current-prepared-carrier-is-in-simba_preparation_st.json"
+}

@@ -171,9 +171,7 @@ def validate_preference_selection(voices, languages, default, selected_voice,
 
 
 def language_key(value):
-    code = (value if isinstance(value, str) and value else "uk").lower().replace("_", "-")
-    base = code.split("-")[0]
-    return {"no": "nb", "iw": "he", "zh": "cmn"}.get(base, base)
+    return _package_component("language_codes").canonical_language(value, default="uk")
 
 
 class PreferencesMixin:

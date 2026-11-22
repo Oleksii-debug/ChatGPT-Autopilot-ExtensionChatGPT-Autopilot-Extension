@@ -1,0 +1,2233 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "nso",
+  "sources": {
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/nso/annotations.json",
+      "sha256": "856b2e6fd9332e12bb03c726f4ee27e6e5501300e69bd24e9fd6174e819797af",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/nso/characters.json",
+      "sha256": "e24db74e56ae5c17e7155dd8cbe63e4058ec8a5888ad26adfd3073bd7efc7d21",
+      "license": "Unicode-3.0"
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "☺": "sefahlego se myemyelago",
+    "☹": "sefahlego se se šošobanego",
+    "☠": "marapo a hlogo le marapo a putlaganego",
+    "❣": "go makala ga pelo e kgolo",
+    "❤": "pelo e khubedu",
+    "✋": "letsogo le išitšwego godimo",
+    "✌": "seatla la go thopa",
+    "☝": "monwana wa bone o šupile godimo",
+    "✊": "feise e išitšwego godimo",
+    "✍": "seatla le ngwalago",
+    "⛷": "sekhaya",
+    "⛹": "motho o bethantšha polo",
+    "☘": "šemoroko",
+    "☕": "seno se fišago",
+    "⛰": "thaba",
+    "⛪": "kereke",
+    "⛩": "aletare ya shinto",
+    "⛲": "petse",
+    "⛺": "tente",
+    "♨": "lehlabula la go fiša",
+    "⛽": "pompo ya peterole",
+    "⚓": "ankere",
+    "⛵": "seketswana sa go sesa",
+    "⛴": "sekepe se segolo",
+    "✈": "sefofane",
+    "⌛": "galasana ya nako",
+    "⏳": "galase ya nako e nago le santa",
+    "⌚": "sešupanako",
+    "⏰": "sešupanako sa alamo",
+    "⏱": "nako ya go ema",
+    "⏲": "go lekanyetša nako",
+    "☀": "letšatši",
+    "⭐": "naledi ya bogare ye tšhweu",
+    "☁": "maru",
+    "⛅": "letšatši ka morago ga ngwedi",
+    "⛈": "maru a magadima le pula",
+    "☂": "samporene",
+    "☔": "samporene se nago le marothodi a pula",
+    "⛱": "samporene mo fase",
+    "⚡": "voltage ya godimo",
+    "❄": "lehlwa le legolo",
+    "☃": "monna wa lehlwa",
+    "⛄": "monna wa lehlwa ntle le lehlwa",
+    "☄": "khomete",
+    "✨": "ya phadima",
+    "⚽": "kgwele ya maoto",
+    "⚾": "peisepolo",
+    "⛳": "folaga ka lešobeng",
+    "⛸": "go bapala go sesa aeseng",
+    "♠": "sutu ya sepeiti",
+    "♥": "pelo ya suit",
+    "♦": "taemane ya suti",
+    "♣": "sutu ya sehlopha",
+    "⛑": "helmete ya bašomi ba thušo",
+    "☎": "founo",
+    "⌨": "khiipoto",
+    "✉": "omfolopo",
+    "✏": "phensele",
+    "✒": "nib e ntsho",
+    "✂": "sekero",
+    "⛏": "peke",
+    "⚒": "hamola le peke",
+    "⚔": "ditšhoša tše di dirilego sefapano",
+    "⚙": "kere",
+    "⚖": "go lekanya boleng",
+    "⛓": "ditšhaene",
+    "⚗": "tshwarišano",
+    "⚰": "lepokisi",
+    "⚱": "moeta wa lehu",
+    "♿": "leswao la wilitšhere",
+    "⚠": "temošo",
+    "⛔": "ga go tsenwe",
+    "☢": "radioekthibi",
+    "☣": "kotsitlhagong",
+    "⬆": "lerungwana la godimo",
+    "↗": "lerungwana la godimo ka gojeng",
+    "➡": "lerungwana la gojeng",
+    "↘": "lerungwana la tlase ka gojeng",
+    "⬇": "lerungwana la tlase",
+    "↙": "lerungwana la tlase ka go le letshadi",
+    "⬅": "lerungwana la ka go le letshadi",
+    "↖": "lerungwana la godimo ka go le letshadi",
+    "↕": "lerungwana la godimo le tlase",
+    "↔": "lerungwana la ka go le letshadi go ya go le letona",
+    "↩": "lerungwana la godimo le eya ka go le letshadi",
+    "↪": "lerungwana la ka go le letshadi le eya ka go le letona",
+    "⤴": "lerungwana la ka go le letona le eya godimo",
+    "⤵": "lerungwana la ka go le letona lekgopamela tlase",
+    "⚛": "leswao la athomo",
+    "✡": "naledi ya Tafita",
+    "☸": "leotwana la dharma",
+    "✝": "sefapano sa latin",
+    "☦": "sefapano sa othotokse",
+    "☪": "naledi e khutlohlano",
+    "☮": "leswao la khutšo",
+    "♏": "Scorpius",
+    "▶": "konope ya go bapala",
+    "⏩": "konope ya go bapala ka lebelo",
+    "⏭": "koša e latelago",
+    "⏯": "konope ya go emiša goba go bapal",
+    "◀": "konope ya go boetša morago",
+    "⏪": "konope ya go boela morago ka lebelo",
+    "⏮": "konope ya koša ya go feta",
+    "⏫": "konope ya go ya godimo ka kebelo",
+    "⏬": "konope ya tlase ka lebelo",
+    "⏸": "konope ya go emišanyana",
+    "⏹": "konope ya go emiša",
+    "⏺": "konope ya go rekhotha",
+    "⏏": "konope ya go ntšha",
+    "♀": "leswao la mosadi",
+    "♂": "leswao la monna",
+    "✖": "leswao e legolo la go atiša x",
+    "➕": "leswao le legolo la hlakanya",
+    "➖": "leswao le legolo la go ntšha",
+    "➗": "leswao le legolo la aroganya",
+    "‼": "maswao a mabedi a makalo",
+    "⁉": "leswao la makalo le potšišo",
+    "❓": "leswao la potšišo",
+    "❔": "leswao le letšhweu la hlakanya",
+    "❕": "leswao le legolo la makalo le letšhweu",
+    "❗": "leswao la go makala",
+    "⚕": "leswao la kalafo",
+    "♻": "leswao la go hwetša gape",
+    "⚜": "fluer-de-lis",
+    "⭕": "leswao le legolo la nkgokolo",
+    "✅": "leswao le legolo la go hlola le letšhweu",
+    "☑": "lepokisi la palote le kgethilwego",
+    "✔": "leswao le legolo la go kgetha",
+    "❌": "sefapano",
+    "❎": "konope ya leswao",
+    "➰": "meriri e tatanego",
+    "➿": "meriri e tatanego gabedi",
+    "✳": "naletšana ya marungwana a seswai",
+    "✴": "naledi ya khutloseswai",
+    "❇": "benya",
+    "©": "khopiraete",
+    "®": "ngwadišitšwe",
+    "™": "leswao la kgwebo",
+    "Ⓜ": "nkgokolo ya M",
+    "⚫": "nkgokolo ye ntsho",
+    "⚪": "nkgokolo e tšhweu",
+    "⬛": "khutlonne e ntsho e kgolo",
+    "⬜": "khutlonne e kgolo tšhweu",
+    "◼": "bogare bja ngwedi o moso",
+    "◻": "bogare bja ngwedi o motšhweu",
+    "◾": "khutlonne e ntsho ya bogareng",
+    "◽": "khutlonee e tšhweu ya bogareng",
+    "▪": "khutlonne e nyenyane e ntsho",
+    "▫": "khutlonne e nyenyane e tšhweu"
+  },
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "a",
+    "b",
+    "d",
+    "e",
+    "ê",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "ô",
+    "p",
+    "r",
+    "s",
+    "š",
+    "t",
+    "u",
+    "w",
+    "x",
+    "y"
+  ],
+  "missing_ordinary_letter_names": [
+    "a",
+    "b",
+    "d",
+    "e",
+    "ê",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "ô",
+    "p",
+    "r",
+    "s",
+    "š",
+    "t",
+    "u",
+    "w",
+    "x",
+    "y"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☺",
+      "aliases": [
+        "sefahlego se myemyelago"
+      ],
+      "text": "sefahlego se myemyelago",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☹",
+      "aliases": [
+        "sefahlego se se šošobanego"
+      ],
+      "text": "sefahlego se se šošobanego",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☠",
+      "aliases": [
+        "marapo a hlogo le marapo a putlaganego"
+      ],
+      "text": "marapo a hlogo le marapo a putlaganego",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❣",
+      "aliases": [
+        "go makala ga pelo e kgolo"
+      ],
+      "text": "go makala ga pelo e kgolo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❤",
+      "aliases": [
+        "pelo e khubedu"
+      ],
+      "text": "pelo e khubedu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✋",
+      "aliases": [
+        "letsogo le išitšwego godimo"
+      ],
+      "text": "letsogo le išitšwego godimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✌",
+      "aliases": [
+        "seatla la go thopa"
+      ],
+      "text": "seatla la go thopa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☝",
+      "aliases": [
+        "monwana wa bone o šupile godimo"
+      ],
+      "text": "monwana wa bone o šupile godimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✊",
+      "aliases": [
+        "feise e išitšwego godimo"
+      ],
+      "text": "feise e išitšwego godimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✍",
+      "aliases": [
+        "seatla le ngwalago"
+      ],
+      "text": "seatla le ngwalago",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛷",
+      "aliases": [
+        "sekhaya"
+      ],
+      "text": "sekhaya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛹",
+      "aliases": [
+        "motho o bethantšha polo"
+      ],
+      "text": "motho o bethantšha polo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☘",
+      "aliases": [
+        "šemoroko"
+      ],
+      "text": "šemoroko",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☕",
+      "aliases": [
+        "seno se fišago"
+      ],
+      "text": "seno se fišago",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛰",
+      "aliases": [
+        "thaba"
+      ],
+      "text": "thaba",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛪",
+      "aliases": [
+        "kereke"
+      ],
+      "text": "kereke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛩",
+      "aliases": [
+        "aletare ya shinto"
+      ],
+      "text": "aletare ya shinto",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛲",
+      "aliases": [
+        "petse"
+      ],
+      "text": "petse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛺",
+      "aliases": [
+        "tente"
+      ],
+      "text": "tente",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♨",
+      "aliases": [
+        "lehlabula la go fiša"
+      ],
+      "text": "lehlabula la go fiša",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛽",
+      "aliases": [
+        "pompo ya peterole"
+      ],
+      "text": "pompo ya peterole",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚓",
+      "aliases": [
+        "ankere"
+      ],
+      "text": "ankere",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛵",
+      "aliases": [
+        "seketswana sa go sesa"
+      ],
+      "text": "seketswana sa go sesa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛴",
+      "aliases": [
+        "sekepe se segolo"
+      ],
+      "text": "sekepe se segolo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✈",
+      "aliases": [
+        "sefofane"
+      ],
+      "text": "sefofane",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⌛",
+      "aliases": [
+        "galasana ya nako"
+      ],
+      "text": "galasana ya nako",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏳",
+      "aliases": [
+        "galase ya nako e nago le santa"
+      ],
+      "text": "galase ya nako e nago le santa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⌚",
+      "aliases": [
+        "sešupanako"
+      ],
+      "text": "sešupanako",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏰",
+      "aliases": [
+        "sešupanako sa alamo"
+      ],
+      "text": "sešupanako sa alamo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏱",
+      "aliases": [
+        "nako ya go ema"
+      ],
+      "text": "nako ya go ema",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏲",
+      "aliases": [
+        "go lekanyetša nako"
+      ],
+      "text": "go lekanyetša nako",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☀",
+      "aliases": [
+        "letšatši"
+      ],
+      "text": "letšatši",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⭐",
+      "aliases": [
+        "naledi ya bogare ye tšhweu"
+      ],
+      "text": "naledi ya bogare ye tšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☁",
+      "aliases": [
+        "maru"
+      ],
+      "text": "maru",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛅",
+      "aliases": [
+        "letšatši ka morago ga ngwedi"
+      ],
+      "text": "letšatši ka morago ga ngwedi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛈",
+      "aliases": [
+        "maru a magadima le pula"
+      ],
+      "text": "maru a magadima le pula",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☂",
+      "aliases": [
+        "samporene"
+      ],
+      "text": "samporene",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☔",
+      "aliases": [
+        "samporene se nago le marothodi a pula"
+      ],
+      "text": "samporene se nago le marothodi a pula",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛱",
+      "aliases": [
+        "samporene mo fase"
+      ],
+      "text": "samporene mo fase",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚡",
+      "aliases": [
+        "voltage ya godimo"
+      ],
+      "text": "voltage ya godimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❄",
+      "aliases": [
+        "lehlwa le legolo"
+      ],
+      "text": "lehlwa le legolo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☃",
+      "aliases": [
+        "monna wa lehlwa"
+      ],
+      "text": "monna wa lehlwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛄",
+      "aliases": [
+        "monna wa lehlwa ntle le lehlwa"
+      ],
+      "text": "monna wa lehlwa ntle le lehlwa",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☄",
+      "aliases": [
+        "khomete"
+      ],
+      "text": "khomete",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✨",
+      "aliases": [
+        "ya phadima"
+      ],
+      "text": "ya phadima",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚽",
+      "aliases": [
+        "kgwele ya maoto"
+      ],
+      "text": "kgwele ya maoto",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚾",
+      "aliases": [
+        "peisepolo"
+      ],
+      "text": "peisepolo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛳",
+      "aliases": [
+        "folaga ka lešobeng"
+      ],
+      "text": "folaga ka lešobeng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛸",
+      "aliases": [
+        "go bapala go sesa aeseng"
+      ],
+      "text": "go bapala go sesa aeseng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♠",
+      "aliases": [
+        "sutu ya sepeiti"
+      ],
+      "text": "sutu ya sepeiti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♥",
+      "aliases": [
+        "pelo ya suit"
+      ],
+      "text": "pelo ya suit",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♦",
+      "aliases": [
+        "taemane ya suti"
+      ],
+      "text": "taemane ya suti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♣",
+      "aliases": [
+        "sutu ya sehlopha"
+      ],
+      "text": "sutu ya sehlopha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛑",
+      "aliases": [
+        "helmete ya bašomi ba thušo"
+      ],
+      "text": "helmete ya bašomi ba thušo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☎",
+      "aliases": [
+        "founo"
+      ],
+      "text": "founo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⌨",
+      "aliases": [
+        "khiipoto"
+      ],
+      "text": "khiipoto",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✉",
+      "aliases": [
+        "omfolopo"
+      ],
+      "text": "omfolopo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✏",
+      "aliases": [
+        "phensele"
+      ],
+      "text": "phensele",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✒",
+      "aliases": [
+        "nib e ntsho"
+      ],
+      "text": "nib e ntsho",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✂",
+      "aliases": [
+        "sekero"
+      ],
+      "text": "sekero",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛏",
+      "aliases": [
+        "peke"
+      ],
+      "text": "peke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚒",
+      "aliases": [
+        "hamola le peke"
+      ],
+      "text": "hamola le peke",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚔",
+      "aliases": [
+        "ditšhoša tše di dirilego sefapano"
+      ],
+      "text": "ditšhoša tše di dirilego sefapano",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚙",
+      "aliases": [
+        "kere"
+      ],
+      "text": "kere",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚖",
+      "aliases": [
+        "go lekanya boleng"
+      ],
+      "text": "go lekanya boleng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛓",
+      "aliases": [
+        "ditšhaene"
+      ],
+      "text": "ditšhaene",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚗",
+      "aliases": [
+        "tshwarišano"
+      ],
+      "text": "tshwarišano",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚰",
+      "aliases": [
+        "lepokisi"
+      ],
+      "text": "lepokisi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚱",
+      "aliases": [
+        "moeta wa lehu"
+      ],
+      "text": "moeta wa lehu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♿",
+      "aliases": [
+        "leswao la wilitšhere"
+      ],
+      "text": "leswao la wilitšhere",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚠",
+      "aliases": [
+        "temošo"
+      ],
+      "text": "temošo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⛔",
+      "aliases": [
+        "ga go tsenwe"
+      ],
+      "text": "ga go tsenwe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☢",
+      "aliases": [
+        "radioekthibi"
+      ],
+      "text": "radioekthibi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☣",
+      "aliases": [
+        "kotsitlhagong"
+      ],
+      "text": "kotsitlhagong",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⬆",
+      "aliases": [
+        "lerungwana la godimo"
+      ],
+      "text": "lerungwana la godimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↗",
+      "aliases": [
+        "lerungwana la godimo ka gojeng"
+      ],
+      "text": "lerungwana la godimo ka gojeng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "➡",
+      "aliases": [
+        "lerungwana la gojeng"
+      ],
+      "text": "lerungwana la gojeng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↘",
+      "aliases": [
+        "lerungwana la tlase ka gojeng"
+      ],
+      "text": "lerungwana la tlase ka gojeng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⬇",
+      "aliases": [
+        "lerungwana la tlase"
+      ],
+      "text": "lerungwana la tlase",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↙",
+      "aliases": [
+        "lerungwana la tlase ka go le letshadi"
+      ],
+      "text": "lerungwana la tlase ka go le letshadi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⬅",
+      "aliases": [
+        "lerungwana la ka go le letshadi"
+      ],
+      "text": "lerungwana la ka go le letshadi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↖",
+      "aliases": [
+        "lerungwana la godimo ka go le letshadi"
+      ],
+      "text": "lerungwana la godimo ka go le letshadi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↕",
+      "aliases": [
+        "lerungwana la godimo le tlase"
+      ],
+      "text": "lerungwana la godimo le tlase",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↔",
+      "aliases": [
+        "lerungwana la ka go le letshadi go ya go le letona"
+      ],
+      "text": "lerungwana la ka go le letshadi go ya go le letona",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↩",
+      "aliases": [
+        "lerungwana la godimo le eya ka go le letshadi"
+      ],
+      "text": "lerungwana la godimo le eya ka go le letshadi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "↪",
+      "aliases": [
+        "lerungwana la ka go le letshadi le eya ka go le letona"
+      ],
+      "text": "lerungwana la ka go le letshadi le eya ka go le letona",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⤴",
+      "aliases": [
+        "lerungwana la ka go le letona le eya godimo"
+      ],
+      "text": "lerungwana la ka go le letona le eya godimo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⤵",
+      "aliases": [
+        "lerungwana la ka go le letona lekgopamela tlase"
+      ],
+      "text": "lerungwana la ka go le letona lekgopamela tlase",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚛",
+      "aliases": [
+        "leswao la athomo"
+      ],
+      "text": "leswao la athomo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✡",
+      "aliases": [
+        "naledi ya Tafita"
+      ],
+      "text": "naledi ya Tafita",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☸",
+      "aliases": [
+        "leotwana la dharma"
+      ],
+      "text": "leotwana la dharma",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✝",
+      "aliases": [
+        "sefapano sa latin"
+      ],
+      "text": "sefapano sa latin",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☦",
+      "aliases": [
+        "sefapano sa othotokse"
+      ],
+      "text": "sefapano sa othotokse",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☪",
+      "aliases": [
+        "naledi e khutlohlano"
+      ],
+      "text": "naledi e khutlohlano",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☮",
+      "aliases": [
+        "leswao la khutšo"
+      ],
+      "text": "leswao la khutšo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♏",
+      "aliases": [
+        "Scorpius"
+      ],
+      "text": "Scorpius",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "▶",
+      "aliases": [
+        "konope ya go bapala"
+      ],
+      "text": "konope ya go bapala",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏩",
+      "aliases": [
+        "konope ya go bapala ka lebelo"
+      ],
+      "text": "konope ya go bapala ka lebelo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏭",
+      "aliases": [
+        "koša e latelago"
+      ],
+      "text": "koša e latelago",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏯",
+      "aliases": [
+        "konope ya go emiša goba go bapal"
+      ],
+      "text": "konope ya go emiša goba go bapal",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "◀",
+      "aliases": [
+        "konope ya go boetša morago"
+      ],
+      "text": "konope ya go boetša morago",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏪",
+      "aliases": [
+        "konope ya go boela morago ka lebelo"
+      ],
+      "text": "konope ya go boela morago ka lebelo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏮",
+      "aliases": [
+        "konope ya koša ya go feta"
+      ],
+      "text": "konope ya koša ya go feta",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏫",
+      "aliases": [
+        "konope ya go ya godimo ka kebelo"
+      ],
+      "text": "konope ya go ya godimo ka kebelo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏬",
+      "aliases": [
+        "konope ya tlase ka lebelo"
+      ],
+      "text": "konope ya tlase ka lebelo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏸",
+      "aliases": [
+        "konope ya go emišanyana"
+      ],
+      "text": "konope ya go emišanyana",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏹",
+      "aliases": [
+        "konope ya go emiša"
+      ],
+      "text": "konope ya go emiša",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏺",
+      "aliases": [
+        "konope ya go rekhotha"
+      ],
+      "text": "konope ya go rekhotha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⏏",
+      "aliases": [
+        "konope ya go ntšha"
+      ],
+      "text": "konope ya go ntšha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♀",
+      "aliases": [
+        "leswao la mosadi"
+      ],
+      "text": "leswao la mosadi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♂",
+      "aliases": [
+        "leswao la monna"
+      ],
+      "text": "leswao la monna",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✖",
+      "aliases": [
+        "leswao e legolo la go atiša x"
+      ],
+      "text": "leswao e legolo la go atiša x",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "➕",
+      "aliases": [
+        "leswao le legolo la hlakanya"
+      ],
+      "text": "leswao le legolo la hlakanya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "➖",
+      "aliases": [
+        "leswao le legolo la go ntšha"
+      ],
+      "text": "leswao le legolo la go ntšha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "➗",
+      "aliases": [
+        "leswao le legolo la aroganya"
+      ],
+      "text": "leswao le legolo la aroganya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "‼",
+      "aliases": [
+        "maswao a mabedi a makalo"
+      ],
+      "text": "maswao a mabedi a makalo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⁉",
+      "aliases": [
+        "leswao la makalo le potšišo"
+      ],
+      "text": "leswao la makalo le potšišo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❓",
+      "aliases": [
+        "leswao la potšišo"
+      ],
+      "text": "leswao la potšišo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❔",
+      "aliases": [
+        "leswao le letšhweu la hlakanya"
+      ],
+      "text": "leswao le letšhweu la hlakanya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❕",
+      "aliases": [
+        "leswao le legolo la makalo le letšhweu"
+      ],
+      "text": "leswao le legolo la makalo le letšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❗",
+      "aliases": [
+        "leswao la go makala"
+      ],
+      "text": "leswao la go makala",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚕",
+      "aliases": [
+        "leswao la kalafo"
+      ],
+      "text": "leswao la kalafo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "♻",
+      "aliases": [
+        "leswao la go hwetša gape"
+      ],
+      "text": "leswao la go hwetša gape",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚜",
+      "aliases": [
+        "fluer-de-lis"
+      ],
+      "text": "fluer-de-lis",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⭕",
+      "aliases": [
+        "leswao le legolo la nkgokolo"
+      ],
+      "text": "leswao le legolo la nkgokolo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✅",
+      "aliases": [
+        "leswao le legolo la go hlola le letšhweu"
+      ],
+      "text": "leswao le legolo la go hlola le letšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "☑",
+      "aliases": [
+        "lepokisi la palote le kgethilwego"
+      ],
+      "text": "lepokisi la palote le kgethilwego",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✔",
+      "aliases": [
+        "leswao le legolo la go kgetha"
+      ],
+      "text": "leswao le legolo la go kgetha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❌",
+      "aliases": [
+        "sefapano"
+      ],
+      "text": "sefapano",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❎",
+      "aliases": [
+        "konope ya leswao"
+      ],
+      "text": "konope ya leswao",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "➰",
+      "aliases": [
+        "meriri e tatanego"
+      ],
+      "text": "meriri e tatanego",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "➿",
+      "aliases": [
+        "meriri e tatanego gabedi"
+      ],
+      "text": "meriri e tatanego gabedi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✳",
+      "aliases": [
+        "naletšana ya marungwana a seswai"
+      ],
+      "text": "naletšana ya marungwana a seswai",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "✴",
+      "aliases": [
+        "naledi ya khutloseswai"
+      ],
+      "text": "naledi ya khutloseswai",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "❇",
+      "aliases": [
+        "benya"
+      ],
+      "text": "benya",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "©",
+      "aliases": [
+        "khopiraete"
+      ],
+      "text": "khopiraete",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "®",
+      "aliases": [
+        "ngwadišitšwe"
+      ],
+      "text": "ngwadišitšwe",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "™",
+      "aliases": [
+        "leswao la kgwebo"
+      ],
+      "text": "leswao la kgwebo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "Ⓜ",
+      "aliases": [
+        "nkgokolo ya M"
+      ],
+      "text": "nkgokolo ya M",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚫",
+      "aliases": [
+        "nkgokolo ye ntsho"
+      ],
+      "text": "nkgokolo ye ntsho",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⚪",
+      "aliases": [
+        "nkgokolo e tšhweu"
+      ],
+      "text": "nkgokolo e tšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⬛",
+      "aliases": [
+        "khutlonne e ntsho e kgolo"
+      ],
+      "text": "khutlonne e ntsho e kgolo",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "⬜",
+      "aliases": [
+        "khutlonne e kgolo tšhweu"
+      ],
+      "text": "khutlonne e kgolo tšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "◼",
+      "aliases": [
+        "bogare bja ngwedi o moso"
+      ],
+      "text": "bogare bja ngwedi o moso",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "◻",
+      "aliases": [
+        "bogare bja ngwedi o motšhweu"
+      ],
+      "text": "bogare bja ngwedi o motšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "◾",
+      "aliases": [
+        "khutlonne e ntsho ya bogareng"
+      ],
+      "text": "khutlonne e ntsho ya bogareng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "◽",
+      "aliases": [
+        "khutlonee e tšhweu ya bogareng"
+      ],
+      "text": "khutlonee e tšhweu ya bogareng",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "▪",
+      "aliases": [
+        "khutlonne e nyenyane e ntsho"
+      ],
+      "text": "khutlonne e nyenyane e ntsho",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "nso",
+      "lookup_text": "▫",
+      "aliases": [
+        "khutlonne e nyenyane e tšhweu"
+      ],
+      "text": "khutlonne e nyenyane e tšhweu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "unreviewed_symbol_candidates": {
+    "☯": {
+      "name": "yin yang",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♈": {
+      "name": "Aries",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♉": {
+      "name": "Taurus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♊": {
+      "name": "Gemini",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♋": {
+      "name": "Cancer",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♌": {
+      "name": "Leo",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♍": {
+      "name": "Virgo",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♎": {
+      "name": "Libra",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♐": {
+      "name": "Sagittarius",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♑": {
+      "name": "Capricorn",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♒": {
+      "name": "Aquarius",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "♓": {
+      "name": "Pisces",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    },
+    "⛎": {
+      "name": "Ophiuchus",
+      "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
+    }
+  },
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

@@ -1,0 +1,269 @@
+{
+  "format": "dordiai-character-name-sources",
+  "format_version": 1,
+  "language": "sat",
+  "sources": {
+    "cldr_annotations": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/sat/annotations.json",
+      "sha256": "1d900c3f774bde448f26844eeaa10cb0198fcbf3c3d6dff3327e85ad8ff254f0",
+      "license": "Unicode-3.0"
+    },
+    "cldr_characters": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/sat/characters.json",
+      "sha256": "0f391f95647e5bef08c161f31d8e5f40e677a1158d17827d46b34a751298d43d",
+      "license": "Unicode-3.0"
+    },
+    "curated_primary_modifier_names": {
+      "url": "https://www.unicode.org/L2/L2005/05243r-n2984-ol-chiki.pdf",
+      "sha256": "fb04ec4fa6b390ed9e5e4fc594fe33484ddb33ec548a28540c453326f47019fc",
+      "title": "Final proposal to encode the Ol Chiki script in the UCS, N2984R/L2/05-243R",
+      "author": "Michael Everson",
+      "date": "2005-09-21",
+      "location": "Processing items 1–6, pages 2–3",
+      "role": "Explicit native-script modifier names, transcoded from the proposal’s legacy Ol Chiki font encoding using its code chart",
+      "license_note": "Individual factual names transcribed with attribution; source PDF and embedded fonts are not redistributed",
+      "native_pronunciation_verified": false
+    }
+  },
+  "missing_sources": [
+    "nvda_symbols",
+    "nvda_descriptions"
+  ],
+  "letter_names": {},
+  "symbol_names": {
+    "‾": "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ",
+    "‽": "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ",
+    "‸": "ᱠᱮᱨᱮᱴ",
+    "⁂": "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ",
+    "ᱸ": "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ",
+    "ᱹ": "ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+    "ᱺ": "ᱢᱩᱸ ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+    "ᱻ": "ᱨᱮᱞᱟ",
+    "ᱼ": "ᱯᱷᱟᱨᱠᱟ",
+    "ᱽ": "ᱚᱦᱚᱫ"
+  },
+  "phonetic_descriptions": {},
+  "duplicate_phonetic_keys": [],
+  "exemplar_units": [
+    "ᱚ",
+    "ᱛ",
+    "ᱜ",
+    "ᱝ",
+    "ᱞ",
+    "ᱟ",
+    "ᱠ",
+    "ᱡ",
+    "ᱢ",
+    "ᱣ",
+    "ᱤ",
+    "ᱥ",
+    "ᱦ",
+    "ᱧ",
+    "ᱨ",
+    "ᱩ",
+    "ᱪ",
+    "ᱫ",
+    "ᱬ",
+    "ᱭ",
+    "ᱮ",
+    "ᱯ",
+    "ᱰ",
+    "ᱱ",
+    "ᱲ",
+    "ᱳ",
+    "ᱴ",
+    "ᱵ",
+    "ᱶ",
+    "ᱷ",
+    "ᱸ",
+    "ᱹ",
+    "ᱺ",
+    "ᱻ",
+    "ᱼ",
+    "ᱽ"
+  ],
+  "missing_ordinary_letter_names": [
+    "ᱚ",
+    "ᱛ",
+    "ᱜ",
+    "ᱝ",
+    "ᱞ",
+    "ᱟ",
+    "ᱠ",
+    "ᱡ",
+    "ᱢ",
+    "ᱣ",
+    "ᱤ",
+    "ᱥ",
+    "ᱦ",
+    "ᱧ",
+    "ᱨ",
+    "ᱩ",
+    "ᱪ",
+    "ᱫ",
+    "ᱬ",
+    "ᱭ",
+    "ᱮ",
+    "ᱯ",
+    "ᱰ",
+    "ᱱ",
+    "ᱲ",
+    "ᱳ",
+    "ᱴ",
+    "ᱵ",
+    "ᱶ",
+    "ᱷ"
+  ],
+  "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "‾",
+      "aliases": [
+        "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ"
+      ],
+      "text": "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "‽",
+      "aliases": [
+        "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ"
+      ],
+      "text": "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "‸",
+      "aliases": [
+        "ᱠᱮᱨᱮᱴ"
+      ],
+      "text": "ᱠᱮᱨᱮᱴ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "⁂",
+      "aliases": [
+        "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ"
+      ],
+      "text": "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "ᱸ",
+      "aliases": [
+        "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ"
+      ],
+      "text": "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "curated_primary_modifier_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "ᱹ",
+      "aliases": [
+        "ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ"
+      ],
+      "text": "ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "curated_primary_modifier_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "ᱺ",
+      "aliases": [
+        "ᱢᱩᱸ ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ"
+      ],
+      "text": "ᱢᱩᱸ ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "curated_primary_modifier_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "ᱻ",
+      "aliases": [
+        "ᱨᱮᱞᱟ"
+      ],
+      "text": "ᱨᱮᱞᱟ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "curated_primary_modifier_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "ᱼ",
+      "aliases": [
+        "ᱯᱷᱟᱨᱠᱟ"
+      ],
+      "text": "ᱯᱷᱟᱨᱠᱟ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "curated_primary_modifier_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "ᱽ",
+      "aliases": [
+        "ᱚᱦᱚᱫ"
+      ],
+      "text": "ᱚᱦᱚᱫ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "curated_primary_modifier_names",
+      "acoustic_validation": "pending"
+    }
+  ],
+  "semantics": {
+    "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
+    "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
+    "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
+    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "runtime_enabled": false,
+    "native_pronunciation_verified": false
+  },
+  "curated_modifier_names": [
+    "ᱸ",
+    "ᱹ",
+    "ᱺ",
+    "ᱻ",
+    "ᱼ",
+    "ᱽ"
+  ],
+  "unreviewed_symbol_candidates": {},
+  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_repertoire": [],
+  "letter_names_ready": false
+}

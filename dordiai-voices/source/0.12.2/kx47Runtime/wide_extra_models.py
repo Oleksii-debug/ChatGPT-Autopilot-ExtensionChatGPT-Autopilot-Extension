@@ -5,18 +5,22 @@ A validated source identity is required before advertising conversion to the
 user-selected voice. Native inference can be probed separately during preparation.
 """
 from functools import lru_cache
+from collections import OrderedDict
 import json
 from pathlib import Path
 import re
 import unicodedata
+from threading import RLock
 
-AVAILABLE = {"sat"}
+AVAILABLE = {"sat", "st", "xh", "ig", "ln", "nd"}
+_ENGINES = OrderedDict()
+_ENGINE_LOCK = RLock()
 
 
 def folder(code, models):
-    if code != "sat":
+    if code not in AVAILABLE:
         raise KeyError(code)
-    return Path(models) / "ExtraLanguages" / "sat"
+    return Path(models) / "ExtraLanguages" / code
 
 
 def available(models, require_source=True):
@@ -24,6 +28,10 @@ def available(models, require_source=True):
     for code in AVAILABLE:
         root = folder(code, models)
         required = ("model.onnx", "config.json") + (("source.npy",) if require_source else ())
+        if code in {"st", "xh"}:
+            required += ("runtime_config.json", "upstream-vocab.json", "upstream-tokenizer_config.json")
+        if code in {"ig", "ln", "nd"}:
+            required += ("runtime_config.json",)
         if all((root / name).is_file() for name in required):
             result.add(code)
     return result
@@ -55,6 +63,7 @@ class NativeSantali:
         self.rate = int(self.config["audio"]["sample_rate"])
         if session_factory is None:
             import onnxruntime as ort
+            ort.disable_telemetry_events()
             options = ort.SessionOptions()
             options.intra_op_num_threads = max(1, int(threads))
             options.inter_op_num_threads = 1
@@ -67,8 +76,15 @@ class NativeSantali:
             self.session = DeferredSession(lambda: session_factory(self.folder / "model.onnx"), owner)
 
     def audio(self, text, character=False, rate=1.0):
+        session = self.session
+        if session is None:
+            raise RuntimeError("Santali carrier is closed")
         if character:
-            raise ValueError("Native Santali symbol names need a validated navigation/letter resource; phonemes are not letter names")
+            from character_names import spoken_name
+            try:
+                text = spoken_name("sat", text, directory=self.folder.parents[1] / "CharacterNames")
+            except LookupError as error:
+                raise ValueError("Native Santali symbol names need a validated navigation/letter resource; phonemes are not letter names") from error
         if self.owner is not None:
             self.owner.check_cancelled()
         sequence = phoneme_ids(text, self.config)
@@ -84,19 +100,50 @@ class NativeSantali:
             "input": ids,
             "input_lengths": np.asarray([ids.shape[1]], dtype=np.int64),
             "scales": np.asarray([inference["noise_scale"], inference["length_scale"] / speed, inference["noise_w"]], dtype=np.float32),
-            "sid": np.asarray([0], dtype=np.int64),
+            # Pinned single-speaker export folds sid=0 into the graph; unlike
+            # the model-card example, its verified ONNX signature has no sid input.
         }
-        output = self.session.run(None, feed)[0].reshape(-1).astype(np.float32, copy=False)
+        output = session.run(None, feed)[0].reshape(-1).astype(np.float32, copy=False)
         if self.owner is not None:
             self.owner.check_cancelled()
         if not output.size or not np.isfinite(output).all():
             raise ValueError("Santali model returned invalid audio")
         return output
 
+    def close(self):
+        self.session = None
 
-@lru_cache(maxsize=2)
-def _engine(code, models, owner=None):
+
+def _make_engine(code, models, owner=None):
+    if code in {"st", "xh"}:
+        from wide_simba import NativeSimba
+        return NativeSimba(folder(code, models), owner=owner)
+    if code in {"ig", "ln", "nd"}:
+        from wide_coqui_onnx import NativeCoqui
+        return NativeCoqui(folder(code, models), owner=owner)
     return NativeSantali(folder(code, models), owner=owner)
+
+
+def _engine(code, models, owner=None):
+    key = (code, models, owner)
+    with _ENGINE_LOCK:
+        if key in _ENGINES:
+            _ENGINES.move_to_end(key)
+            return _ENGINES[key]
+        while len(_ENGINES) >= 2:
+            _, previous = _ENGINES.popitem(last=False)
+            previous.close()
+        value = _make_engine(code, models, owner)
+        _ENGINES[key] = value
+        return value
+
+
+def clear_engines(owner=None):
+    """Release native graph cycles on eviction/worker close, not at a later GC."""
+    with _ENGINE_LOCK:
+        for key in tuple(_ENGINES):
+            if owner is None or key[2] is owner:
+                _ENGINES.pop(key).close()
 
 
 def audio(code, text, character=False, *, models, rate=1.0, owner=None):

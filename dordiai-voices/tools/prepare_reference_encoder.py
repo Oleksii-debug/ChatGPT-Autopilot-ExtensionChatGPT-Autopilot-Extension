@@ -65,13 +65,18 @@ def download_pinned(record, output):
     return output
 
 
-def prepare(output=DEFAULT_OUTPUT, variants=("fp32", "q8")):
+def prepare(output=DEFAULT_OUTPUT, variants=("fp32", "q8"), verify_only=False):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     records = {}
     for variant in variants:
         record = ENCODERS[variant]
-        path = download_pinned(record, output / record["filename"])
+        path = output / record["filename"]
+        if verify_only:
+            if not path.is_file() or path.stat().st_size != record["size_bytes"] or file_hash(path) != record["sha256"]:
+                raise ValueError("Missing or invalid pinned encoder during offline verification")
+        else:
+            path = download_pinned(record, path)
         records[variant] = {**record, "url": f"https://huggingface.co/{REPO}/resolve/{REVISION}/{record['filename']}",
                             "verified_sha256": file_hash(path)}
     provenance = {}
@@ -79,6 +84,8 @@ def prepare(output=DEFAULT_OUTPUT, variants=("fp32", "q8")):
         url = f"https://huggingface.co/{REPO}/resolve/{REVISION}/{name}"
         destination = output / ("reference-encoder-" + name)
         if not destination.is_file():
+            if verify_only:
+                raise ValueError("Missing pinned provenance during offline verification")
             with urllib.request.urlopen(url, timeout=30) as response:
                 contents = response.read(1024 * 1024 + 1)
             if len(contents) > 1024 * 1024:
@@ -90,6 +97,7 @@ def prepare(output=DEFAULT_OUTPUT, variants=("fp32", "q8")):
 
 def load_encoder(path, threads=2):
     import onnxruntime as ort
+    ort.disable_telemetry_events()
     options = ort.SessionOptions()
     options.intra_op_num_threads = max(1, int(threads))
     options.inter_op_num_threads = 1
@@ -137,6 +145,7 @@ def extract_embedding(audio, sample_rate, encoder, *, threads=2):
 def validate(output=DEFAULT_OUTPUT, sample=None, baseline_embedding=None, threads=2):
     import numpy as np
     import onnxruntime as ort
+    ort.disable_telemetry_events()
     import soundfile as sf
     output = Path(output)
     if sample is None:
@@ -196,6 +205,7 @@ def main():
     parser.add_argument("--metadata", type=Path, default=ROOT / "evidence/ref_encoder_metadata.json")
     parser.add_argument("--variant", choices=("fp32", "q8", "both"), default="both")
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--verify-only", action="store_true", help="Use existing pinned files only; never access the network")
     parser.add_argument("--sample", type=Path)
     parser.add_argument("--baseline-embedding", type=Path)
     parser.add_argument("--threads", type=int, default=2)
@@ -205,7 +215,7 @@ def main():
     if args.embedding_output is not None and args.sample is None:
         parser.error("An actual --sample waveform is required to generate source.npy")
     variants = tuple(ENCODERS) if args.variant == "both" else (args.variant,)
-    files, provenance = prepare(args.output, variants)
+    files, provenance = prepare(args.output, variants, verify_only=args.verify_only)
     result = {"format": 1, "repo_id": REPO, "revision": REVISION, "license": "MIT",
               "upstream_weights": "myshell-ai/OpenVoiceV2", "files": files, "provenance": provenance,
               "preferred_calibration_variant": "fp32", "validation": None}

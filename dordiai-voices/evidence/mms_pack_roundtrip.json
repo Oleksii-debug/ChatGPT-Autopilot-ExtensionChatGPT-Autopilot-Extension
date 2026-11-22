@@ -1,0 +1,23 @@
+{
+  "kind": "installed-mms-native-carrier-roundtrip",
+  "code": "ay",
+  "minimum_core_version": "0.13.1-dev.1",
+  "legacy_core_rejected": true,
+  "installed_files": 5,
+  "removed_files": 5,
+  "actual_cpu_onnx_synthesis": true,
+  "probe_text_kind": "native-grapheme-smoke",
+  "sample_rate": 16000,
+  "audio_seconds": 4.16,
+  "elapsed_seconds": 2.2664911179999763,
+  "audio_sha256": "425fdc2c1f254ee14d754571b01886982c6ee47a6403e88ba18a4bbc6a897235",
+  "source_shape": [
+    1,
+    256,
+    1
+  ],
+  "clean_uninstall": true,
+  "native_pronunciation_verified": false,
+  "nvda_latency_acceptance": false,
+  "windows_nvda_verified": false
+}

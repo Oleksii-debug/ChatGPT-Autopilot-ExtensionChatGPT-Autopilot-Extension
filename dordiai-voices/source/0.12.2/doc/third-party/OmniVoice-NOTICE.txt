@@ -1,0 +1,18 @@
+OmniVoice optional ONNX backend
+
+OmniVoice model/inference source: https://github.com/k2-fsa/OmniVoice
+Code copyright: 2026 Xiaomi Corp., authors including Han Zhu.
+Pinned code revision: 4d5ed0f0621507e8aebd4560bde316549e85c553
+Code license: Apache License, Version 2.0.
+The retained omnivoice_duration.py includes its upstream copyright/license header.
+wide_omnivoice_onnx.py ports the conditional/unconditional input construction,
+classifier-free guidance, shifted unmasking schedule, layer penalty and position
+sampling procedure into NumPy for ONNX Runtime inference without PyTorch.
+
+Pretrained OmniVoice weights are CC-BY-NC according to the official model card:
+https://huggingface.co/k2-fsa/OmniVoice
+ONNX conversion: https://huggingface.co/gaber/OmniVoice-ONNX-CPU-INT8
+Pinned ONNX revision: efddec1c39169c79e57eb65f1a7b650d0906a182
+Converter metadata does not remove the upstream weight license conditions.
+The optional resource pack includes the Higgs Audio 2 and Llama 3 license texts
+provided by the exporter. No commercial relicensing is asserted.

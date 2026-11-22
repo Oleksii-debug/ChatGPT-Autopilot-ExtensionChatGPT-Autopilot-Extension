@@ -1,0 +1,5 @@
+Character symbol replacements and phonetic examples derive from pinned official NVDA locale data (GPL-2.0-or-later), copyright NVDA Contributors.
+Additional explicit symbol annotations and exemplar glyph sets derive from pinned Unicode CLDR JSON (Unicode-3.0), copyright Unicode, Inc.
+Curated ordinary alphabet names and Santali modifier names are factual transcriptions attributed in each language manifest; original books/PDFs/fonts are not redistributed.
+Each language JSON retains source URLs, SHA-256 and semantic type. No English fallback or inferred alphabet names.
+Ordinary alphabet names, acoustic correctness and model frontend support require separate validation.
