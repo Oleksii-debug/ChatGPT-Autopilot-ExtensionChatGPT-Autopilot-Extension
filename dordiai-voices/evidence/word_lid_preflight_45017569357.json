@@ -1,0 +1,151 @@
+{
+  "run": 45017569357,
+  "job": 137193100912,
+  "source_commit": "656a46c18eae2b859f7cc6a7d642b1e99a9ababd",
+  "source": "Parsed exact JSON printed in completed job log; UTF-8 reserialization",
+  "scope": "actual pinned source acquisition/schema/split audit; no model installation or language-quality acceptance",
+  "trained_model_installed": false,
+  "classifier_language_coverage_verified": false,
+  "sources": [
+    {
+      "id": "aksharantar-doi",
+      "language": "doi",
+      "source_language": "doi",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/doi.zip",
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "bytes": 59706,
+      "sha256": "a5f79317baa51be6815d89b1e10fd86c5456fb2877b26bdfb5b979b102b33885",
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "members": [
+        {
+          "name": "doi/",
+          "bytes": 0
+        },
+        {
+          "name": "doi/doi_test.json",
+          "bytes": 295703
+        },
+        {
+          "name": "doi/doi_train.json",
+          "bytes": 236356
+        }
+      ],
+      "observed_schemas": [
+        {
+          "member": "doi/doi_test.json",
+          "keys": [
+            "english word",
+            "native word",
+            "score",
+            "source",
+            "unique_identifier"
+          ],
+          "identifier_prefix": "doi1",
+          "source_tag": "Ak-Freq"
+        },
+        {
+          "member": "doi/doi_train.json",
+          "keys": [
+            "english word",
+            "native word",
+            "score",
+            "source",
+            "unique_identifier"
+          ],
+          "identifier_prefix": "doi3",
+          "source_tag": "Ak-Freq"
+        }
+      ]
+    },
+    {
+      "id": "aksharantar-brx",
+      "language": "brx",
+      "source_language": "brx",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/brx.zip",
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "bytes": 953631,
+      "sha256": "4117f9dab514ca613174fd0af6c79fcd74233c6f2a1916e8cc73de0f8ffc0d1b",
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "members": [
+        {
+          "name": "brx_test.json",
+          "bytes": 502917
+        },
+        {
+          "name": "brx_train.json",
+          "bytes": 5409108
+        },
+        {
+          "name": "brx_valid.json",
+          "bytes": 454769
+        }
+      ],
+      "observed_schemas": [
+        {
+          "member": "brx_test.json",
+          "keys": [
+            "english word",
+            "native word",
+            "source",
+            "unique_identifier"
+          ],
+          "identifier_prefix": "brx1",
+          "source_tag": "AK-Freq"
+        },
+        {
+          "member": "brx_train.json",
+          "keys": [
+            "english word",
+            "native word",
+            "score",
+            "source",
+            "unique_identifier"
+          ],
+          "identifier_prefix": "brx1",
+          "source_tag": "AK-Freq"
+        },
+        {
+          "member": "brx_valid.json",
+          "keys": [
+            "english word",
+            "native word",
+            "score",
+            "source",
+            "unique_identifier"
+          ],
+          "identifier_prefix": "brx1",
+          "source_tag": "AK-Uni"
+        }
+      ]
+    }
+  ],
+  "prepared_corpora": {
+    "preflight": {
+      "normalised_extra_spellings": 42068,
+      "extra_labels_present": {
+        "brx": 38644,
+        "doi": 3467
+      },
+      "extra_ambiguous_spellings": 43,
+      "publisher_holdout_spellings": 6822,
+      "baseline_hash_training_spellings_reassigned": 0,
+      "combined_split_spellings": {
+        "train": 334349,
+        "validation": 45095,
+        "test": 45561
+      },
+      "combined_spelling_overlap": {
+        "train_validation": 0,
+        "train_test": 0,
+        "validation_test": 0
+      },
+      "corpus_sha256": "d38373eb05c582764c8ec75e319697feb150b714258bface25188d3dc141ad05",
+      "source_lock_sha256": "726672b4550f44d89e2f26eaf04056ebf6cef58156ffe021c8392694449c94d4",
+      "model_quality_verified": false
+    }
+  }
+}

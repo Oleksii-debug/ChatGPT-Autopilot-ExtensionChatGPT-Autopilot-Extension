@@ -1,0 +1,167 @@
+name: Prepare supplementary same-voice banks
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+    inputs:
+      core_run_id:
+        description: Trusted immutable core8 artifact run
+        required: true
+        default: '45005894766'
+      core_artifact_name:
+        description: Exact artifact name containing immutable core8 addon
+        required: true
+        default: dordiai-voices-development-core
+      expected_core_sha256:
+        description: Full trusted SHA256 of core8 nvda-addon
+        required: true
+        default: '568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6'
+      overlay_version:
+        description: Immutable data-overlay version
+        required: true
+        default: '0.13.1-banks.1'
+      max_new_clips:
+        description: '0=complete; small positive value=supervised trial, no overlay published'
+        required: true
+        default: '0'
+      resume_run_id:
+        description: Prior run whose supplementary-bank-state artifact should resume
+        required: false
+      resume_artifact_name:
+        description: Prior state artifact name
+        required: true
+        default: supplementary-bank-state
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[banks-trial]'))
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PYTHONUTF8: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      HF_DATASETS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      CORE_EXPECTED_SHA256: ${{ github.event_name == 'push' && '568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6' || inputs.expected_core_sha256 }}
+      CORE_ARTIFACT_RUN: ${{ inputs.core_run_id || '45005894766' }}
+      CORE_ARTIFACT_NAME: ${{ inputs.core_artifact_name || 'dordiai-voices-development-core' }}
+      OVERLAY_VERSION: ${{ inputs.overlay_version || '0.13.1-banks.1' }}
+      MAX_NEW_CLIPS: ${{ github.event_name == 'push' && '2' || inputs.max_new_clips }}
+      RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Compile and test orchestration and overlay safety
+        working-directory: dordiai-voices
+        run: |
+          python -m py_compile tools/generate_supplementary_banks.py tools/prepared_bank_overlay.py tools/inspect_character_banks.py
+          python -m unittest discover -s tests -p "test_generate_supplementary_banks.py"
+          python -m unittest discover -s tests -p "test_prepared_bank_overlay.py"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ env.CORE_ARTIFACT_NAME }}
+          run-id: ${{ env.CORE_ARTIFACT_RUN }}
+          github-token: ${{ github.token }}
+          path: core-artifact
+      - name: Establish short owned runtime and validate immutable source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:CORE_EXPECTED_SHA256 -notmatch '^[a-f0-9]{64}$') { throw 'Full trusted lowercase core SHA256 required' }
+          if ($env:OVERLAY_VERSION -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid immutable overlay version' }
+          if ($env:MAX_NEW_CLIPS -notmatch '^[0-9]+$') { throw 'Invalid supervised trial budget' }
+          $addons = @(Get-ChildItem -LiteralPath core-artifact -Recurse -File -Filter '*.nvda-addon')
+          if ($addons.Count -ne 1) { throw 'Expected exactly one immutable core addon' }
+          if ($addons[0].Name -ne 'dordiai-voices-0.13.1-dev.8.nvda-addon') { throw 'Expected the immutable dev8 artifact filename' }
+          $actual = (Get-FileHash -LiteralPath $addons[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:CORE_EXPECTED_SHA256) { throw 'Core artifact SHA mismatch' }
+          $work = Join-Path 'C:\DordiaiBanks' $env:GITHUB_RUN_ID
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          New-Item -ItemType Directory -Force -Path 'bank-overlay-output' | Out-Null
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value ('BANK_WORK_ROOT=' + $work)
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value ('CORE_ARCHIVE=' + $addons[0].FullName)
+          $overlay = Join-Path $env:GITHUB_WORKSPACE ('bank-overlay-output/dordiai-supplementary-banks-' + $env:OVERLAY_VERSION + '.zip')
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value ('BANK_OVERLAY_ARCHIVE_PATH=' + $overlay)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: ${{ inputs.resume_run_id != '' }}
+        with:
+          name: ${{ inputs.resume_artifact_name }}
+          run-id: ${{ inputs.resume_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ env.BANK_WORK_ROOT }}/state
+      - name: Render genuine misses and retain verified same-voice spaces
+        working-directory: dordiai-voices
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $destination = $env:BANK_OVERLAY_ARCHIVE_PATH
+          $arguments = @('tools/generate_supplementary_banks.py',
+            '--core', $env:CORE_ARCHIVE, '--expected-core-sha256', $env:CORE_EXPECTED_SHA256,
+            '--work-root', $env:BANK_WORK_ROOT, '--output', $destination,
+            '--version', $env:OVERLAY_VERSION, '--probe-source', 'tools/windows_nvda_probe.py',
+            '--user-provided-provenance', '--expected-voice-count', '45',
+            '--timeout', '90', '--max-seconds', '2400', '--max-new-clips', $env:MAX_NEW_CLIPS)
+          if ($env:RESUME_RUN_ID) { $arguments += '--resume' }
+          & python @arguments
+          $code = $LASTEXITCODE
+          if ([int]$env:MAX_NEW_CLIPS -gt 0) {
+            if ($code -ne 2) { throw ('Supervised trial expected explicit pause2; got ' + $code) }
+            $state = Join-Path $env:BANK_WORK_ROOT 'state'
+            $report = Get-Content -LiteralPath (Join-Path $state 'generation-report.json') -Raw | ConvertFrom-Json
+            if ($report.status -ne 'paused-not-published' -or
+                $report.source_core_sha256 -ne $env:CORE_EXPECTED_SHA256 -or
+                $report.planned_clips -ne 3330 -or
+                $report.completed_clips -ne [int]$env:MAX_NEW_CLIPS -or
+                $report.new_worker_clips -lt 1 -or
+                $null -eq $report.worker_shutdown.exit_code -or
+                (Test-Path -LiteralPath $destination)) { throw 'Trial state did not attest actual bounded generation/no publication' }
+            $clips = @(Get-ChildItem -LiteralPath (Join-Path $state 'clips') -Recurse -File -Filter 'clip.json')
+            if ($clips.Count -ne [int]$env:MAX_NEW_CLIPS) { throw 'Trial clip records differ from its finite budget' }
+            $actualNeural = 0
+            foreach ($clipFile in $clips) {
+              $clip = Get-Content -LiteralPath $clipFile.FullName -Raw | ConvertFrom-Json
+              if ($clip.status -ne 'complete' -or $clip.source_core_sha256 -ne $env:CORE_EXPECTED_SHA256 -or $clip.audio.nonzero_samples -le 0) { throw 'Invalid completed trial clip' }
+              $pcm = Join-Path $clipFile.DirectoryName 'clip.pcm'
+              if ((Get-FileHash -LiteralPath $pcm -Algorithm SHA256).Hash.ToLowerInvariant() -ne $clip.pcm_sha256) { throw 'Trial PCM checksum differs' }
+              if ($clip.origin.kind -eq 'actual-private-worker') {
+                if ($clip.origin.path -ne 'kx47Runtime/nvda_worker.py' -or
+                    $clip.origin.request.profile -ne $clip.profile -or $clip.origin.request.character -ne $false -or
+                    $clip.origin.request.nativeProfile -ne ($clip.language -in @('ru','en-us')) -or
+                    $clip.origin.request.nativeEnglish -ne $false) { throw 'Trial changed actual native request identity' }
+                foreach ($renderer in $clip.worker.renderers) {
+                  if ($renderer.profile -ne $clip.profile -or ($renderer.speaker -and $renderer.speaker -ne $clip.profile)) { throw 'Trial renderer borrowed another voice' }
+                }
+                $actualNeural += 1
+              } elseif ($clip.origin.kind -ne 'retained-core8-prepared-navigation') { throw 'Unknown trial origin' }
+            }
+            if ($actualNeural -lt 1) { throw 'No actual NN result in supervised trial' }
+            @{ status='passed-supervised-pause'; actual_new_neural_clips=$actualNeural; physical_audio_verified=$false; full_overlay_published=$false } |
+              ConvertTo-Json | Set-Content -LiteralPath (Join-Path $state 'supervised-trial-verdict.json') -Encoding utf8
+            exit 0
+          }
+          if ($code -ne 0) { exit $code }
+      - name: Persist compact resumable state, never model weights
+        if: ${{ always() && env.BANK_WORK_ROOT != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: supplementary-bank-state
+          path: ${{ env.BANK_WORK_ROOT }}/state
+          compression-level: 1
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Persist completed standalone data overlay
+        if: ${{ always() && env.BANK_OVERLAY_ARCHIVE_PATH != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: supplementary-bank-overlay-${{ env.OVERLAY_VERSION }}
+          path: ${{ env.BANK_OVERLAY_ARCHIVE_PATH }}
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 30
