@@ -117,7 +117,8 @@ class PlainTextFixtureAndAccountingTests(unittest.TestCase):
 class GenuineHandlerAndCompositionTests(unittest.TestCase):
     def test_plugin_uses_real_file_native_textinfo_and_unchanged_global_read_command(self):
         source = helper.PLUGIN_CODE
-        for marker in ("control.LoadFile(str(path))","focus.makeTextInfo(textInfos.POSITION_CARET)",
+        for marker in ("control.LoadFile(str(path))","focus.makeTextInfo(text_infos.POSITION_CARET)",
+                       "focus.makeTextInfo(text_infos.POSITION_ALL)","speech.speakTextInfo(info, unit=read_unit",
                        "info.getTextWithFields()","globalCommands.commands.script_reportCurrentLine",
                        "scriptHandler.executeScript","scriptHandler.clearLastScript()",
                        "originalSpeechSequence",'point.register(_plain_on_pre_speech)',
@@ -164,6 +165,40 @@ class GenuineHandlerAndCompositionTests(unittest.TestCase):
         self.assertIn("def start_actual_plain_text_probe(",base.PROBE_PLUGIN)
         with self.assertRaises(ValueError):
             helper.install_plain_text_probe(base)
+
+    def test_complete100_word_read_uses_actual_all_range_and_retains1024_line_diagnostic(self):
+        tree=ast.parse(helper.PLUGIN_CODE)
+        function=next(node for node in tree.body if isinstance(node,ast.FunctionDef)
+                      and node.name=="_plain_read_range")
+        namespace={}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[function],type_ignores=[])),
+                     "genuine-range-choice-logic","exec"),namespace)
+        calls=[]
+        line=types.SimpleNamespace(text="x"*1024,expand=lambda unit:calls.append(("expand",unit)))
+        all_range=types.SimpleNamespace(text="x"*1137)
+        focus=types.SimpleNamespace(makeTextInfo=lambda position:(
+            calls.append(("range",position)) or (line if position=="caret" else all_range)))
+        ti=types.SimpleNamespace(POSITION_CARET="caret",POSITION_ALL="all",UNIT_LINE="line",UNIT_PARAGRAPH="paragraph")
+        info,observed_line,unit=namespace["_plain_read_range"](focus,ti,True)
+        self.assertIs(info,all_range)
+        self.assertIs(observed_line,line)
+        self.assertEqual(unit,"paragraph")
+        self.assertEqual(calls,[("range","caret"),("expand","line"),("range","all")])
+
+    def test_smaller_policy_cases_keep_genuine_current_line_range(self):
+        tree=ast.parse(helper.PLUGIN_CODE)
+        function=next(node for node in tree.body if isinstance(node,ast.FunctionDef)
+                      and node.name=="_plain_read_range")
+        namespace={}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[function],type_ignores=[])),
+                     "current-line-choice-logic","exec"),namespace)
+        line=types.SimpleNamespace(text="short",expand=lambda unit:None)
+        focus=types.SimpleNamespace(makeTextInfo=lambda position:line if position=="caret" else self.fail("Unexpected all-range query"))
+        ti=types.SimpleNamespace(POSITION_CARET="caret",POSITION_ALL="all",UNIT_LINE="line",UNIT_PARAGRAPH="paragraph")
+        info,observed_line,unit=namespace["_plain_read_range"](focus,ti,False)
+        self.assertIs(info,line)
+        self.assertIs(observed_line,line)
+        self.assertEqual(unit,"line")
 
     def test_stale_base_is_rejected_before_any_execution(self):
         with self.assertRaises(ValueError):

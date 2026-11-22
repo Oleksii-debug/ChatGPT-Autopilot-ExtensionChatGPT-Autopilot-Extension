@@ -1,0 +1,59 @@
+{
+  "format": "dordiai-owned-loopback-actual-summary",
+  "format_version": 1,
+  "run_id": 45034601082,
+  "job_id": 137245421711,
+  "source_commit": "4445d0930742f30923257e02645285db25bb7e3f",
+  "artifact": {
+    "id": 14758769853,
+    "size_bytes": 347685,
+    "sha256": "a6d50db1e3a201a3d1d8697c31a1d4d84a2ed2714e8e421dd7af551060566f65"
+  },
+  "unit_tests": {
+    "backend": 10,
+    "correlation_and_lease": 18,
+    "device_guards": 16,
+    "actual_windows_result": "pass"
+  },
+  "exact_report_bundle": {
+    "path": "evidence/loopback_calibration_45034601082.json.gz",
+    "size_bytes": 14403,
+    "sha256": "bd80a7ede12dedb59fefbcc20addaf7d9f5bd20d036c88ef8558ff34d889915b"
+  },
+  "status": "actual-calibration-not-correlated",
+  "physical_audio_verified": false,
+  "virtual_audio_verified": false,
+  "reference_all_submitted": true,
+  "captured_bytes": 1144320,
+  "captured_all_bytes_zero": true,
+  "zero_bytes_sha256": "aa8e5d29f4c74400e4417e742ff1c98689a8c4ceabca838ab76213fdc904cda2",
+  "capture_packets": 298,
+  "packet_flags_counts": {
+    "0": 297,
+    "1": 1
+  },
+  "device_positions_contiguous": true,
+  "qpc_100ns_strictly_increasing": true,
+  "native_call_counts": {
+    "Enumerate render endpoints": 1,
+    "Get render endpoint count": 1,
+    "Get render endpoint": 2,
+    "Resolve exact render endpoint": 1,
+    "Activate loopback IAudioClient": 1,
+    "Activate render IAudioClient": 1,
+    "IAudioClient.GetMixFormat": 1,
+    "Initialize shared LOOPBACK on eRender": 1,
+    "Initialize shared render same native format": 1,
+    "Get loopback IAudioCaptureClient": 1,
+    "Get IAudioRenderClient": 1,
+    "Get native render buffer size": 1,
+    "IAudioRenderClient.GetBuffer": 301,
+    "IAudioRenderClient.ReleaseBuffer": 301,
+    "Start render-loopback capture": 1,
+    "Start own marker render": 1,
+    "IAudioCaptureClient.GetNextPacketSize": 1479,
+    "Get render padding": 1181,
+    "IAudioCaptureClient.ReleaseBuffer": 298
+  },
+  "note": "SuccessfulAPIcalls/submittedcursor do not prove nonzero render mix; no render-buffer readback, endpoint/session mute or volume readings in this run. No volume/privacy/default/security changes performed."
+}
