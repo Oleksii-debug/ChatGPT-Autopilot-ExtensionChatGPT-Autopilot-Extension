@@ -1,5 +1,6 @@
 """Reconstruction tool semantics; no models or network are required for helpers."""
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -7,6 +8,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("all29_reproduction", ROOT / "tools/probe_mms_all_language_parity.py")
@@ -52,6 +54,109 @@ class ProcedureTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 tool.validate_output(report, (models,), overwrite=False)
             self.assertEqual(tool.validate_output(report, (models,), overwrite=True), report.resolve())
+
+
+class EvidenceFileSafetyTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
+    def symlink(self, link, target):
+        try:
+            link.symlink_to(target)
+        except (OSError, NotImplementedError):
+            self.skipTest("This account cannot create filesystem symlinks")
+
+    def test_report_nooverwrite_and_explicit_regular_replacement(self):
+        output = self.root / "report.json"
+        output.write_text("existing evidence", encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            tool.write_report(output, {"status": "new"})
+        self.assertEqual(output.read_text(encoding="utf-8"), "existing evidence")
+        tool.write_report(output, {"status": "new"}, overwrite=True)
+        self.assertEqual(json.loads(output.read_text(encoding="utf-8")), {"status": "new"})
+
+    def test_old_predictable_temp_symlink_cannot_modify_model(self):
+        model = self.root / "protected-model.onnx"
+        model.write_bytes(b"unchanged model")
+        output = self.root / "report.json"
+        old_temporary = output.with_suffix(".json.tmp")
+        self.symlink(old_temporary, model)
+        tool.write_report(output, {"status": "new"})
+        self.assertEqual(model.read_bytes(), b"unchanged model")
+        self.assertTrue(old_temporary.is_symlink())
+        self.assertEqual(json.loads(output.read_text(encoding="utf-8")), {"status": "new"})
+        self.assertEqual(list(self.root.glob("report.json.*.tmp")), [])
+
+    def test_linked_report_destination_is_rejected_before_resolution_or_write(self):
+        model = self.root / "protected-model.onnx"
+        model.write_bytes(b"unchanged model")
+        output = self.root / "report.json"
+        self.symlink(output, model)
+        with self.assertRaises(ValueError):
+            tool.validate_output(output, (), overwrite=True)
+        with self.assertRaises(ValueError):
+            tool.write_report(output, {"status": "new"}, overwrite=True)
+        self.assertEqual(model.read_bytes(), b"unchanged model")
+
+    def test_linked_wav_destination_cannot_truncate_model(self):
+        model = self.root / "protected-model.onnx"
+        model.write_bytes(b"unchanged model")
+        audio = self.root / "audio"
+        audio.mkdir()
+        self.symlink(audio / "ha-original-native.wav", model)
+        with self.assertRaises(ValueError):
+            tool.write_audio(audio, "ha-original-native", object(), 16000, overwrite=True)
+        self.assertEqual(model.read_bytes(), b"unchanged model")
+
+    def test_wav_nooverwrite_and_explicit_regular_replacement(self):
+        audio = self.root / "audio"
+        audio.mkdir()
+        output = audio / "probe.wav"
+        output.write_bytes(b"existing evidence")
+        with self.assertRaises(FileExistsError):
+            tool.write_audio(audio, "probe", object(), 16000)
+        self.assertEqual(output.read_bytes(), b"existing evidence")
+        prepared_pcm = SimpleNamespace(tobytes=lambda: b"\0\0" * 64)
+        with patch.object(tool, "pcm16", return_value=prepared_pcm):
+            tool.write_audio(audio, "probe", object(), 16000, overwrite=True)
+        with wave.open(str(output), "rb") as restored:
+            self.assertEqual((restored.getnchannels(), restored.getsampwidth(), restored.getframerate(), restored.getnframes()),
+                             (1, 2, 16000, 64))
+
+    def test_nonregular_outputs_are_rejected(self):
+        output = self.root / "report.json"
+        output.mkdir()
+        (output / "keep").write_bytes(b"keep")
+        with self.assertRaises(ValueError):
+            tool.write_report(output, {"status": "new"}, overwrite=True)
+        self.assertEqual((output / "keep").read_bytes(), b"keep")
+        audio = self.root / "audio"
+        (audio / "probe.wav").mkdir(parents=True)
+        with self.assertRaises(ValueError):
+            tool.write_audio(audio, "probe", object(), 16000, overwrite=True)
+        self.assertTrue((audio / "probe.wav").is_dir())
+
+    def test_failed_write_cleans_unique_temp_and_preserves_existing_evidence(self):
+        output = self.root / "report.json"
+        output.write_bytes(b"existing evidence")
+        def fail(stream):
+            stream.write(b"partial")
+            raise RuntimeError("simulated writer failure")
+        with self.assertRaisesRegex(RuntimeError, "simulated"):
+            tool._atomic_write(output, fail, overwrite=True)
+        self.assertEqual(output.read_bytes(), b"existing evidence")
+        self.assertEqual(list(self.root.glob("report.json.*.tmp")), [])
+
+    def test_final_hash_check_reports_modified_and_deleted_inputs(self):
+        paths = [self.root / name for name in ("model.onnx", "tokens.txt", "source.npy")]
+        for path in paths:
+            path.write_bytes(b"original")
+        expected = {str(path): tool.digest(path) for path in paths}
+        paths[0].write_bytes(b"changed")
+        paths[1].unlink()
+        self.assertEqual(set(tool.changed_fingerprints(expected)), {str(paths[0]), str(paths[1])})
 
 
 sys.path.insert(0, str(ROOT / "source/0.12.2/kx47Runtime"))
@@ -143,6 +248,37 @@ class TargetPolicyTests(unittest.TestCase):
         self.managed_asset(matching=False)
         with self.assertRaises(ValueError):
             self.bind()
+
+
+    def test_real_installed_profile_verifies_embedding_checksum(self):
+        import voice_assets as real_assets
+        real_assets.clear_cache()
+        self.addCleanup(real_assets.clear_cache)
+        references = self.root / "real-references"
+        directory = references / "packages/future_voice_50/1.0.0"
+        directory.mkdir(parents=True)
+        managed = directory / "embedding.npy"
+        managed.write_bytes(self.target.read_bytes())
+        document = {
+            "format": "dordiai-voice-package", "format_version": 1,
+            "id": "future_voice_50", "version": "1.0.0", "name": "Future voice",
+            "engine": {"id": "openvoice", "compatibility_version": 1},
+            "languages": ["uk"], "styles": ["neutral"],
+            "provenance": {"source": "permitted user profile", "license": "CC0-1.0"},
+            "files": {"embedding.npy": {"role": "target_embedding",
+                "sha256": tool.digest(managed), "size_bytes": managed.stat().st_size}},
+        }
+        (directory / "voice-package.json").write_text(json.dumps(document), encoding="utf-8")
+        (references / "packages" / real_assets.INDEX_NAME).write_text(
+            json.dumps({"format_version": 1, "active": {"future_voice_50": "1.0.0"}}), encoding="utf-8")
+        self.args.voice_references = references
+        binding = tool.target_identity(self.args, self.target.resolve(), voice_policy, real_assets)
+        self.assertEqual(binding["binding_kind"], "active-managed-profile-and-verified-asset-hash")
+        # Same size, so this specifically exercises the registered SHA check.
+        managed.write_bytes(b"x" * managed.stat().st_size)
+        real_assets.clear_cache()
+        with self.assertRaises(real_assets.PackageError):
+            tool.target_identity(self.args, self.target.resolve(), voice_policy, real_assets)
 
 
 try:

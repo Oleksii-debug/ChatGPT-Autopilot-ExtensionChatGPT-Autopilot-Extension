@@ -1,0 +1,50 @@
+name: Dordiai immutable character bank audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths: ["dordiai-voices/tools/inspect_character_banks.py", ".github/workflows/dordiai-character-bank-audit.yml"]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-character-bank-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  metadata:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[bank-audit]')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Preserve exact source bytes
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: dordiai-voices-development-core
+          run-id: 45005894766
+          github-token: ${{ github.token }}
+          path: dordiai-voices/dist
+      - name: Verify exact immutable development core
+        shell: python
+        run: |
+          import hashlib,pathlib
+          path=pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.8.nvda-addon")
+          with path.open("rb") as stream:
+              actual=hashlib.file_digest(stream,"sha256").hexdigest()
+          if actual!="568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6":
+              raise RuntimeError("Immutable core8 checksum mismatch")
+          print("Verified core8 "+actual,flush=True)
+      - name: Audit actual bank keys and clip bounds without running models
+        run: python dordiai-voices/tools/inspect_character_banks.py --core dordiai-voices/dist/dordiai-voices-0.13.1-dev.8.nvda-addon --profiles all --output dordiai-voices/character-bank-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-character-bank-audit-dev8
+          path: dordiai-voices/character-bank-audit.json
+          if-no-files-found: warn
+          retention-days: 7

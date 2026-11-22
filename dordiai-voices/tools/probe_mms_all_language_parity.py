@@ -24,7 +24,9 @@ import json
 import os
 from pathlib import Path
 import platform
+import stat
 import sys
+import tempfile
 from time import perf_counter
 from types import SimpleNamespace
 import wave
@@ -129,19 +131,72 @@ def mode(family, shared):
             os.environ[name] = old
 
 
-def write_report(path, report):
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+def _check_output_file(path, overwrite):
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return
+    if not stat.S_ISREG(mode):
+        raise ValueError("Evidence destination is linked or not a regular file: " + str(path))
+    if not overwrite:
+        raise FileExistsError("Evidence output already exists: " + str(path))
 
 
-def write_audio(directory, name, audio, rate):
+def _atomic_write(path, writer, *, overwrite=False):
+    path = Path(path)
+    _check_output_file(path, overwrite)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w+b") as stream:
+            writer(stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        _check_output_file(path, overwrite)
+        if overwrite:
+            os.replace(temporary, path)
+        elif os.name == "nt":
+            os.rename(temporary, path)  # Windows rename refuses existing targets.
+        else:
+            os.link(temporary, path)  # Atomic no-clobber publication on POSIX.
+            temporary.unlink()
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def write_report(path, report, *, overwrite=False):
+    data = (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    _atomic_write(path, lambda stream: stream.write(data), overwrite=overwrite)
+
+
+def write_audio(directory, name, audio, rate, *, overwrite=False):
+    directory = Path(directory)
+    if directory.is_symlink() or directory.exists() and not directory.is_dir():
+        raise ValueError("Audio evidence directory is linked or not a directory")
+    if not isinstance(name, str) or not name or "/" in name or "\\" in name:
+        raise ValueError("Audio evidence name must be a basename")
     directory.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(directory / (name + ".wav")), "wb") as stream:
-        stream.setnchannels(1)
-        stream.setsampwidth(2)
-        stream.setframerate(rate)
-        stream.writeframes(pcm16(audio).tobytes())
+    def emit(stream):
+        with wave.open(stream, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(rate)
+            output.writeframes(pcm16(audio).tobytes())
+    _atomic_write(directory / (name + ".wav"), emit, overwrite=overwrite)
+
+
+def changed_fingerprints(fingerprints):
+    changed = []
+    for path, expected in fingerprints.items():
+        try:
+            actual = digest(path)
+        except OSError:
+            changed.append(path)
+            continue
+        if actual != expected:
+            changed.append(path)
+    return changed
 
 
 def embedding(path):
@@ -155,6 +210,9 @@ def embedding(path):
 
 
 def validate_output(path, protected, overwrite):
+    path = Path(path)
+    if path.is_symlink():
+        raise ValueError("Evidence destination cannot be a symbolic link")
     path = path.resolve()
     if any(path.is_relative_to(Path(root).resolve()) for root in protected):
         raise ValueError("Evidence output must be outside runtime/model/reference directories")
@@ -353,7 +411,7 @@ def run(args):
         "all_requested_native_bitwise_equal": False, "all_requested_projected_bitwise_equal": False,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    write_report(output, report)
+    write_report(output, report, overwrite=args.overwrite)
     flow = ort.InferenceSession(str(converter_models / "encoder-flow.onnx"),
                                sess_options=settings(ort), providers=["CPUExecutionProvider"])
     decoder = ort.InferenceSession(str(converter_models / "decoder.onnx"),
@@ -394,6 +452,12 @@ def run(args):
                        model_sha256=model_hash, model_bytes=(folder / "model.onnx").stat().st_size,
                        config_sha256=digest(folder / "config.json"), tokens_sha256=digest(folder / "tokens.txt"),
                        source_sha256=source_hash)
+            # Recheck every actually used language resource at the end too,
+            # not just the runtime/converter/target fingerprints.
+            for filename, checksum in (
+                    ("model.onnx", model_hash), ("config.json", row["config_sha256"]),
+                    ("tokens.txt", row["tokens_sha256"]), ("source.npy", source_hash)):
+                fingerprints[str((folder / filename).resolve())] = checksum
             with mode(family, False):
                 original = mms.MMSCarrier(folder, session_factory=open_original)
                 tick = perf_counter()
@@ -425,7 +489,7 @@ def run(args):
                 for name, audio, sample_rate in (
                         ("original-native", first, 16000), ("shared-native", second, 16000),
                         ("original-projected", first_projected, 22050), ("shared-projected", second_projected, 22050)):
-                    write_audio(audio_directory, code + "-" + name, audio, sample_rate)
+                    write_audio(audio_directory, code + "-" + name, audio, sample_rate, overwrite=args.overwrite)
             family.assert_resources(identity)
             guard = row["native"]["numerical_guard_passed"] and row["projected"]["numerical_guard_passed"]
             exact = all(row[k]["float32_bitwise_equal"] and row[k]["pcm16_bitwise_equal"] for k in ("native", "projected"))
@@ -445,7 +509,7 @@ def run(args):
         row["memory_after_language"] = memory()
         report["languages"].append(row)
         report["shared_raw_graph_instances"] = len(shared_opens)
-        write_report(output, report)
+        write_report(output, report, overwrite=True)
         print(json.dumps({"code": code, "status": row["status"],
                           "native_max_lsb": row.get("native", {}).get("pcm16_max_lsb_difference"),
                           "projected_max_lsb": row.get("projected", {}).get("pcm16_max_lsb_difference")}), flush=True)
@@ -455,12 +519,12 @@ def run(args):
     for kind, field in (("native", "all_requested_native_bitwise_equal"), ("projected", "all_requested_projected_bitwise_equal")):
         report[field] = complete and all(row.get(kind, {}).get("float32_bitwise_equal", False)
                                         and row.get(kind, {}).get("pcm16_bitwise_equal", False) for row in rows)
-    changed = [path for path, expected in fingerprints.items() if digest(path) != expected]
+    changed = changed_fingerprints(fingerprints)
     report["fingerprinted_inputs_unchanged"] = not changed
     report["changed_inputs"] = changed
     report["finished_utc"] = datetime.now(timezone.utc).isoformat()
     report["status"] = "passed" if report["all_requested_numerical_guards_passed"] and not changed else "failed"
-    write_report(output, report)
+    write_report(output, report, overwrite=True)
     return 0 if report["status"] == "passed" else 1
 
 
