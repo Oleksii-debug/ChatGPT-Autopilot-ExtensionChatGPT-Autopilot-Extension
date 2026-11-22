@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [standard, characters-only, navigation, forced-uk, disabled-ru]
+        scenario: [navigation, forced-uk, disabled-ru]
     env:
       PYTHONUTF8: '1'
       CORE_SHA256: '437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8'

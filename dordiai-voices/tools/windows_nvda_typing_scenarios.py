@@ -131,6 +131,14 @@ def _typing_on_feed(data, *args, **kwargs):
     return result
 
 
+def _scenario_config_values(section):
+    import copy
+    # Official NVDA AggregatedSection has items()/dict(), but no keys() and
+    # deliberately does not implement the Mapping protocol used by dict(obj).
+    snapshot = getattr(section, "dict", None)
+    return copy.deepcopy(snapshot() if callable(snapshot) else dict(section.items()))
+
+
 def _scenario_save_preferences():
     import copy
     import config
@@ -139,7 +147,7 @@ def _scenario_save_preferences():
     return {"voices": enabled_voices, "languages": list(DRIVER._dordiai_enabled_languages),
         "default": DRIVER._dordiai_selection[2], "selected_voice": DRIVER.voice,
         "mode": DRIVER._dordiai_mode, "voice_map": dict(DRIVER._dordiai_voice_map),
-        "config": copy.deepcopy(dict(config.conf["speech"][DRIVER.name]))}
+        "config": _scenario_config_values(config.conf["speech"][DRIVER.name])}
 
 
 def _scenario_restore_preferences():
@@ -153,17 +161,21 @@ def _scenario_restore_preferences():
     DRIVER._dordiai_apply(saved["voices"], saved["languages"], saved["default"],
                          saved["selected_voice"], {}, mode=saved["mode"], voice_map=saved["voice_map"])
     section = config.conf["speech"][DRIVER.name]
-    for key in list(section):
+    for key, _ in tuple(section.items()):
         if key not in saved["config"]:
-            del section[key]
+            remover = getattr(section, "__delitem__", None)
+            if not callable(remover):
+                raise RuntimeError("Aggregated config gained an unexpected key that cannot be safely removed")
+            remover(key)
     for key, value in saved["config"].items():
         section[key] = value
     restored = (DRIVER._dordiai_mode == saved["mode"] and
                 DRIVER._dordiai_enabled_languages == frozenset(saved["languages"]) and
                 DRIVER._dordiai_selection[2] == saved["default"] and
                 DRIVER.voice == saved["selected_voice"] and
-                DRIVER._dordiai_voice_map == saved["voice_map"] and dict(section) == saved["config"])
-    RESULT["actual_typing"]["preference_restoration"] = {"restored": restored}
+                DRIVER._dordiai_voice_map == saved["voice_map"] and _scenario_config_values(section) == saved["config"])
+    RESULT["actual_typing"]["preference_restoration"] = {"restored": restored,
+        "configuration_scope":"effective isolated AggregatedSection values; owned process discarded afterward"}
     if not restored:
         raise RuntimeError("Real driver preferences were not restored")
 
@@ -264,12 +276,14 @@ def _typing_finish_results():
 
 
 def _scenario_start_navigation():
+    global STAGE
     import speech
     state = _TYPING
     if not _typing_focus_owned() or state["text"].GetValue() != "бї" or state["text"].GetInsertionPoint() != 2:
         check("actual_typing_navigation_setup", "blocked", reason="Real UK seed/caret/focus differs")
         finish()
         return
+    STAGE = "navigation-layout-ru"
     layout = state["user"].LoadKeyboardLayoutW("00000419", 0)
     if layout and layout not in state["before_layouts"] and layout not in state["loaded"]:
         state["loaded"].append(layout)
@@ -301,9 +315,29 @@ def _scenario_send_navigation():
         _scenario_check_utterance_observer()
         finish()
         return
-    if not _typing_focus_owned() or speech.isSpeaking() or synthDriverHandler.getSynth() is not DRIVER:
-        check("actual_typing_navigation_setup", "blocked", reason="Owned focus/driver/quiescence changed")
+    focus_ok = _typing_focus_owned()
+    driver_ok = synthDriverHandler.getSynth() is DRIVER
+    if not focus_ok or not driver_ok:
+        check("actual_typing_navigation_setup", "blocked", reason="Owned focus or selected driver changed",
+              owned_focus=focus_ok, selected_driver_matches=driver_ok)
         finish()
+        return
+    if speech.isSpeaking():
+        now = time.monotonic()
+        settle = state.get("navigation_settle")
+        if settle is None or settle["position"] != position:
+            settle = state["navigation_settle"] = {"position":position,"started":now,"deadline":now+8.0,"polls":0}
+        settle["polls"] += 1
+        RESULT["actual_typing"].setdefault("navigation_settle",{})[str(position)] = {
+            "polls":settle["polls"],"elapsed_seconds":now-settle["started"],
+            "scope":"bounded wait for genuine NVDA layout/previous utterance; no speech suppression"}
+        if now < settle["deadline"]:
+            later(100,_scenario_send_navigation)
+        else:
+            check("actual_typing_navigation_setup","blocked",
+                  reason="Normal NVDA layout/previous speech did not become quiescent within8seconds",
+                  owned_focus=True, selected_driver_matches=True, speech_is_speaking=True)
+            finish()
         return
     focus = __import__("api").getFocusObject()
     layout = state["user"].GetKeyboardLayout(focus.windowThreadID)
