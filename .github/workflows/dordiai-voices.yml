@@ -336,6 +336,37 @@ jobs:
               print("Functional NVDA checks completed; physical/device and full-product acceptance remain BLOCKED.", flush=True)
           elif completed.returncode != 0:
               raise subprocess.CalledProcessError(completed.returncode, command)
+      - name: Verify real keyboard echo and genuine resource recovery in the same built core
+        if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
+        shell: python
+        run: |
+          import json,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          audio=root/"windows-results/audio/audio-endpoint.json"
+          headless=audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after")==0
+          failures=[]
+          for mode,flag in (("typing","--typing-probe"),("required","--required-resource-recovery-probe")):
+              output=root/("windows-results/nvda-"+mode)
+              command=[sys.executable,str(root/"tools/windows_nvda_probe.py"),"--addon",str(root/"dist/dordiai-voices-0.13.1-dev.9.nvda-addon"),"--output",str(output),flag,"--timeout","300"]
+              if headless:
+                  command.append("--headless-ui-probe")
+              completed=subprocess.run(command,check=False)
+              if completed.returncode==2 and headless:
+                  report=json.loads((output/"windows-nvda-probe.json").read_text(encoding="utf-8"))
+                  allowed={"windows_audio_output_enumeration","physical_audio_output","warm_letter_predevice_target","cancel_api_target"}
+                  unexpected=[row for document in (report,report.get("probe",{})) for row in document.get("checks",[])
+                              if row.get("status")!="passed" and not(row.get("status")=="blocked" and row.get("name") in allowed)]
+                  valid=(report.get("status")=="partial" and not unexpected
+                         and report.get("recording_pcm_sink_test_double") is True
+                         and report.get("physical_audio_verified") is False
+                         and report.get("product_ready") is False)
+                  if not valid:
+                      failures.append({"mode":mode,"returncode":completed.returncode,"unexpected":unexpected})
+              elif completed.returncode!=0:
+                  failures.append({"mode":mode,"returncode":completed.returncode})
+          if failures:
+              raise RuntimeError("Actual NVDA functional failures: "+json.dumps(failures))
+          print("Real typing and resource-recovery functional checks complete; physical audio and product acceptance remain separate.",flush=True)
       - name: Print probe failures and collect bounded Windows diagnostics
         if: always()
         run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence

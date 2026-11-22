@@ -1,0 +1,73 @@
+name: Dordiai Afri export and checkpoint structure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-afri-inspect.yml"
+      - "dordiai-voices/tools/research/inspect_afri_checkpoint.py"
+      - "dordiai-voices/tests/test_afri_checkpoint_inspection.py"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-published-structure:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[afri-inspect]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CACHE: ${{ github.workspace }}/ci-afri-model-cache
+      REPORTS: ${{ github.workspace }}/dordiai-voices/afri-structure-results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install only metadata/protobuf dependencies
+        run: python -m pip install --only-binary=:all: numpy==2.3.5 onnx==1.17.0
+      - name: Check bounded header parsing and state observations
+        run: python -m unittest discover -s dordiai-voices/tests -p test_afri_checkpoint_inspection.py -v
+      - uses: actions/cache/restore@v4
+        id: model_cache
+        with:
+          path: ${{ env.CACHE }}
+          key: dordiai-africa-pocket-d47667a3bb03d0d6db924e789648abd7d55d828b-v1
+      - name: Recover the exact existing native-proof assets only on cache miss
+        if: steps.model_cache.outputs.cache-hit != 'true'
+        run: |
+          python dordiai-voices/tools/research/afri_sherpa_probe.py acquire \
+            --cache "$CACHE" --report "$REPORTS/source-acquisition.json"
+      - uses: actions/cache/save@v4
+        if: steps.model_cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.CACHE }}
+          key: dordiai-africa-pocket-d47667a3bb03d0d6db924e789648abd7d55d828b-v1
+      - name: Inspect original checkpoint header and cached ONNX names/shapes without inference
+        run: |
+          python dordiai-voices/tools/research/inspect_afri_checkpoint.py \
+            --cache "$CACHE" --report "$REPORTS/structure.json"
+      - name: Preserve exact observed structure in logs
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path(os.environ["REPORTS"])/"structure.json"
+          if path.is_file():
+              raw=path.read_bytes()
+              document=json.loads(raw)
+              print("AFRI_STRUCTURE_SUMMARY "+json.dumps({"status":document.get("status"),"checkpoint_layers":document.get("original_checkpoint",{}).get("strict_flow_lm_layer_ids"),"onnx_layers":document.get("published_onnx_lm_main",{}).get("strict_transformer_layer_ids_from_initializer_prefixes"),"onnx_states":document.get("published_onnx_lm_main",{}).get("state_input_count")}),flush=True)
+              data=gzip.compress(raw,mtime=0)
+              encoded=base64.b64encode(data).decode("ascii")
+              chunks=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              print("AFRI_STRUCTURE_GZIP_SHA256 "+hashlib.sha256(data).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):
+                  print("AFRI_STRUCTURE_GZIP_B64_PART "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-afri-structure-${{ github.run_id }}
+          path: ${{ env.REPORTS }}
+          if-no-files-found: warn
+          retention-days: 7

@@ -6,6 +6,7 @@ import importlib.util
 from collections import OrderedDict
 from contextlib import closing
 import json
+import ntpath
 from hashlib import sha256
 from pathlib import Path
 from queue import Empty, Full, Queue
@@ -31,8 +32,7 @@ SAMPLE_RATE = 24000
 # NVDA's host executable may lack the private interpreter's long-path manifest.
 RUNTIME = Path(__file__).absolute().parent.parent / "kx47Runtime"
 if sys.platform == "win32":
-    import ntpath as _runtime_ntpath
-    _runtime_spelling = _runtime_ntpath.normpath(str(RUNTIME))
+    _runtime_spelling = ntpath.normpath(str(RUNTIME))
     if not _runtime_spelling.startswith(("\\\\?\\", "\\\\.\\")):
         _runtime_spelling = ("\\\\?\\UNC\\" + _runtime_spelling[2:] if _runtime_spelling.startswith("\\\\")
                              else "\\\\?\\" + _runtime_spelling)
@@ -57,6 +57,7 @@ def _runtime_module(name):
 
 _host_paths = _runtime_module("host_paths")
 RUNTIME = _host_paths.filesystem_path(RUNTIME)
+_typing_locale = _runtime_module("typing_locale")
 _voice_policy = _runtime_module("voice_policy")
 _error_diagnostics = _runtime_module("error_diagnostics")
 _pref_spec = importlib.util.spec_from_file_location("_dordiai_main_preferences", RUNTIME / "preferences.py")
@@ -1459,6 +1460,26 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 pending = request
         if pending is not None:
             yield "text", pending
+
+    # This property is read synchronously while NVDA builds typed spelling.
+    # It must never cache a keyboard locale into subsequent document speech.
+    _cache_language = False
+
+    def _get_language(self):
+        default = None
+        selection = getattr(self, "_dordiai_selection", None)
+        if (isinstance(selection, (tuple, list)) and len(selection) >= 3 and
+                isinstance(selection[2], str) and selection[2].strip()):
+            primary = _prefs.language_key(selection[2])
+            if primary in (getattr(self, "_dordiai_enabled_languages", ()) or ()):
+                default = primary
+        if default is None:
+            default = super()._get_language()
+        return _typing_locale.language_for(self, default)
+
+    def _dordiai_typing_context(self, locale, valid=None):
+        language = _prefs.language_key(locale) if isinstance(locale, str) and locale.strip() else ""
+        return _typing_locale.typed_context(self, language, valid, locale=locale)
 
     def _get_voice(self):
         return self._voice

@@ -1,0 +1,656 @@
+{
+  "format": "dordiai-afri-pocket-native-cpu-proof-v1",
+  "status": "passed-native-technical-prototype",
+  "started_utc": "2026-11-22T10:27:09.838764+00:00",
+  "product_integrated": false,
+  "native_listener_verified": false,
+  "nvda_verified": false,
+  "typing_or_character_names_verified": false,
+  "scope": "Exact trained Swati/Venda frontend IPA and actual same-language native CPU WAVs only.",
+  "cases": [
+    {
+      "language": "ssw",
+      "text": "KUCOLELA KWAJEHOVA KUSHO KUTSINI KITSI?",
+      "expected_training_ipa": "kʼuᵏǀɔlɛla kʼwad͡ʒʱɛhɔva kʼuʃɔ kʼut͡sʼini kʼit͡sʼi?",
+      "ipa": "kʼuᵏǀɔlɛla kʼwad͡ʒʱɛhɔva kʼuʃɔ kʼut͡sʼini kʼit͡sʼi?",
+      "status": "passed",
+      "sample_rate": 24000,
+      "samples": 72960,
+      "audio_seconds": 3.04,
+      "inference_seconds": 3.696760347999998,
+      "rtf": 1.216039588157894,
+      "peak": 0.6592942476272583,
+      "rms": 0.10541070252656937,
+      "pcm_clip_fraction": 0.0,
+      "wav_path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/dordiai-voices/afri-sherpa-results/audio/ssw-0.wav",
+      "wav_sha256": "061b144c571251121cb2b317b696a0ab0904f5fe7046614e410e008ce5e44713",
+      "float32_sha256": "59f56fd88321ea8cd2cf0ba52a896ce0453043a3dd303d21af0e8ad3707e8994",
+      "reference_sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94",
+      "reference_sample_rate": 24000,
+      "settings": {
+        "temperature": "0.3",
+        "num_steps": 1,
+        "silence_scale": 1.0,
+        "provider": "cpu",
+        "threads": 2
+      },
+      "process_peak_rss_bytes": 1800380416
+    },
+    {
+      "language": "ssw",
+      "text": "JEHOVA NAJESU BAYAKWENYANYA KUNGALUNGI",
+      "expected_training_ipa": "d͡ʒʱɛhɔva nad͡ʒʱɛsu ɓajakʼwɛnjanja kʼuŋaluŋi",
+      "ipa": "d͡ʒʱɛhɔva nad͡ʒʱɛsu ɓajakʼwɛnjanja kʼuŋaluŋi",
+      "status": "passed",
+      "sample_rate": 24000,
+      "samples": 67200,
+      "audio_seconds": 2.8,
+      "inference_seconds": 3.0588632259999997,
+      "rtf": 1.092451152142857,
+      "peak": 0.5122930407524109,
+      "rms": 0.10001157224178314,
+      "pcm_clip_fraction": 0.0,
+      "wav_path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/dordiai-voices/afri-sherpa-results/audio/ssw-1.wav",
+      "wav_sha256": "93d8ba849ba32d3306823b30466aee4056ba27a57191c6585bc121fd0954c377",
+      "float32_sha256": "ec5b628731aa5a3ee714f48fba0ed429f9b20bde4055cf465a1f29efe507b3ef",
+      "reference_sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94",
+      "reference_sample_rate": 24000,
+      "settings": {
+        "temperature": "0.3",
+        "num_steps": 1,
+        "silence_scale": 1.0,
+        "provider": "cpu",
+        "threads": 2
+      },
+      "process_peak_rss_bytes": 1803395072
+    },
+    {
+      "language": "ssw",
+      "text": "wathi usanda kuthuthela endaweni yangakithi nokuthi udadisha ibhayibheli futhi nabazalwane bese bamvakashela ekhaya na",
+      "expected_training_ipa": "watʰi usandʱa kʼutʰutʰɛla ɛndʱawɛni jaŋakʼitʰi nɔkʼutʰi udʱadʱiʃa ibʱajibʱɛli futʰi naɓazalʷanɛ ɓɛsɛ ɓamvakʼaʃɛla ɛkʰaja na",
+      "ipa": "watʰi usandʱa kʼutʰutʰɛla ɛndʱawɛni jaŋakʼitʰi nɔkʼutʰi udʱadʱiʃa ibʱajibʱɛli futʰi naɓazalʷanɛ ɓɛsɛ ɓamvakʼaʃɛla ɛkʰaja na",
+      "status": "passed",
+      "sample_rate": 24000,
+      "samples": 186240,
+      "audio_seconds": 7.76,
+      "inference_seconds": 8.02171859100001,
+      "rtf": 1.0337266225515476,
+      "peak": 0.6341416835784912,
+      "rms": 0.08439740538597107,
+      "pcm_clip_fraction": 0.0,
+      "wav_path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/dordiai-voices/afri-sherpa-results/audio/ssw-2.wav",
+      "wav_sha256": "abaaa30e87ae07d1e5c0e7684d5e0d4a370666e0de60af124ccb958c45c034ac",
+      "float32_sha256": "213e46583c844d6d91bc8a72138fc5d6069f93902a8e984bbc1f202bb954fbb1",
+      "reference_sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94",
+      "reference_sample_rate": 24000,
+      "settings": {
+        "temperature": "0.3",
+        "num_steps": 1,
+        "silence_scale": 1.0,
+        "provider": "cpu",
+        "threads": 2
+      },
+      "process_peak_rss_bytes": 1807720448
+    },
+    {
+      "language": "ven",
+      "text": "Tshivhi tshe ra tshi mamela tshi nga ita hani uri ri timatime uri Yehova u a ri funa?",
+      "expected_training_ipa": "t͡ʃʼiβi t͡ʃʼɛ ɾa t͡ʃʼi mamɛɺa t͡ʃʼi ŋɡa itʼa ɦani uɾi ɾi tʼimatʼimɛ uɾi jɛɦɔva u a ɾi funa?",
+      "ipa": "t͡ʃʼiβi t͡ʃʼɛ ɾa t͡ʃʼi mamɛɺa t͡ʃʼi ŋɡa itʼa ɦani uɾi ɾi tʼimatʼimɛ uɾi jɛɦɔva u a ɾi funa?",
+      "status": "passed",
+      "sample_rate": 24000,
+      "samples": 130560,
+      "audio_seconds": 5.44,
+      "inference_seconds": 5.920926434000009,
+      "rtf": 1.0884055944852957,
+      "peak": 0.517799437046051,
+      "rms": 0.11574287712574005,
+      "pcm_clip_fraction": 0.0,
+      "wav_path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/dordiai-voices/afri-sherpa-results/audio/ven-3.wav",
+      "wav_sha256": "91c06308e43ebc4912a2275e118e9f63847f94384366ce6a72bf100bf9bb9481",
+      "float32_sha256": "5155be13fa3ce278b327772c097a1efe4969d74e24c08f58b76d97c34e4980a5",
+      "reference_sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0",
+      "reference_sample_rate": 24000,
+      "settings": {
+        "temperature": "0.3",
+        "num_steps": 1,
+        "silence_scale": 1.0,
+        "provider": "cpu",
+        "threads": 2
+      },
+      "process_peak_rss_bytes": 1809670144
+    },
+    {
+      "language": "ven",
+      "text": "Ḓilindeni Kha “Maanḓa A Vhufhura A Tshivhi”",
+      "expected_training_ipa": "d̪iɺindɛni kʰa “maand̪a a βuɸuɾa a t͡ʃʼiβi”",
+      "ipa": "d̪iɺindɛni kʰa “maand̪a a βuɸuɾa a t͡ʃʼiβi”",
+      "status": "passed",
+      "sample_rate": 24000,
+      "samples": 80640,
+      "audio_seconds": 3.36,
+      "inference_seconds": 3.6636696340000015,
+      "rtf": 1.0903778672619053,
+      "peak": 0.5103917121887207,
+      "rms": 0.12009380012750626,
+      "pcm_clip_fraction": 0.0,
+      "wav_path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/dordiai-voices/afri-sherpa-results/audio/ven-4.wav",
+      "wav_sha256": "87e4d420d1975531390579683f077b64c58f0384da93b95672bd745f175c7537",
+      "float32_sha256": "461b1fee7d2984fe636775f6b8268f3f3e654421f2ee3406c8717ee4a9f9fd0d",
+      "reference_sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0",
+      "reference_sample_rate": 24000,
+      "settings": {
+        "temperature": "0.3",
+        "num_steps": 1,
+        "silence_scale": 1.0,
+        "provider": "cpu",
+        "threads": 2
+      },
+      "process_peak_rss_bytes": 1809670144
+    },
+    {
+      "language": "ven",
+      "text": "U SA DZHIA ZWITHU NGA NḒILA INE YEHOVA A ṰOḒA RI TSHI ZWI DZHIA NGAYO ZWI NGA ṊAṊISA MAFHUNGO",
+      "expected_training_ipa": "u sa d͡ʒia ʐitʰu ŋɡa nd̪iɺa inɛ jɛɦɔva a t̪ɔd̪a ɾi t͡ʃʼi ʐi d͡ʒia ŋɡajɔ ʐi ŋɡa n̪an̪isa maɸuŋɡɔ",
+      "ipa": "u sa d͡ʒia ʐitʰu ŋɡa nd̪iɺa inɛ jɛɦɔva a t̪ɔd̪a ɾi t͡ʃʼi ʐi d͡ʒia ŋɡajɔ ʐi ŋɡa n̪an̪isa maɸuŋɡɔ",
+      "status": "passed",
+      "sample_rate": 24000,
+      "samples": 147840,
+      "audio_seconds": 6.16,
+      "inference_seconds": 6.355992622000002,
+      "rtf": 1.0318169840909095,
+      "peak": 0.5420060157775879,
+      "rms": 0.11372953653335571,
+      "pcm_clip_fraction": 0.0,
+      "wav_path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/dordiai-voices/afri-sherpa-results/audio/ven-5.wav",
+      "wav_sha256": "2c05b964775fd2a39b2862c7a9765955930e7e440d93bed41d0b3fd40867aa96",
+      "float32_sha256": "fda786cd14b254db8435778251c31ea443fe49917fe621c7759b7363439af6fa",
+      "reference_sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0",
+      "reference_sample_rate": 24000,
+      "settings": {
+        "temperature": "0.3",
+        "num_steps": 1,
+        "silence_scale": 1.0,
+        "provider": "cpu",
+        "threads": 2
+      },
+      "process_peak_rss_bytes": 1810194432
+    }
+  ],
+  "network_guard": {
+    "kernel_filter_loaded_before_inference_imports": true,
+    "denied_syscalls": [
+      "socket",
+      "connect",
+      "sendto",
+      "sendmsg",
+      "sendmmsg"
+    ],
+    "actual_socket_test_errno": 1
+  },
+  "source_index_sha256": "56391fa15f9cd21ffbf5aee77f46662c73e6094497536fcb698cd19c442a148b",
+  "source": {
+    "format": "dordiai-afri-pocket-source-index-v1",
+    "status": "verified-existing-publisher-assets",
+    "repository": "AfriSpeech/africa-tts",
+    "revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
+    "source_revision": "b4508ae979dd34eea2597d420d67176ef55a21a0",
+    "g2p_revision": "76b53a8fa2a688812e369837d179d4710c111a7a",
+    "sherpa_version": "2.0.1",
+    "sherpa_source_revision": "af2d8d81dbfa61c4cea4c568da78f3982edca005",
+    "selected_languages": {
+      "ssw": {
+        "selected_code": "ss",
+        "name": "Swati",
+        "trained_hours": 12.08
+      },
+      "ven": {
+        "selected_code": "ve",
+        "name": "Venda",
+        "trained_hours": 10.62
+      }
+    },
+    "precision": "publisher-mixed-int8-lm-decoder-fp32-encoder-conditioner",
+    "fp32_sets_not_selected": [],
+    "our_quantization_or_export": false,
+    "publisher_card_license": "cc-by-nc-4.0",
+    "publisher_model_and_default_voice_license": "CC-BY-NC-4.0 according to primary publisher",
+    "code_license": "MIT (AfricaTTS), Apache-2.0 (sherpa-onnx and africa-g2p code); linguistic-data attribution separate",
+    "files": {
+      "lm_main": {
+        "bytes": 304306036,
+        "sha256": "ce2dd37e2bb257cedd5a71ccdc7fcb0dc8a2955638d569a47833884104cde764",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/lm_main.int8.onnx",
+        "repository_path": "sherpa-onnx/lm_main.int8.onnx",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/lm_main.int8.onnx",
+        "measured_raw_sha256": "ce2dd37e2bb257cedd5a71ccdc7fcb0dc8a2955638d569a47833884104cde764"
+      },
+      "lm_flow": {
+        "bytes": 9962517,
+        "sha256": "19fa27ae28c3a322cf62f290f03013ee03222652a322d2d26553c77a3682037f",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/lm_flow.int8.onnx",
+        "repository_path": "sherpa-onnx/lm_flow.int8.onnx",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/lm_flow.int8.onnx",
+        "measured_raw_sha256": "19fa27ae28c3a322cf62f290f03013ee03222652a322d2d26553c77a3682037f"
+      },
+      "encoder": {
+        "bytes": 39286495,
+        "sha256": "9b80b76221ecb791e486dfb502a0279c86a6ad09d01546b1d18047d42c8024db",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/encoder.onnx",
+        "repository_path": "sherpa-onnx/encoder.onnx",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/encoder.onnx",
+        "measured_raw_sha256": "9b80b76221ecb791e486dfb502a0279c86a6ad09d01546b1d18047d42c8024db"
+      },
+      "decoder": {
+        "bytes": 22587708,
+        "sha256": "f2083d75f2027179ee335ce3e27d4e7b5e0d21d8166ed22e4e845b3143669d50",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/decoder.int8.onnx",
+        "repository_path": "sherpa-onnx/decoder.int8.onnx",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/decoder.int8.onnx",
+        "measured_raw_sha256": "f2083d75f2027179ee335ce3e27d4e7b5e0d21d8166ed22e4e845b3143669d50"
+      },
+      "text_conditioner": {
+        "bytes": 16388349,
+        "sha256": "7aa23a316ae43ce94f3d2c3be5c30b4910cba86a29362f7f4e365268035b8eeb",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/text_conditioner.onnx",
+        "repository_path": "sherpa-onnx/text_conditioner.onnx",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/text_conditioner.onnx",
+        "measured_raw_sha256": "7aa23a316ae43ce94f3d2c3be5c30b4910cba86a29362f7f4e365268035b8eeb"
+      },
+      "vocab_json": {
+        "bytes": 67701,
+        "git_blob_sha1": "6ad9adee82e1ec83ed9bcbe6a575115f12a27bd6",
+        "pin_kind": "publisher-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/vocab.json",
+        "repository_path": "sherpa-onnx/vocab.json",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/vocab.json",
+        "measured_raw_sha256": "837b3d78f160549ccaa4d193afe13c6d1ebbdc15386e033ac60c09fd269bb005"
+      },
+      "token_scores_json": {
+        "bytes": 121887,
+        "git_blob_sha1": "abb90b65e87dbccb92aca02f4d10142c9aa24e7a",
+        "pin_kind": "publisher-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/token_scores.json",
+        "repository_path": "sherpa-onnx/token_scores.json",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/token_scores.json",
+        "measured_raw_sha256": "c48821eaeb524dc8a36101d04d066e61726ac0afaa2b2a53526a1f268fab9d2e"
+      },
+      "voice_ssw": {
+        "bytes": 161804,
+        "sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/voices/ssw.wav",
+        "repository_path": "sherpa-onnx/voices/ssw.wav",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/voices/ssw.wav",
+        "measured_raw_sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94"
+      },
+      "voice_ven": {
+        "bytes": 188204,
+        "sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0",
+        "pin_kind": "publisher-lfs-raw-sha256",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/voices/ven.wav",
+        "repository_path": "sherpa-onnx/voices/ven.wav",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/voices/ven.wav",
+        "measured_raw_sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0"
+      },
+      "metadata_9": {
+        "bytes": 1065,
+        "git_blob_sha1": "d61303e11d12422e5c56fcf72384d1e184ab115b",
+        "pin_kind": "publisher-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/config.yaml",
+        "repository_path": "config.yaml",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/config.yaml",
+        "measured_raw_sha256": "67ff8d1cf99e8ae8185fa2d5ece8b6cd3ff6fd924868abc4b446506e571514a5"
+      },
+      "metadata_10": {
+        "bytes": 9087,
+        "git_blob_sha1": "4e3d3ee6cbeaa7521ddf14c21bb7e2ec10bc98e6",
+        "pin_kind": "publisher-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/README.md",
+        "repository_path": "README.md",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/README.md",
+        "measured_raw_sha256": "1b028b874d114e683cc1487d86f401d1177d61d21a5934114a581515d72f2648"
+      },
+      "metadata_11": {
+        "bytes": 27081,
+        "git_blob_sha1": "c1e0e939f310f41f6fae9cacf9cdd4168033ea2d",
+        "pin_kind": "publisher-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/model/sherpa-onnx/voices/voices.json",
+        "repository_path": "sherpa-onnx/voices/voices.json",
+        "url": "https://huggingface.co/AfriSpeech/africa-tts/resolve/d47667a3bb03d0d6db924e789648abd7d55d828b/sherpa-onnx/voices/voices.json",
+        "measured_raw_sha256": "8ebf2a1815b9ae88f63a9d509e4bdb48d09aae4f950d8e8d1e5b74f28d3253dc"
+      },
+      "source_languages.json": {
+        "bytes": 4749,
+        "git_blob_sha1": "a2d547853bd1b3b8c6db110b42e23e0f76c43000",
+        "pin_kind": "primary-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/primary/languages.json",
+        "url": "https://raw.githubusercontent.com/AfriSpeech/africa-tts/b4508ae979dd34eea2597d420d67176ef55a21a0/africa_tts/languages.json",
+        "measured_raw_sha256": "8783c5735502cf5a0d88bbbf3fbc05150cbe03bb0247844a2269c9ade7f4210b"
+      },
+      "source_parity_set.tsv": {
+        "bytes": 221529,
+        "git_blob_sha1": "7a24129c8f737143abffa5033de0661d312717d4",
+        "pin_kind": "primary-git-blob-sha1",
+        "path": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ci-afri-model-cache/primary/parity_set.tsv",
+        "url": "https://raw.githubusercontent.com/AfriSpeech/africa-tts/b4508ae979dd34eea2597d420d67176ef55a21a0/mobile/frontend/tests/parity_set.tsv",
+        "measured_raw_sha256": "05acd0163c46daf8c591a50a1a3458324bf08308be08308769f28109a4a5493a"
+      }
+    },
+    "native_listener_verified": false,
+    "product_integrated": false,
+    "selected_required_model_bytes": 392531105,
+    "all_selected_download_bytes": 393334212
+  },
+  "native_runtime": {
+    "git_sha1": "af2d8d81",
+    "git_date": "Mon Oct 26 14:57:12 2026",
+    "onnxruntime_version": "1.28.2"
+  },
+  "sherpa_onnx_version": "2.0.1",
+  "sherpa_onnx_module": "/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/sherpa_onnx/__init__.py",
+  "g2p_revision": "76b53a8fa2a688812e369837d179d4710c111a7a",
+  "g2p_linguistic_data_notice": "# Data sources & licensing\n\nThe **code** in this repository is licensed under Apache-2.0 (see `LICENSE`). The\n**linguistic data** in `src/africa_g2p/languages/` is derived from third-party sources and\nis provided for research and language-technology use. Please retain the attributions below.\n\n## Sources\n\n### Omniglot script charts — © Simon Ager\nLanguage rule files with `\"confidence\": \"omniglot\"` are derived from the writing-system\ncharts published on [Omniglot](https://www.omniglot.com/) (© Simon Ager). Each such file\nrecords its source chart in its `\"source\"` field. We extract only the factual\ngrapheme ↔ IPA ↔ romanisation correspondences (not Omniglot's prose, images, or page\nlayout). Omniglot content is copyrighted; this project uses these factual correspondences\nwith attribution and is not affiliated with or endorsed by Omniglot. If you are the\nrights-holder and have any concern about this use, please open an issue and we will respond\npromptly.\n\n### Alphabets of Africa (Hartell, ed.) — © UNESCO 1993\nLanguage rule files sourced from Rhonda L. Hartell (ed.), *Alphabets of Africa*\n(UNESCO / SIL, Dakar, 1993). Recorded in each file's `\"source\"` field as \"Hartell 1993\".\n\n### afriso — ISO 639-3 + Glottolog\nLanguage metadata (canonical codes, families, regions, alternative names) via\n[afriso](https://github.com/AfriSpeech/afriso), built from SIL ISO 639-3 tables and\nGlottolog (CC-BY 4.0).\n\n### africa-corpus — public Bible translations\nExample sentences in the README showcase come from\n[africa-corpus](https://github.com/AfriSpeech/africa-corpus-builder).\n\n## Using the data\n\nIf you redistribute the language data, keep these attributions and this notice. For any\nuse beyond research/attention that the original rights-holders' terms may restrict, obtain\npermission from the respective source.\n",
+  "graph_facts": {
+    "lm_main": {
+      "initializer_dtypes": {
+        "FLOAT": 198,
+        "INT8": 196
+      },
+      "observed_layer_ids_from_weight_names": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "inputs": [
+        "sequence",
+        "text_embeddings",
+        "state_0",
+        "state_1",
+        "state_2",
+        "state_3",
+        "state_4",
+        "state_5",
+        "state_6",
+        "state_7",
+        "state_8",
+        "state_9",
+        "state_10",
+        "state_11",
+        "state_12",
+        "state_13",
+        "state_14",
+        "state_15",
+        "state_16",
+        "state_17",
+        "state_18",
+        "state_19",
+        "state_20",
+        "state_21",
+        "state_22",
+        "state_23",
+        "state_24",
+        "state_25",
+        "state_26",
+        "state_27",
+        "state_28",
+        "state_29",
+        "state_30",
+        "state_31",
+        "state_32",
+        "state_33",
+        "state_34",
+        "state_35",
+        "state_36",
+        "state_37",
+        "state_38",
+        "state_39",
+        "state_40",
+        "state_41",
+        "state_42",
+        "state_43",
+        "state_44",
+        "state_45",
+        "state_46",
+        "state_47"
+      ],
+      "outputs": [
+        "conditioning",
+        "eos_logit",
+        "out_state_0",
+        "out_state_1",
+        "out_state_2",
+        "out_state_3",
+        "out_state_4",
+        "out_state_5",
+        "out_state_6",
+        "out_state_7",
+        "out_state_8",
+        "out_state_9",
+        "out_state_10",
+        "out_state_11",
+        "out_state_12",
+        "out_state_13",
+        "out_state_14",
+        "out_state_15",
+        "out_state_16",
+        "out_state_17",
+        "out_state_18",
+        "out_state_19",
+        "out_state_20",
+        "out_state_21",
+        "out_state_22",
+        "out_state_23",
+        "out_state_24",
+        "out_state_25",
+        "out_state_26",
+        "out_state_27",
+        "out_state_28",
+        "out_state_29",
+        "out_state_30",
+        "out_state_31",
+        "out_state_32",
+        "out_state_33",
+        "out_state_34",
+        "out_state_35",
+        "out_state_36",
+        "out_state_37",
+        "out_state_38",
+        "out_state_39",
+        "out_state_40",
+        "out_state_41",
+        "out_state_42",
+        "out_state_43",
+        "out_state_44",
+        "out_state_45",
+        "out_state_46",
+        "out_state_47"
+      ],
+      "node_count": 7326,
+      "opset": [
+        {
+          "domain": "",
+          "version": 14
+        }
+      ]
+    },
+    "lm_flow": {
+      "initializer_dtypes": {
+        "FLOAT": 67,
+        "INT8": 52
+      },
+      "observed_layer_ids_from_weight_names": [],
+      "inputs": [
+        "c",
+        "s",
+        "t",
+        "x"
+      ],
+      "outputs": [
+        "flow_dir"
+      ],
+      "node_count": 461,
+      "opset": [
+        {
+          "domain": "",
+          "version": 14
+        }
+      ]
+    },
+    "encoder": {
+      "initializer_dtypes": {
+        "FLOAT": 45
+      },
+      "observed_layer_ids_from_weight_names": [
+        0,
+        1
+      ],
+      "inputs": [
+        "audio"
+      ],
+      "outputs": [
+        "latents"
+      ],
+      "node_count": 752,
+      "opset": [
+        {
+          "domain": "",
+          "version": 14
+        }
+      ]
+    },
+    "decoder": {
+      "initializer_dtypes": {
+        "FLOAT": 49,
+        "INT8": 16
+      },
+      "observed_layer_ids_from_weight_names": [
+        0,
+        1
+      ],
+      "inputs": [
+        "latent",
+        "state_0",
+        "state_1",
+        "state_2",
+        "state_3",
+        "state_4",
+        "state_5",
+        "state_6",
+        "state_7",
+        "state_8",
+        "state_9",
+        "state_10",
+        "state_11",
+        "state_12",
+        "state_13",
+        "state_14",
+        "state_15"
+      ],
+      "outputs": [
+        "audio_frame",
+        "out_state_0",
+        "out_state_1",
+        "out_state_2",
+        "out_state_3",
+        "out_state_4",
+        "out_state_5",
+        "out_state_6",
+        "out_state_7",
+        "out_state_8",
+        "out_state_9",
+        "out_state_10",
+        "out_state_11",
+        "out_state_12",
+        "out_state_13",
+        "out_state_14",
+        "out_state_15"
+      ],
+      "node_count": 775,
+      "opset": [
+        {
+          "domain": "",
+          "version": 14
+        }
+      ]
+    },
+    "text_conditioner": {
+      "initializer_dtypes": {
+        "FLOAT": 1
+      },
+      "observed_layer_ids_from_weight_names": [],
+      "inputs": [
+        "token_ids"
+      ],
+      "outputs": [
+        "embeddings"
+      ],
+      "node_count": 1,
+      "opset": [
+        {
+          "domain": "",
+          "version": 14
+        }
+      ]
+    }
+  },
+  "observed_lm_layer_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23
+  ],
+  "publisher_six_layer_claim_matches_named_graph_layers": false,
+  "all_selected_frontend_bytes_match_training": true,
+  "engine_load_seconds": 1.456909522999993,
+  "all_cases_passed": true,
+  "process_peak_rss_bytes": 1810325504,
+  "inputs_unchanged": true,
+  "finished_utc": "2026-11-22T10:27:43.992476+00:00"
+}

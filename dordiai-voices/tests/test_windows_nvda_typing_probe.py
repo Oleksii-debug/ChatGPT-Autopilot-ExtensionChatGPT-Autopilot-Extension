@@ -32,7 +32,7 @@ def load_parts(namespace, *names):
 class TypingProbeScaffoldingTests(unittest.TestCase):
     def test_real_win32_input_structure_size_and_scan_flags(self):
         ns = load_parts({"_typing_ct": ctypes}, "_TypingMouse", "_TypingKeyboard",
-                        "_TypingHardware", "_TypingUnion", "_TypingInput", "_typing_key_pair")
+                        "_TypingHardware", "_TypingUnion", "_TypingInput", "_typing_key_events", "_typing_key_pair")
         expected = 40 if ctypes.sizeof(ctypes.c_void_p) == 8 else 28
         self.assertEqual(ctypes.sizeof(ns["_TypingInput"]), expected)
         pair = ns["_typing_key_pair"](30)
@@ -41,6 +41,24 @@ class TypingProbeScaffoldingTests(unittest.TestCase):
         self.assertEqual([item.data.ki.wVk for item in pair], [0, 0])
         self.assertEqual([item.data.ki.dwFlags for item in pair], [8, 10])
         self.assertFalse(any(item.data.ki.dwFlags & 4 for item in pair), "Unicode injection bypasses the intended scan-code path")
+
+    def test_shifted_scan_events_balance_and_partial_prefix_retains_only_owned_keys(self):
+        ns = load_parts({"_typing_ct": ctypes}, "_TypingMouse", "_TypingKeyboard",
+                        "_TypingHardware", "_TypingUnion", "_TypingInput",
+                        "_typing_key_events", "_typing_key_pair", "_typing_pending_keys")
+        values = ns["_typing_key_events"](2, shift=True)
+        self.assertEqual([item.data.ki.wScan for item in values], [42, 2, 2, 42])
+        self.assertEqual([item.data.ki.dwFlags for item in values], [8, 8, 10, 10])
+        expected = ([], [42], [42, 2], [42], [])
+        for count, pressed in enumerate(expected):
+            self.assertEqual(ns["_typing_pending_keys"](values, count), pressed)
+
+    def test_route_comparison_canonicalizes_en_variants_without_allowing_wrong_ru(self):
+        ns = load_parts({}, "_typing_route_matches")
+        self.assertTrue(ns["_typing_route_matches"]("en", ["en-us", "en_GB"]))
+        self.assertTrue(ns["_typing_route_matches"]("ru", ["ru-RU"]))
+        self.assertFalse(ns["_typing_route_matches"]("ru", ["uk"]))
+        self.assertFalse(ns["_typing_route_matches"]("en", []))
 
     def test_official_nvda_raw_key_keyword_signature_is_nonblocking(self):
         # release-2026.3.1 keyboardHandler.internal_keyDownEvent calls the
@@ -200,6 +218,36 @@ class TypingProbeScaffoldingTests(unittest.TestCase):
         self.assertIn("destroy", events)
         self.assertTrue(result["actual_typing"]["cleanup"]["keyboard_layout_restored"])
         self.assertEqual(checks[-1][1], "failed", "Cleanup failures must remain visible")
+
+    def test_partial_shift_cleanup_releases_only_owned_pressed_scans_in_reverse(self):
+        released = []
+        config = SimpleNamespace(conf={"keyboard": {}})
+        speech = SimpleNamespace(pre_speechQueued=SimpleNamespace(unregister=lambda cb: None),
+            cancelSpeech=lambda: None, clearTypedWordBuffer=lambda: None,
+            setSpeechMode=lambda mode: None, getState=lambda: SimpleNamespace(speechMode="off"))
+        input_core = SimpleNamespace(decide_handleRawKey=SimpleNamespace(unregister=lambda cb: None))
+        state = {"cleaned": False, "active": None, "pending_releases": [42, 2],
+                 "saved_keys": {}, "saved_mode": "off", "original_layout": 47, "loaded": [],
+                 "original_parts": object(), "original_feed": object(),
+                 "frame": SimpleNamespace(Destroy=lambda: None)}
+        def send(count, pointer, size):
+            packet = ctypes.cast(pointer, ctypes.POINTER(ns["_TypingInput"])).contents
+            released.append((packet.data.ki.wScan, packet.data.ki.dwFlags))
+            return 1
+        state["user"] = SimpleNamespace(SendInput=send, ActivateKeyboardLayout=lambda *args: 1,
+                                        GetKeyboardLayout=lambda thread: 47)
+        checks = []
+        ns = load_parts({"_typing_ct": ctypes, "_TYPING": state, "RESULT": {"actual_typing": {}},
+            "DRIVER": SimpleNamespace(_planned_parts=None, _player=SimpleNamespace(feed=None)),
+            "_typing_on_raw_key": object(), "_typing_on_queued": object(), "_typing_on_synth": object(),
+            "synthDriverHandler": SimpleNamespace(pre_synthSpeak=SimpleNamespace(unregister=lambda cb: None)),
+            "check": lambda name, status, **kw: checks.append(status)},
+            "_TypingMouse", "_TypingKeyboard", "_TypingHardware", "_TypingUnion", "_TypingInput",
+            "_typing_key_events", "_typing_key_pair", "_typing_cleanup")
+        with patch.dict(sys.modules, {"config": config, "speech": speech, "inputCore": input_core}):
+            ns["_typing_cleanup"]()
+        self.assertEqual(released, [(2, 10), (42, 10)])
+        self.assertEqual(checks[-1], "passed")
 
     def test_standalone_controller_enables_explicit_typing_mode_once(self):
         captured = []

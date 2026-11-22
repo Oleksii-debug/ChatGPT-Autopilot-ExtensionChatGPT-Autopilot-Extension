@@ -28,8 +28,9 @@ class _TypingInput(_typing_ct.Structure):
     _fields_ = [("type", _typing_ct.c_uint32), ("data", _TypingUnion)]
 
 _TYPING_CASES = (("uk", "00000422", "а"), ("uk", "00000422", "ї"),
-                 ("en", "00000409", "a"), ("en", "00000409", "b"),
-                 ("ru", "00000419", "а"), ("ru", "00000419", "ы"))
+                 ("en", "00000409", "a"), ("en", "00000409", "b"), ("en", "00000409", "!"),
+                 ("ru", "00000419", "а"), ("ru", "00000419", "б"), ("ru", "00000419", "ы"),
+                 ("ru", "00000419", " "))
 _TYPING = None
 
 
@@ -66,8 +67,8 @@ def _typing_focus_owned():
 def _typing_on_raw_key(vkCode, scanCode, extended, pressed, injected):
     state = _TYPING
     row = state.get("active") if state and not state.get("cleaned") else None
-    if row is not None and vkCode == row.get("vk"):
-        row["raw_keys"].append({"pressed": bool(pressed), "injected": bool(injected),
+    if row is not None and (vkCode == row.get("vk") or row.get("shift") and vkCode in (0x10, 0xa0)):
+        row["raw_keys"].append({"vk": int(vkCode), "pressed": bool(pressed), "injected": bool(injected),
                                 "scan": int(scanCode), "time_ns": time.perf_counter_ns()})
     return True
 
@@ -137,12 +138,36 @@ def _typing_bind_user32():
     return user
 
 
-def _typing_key_pair(scan):
-    values = (_TypingInput * 2)()
-    for index, flags in enumerate((0x0008, 0x0008 | 0x0002)):
+def _typing_key_events(scan, shift=False):
+    events = ([(0x2a, 0x0008)] if shift else []) + [(scan, 0x0008), (scan, 0x000a)]
+    if shift:
+        events.append((0x2a, 0x000a))
+    values = (_TypingInput * len(events))()
+    for index, (code, flags) in enumerate(events):
         values[index].type = 1
-        values[index].data.ki = _TypingKeyboard(0, scan, flags, 0, 0x44565459)
+        values[index].data.ki = _TypingKeyboard(0, code, flags, 0, 0x44565459)
     return values
+
+
+def _typing_key_pair(scan):
+    return _typing_key_events(scan)
+
+
+def _typing_pending_keys(events, inserted):
+    pressed = []
+    for item in events[:max(0, min(len(events), inserted))]:
+        key = int(item.data.ki.wScan)
+        if item.data.ki.dwFlags & 0x0002:
+            if key in pressed:
+                pressed.remove(key)
+        elif key not in pressed:
+            pressed.append(key)
+    return pressed
+
+
+def _typing_route_matches(expected, languages):
+    return bool(languages) and all(value.replace("_", "-").lower().split("-")[0] == expected
+                                  for value in languages)
 
 
 def start_actual_typing_probe():
@@ -170,7 +195,7 @@ def start_actual_typing_probe():
     frame = wx.Frame(None, title="Dordiai isolated real typing probe")
     text = wx.TextCtrl(frame, value="", size=(500, 80))
     frame.SetClientSize((520, 100))
-    keys = {"speakTypedCharacters": 1, "speakTypedWords": 0,
+    keys = {"speakTypedCharacters": 1, "speakTypedWords": 1,
             "handleInjectedKeys": True, "speechInterruptForCharacters": True, "speakCommandKeys": False}
     _TYPING = {"frame": frame, "text": text, "user": user, "index": 0, "active": None,
                "last_language": None, "expected": "", "loaded": [],
@@ -182,7 +207,7 @@ def start_actual_typing_probe():
                "cleaned": False, "in_typed_handler": False}
     RESULT["actual_typing"] = {"scope": "real SendInput to owned wx.TextCtrl through unchanged NVDA typing handlers",
         "input_injection": "scan-code SendInput, not WM_CHAR or direct speech calls",
-        "speech_mode": "talk", "speak_typed_characters": 1, "speak_typed_words": 0,
+        "speech_mode": "talk", "speak_typed_characters": 1, "speak_typed_words": 1,
         "no_manual_language_commands": True, "physical_audio_verified": False,
         "recording_pcm_sink_test_double": bool(SETTINGS.get("headless_ui_probe")), "cases": []}
     for key, value in keys.items():
@@ -212,6 +237,7 @@ def _typing_wait_for_focus(deadline):
 
 
 def _typing_next_case():
+    global STAGE
     state = _TYPING
     if state["index"] >= len(_TYPING_CASES):
         _typing_finish_results()
@@ -222,6 +248,7 @@ def _typing_next_case():
         finish()
         return
     if language != state["last_language"]:
+        STAGE = "typing-layout-" + language
         layout = state["user"].LoadKeyboardLayoutW(klid, 0)
         if layout and layout not in state["before_layouts"] and layout not in state["loaded"]:
             state["loaded"].append(layout)
@@ -258,9 +285,9 @@ def _typing_send_case():
         finish()
         return
     mapped = state["user"].VkKeyScanExW(glyph, layout)
-    if mapped == -1 or mapped >> 8:
+    if mapped == -1 or mapped >> 8 not in (0, 1):
         check("actual_typing_key_mapping", "blocked", language=language, glyph=glyph,
-              reason="Initial smoke requires an unmodified key in the actual selected layout")
+              reason="The keyboard mapping requires unsupported Ctrl/Alt modifiers")
         finish()
         return
     vk = mapped & 0xff
@@ -269,35 +296,44 @@ def _typing_send_case():
         raise RuntimeError("Actual typing key scan code is unavailable")
     STAGE = "typing-" + language + "-" + str(state["index"])
     row = {"language": language, "klid": klid, "actual_hkl": hex(int(layout)),
-           "hkl_language_id": int(layout) & 0xffff, "glyph": glyph, "vk": vk, "scan": scan,
+           "hkl_language_id": int(layout) & 0xffff, "glyph": glyph, "vk": vk, "scan": scan, "shift": bool(mapped >> 8),
            "expected_control_value": state["expected"] + glyph,
            "raw_keys": [], "typed_events": [], "normal_typed_speech": [],
            "driver_sequences": [], "routes": [], "stage": STAGE}
+    if glyph == "!" or glyph.isspace():
+        import characterProcessing
+        locale = "en_US" if language == "en" else "ru_RU"
+        row["expected_symbol_label"] = characterProcessing.processSpeechSymbol(locale, glyph)
+        row["expected_word_echo"] = state["expected"]
+    if language == "ru" and glyph == "б":
+        row["expected_letter_name"] = "бэ"
     RESULT["actual_typing"]["cases"].append(row)
     state["active"] = row
     DONE.clear()
     DRIVER._dordiai_last_error = None
     DRIVER._dordiai_last_error_details = None
     row["send_started_ns"] = time.perf_counter_ns()
-    state["pending_release"] = scan
-    pair = _typing_key_pair(scan)
-    sent = state["user"].SendInput(2, pair, _typing_ct.sizeof(_TypingInput))
-    if sent != 2:
-        row.update(status="failed", reason="SendInput did not insert both keyboard events", inserted=int(sent))
+    events = _typing_key_events(scan, shift=row["shift"])
+    state["pending_releases"] = [0x2a, scan] if row["shift"] else [scan]
+    sent = state["user"].SendInput(len(events), events, _typing_ct.sizeof(_TypingInput))
+    state["pending_releases"] = _typing_pending_keys(events, int(sent))
+    row["inserted_key_events"] = int(sent)
+    if sent != len(events):
+        row.update(status="failed", reason="SendInput did not insert every balanced keyboard event", expected_events=len(events))
         finish()
         return
-    state["pending_release"] = None
     later(50, lambda: _typing_wait_case(time.monotonic() + 8.0))
 
 
 def _typing_wait_case(deadline):
+    import speech
     state = _TYPING
     row = state["active"]
     metrics = snapshot(row["stage"])
     first_pcm = row.get("first_typing_pcm_ns")
     complete = (state["text"].GetValue() == row["expected_control_value"] and
                 row["typed_events"] and row["normal_typed_speech"] and row["driver_sequences"] and
-                row["routes"] and first_pcm and DONE.is_set())
+                row["routes"] and first_pcm and DONE.is_set() and not speech.isSpeaking())
     if not complete and not getattr(DRIVER, "_dordiai_last_error", None) and time.monotonic() < deadline:
         later(50, lambda: _typing_wait_case(deadline))
         return
@@ -307,13 +343,23 @@ def _typing_wait_case(deadline):
     row["effective_languages"] = sorted({part["language"] for part in row["routes"] if part.get("language")})
     row["emitted_languages"] = [part["lang"] for sequence in row["driver_sequences"] for part in sequence
                                 if part.get("command") == "LangChangeCommand"]
-    raw_seen = any(key["pressed"] and key["injected"] for key in row["raw_keys"])
+    raw_seen = any(key["pressed"] and key["injected"] and key.get("vk") == row["vk"] for key in row["raw_keys"])
     typed_exact = [entry["glyph"] for entry in row["typed_events"]] == [row["glyph"]]
     pcm_after_request = bool(first_pcm and first_pcm >= row.get("driver_request_ns", first_pcm + 1))
     passed = bool(complete and raw_seen and typed_exact and pcm_after_request and
                   metrics.get("nonzero_bytes", 0) > 0 and not row["driver_error"])
     row["status"] = "passed" if passed else "failed"
-    row["routing_status"] = ("passed" if row["effective_languages"] == [row["language"]] else "mismatch")
+    labels = [part["text"].strip() for sequence in row["normal_typed_speech"]
+              for part in sequence if "text" in part]
+    symbol_ok = ("expected_symbol_label" not in row or row["expected_symbol_label"].strip() in labels)
+    word_ok = ("expected_word_echo" not in row or row["expected_word_echo"] in labels)
+    letter_ok = ("expected_letter_name" not in row or
+                 any(part.get("text", "").strip() == row["expected_letter_name"] for part in row["routes"]))
+    row["symbol_label_matches"] = symbol_ok
+    row["letter_name_matches"] = letter_ok
+    row["word_echo_matches"] = word_ok
+    row["routing_status"] = ("passed" if _typing_route_matches(row["language"], row["effective_languages"])
+                             and symbol_ok and letter_ok and word_ok else "mismatch")
     row["first_pcm_ms"] = (first_pcm - row["send_started_ns"]) / 1000000.0 if first_pcm else None
     state["expected"] = row["expected_control_value"]
     state["active"] = None
@@ -350,9 +396,13 @@ def _typing_cleanup():
             action()
         except Exception as error:
             failures.append(type(error).__name__)
-    if state.get("pending_release"):
-        pair = _typing_key_pair(state["pending_release"])
-        restore(lambda: state["user"].SendInput(1, _typing_ct.byref(pair[1]), _typing_ct.sizeof(_TypingInput)))
+    for scan in reversed(state.get("pending_releases", ())):
+        pair = _typing_key_pair(scan)
+        try:
+            if state["user"].SendInput(1, _typing_ct.byref(pair[1]), _typing_ct.sizeof(_TypingInput)) != 1:
+                failures.append("OwnedKeyReleaseFailed")
+        except Exception as error:
+            failures.append(type(error).__name__)
     restore(lambda: inputCore.decide_handleRawKey.unregister(_typing_on_raw_key))
     restore(lambda: speech.pre_speechQueued.unregister(_typing_on_queued))
     restore(lambda: synthDriverHandler.pre_synthSpeak.unregister(_typing_on_synth))

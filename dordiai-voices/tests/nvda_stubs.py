@@ -8,6 +8,9 @@ from unittest.mock import patch
 
 
 class BaseDriver:
+    def _get_language(self):
+        return self.availableVoices[self.voice].language
+
     def __getattr__(self, name):
         getter = getattr(type(self), "_get_" + name, None)
         if getter is not None:

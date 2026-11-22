@@ -1,0 +1,397 @@
+name: Dordiai all29 MMS optional resource packs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-mms-packs.yml"
+      - "dordiai-voices/tools/prepare_mms_parity_ci.py"
+      - "dordiai-voices/tools/build_mms_resource_packs_ci.py"
+      - "dordiai-voices/tools/build_resource_pack.py"
+      - "dordiai-voices/tools/prepare_mms_models.py"
+      - "dordiai-voices/tools/requirements-mms-parity.txt"
+      - "dordiai-voices/tools/mms_model_sources.json"
+      - "dordiai-voices/tests/test_mms_resource_packs_ci.py"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dordiai-mms-packs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  all29-packs:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mms-packs]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RAW_CACHE: ${{ github.workspace }}/ci-mms-cache/native-raw
+      REPORTS: ${{ github.workspace }}/dordiai-voices/mms-pack-results
+      PACKS: ${{ github.workspace }}/dordiai-voices/dist/mms-packs
+      PACK_VERSION: 1.0.1+ci.${{ github.run_id }}.${{ github.run_attempt }}
+      DORDIAI_MMS_SHARED_GRAPH: "0"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: dordiai-voices/tools/requirements-mms-parity.txt
+      - name: Install only pinned CPU preparation dependencies
+        run: |
+          mkdir -p "$REPORTS"
+          python -m pip install --only-binary=:all: -r dordiai-voices/tools/requirements-mms-parity.txt
+          python -m pip freeze > "$REPORTS/python-packages.txt"
+      - name: Record and verify the known offline inference runtime
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,sys
+          import numpy as np
+          import onnxruntime as ort
+          if ort.__version__ != "1.27.0":
+              raise RuntimeError("This isolated CPU recipe requires ORT1.27.0")
+          ort.disable_telemetry_events()
+          binaries={}
+          forbidden=(b"onecollector",b"mobile.events.data.microsoft.com")
+          for path in pathlib.Path(ort.__file__).parent.rglob("*.so"):
+              data=path.read_bytes()
+              if any(marker in data.lower() for marker in forbidden):
+                  raise RuntimeError("Unexpected telemetry implementation in the selected wheel")
+              binaries[str(path.relative_to(pathlib.Path(ort.__file__).parent))]=hashlib.sha256(data).hexdigest()
+          if not binaries:
+              raise RuntimeError("No native ONNX Runtime binary was found")
+          record={"python":sys.version,"numpy":np.__version__,"onnxruntime":ort.__version__,
+                  "onnxruntime_module":str(ort.__file__),"binary_sha256":binaries,
+                  "telemetry_disabled_before_sessions":True,"selected_providers":["CPUExecutionProvider"]}
+          pathlib.Path(os.environ["REPORTS"],"python-runtime.json").write_text(json.dumps(record,indent=2)+"\n",encoding="utf-8")
+      - name: Check preparation and packaging contracts before heavy work
+        run: |
+          python -m unittest discover -s dordiai-voices/tests -p test_mms_parity_ci.py -v
+          python -m unittest discover -s dordiai-voices/tests -p test_mms_resource_packs_ci.py -v
+      - uses: actions/cache/restore@v4
+        id: native_raw
+        with:
+          path: ${{ env.RAW_CACHE }}
+          key: dordiai-mms29-fp32-raw-v1-${{ hashFiles('dordiai-voices/tools/mms_model_sources.json') }}-ref3dd4918cab90e1ac
+          restore-keys: dordiai-mms29-fp32-raw-v1-
+      - name: Acquire or verify pinned native weights and same-checkpoint references
+        run: |
+          python dordiai-voices/tools/prepare_reference_encoder.py --variant fp32 \
+            --output "$RAW_CACHE/reference-encoder" --metadata "$REPORTS/reference-encoder-acquisition.json"
+          python dordiai-voices/tools/prepare_mms_models.py --download-only --languages all --workers 2 \
+            --output "$RAW_CACHE/MMS" --audio-evidence "$RAW_CACHE/audio" \
+            --report "$REPORTS/mms-native-acquisition.json"
+      - name: Save verified raw bytes before calibration or parity can fail
+        if: steps.native_raw.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.RAW_CACHE }}
+          key: dordiai-mms29-fp32-raw-v1-${{ hashFiles('dordiai-voices/tools/mms_model_sources.json') }}-ref3dd4918cab90e1ac
+      - name: Reprepare genuine source references in29 fresh serial CPU processes
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          DO_NOT_TRACK: "1"
+          DORDIAI_MMS_SHARED_GRAPH: "0"
+        run: |
+          python dordiai-voices/tools/prepare_mms_parity_ci.py prepare-all \
+            --models "$RAW_CACHE/MMS" \
+            --reference-encoder "$RAW_CACHE/reference-encoder/tone_ref_encoder.onnx" \
+            --audio-evidence "$RAW_CACHE/audio" --timeout-seconds 90 \
+            --logs "$REPORTS/preparation" --report "$REPORTS/fresh-reference-preparation.json"
+      - name: Build and verify all29 independent native FP32 resource ZIPs
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          DO_NOT_TRACK: "1"
+        run: |
+          python dordiai-voices/tools/build_mms_resource_packs_ci.py \
+            --models "$RAW_CACHE/MMS" \
+            --preparation-report "$REPORTS/fresh-reference-preparation.json" \
+            --preparation-logs "$REPORTS/preparation" \
+            --output "$PACKS" --report "$REPORTS/mms-pack-build.json" \
+            --pack-version "$PACK_VERSION"
+          cp "$PACKS/resource-catalog.json" "$REPORTS/resource-catalog.json"
+          cp "$PACKS/SHA256SUMS" "$REPORTS/SHA256SUMS"
+      - name: Preserve completed or partial build proof in bounded logs
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path(os.environ["REPORTS"])/"mms-pack-build.json"
+          if path.is_file():
+              raw=path.read_bytes()
+              report=json.loads(raw)
+              summary={key:report.get(key) for key in ("status","package_count","pack_version","minimum_core_version","all29_packs_verified","download_bytes")}
+              summary["completed_packs"]=len(report.get("packs",[]))
+              print("DORDIAI_MMS_PACK_SUMMARY "+json.dumps(summary),flush=True)
+              compressed=gzip.compress(raw,mtime=0)
+              if len(compressed)>512*1024:
+                  raise RuntimeError("Unexpectedly large package proof; artifact remains available")
+              encoded=base64.b64encode(compressed).decode("ascii")
+              chunks=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              print("DORDIAI_MMS_PACK_JSON_GZIP_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):
+                  print("DORDIAI_MMS_PACK_JSON_GZIP_B64_PART "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+          else:
+              print("DORDIAI_MMS_PACK_SUMMARY "+json.dumps({"status":"pack-report-not-generated"}),flush=True)
+      - name: Save optional ak package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-ak-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-ak-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional ay package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-ay-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-ay-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional bm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-bm-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-bm-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional doi package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-doi-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-doi-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional dv package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-dv-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-dv-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional dyu package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-dyu-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-dyu-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional dz package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-dz-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-dz-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional ff package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-ff-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-ff-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional fil package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-fil-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-fil-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional fj package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-fj-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-fj-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional gil package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-gil-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-gil-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional ha package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-ha-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-ha-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional kab package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-kab-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-kab-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional km package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-km-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-km-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional lo package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-lo-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-lo-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional mai package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-mai-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-mai-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional mg package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-mg-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-mg-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional mos package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-mos-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-mos-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional ny package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-ny-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-ny-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional rn package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-rn-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-rn-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional rw package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-rw-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-rw-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional sg package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-sg-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-sg-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional sm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-sm-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-sm-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional sn package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-sn-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-sn-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional so package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-so-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-so-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional tg package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-tg-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-tg-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional tpi package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-tpi-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-tpi-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional ts package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-ts-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-ts-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save optional yo package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-yo-${{ env.PACK_VERSION }}
+          path: ${{ env.PACKS }}/dordiai-mms-yo-${{ env.PACK_VERSION }}.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 90
+      - name: Record package download and acceptance scope
+        shell: python
+        run: |
+          import json,os,pathlib
+          report=json.loads((pathlib.Path(os.environ["REPORTS"])/"mms-pack-build.json").read_text(encoding="utf-8"))
+          assert report["status"]=="passed" and report["package_count"]==29
+          text=["29 verified optional native FP32 packages are attached separately to this run.",
+                "Install only required languages using the synthesizer Packages tab.",
+                "These are newly reconstructed CC-BY-NC-4.0 experimental resources; pronunciation, typing and Windows/NVDA acceptance remain separate.",
+                "Minimum core0.13.1-dev.1 denotes the existing mms-onnx resource API, not a claim that dev9 was tested.",
+                "The reference encoder and OpenVoice conversion graphs are not duplicated in language packs.",
+                "Requested artifact retention:90days; workflow/cache/source pins permit rebuilding later.",
+                "Checksum and package catalogue are in the proof artifact."]
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as stream:
+              stream.write("\n\n".join(text)+"\n")
+      - name: Save build/preparation/checksum evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mms-pack-proofs-${{ github.run_id }}
+          path: ${{ env.REPORTS }}
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 90
