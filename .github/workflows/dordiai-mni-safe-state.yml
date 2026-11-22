@@ -1,0 +1,74 @@
+name: Dordiai isolated MNI safe checkpoint state audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-mni-safe-state.yml'
+      - 'dordiai-voices/tools/research/inspect_mni_checkpoint_state.py'
+      - 'dordiai-voices/tests/test_mni_checkpoint_state.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-mni-safe-state-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  state-audit:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mni-state]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated official CPU Torch only
+        run: >-
+          python -m pip install --only-binary=:all:
+          --index-url https://download.pytorch.org/whl/cpu
+          torch==2.6.0+cpu
+      - name: Prove safe deserialization and output guards with synthetic fixtures
+        run: python -m unittest discover -s dordiai-voices/tests -p test_mni_checkpoint_state.py -v
+      - name: Restore immutable raw official archive by full audited SHA
+        id: raw-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/dordiai-mni-official-raw
+          key: mni-official-raw-f689abf7d7398b99b40e589350beae6ceee62bdde880eb8c217b2d076e6683e5
+      - name: Acquire or fully rehash pinned source and architecture metadata
+        run: >-
+          python dordiai-voices/tools/research/inspect_mni_checkpoint_state.py acquire
+          --archive "${{ runner.temp }}/dordiai-mni-official-raw/mni.zip"
+          --receipt "${{ github.workspace }}/output/mni-safe-state/source-receipt.json"
+      - name: Save only fully hash-verified raw official archive
+        if: success() && steps.raw-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/dordiai-mni-official-raw
+          key: mni-official-raw-f689abf7d7398b99b40e589350beae6ceee62bdde880eb8c217b2d076e6683e5
+      - name: Inspect weights_only on CPU with kernel-denied network
+        run: >-
+          python dordiai-voices/tools/research/inspect_mni_checkpoint_state.py inspect
+          --archive "${{ runner.temp }}/dordiai-mni-official-raw/mni.zip"
+          --receipt "${{ github.workspace }}/output/mni-safe-state/source-receipt.json"
+          --report "${{ github.workspace }}/output/mni-safe-state/checkpoint-state.json"
+      - name: Preserve complete or blocked metadata report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mni-safe-state-${{ github.run_id }}
+          path: output/mni-safe-state/
+          if-no-files-found: warn
+          compression-level: 0
