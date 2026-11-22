@@ -1,0 +1,69 @@
+{
+  "format": "dordiai-fil-ordinary-name-candidate-v1",
+  "code": "fil",
+  "iso_code": "tgl",
+  "semantic_role": "ordinary_letter_name",
+  "letter_names": {
+    "a": "ey",
+    "b": "bi",
+    "c": "si",
+    "d": "di",
+    "e": "i",
+    "f": "ef",
+    "g": "dyi",
+    "h": "eyts",
+    "i": "ay",
+    "j": "dyey",
+    "k": "key",
+    "l": "el",
+    "m": "em",
+    "n": "en",
+    "ñ": "enye",
+    "ng": "en dyi",
+    "o": "o",
+    "p": "pi",
+    "q": "kyu",
+    "r": "ar",
+    "s": "es",
+    "t": "ti",
+    "u": "yu",
+    "v": "vi",
+    "w": "dobolyu",
+    "x": "eks",
+    "y": "way",
+    "z": "zi"
+  },
+  "ordinary_alphabet_source_complete": true,
+  "source_repertoire_size": 28,
+  "primary_corroboration": {
+    "url": "https://kwfwikaatkultura.ph/wp-content/uploads/2024/03/Manwal-sa-Masinop-na-Pagsulat.pdf",
+    "bytes": 2042405,
+    "sha256": "5f20b7eb93ef53af129822bede538121b8967fbc0e7fd93c64bef646d740f66f",
+    "sha256_scope": "original PDF bytes actually downloaded and inspected",
+    "title": "KWF Manwal sa Masinop na Pagsulat",
+    "author": "Virgilio S. Almario, editor; Komisyon sa Wikang Filipino",
+    "edition": 2014,
+    "location": "Printed page9, PDF page19 (zero-based18), §1.1 Titik, all28-letter ordinary-name table; printed page5 corroborating prose list",
+    "rights": "All rights reserved in original PDF; factual name mappings independently transcribed. No PDF/images/prose redistributed.",
+    "caution": "These are explicitly prescribed Filipino ordinary names (English-derived except Spanish ñ), not unreviewed English fallback. NG is ONE Filipino alphabet letter, supplied literal spaced table name en dyi. Page5 gives joined endyi as alternative. The unchanged native MMS acoustic checkpoint is Central Tagalog tgl, used by existing selected Filipino catalog entry; this does not establish pronunciation acceptance."
+  },
+  "letter_name_alternatives": {
+    "ng": [
+      "endyi"
+    ]
+  },
+  "publisher_identity": {
+    "url": "https://kwfdiksiyonaryo.ph/",
+    "evidence": "Official KWF dictionary homepage copyright Komisyon sa Wikang Filipino links both kwf.gov.ph and Repositoryo ng mga Wika ng Pilipinas kwfwikaatkultura.ph",
+    "repertoire_corroboration_url": "https://kwfdiksiyonaryo.ph/css/files/gabay_op.pdf",
+    "repertoire_only_pdf_bytes": 596291,
+    "repertoire_only_pdf_sha256": "2350faee606990c795a3699df706ad9d2cafaa1ee15c16f6de9ce54a3366771f",
+    "repertoire_only_location": "PDF page2 alphabet chart; not cited as ordinary-name table"
+  },
+  "provenance_decision": "All28 mappings transcribed from exact primary printed table, preserving the table-specific spaced name en dyi. No historical20-letter abakada name substituted.",
+  "letter_names_ready": false,
+  "native_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "typing_verified": false,
+  "production_registered": false
+}

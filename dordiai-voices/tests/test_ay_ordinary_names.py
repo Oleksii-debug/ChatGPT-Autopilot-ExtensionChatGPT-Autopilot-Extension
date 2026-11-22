@@ -38,6 +38,15 @@ class SourceFacts(unittest.TestCase):
         self.assertTrue(all(value[k] is False for k in m.FALSE_FLAGS))
         self.assertEqual(value['semantic_role'],'ordinary_letter_name')
 
+class OfflineAudit(unittest.TestCase):
+    def test_local_hostname_permitted_but_socket_dns_and_http_stay_blocked(self):
+        m.deny_network_event('socket.gethostname',())
+        m.deny_network_event('import',('onnxruntime',))
+        for event in ('socket.__new__','socket.connect','socket.sendto','socket.getaddrinfo',
+                      'socket.gethostbyname','socket.gethostbyaddr','http.client.connect','urllib.Request'):
+            with self.subTest(event=event),self.assertRaises(RuntimeError):
+                m.deny_network_event(event,())
+
 class PCMRate(unittest.TestCase):
     def test_projected22050_roundtrip_preserves_duration(self):
         import numpy as np

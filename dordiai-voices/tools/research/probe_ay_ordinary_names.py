@@ -62,6 +62,14 @@ def names_candidate(path):
     return value
 
 
+def deny_network_event(event,details):
+    # CPython platform.system on Windows reads the LOCAL computer name during
+    # unchanged ORT import. gethostname is not DNS, a socket or external IO.
+    if ((event.startswith('socket.') and event!='socket.gethostname')
+            or event.startswith(('http.client.','urllib.'))):
+        raise RuntimeError('Offline native inference forbids network access: '+event)
+
+
 def snapshot(root):
     """Measure existing files; all must survive experiment byte-for-byte."""
     return {str(p.relative_to(root)).replace('\\','/'):digest(p) for p in root.rglob('*') if p.is_file()}
@@ -109,10 +117,7 @@ def probe(args):
     if not Path(sys.executable).resolve().is_relative_to(python.resolve()):
         raise RuntimeError('Must execute unchanged core11 private Python')
     os.environ['PYTHONDONTWRITEBYTECODE']='1'
-    def deny(event,details):
-        if event.startswith(('socket.','http.client.','urllib.')):
-            raise RuntimeError('Offline native inference forbids network access')
-    sys.addaudithook(deny)
+    sys.addaudithook(deny_network_event)
     bootstrap=module('_ay_private_bootstrap',runtime/'windows_runtime.py')
     bootstrap.reset_inherited_dll_directory()
     sys.path.insert(0,str(runtime))
