@@ -1,0 +1,83 @@
+{
+  "format": "dordiai-settings13-independent-ci-diagnosis",
+  "run_id": 45059727656,
+  "job_id": 137322721848,
+  "status": "failed-helper-menu-disambiguation",
+  "runtime_changed": false,
+  "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "first_phase_real_keyboard_save_passed": true,
+  "genuine_saved_synth_startup_verified": true,
+  "failure": {
+    "name": "keyboard_settings_exception",
+    "status": "failed",
+    "error": "ValueError('Expected exact dordiai Tools menu item absent/ambiguous')",
+    "traceback": "Traceback (most recent call last):\n  File \"D:\\a\\_temp\\dordiai-settings-keyboard-45059727656\\edit\\nvda-probe-wik4cqyl\\config-native-host\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 126, in guarded\n    callback()\n    ~~~~~~~~^^\n  File \"D:\\a\\_temp\\dordiai-settings-keyboard-45059727656\\edit\\nvda-probe-wik4cqyl\\config-native-host\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 1325, in _ks_menu\n    _ks_require(len(targets)==1,\"Expected exact dordiai Tools menu item absent/ambiguous\")\n    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"D:\\a\\_temp\\dordiai-settings-keyboard-45059727656\\edit\\nvda-probe-wik4cqyl\\config-native-host\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 1116, in _ks_require\n    if not value:raise ValueError(message)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: Expected exact dordiai Tools menu item absent/ambiguous\n"
+  },
+  "cause": "Frozen core includes both dordiaiLanguages and dordiaiMainPreferences. A substring search matching dordiai-voices found both, causing the helper to reject before NVDA+n menu input.",
+  "fix": "Identify the unique dordiaiMainPreferences plugin-owned item by its actual menu ID; keep native keyboard traversal. Add regression with both real labels present.",
+  "next_trial_required": true,
+  "full_keyboard_restart_acceptance": false,
+  "actual_startup_limit": "Observed in real restarted NVDA with unchanged source13 and original WavePlayer routed to owned virtual endpoint. Not physical audio or pronunciation proof.",
+  "source_packet_sha256": "2ef5aee478a705484107c5f830fb33fda4eb9eecf4418aa47fd4b1fa314fd75e",
+  "source_packet_gzip_sha256": "7ab775d3abbc15bf1ad4ede4b5fb7c1194ecd58b9b2e78f2b536c411e83594c9",
+  "owned_process_cleanup": {
+    "children": [
+      {
+        "pid": 8840,
+        "executable": "nvda_2026.3.1.exe",
+        "returncode": 0,
+        "reaped": true
+      },
+      {
+        "pid": 1312,
+        "executable": "nvda.exe",
+        "returncode": 0,
+        "reaped": true
+      },
+      {
+        "pid": 7764,
+        "executable": "nvda.exe",
+        "returncode": 0,
+        "reaped": true
+      }
+    ],
+    "errors": [],
+    "all_reaped_before_device_cleanup": true,
+    "actual_nvda_process_count": 2
+  },
+  "owned_virtual_cleanup": {
+    "attempted": true,
+    "scope": "Only this call's exact owned device instance",
+    "driver_store_purge_attempted": false,
+    "removal_requested": true,
+    "removed": true,
+    "absence_verified": true,
+    "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence"
+  },
+  "original_files": {
+    "edit-controller.json": {
+      "size_bytes": 86229,
+      "sha256": "fd213910c742cfd62a6079b844e042a3becd57b8089e8626ed32f1a5ca1bd0de"
+    },
+    "edit-host.json": {
+      "size_bytes": 75999,
+      "sha256": "4587e771ca86c52e4c136a138c23e551bb28fd4acbd7b08d1a492644e406c096"
+    },
+    "edit-nvda.log": {
+      "size_bytes": 57921,
+      "sha256": "42e4e04e48bdde71f87fff21ec20d9903e6f5aa801d0f92a56c6159d980fce83"
+    },
+    "keyboard-settings-supplement.json": {
+      "size_bytes": 123548,
+      "sha256": "9babcc17982f7bf3d1a5b4086fcfe718df1f33007d31e02a0041c856834c04f4"
+    },
+    "resume-host.json": {
+      "size_bytes": 14294,
+      "sha256": "ac516ecf6e88a77b410c0c0c547aa6b1380166a351d9432974dd405b7befa351"
+    },
+    "resume-nvda.log": {
+      "size_bytes": 32900,
+      "sha256": "1bde4566a3ccf971a8b60bb9e32295272c170f308505bd4e0b920f3c80410676"
+    }
+  }
+}

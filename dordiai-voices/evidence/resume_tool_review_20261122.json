@@ -1,0 +1,41 @@
+{
+  "format": "dordiai-resume-independent-tool-review",
+  "date": "2026-11-22",
+  "baseline_version": "0.13.1-dev.13",
+  "production_source_changed": false,
+  "source13_archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "prefetch_runner": {
+    "root_independent_tests": 21,
+    "passed": 21,
+    "order": [
+      12,
+      24,
+      32,
+      32,
+      24,
+      12
+    ],
+    "full_waveform_ncc_threshold": 0.98,
+    "actual_trials_awaited": true
+  },
+  "keyboard_probe": {
+    "local_tests": 35,
+    "passed": 35,
+    "first_actual_run": 45059727656,
+    "first_actual_result": "saved-synth genuine startup succeeded, menu probe failed due to ambiguous substring",
+    "repair": "Use exact observed plugin menu item identifier while retaining actual Home/Down/Enter",
+    "actual_retry_awaited": true
+  },
+  "local_test_environment": {
+    "python": "3.13.9",
+    "numpy": "2.3.5",
+    "temporary_directory_on_D": true,
+    "initial_full_run": {
+      "total": 1815,
+      "errors": 2,
+      "skipped": 78,
+      "note": "Two missing Windows symlink privileges. Fixture-only capability skips added and corrupt-source assertion separated."
+    }
+  },
+  "product_ready": false
+}

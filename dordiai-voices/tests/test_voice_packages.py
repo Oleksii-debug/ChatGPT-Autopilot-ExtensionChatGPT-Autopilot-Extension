@@ -170,15 +170,22 @@ class VoicePackagesTests(unittest.TestCase):
             packages.install_package(self.package, self.root, max_bytes=1)
         self.assertFalse((self.root / "example_voice").exists())
 
-    def test_source_symlinks_and_corrupted_sources_are_rejected(self):
+    def test_source_symlinks_are_rejected(self):
         path = self.source / "profile.npy"
         path.unlink()
         outside = self.base / "outside.npy"
         outside.write_bytes(b"prepared vector data")
-        path.symlink_to(outside)
+        try:
+            path.symlink_to(outside)
+        except OSError as error:
+            if getattr(error, "winerror", None) == 1314:
+                self.skipTest("This Windows account cannot create filesystem symlinks")
+            raise
         with self.assertRaises(packages.PackageError):
             self.build()
-        path.unlink()
+
+    def test_corrupted_sources_are_rejected(self):
+        path = self.source / "profile.npy"
         path.write_bytes(b"unverified replacement")
         with self.assertRaises(packages.PackageError):
             self.build()

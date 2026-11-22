@@ -188,6 +188,25 @@ class InputBufferTests(unittest.TestCase):
         ns=self.namespace()
         self.assertEqual(ctypes.sizeof(ns['_KSInput']),40 if ctypes.sizeof(ctypes.c_void_p)==8 else 28)
 
+    def test_menu_uses_actual_preferences_item_when_legacy_label_also_matches(self):
+        ns=self.namespace()
+        def item(ident,label):return SimpleNamespace(GetId=lambda:ident,GetItemLabelText=lambda:label)
+        legacy=item(10,'dordiai-voices: поєднання голосів за мовами…')
+        current=item(20,'dordiai-voices — голоси, мови й мовлення…')
+        owner=type('GlobalPlugin',(),{'__module__':'globalPlugins.dordiaiMainPreferences'})()
+        owner._item=current
+        self.assertEqual(ns['_ks_preferences_item_index']([legacy,current],[owner]),1)
+        self.assertEqual(ns['_ks_preferences_item_index']([current,legacy],[owner]),0)
+
+    def test_menu_rejects_missing_or_ambiguous_preferences_owner_and_item(self):
+        ns=self.namespace()
+        item=SimpleNamespace(GetId=lambda:20)
+        owner=type('GlobalPlugin',(),{'__module__':'globalPlugins.dordiaiMainPreferences'})()
+        owner._item=item
+        for items,plugins in (([item],[]),([item],[owner,owner]),([],[owner]),([item,item],[owner])):
+            with self.subTest(items=len(items),plugins=len(plugins)),self.assertRaises(ValueError):
+                ns['_ks_preferences_item_index'](items,plugins)
+
     def test_balanced_buffer_and_partial_send_modifier_release(self):
         for partial in [False,True]:
             ns=self.namespace();calls=[];events=[];later=[]

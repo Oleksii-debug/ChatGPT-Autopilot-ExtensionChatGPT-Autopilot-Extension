@@ -337,18 +337,29 @@ def _ks_restore(dialog):
             lambda:_ks_edit_mapping(dialog,restore=True),"Restore primary language")
     _ks_list(dialog,"language","uk",True,lambda:_ks_list(dialog,"language","ru",True,enabled))
 
+def _ks_preferences_item_index(items,plugins):
+    # The frozen core also registers its legacy language-assignment menu.
+    # Identify the real preferences item through its owning plugin, then reach
+    # that unchanged item through ordinary Home/Down/Enter keyboard input.
+    owners=[p for p in plugins if type(p).__module__.lower().endswith(".dordiaimainpreferences")]
+    _ks_require(len(owners)==1,"Expected exact preferences plugin absent/ambiguous")
+    target=getattr(owners[0],"_item",None)
+    _ks_require(target is not None,"Actual preferences menu item absent")
+    targets=[i for i,item in enumerate(items) if item.GetId()==target.GetId()]
+    _ks_require(len(targets)==1,"Expected exact preferences menu ID absent/ambiguous")
+    return targets[0]
+
 def _ks_menu():
-    import gui
+    import gui,globalPluginHandler
     tray=gui.mainFrame.sysTrayIcon
     root_items=[x for x in tray.menu.GetMenuItems() if not x.IsSeparator() and x.IsEnabled()]
     tools_index=next(i for i,x in enumerate(root_items) if x.GetSubMenu() is tray.toolsMenu)
     items=[x for x in tray.toolsMenu.GetMenuItems() if not x.IsSeparator() and x.IsEnabled()]
-    targets=[i for i,x in enumerate(items) if "dordiai-voices" in x.GetItemLabelText()]
-    _ks_require(len(targets)==1,"Expected exact dordiai Tools menu item absent/ambiguous")
+    target_index=_ks_preferences_item_index(items,globalPluginHandler.runningPlugins)
     def root_open():
         _ks_send([[(0x24,True)]]+[[(0x28,True)]]*tools_index+[[(0x27,True)]],"Navigate NVDA Tools submenu",tools_open)
     def tools_open():
-        _ks_send([[(0x24,True)]]+[[(0x28,True)]]*targets[0]+[[(0x0d,False)]],"Activate dordiai Tools item",
+        _ks_send([[(0x24,True)]]+[[(0x28,True)]]*target_index+[[(0x0d,False)]],"Activate dordiai Tools item",
             lambda:_ks_wait(lambda:find_dialog() is not None,lambda:_ks_restore(find_dialog()),"Real NVDA menu did not open settings"))
     _ks_send([[_KS["nvda_key"],(0x4e,False)]],"NVDA+n",root_open)
 

@@ -79,7 +79,12 @@ class SyntheticStateTests(unittest.TestCase):
             root=Path(directory)
             source=root/"source"
             source.write_bytes(b"kept")
-            (root/"link").symlink_to(source)
+            try:
+                (root/"link").symlink_to(source)
+            except OSError as error:
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("This Windows account cannot create filesystem symlinks")
+                raise
             with self.assertRaises(ValueError):
                 m.publish(root/"link",b"bad")
             self.assertEqual(source.read_bytes(),b"kept")
