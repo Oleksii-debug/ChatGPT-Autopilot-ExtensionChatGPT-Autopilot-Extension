@@ -1,0 +1,55 @@
+{
+  "format": "dordiai-native-compound-candidate-review",
+  "format_version": 1,
+  "product_integrated": false,
+  "production_target_version": "0.13.1-dev.12",
+  "baseline_git_blob": "66ab71b2ec3b7e7d4b601efb319c6168f2abeec7",
+  "candidate_git_blob": "7c33c5396703d0a07d5d849a7b593078fe5f0ae5",
+  "tests_git_blob": "4d727cb3b3056a0e70fd5658834a914fcc0f98a0",
+  "targets": {
+    "candidate": "source/0.12.2/kx47Runtime/wide_languages.py",
+    "tests": "tests/test_native_compound_routing.py"
+  },
+  "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+  "verified_logical_counterexample": {
+    "word": "пресс-центр",
+    "whole_memberships": [
+      "ru"
+    ],
+    "component_memberships": [
+      [
+        "ru",
+        "uk"
+      ],
+      [
+        "ru",
+        "uk"
+      ]
+    ],
+    "preferred": "uk",
+    "baseline_routes": [
+      [
+        "uk",
+        "пресс-центр"
+      ]
+    ],
+    "candidate_routes": [
+      [
+        "ru",
+        "пресс-центр"
+      ]
+    ]
+  },
+  "safety": "Only known maximal ASCII-hyphen Cyrillic chains <=96 characters merge. Unknown chains, other scripts, whitespace/dashes/numbers/double-hyphens keep previous components; shared whole forms retain current language; forced/disabled policy unchanged. Resource errors propagate. No claim of author intent beyond finite source membership.",
+  "local_tests": {
+    "baseline_source_snapshot": "8b1fed1251277b328268979360cfa32aa1df244c",
+    "candidate_only_overlay": "wide_languages.py +9newtests",
+    "total": 1140,
+    "passed": 1095,
+    "skipped": 45,
+    "seconds": 8.86,
+    "platform": "Linux Python3.12.14",
+    "windows_or_nvda_verified": false
+  },
+  "scope": "Read-only actual native artifact and routing logic; no NVDA speech-origin or acoustic acceptance."
+}
