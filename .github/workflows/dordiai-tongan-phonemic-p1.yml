@@ -1,0 +1,251 @@
+name: Dordiai isolated strict Tongan phonemic contrast and projection
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-tongan-phonemic-p1.yml"
+      - "dordiai-voices/tools/research/tongan_frontend.py"
+      - "dordiai-voices/tools/research/test_tongan_frontend.py"
+      - "dordiai-voices/tools/research/probe_tongan_windows.py"
+      - "dordiai-voices/tools/research/acquire_native_rule_sources.py"
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-tongan-phonemic-p1-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  actual-original-windows-carrier-and-projection:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[tongan-phonemic-p1]')
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      RESEARCH_REPORTS: ${{ github.workspace }}/dordiai-voices/tongan-p1-results
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      DO_NOT_TRACK: "1"
+      CUDA_VISIBLE_DEVICES: ""
+    steps:
+      - name: Preserve pinned source bytes across Windows checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install pinned CI-only sine-fixture dependency
+        run: python -m pip install --disable-pip-version-check numpy==2.3.5
+      - name: Compile strict frontend and run source contrast tests before model downloads
+        working-directory: dordiai-voices
+        run: |
+          python -m py_compile tools/research/tongan_frontend.py tools/research/probe_tongan_windows.py tools/research/acquire_native_rule_sources.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tools/research -p test_tongan_frontend.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Create fresh short owned research roots
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = Join-Path $env:RUNNER_TEMP ("dordiai-to-p1-" + $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $stage) { throw "Research stage already exists" }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          New-Item -ItemType Directory -Path "$env:RESEARCH_REPORTS" | Out-Null
+          "P1_STAGE=$stage" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "PRIVATE_CORE=$stage/core/kx47Runtime" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "CARRIER_STAGE=$stage/wide" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "P1_ENCODER=$stage/reference/tone_ref_encoder.onnx" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Acquire bounded primary phonology sources separately from product resources
+        shell: pwsh
+        run: |
+          python dordiai-voices/tools/research/acquire_native_rule_sources.py --cache "$env:P1_STAGE/primary-cache" --report "$env:RESEARCH_REPORTS/primary-source-acquisition.json"
+          if ($LASTEXITCODE -ne 0) { throw "Source acquisition receipt failed" }
+      - name: Download exact immutable core10
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: "14753953381"
+          run-id: 45021069771
+          github-token: ${{ github.token }}
+          path: ci-tongan-original-core10
+      - name: Verify original core SHA and extract only interpreter conversion graphs and one allowed target
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,shutil,stat,zipfile
+          def sha(path):
+              with path.open("rb") as stream:
+                  return hashlib.file_digest(stream,"sha256").hexdigest()
+          archives=list(pathlib.Path("ci-tongan-original-core10").rglob("*.nvda-addon"))
+          assert len(archives)==1
+          addon=archives[0]
+          assert addon.stat().st_size==1974796411
+          assert sha(addon)=="437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8"
+          runtime=pathlib.Path(os.environ["PRIVATE_CORE"])
+          assert not runtime.exists()
+          target_name="kx47Runtime/models/voices/classmate_locales/viktoriia.npy"
+          exact={"kx47Runtime/models/OpenVoiceV2/encoder-flow.onnx","kx47Runtime/models/OpenVoiceV2/decoder.onnx",target_name}
+          records={}
+          with zipfile.ZipFile(addon) as archive:
+              for info in archive.infolist():
+                  path=pathlib.PurePosixPath(info.filename)
+                  wanted=(info.filename.startswith("kx47Runtime/python/") or info.filename in exact or
+                          len(path.parts)==2 and path.parts[0]=="kx47Runtime" and path.suffix in (".py",".json"))
+                  if info.is_dir() or not wanted:
+                      continue
+                  assert info.orig_filename==info.filename and "\\" not in info.filename and not path.is_absolute() and ".." not in path.parts
+                  assert not stat.S_ISLNK(info.external_attr>>16)
+                  destination=runtime.parent.joinpath(*path.parts)
+                  destination.parent.mkdir(parents=True,exist_ok=True)
+                  with archive.open(info) as source,destination.open("xb") as output:
+                      shutil.copyfileobj(source,output,1024*1024)
+                  records[info.filename]=sha(destination)
+          assert exact.issubset(records)
+          report={"format":"tongan-p1-immutable-core-subset","source_run":45021069771,"source_artifact":14753953381,
+                  "addon_sha256":sha(addon),"files":records,"target_profile":"viktoriia",
+                  "all_45_profiles_regenerated":False,"new_language_registered":False}
+          (pathlib.Path(os.environ["RESEARCH_REPORTS"])/"private-core-inventory.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+      - name: Download exact own wide artifact without forwarding repository credentials
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $handler = [System.Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect = $false
+          $client = [System.Net.Http.HttpClient]::new($handler)
+          $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "https://api.github.com/repos/$env:REPOSITORY/actions/artifacts/14754247478/zip")
+          $request.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $env:GH_TOKEN)
+          $request.Headers.UserAgent.ParseAdd("dordiai-own-phonology-research")
+          $response = $client.SendAsync($request).GetAwaiter().GetResult()
+          if ([int]$response.StatusCode -ne 302 -or $response.Headers.Location.Scheme -ne "https") { throw "Unexpected artifact redirect" }
+          $anonymous = [System.Net.Http.HttpClient]::new()
+          $stream = $anonymous.GetStreamAsync($response.Headers.Location).GetAwaiter().GetResult()
+          $zip = Join-Path $env:P1_STAGE "wide-artifact.zip"
+          $file = [System.IO.File]::Open($zip,[System.IO.FileMode]::CreateNew)
+          try { $stream.CopyTo($file) } finally { $file.Dispose(); $stream.Dispose(); $anonymous.Dispose(); $response.Dispose(); $request.Dispose(); $client.Dispose(); $handler.Dispose() }
+          if ((Get-Item $zip).Length -ne 552777798) { throw "Wide wrapper byte count changed" }
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262") { throw "Wide wrapper SHA changed" }
+      - name: Extract and verify original Windows phoneme engine and native data only
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,shutil,stat,zipfile
+          stage=pathlib.Path(os.environ["P1_STAGE"]);folder=pathlib.Path(os.environ["CARRIER_STAGE"])
+          inner=stage/"wide-language-package.zip"
+          with zipfile.ZipFile(stage/"wide-artifact.zip") as outer:
+              names=[name for name in outer.namelist() if pathlib.PurePosixPath(name).name=="dordiai-wide-languages-0.13.1-dev.10.zip"]
+              assert len(names)==1
+              with outer.open(names[0]) as source,inner.open("xb") as output:
+                  shutil.copyfileobj(source,output,1024*1024)
+          records={};prefix="kx47Runtime/models/WideLanguages/"
+          with zipfile.ZipFile(inner) as archive:
+              manifest=json.loads(archive.read("dordiai-resource-pack.json"))
+              assert manifest["format"]=="dordiai-resource-pack" and manifest["id"]=="wide-languages" and manifest["version"]=="0.13.1-dev.10"
+              for info in archive.infolist():
+                  if info.is_dir() or not info.filename.startswith(prefix):continue
+                  relative=pathlib.PurePosixPath(info.filename[len(prefix):])
+                  wanted=(relative.parts[0]=="espeak-ng-data" or len(relative.parts)==1 and relative.suffix.lower()==".dll")
+                  if not wanted:continue
+                  assert info.orig_filename==info.filename and "\\" not in info.filename
+                  assert not relative.is_absolute() and ".." not in relative.parts and not stat.S_ISLNK(info.external_attr>>16)
+                  destination=folder.joinpath(*relative.parts);destination.parent.mkdir(parents=True,exist_ok=True)
+                  with archive.open(info) as source,destination.open("xb") as output:
+                      shutil.copyfileobj(source,output,1024*1024)
+                  with destination.open("rb") as stream:digest=hashlib.file_digest(stream,"sha256").hexdigest()
+                  expected=manifest["files"][info.filename]
+                  assert destination.stat().st_size==expected["size_bytes"] and digest==expected["sha256"]
+                  records[relative.as_posix()]=digest
+          assert (folder/"espeak.dll").is_file() and (folder/"espeak-ng-data/phontab").is_file()
+          report={"artifact":14754247478,"run":45021069771,"outer_sha256":"5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262",
+                  "scope":"Original actual Windows eSpeak engine/data only; no wide neural models extracted","files":records}
+          (pathlib.Path(os.environ["RESEARCH_REPORTS"])/"carrier-inventory.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+      - name: Acquire only already-reviewed pinned FP32 reference encoder
+        shell: python
+        run: |
+          import json,os,pathlib,sys
+          sys.path.insert(0,"dordiai-voices/tools")
+          import prepare_reference_encoder as prep
+          target=pathlib.Path(os.environ["P1_ENCODER"])
+          assert not target.exists()
+          prep.download_pinned(prep.ENCODERS["fp32"],target)
+          report={"repository":prep.REPO,"revision":prep.REVISION,"record":prep.ENCODERS["fp32"],
+                  "actual_sha256":prep.file_hash(target),"graph_regenerated":False}
+          (pathlib.Path(os.environ["RESEARCH_REPORTS"])/"reference-encoder-acquisition.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+      - name: Execute actual strict native-character contrasts phoneme events and selected-profile conversion offline
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $python = (Resolve-Path (Join-Path $env:PRIVATE_CORE "python/python.exe")).Path
+          $programs = @(& $python -c "import json,sys;print(json.dumps(sorted(set((sys.executable,sys._base_executable)))))" | ConvertFrom-Json)
+          $profiles = @(Get-NetFirewallProfile)
+          if ($profiles.Count -lt 1 -or @($profiles | Where-Object { -not $_.Enabled }).Count -gt 0) { throw "Effective existing firewall profiles required" }
+          $rules=@();$exitCode=1
+          try {
+            $i=0
+            foreach ($program in $programs) {
+              $name="DordiaiTonganP1-$env:GITHUB_RUN_ID-$i";$rules+=$name
+              New-NetFirewallRule -Name $name -DisplayName $name -Direction Outbound -Action Block -Program $program -Enabled True -Profile Any | Out-Null
+              $rule=Get-NetFirewallRule -Name $name
+              if ($rule.Action -ne "Block" -or $rule.Direction -ne "Outbound" -or $rule.Enabled -ne "True") { throw "Scoped deny did not become effective" }
+              $i++
+            }
+            @{action="Block";direction="Outbound";enabled=$true;programs=$programs;all_firewall_profiles_enabled=$true;scope="own-ephemeral-private-python-only"} | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 "$env:RESEARCH_REPORTS/network-policy.json"
+            & $python -I -B dordiai-voices/tools/research/probe_tongan_windows.py --packaged-runtime "$env:PRIVATE_CORE" --espeak "$env:CARRIER_STAGE" --reference-encoder "$env:P1_ENCODER" --network-policy "$env:RESEARCH_REPORTS/network-policy.json" --output "$env:RESEARCH_REPORTS/projection"
+            $exitCode=$LASTEXITCODE
+          } finally {
+            foreach ($name in $rules) { Remove-NetFirewallRule -Name $name -ErrorAction Continue }
+          }
+          if ($exitCode -ne 0) { throw "Actual native-character or phoneme/projection proof failed" }
+      - name: Verify every copied core carrier and encoder byte stayed unchanged
+        if: always()
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib
+          reports=pathlib.Path(os.environ["RESEARCH_REPORTS"])
+          def sha(path):
+              with path.open("rb") as stream:return hashlib.file_digest(stream,"sha256").hexdigest()
+          core=json.loads((reports/"private-core-inventory.json").read_text(encoding="utf-8"))
+          carrier=json.loads((reports/"carrier-inventory.json").read_text(encoding="utf-8"))
+          root=pathlib.Path(os.environ["PRIVATE_CORE"]).parent;wide=pathlib.Path(os.environ["CARRIER_STAGE"])
+          changed=[]
+          for name,expected in core["files"].items():
+              path=root.joinpath(*pathlib.PurePosixPath(name).parts)
+              if not path.is_file() or sha(path)!=expected:changed.append("core:"+name)
+          for name,expected in carrier["files"].items():
+              path=wide.joinpath(*pathlib.PurePosixPath(name).parts)
+              if not path.is_file() or sha(path)!=expected:changed.append("carrier:"+name)
+          encoder=pathlib.Path(os.environ["P1_ENCODER"])
+          if not encoder.is_file() or sha(encoder)!="3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7":changed.append("reference-encoder")
+          report={"all_original_input_bytes_unchanged":not changed,"changed":changed,"checked_core_files":len(core["files"]),
+                  "checked_carrier_files":len(carrier["files"]),"production_integrated":False}
+          (reports/"input-integrity.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+          assert not changed
+      - name: Preserve bounded exact reports and honest capability limits
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ["RESEARCH_REPORTS"])
+          for name in ("primary-source-acquisition.json","input-integrity.json","reference-encoder-acquisition.json","projection/proof.json"):
+              path=root/name
+              if not path.is_file():continue
+              raw=path.read_bytes();doc=json.loads(raw.decode("utf-8-sig"))
+              print("TONGAN_P1_REPORT_SUMMARY "+name+" "+json.dumps({key:doc.get(key) for key in ("status","actual_cases","strictly_renderable_original27","original27_research_hypothesis_count","all_five_long_double_event_contrasts_passed","original_input_bytes_unchanged","all_original_input_bytes_unchanged","native_listener_verified","native_phonetic_fidelity_verified","windows_nvda_verified","physical_audio_verified","registered")}),flush=True)
+              compressed=gzip.compress(raw,mtime=0)
+              if len(compressed)>524288:raise ValueError("Report exceeds explicit bounded receipt")
+              text=base64.b64encode(compressed).decode()
+              chunks=[text[i:i+12000] for i in range(0,len(text),12000)]
+              print("TONGAN_P1_GZIP_SHA256 "+name+" "+hashlib.sha256(compressed).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):
+                  print("TONGAN_P1_GZIP_B64 "+name+" "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-tongan-phonemic-p1-${{ github.run_id }}
+          path: ${{ env.RESEARCH_REPORTS }}
+          if-no-files-found: warn
+          retention-days: 30
