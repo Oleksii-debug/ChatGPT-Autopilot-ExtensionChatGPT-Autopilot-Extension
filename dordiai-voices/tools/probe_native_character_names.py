@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='dordiai-character-probe-') as temporary
  (models/'MMS').symlink_to(ROOT/'model-packs/mms/kx47Runtime/models/MMS',target_is_directory=True)
  (models/'SharedOmniONNX').symlink_to(ROOT/'model-packs/extra-onnx/kx47Runtime/models/SharedOmniONNX',target_is_directory=True)
  for code,keys in [('ha',['b','ɓ','sh']),('ay',['ch','ñ',"q'"]),('rm',['b','c','w'])]:
-  doc=json.loads((resources/(code+'.json')).read_text());entry={'source_alphabet_complete':doc['ordinary_alphabet_source_complete'],'source_native_names':len(doc['ordinary_alphabet_source_repertoire']),'clips':[],'human_pronunciation_accepted':False}
+  doc=json.loads((resources/(code+'.json')).read_text(encoding='utf-8'));entry={'source_alphabet_complete':doc['ordinary_alphabet_source_complete'],'source_native_names':len(doc['ordinary_alphabet_source_repertoire']),'clips':[],'human_pronunciation_accepted':False}
   report['languages'][code]=entry
   if code!='rm':
    carrier=MMSCarrier(models/'MMS'/code)

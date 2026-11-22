@@ -130,8 +130,8 @@ def save():
     temporary.replace(OUTPUT / "nvda-probe.json")
 
 
-def check(name, status, **details):
-    RESULT["checks"].append(dict(name=name, status=status, **details))
+def check(check_name, status, **details):
+    RESULT["checks"].append(dict(name=check_name, status=status, **details))
     save()
 
 
@@ -243,7 +243,7 @@ def begin():
         check("select_dordiai", "failed", returned=bool(selected), actual=getattr(DRIVER, "name", None))
         finish()
         return
-    check("select_dordiai", "passed", name=DRIVER.name)
+    check("select_dordiai", "passed", driver_name=DRIVER.name)
     module = sys.modules.get(type(DRIVER).__module__)
     SAMPLE_RATE = getattr(module, "SAMPLE_RATE", SAMPLE_RATE)
     voices = list(DRIVER.availableVoices)

@@ -13,9 +13,9 @@ from wide_coqui_onnx import CoquiFrontend, NativeCoqui
 class ExportEvidenceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.index = json.loads((ROOT / "tools/ndebele_checkpoint_sources.json").read_text())
-        cls.evidence = json.loads((ROOT / "evidence/ndebele_export.json").read_text())
-        cls.frontend = json.loads((ROOT / "evidence/ndebele_frontend.json").read_text())
+        cls.index = json.loads((ROOT / "tools/ndebele_checkpoint_sources.json").read_text(encoding="utf-8"))
+        cls.evidence = json.loads((ROOT / "evidence/ndebele_export.json").read_text(encoding="utf-8"))
+        cls.frontend = json.loads((ROOT / "evidence/ndebele_frontend.json").read_text(encoding="utf-8"))
 
     def test_source_is_exact_northern_standard_and_client_graph_is_compact(self):
         self.assertEqual(self.index["language"], "nd")
@@ -28,7 +28,7 @@ class ExportEvidenceTests(unittest.TestCase):
             CoquiFrontend(dict(self.frontend, lang_code="nr"))
 
     def test_safe_real_state_load_and_unconditioned_speaker_evidence(self):
-        inspection = json.loads((ROOT / "evidence/ndebele_checkpoint_inspection.json").read_text())
+        inspection = json.loads((ROOT / "evidence/ndebele_checkpoint_inspection.json").read_text(encoding="utf-8"))
         self.assertTrue(inspection["safety"]["weights_only"])
         self.assertTrue(inspection["safety"]["mmap"])
         self.assertEqual(inspection["safety"]["unsafe_pickle_globals"], [])
@@ -78,7 +78,7 @@ class ActualRuntimeTests(unittest.TestCase):
             self.assertGreater(float(np.max(np.abs(audio))), .001)
             samples.append(len(audio))
         self.assertEqual(len(set(samples)), len(samples))
-        metadata = json.loads((folder / "runtime_config.json").read_text())
+        metadata = json.loads((folder / "runtime_config.json").read_text(encoding="utf-8"))
         source = np.load(folder / "source.npy", allow_pickle=False)
         self.assertEqual(source.shape, (1, 256, 1))
         self.assertEqual(source.dtype, np.float32)

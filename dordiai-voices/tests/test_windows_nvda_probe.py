@@ -1,6 +1,7 @@
 """Probe scaffolding tests; these explicitly do not run or simulate NVDA."""
 import ast
 import importlib.util
+import inspect
 import io
 import json
 from pathlib import Path
@@ -16,6 +17,44 @@ TOOLS = Path(__file__).resolve().parents[1] / "tools"
 spec = importlib.util.spec_from_file_location("windows_probe_under_test", TOOLS / "windows_nvda_probe.py")
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
+
+
+def helper_binding_errors(source):
+    """Check actual embedded calls without importing or pretending to run NVDA."""
+    tree = ast.parse(source.replace("__PROBE_SETTINGS__", "{}"))
+    signatures = {}
+    for definition in tree.body:
+        if not isinstance(definition, ast.FunctionDef):
+            continue
+        arguments = definition.args
+        positional = arguments.posonlyargs + arguments.args
+        first_default = len(positional) - len(arguments.defaults)
+        parameters = [inspect.Parameter(
+            argument.arg,
+            inspect.Parameter.POSITIONAL_ONLY if index < len(arguments.posonlyargs)
+            else inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            default=object() if index >= first_default else inspect.Parameter.empty,
+        ) for index, argument in enumerate(positional)]
+        if arguments.vararg:
+            parameters.append(inspect.Parameter(arguments.vararg.arg, inspect.Parameter.VAR_POSITIONAL))
+        parameters.extend(inspect.Parameter(argument.arg, inspect.Parameter.KEYWORD_ONLY,
+            default=inspect.Parameter.empty if default is None else object())
+            for argument, default in zip(arguments.kwonlyargs, arguments.kw_defaults))
+        if arguments.kwarg:
+            parameters.append(inspect.Parameter(arguments.kwarg.arg, inspect.Parameter.VAR_KEYWORD))
+        signatures[definition.name] = inspect.Signature(parameters)
+    errors = []
+    for call in ast.walk(tree):
+        if (not isinstance(call, ast.Call) or not isinstance(call.func, ast.Name)
+                or call.func.id not in signatures or any(isinstance(arg, ast.Starred) for arg in call.args)
+                or any(keyword.arg is None for keyword in call.keywords)):
+            continue
+        try:
+            signatures[call.func.id].bind(*[object() for _ in call.args],
+                **{keyword.arg: object() for keyword in call.keywords})
+        except TypeError as error:
+            errors.append({"helper": call.func.id, "line": call.lineno, "error": str(error)})
+    return errors
 
 
 class WindowsProbeScaffoldingTests(unittest.TestCase):
@@ -60,6 +99,19 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         compile(code, "dordiaiProbe.py", "exec")
         self.assertIn("synthDriverHandler.setSynth", code)
         self.assertIn("wx.UIActionSimulator", code)
+
+    def test_actual_embedded_helper_calls_bind_their_signatures(self):
+        self.assertEqual(helper_binding_errors(probe.PROBE_PLUGIN), [])
+
+    def test_signature_check_detects_original_driver_selection_failure(self):
+        # Reproduce the exact error observed after real NVDA selected the
+        # driver: positional check name collided with the name= detail.
+        original_bug = probe.PROBE_PLUGIN.replace(
+            "def check(check_name, status, **details):", "def check(name, status, **details):"
+        ).replace("driver_name=DRIVER.name", "name=DRIVER.name")
+        self.assertNotEqual(original_bug, probe.PROBE_PLUGIN)
+        errors = helper_binding_errors(original_bug)
+        self.assertTrue(any(row["helper"] == "check" and "multiple values" in row["error"] for row in errors), errors)
 
     def test_percentile_math_is_checked_without_running_nvda_plugin(self):
         tree = ast.parse(probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", "{}"))

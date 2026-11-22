@@ -76,7 +76,7 @@ class GraphContractTests(unittest.TestCase):
 
     def test_wrong_prepared_language_standard_rejected(self):
         path = self.folder / "runtime_config.json"
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding="utf-8"))
         value["iso_code"] = "lin"
         path.write_text(json.dumps(value))
         with self.assertRaises(ValueError):
@@ -91,7 +91,7 @@ class GraphContractTests(unittest.TestCase):
 
 class SourceIndexTests(unittest.TestCase):
     def test_actual_models_and_configs_are_pinned(self):
-        index = json.loads((ROOT / "tools/coqui_model_sources.json").read_text())
+        index = json.loads((ROOT / "tools/coqui_model_sources.json").read_text(encoding="utf-8"))
         self.assertEqual(set(index["models"]), {"ig", "ln"})
         for code, row in index["models"].items():
             self.assertEqual(row["license"], "cc-by-sa-4.0")
@@ -126,7 +126,7 @@ class RealModelTests(unittest.TestCase):
                 source = np.load(folder / "source.npy", allow_pickle=False)
                 self.assertEqual(source.shape, (1, 256, 1))
                 self.assertEqual(source.dtype, np.float32)
-                metadata = json.loads((folder / "runtime_config.json").read_text())
+                metadata = json.loads((folder / "runtime_config.json").read_text(encoding="utf-8"))
                 self.assertEqual(metadata["source_identity"]["source_sha256"], sha256((folder / "source.npy").read_bytes()).hexdigest())
                 self.assertFalse(metadata["native_pronunciation_verified"])
                 self.assertFalse(metadata["windows_nvda_verified"])

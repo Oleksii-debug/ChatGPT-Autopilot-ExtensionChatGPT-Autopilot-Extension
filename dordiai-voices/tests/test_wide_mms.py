@@ -205,7 +205,7 @@ class ProvenanceTests(unittest.TestCase):
             with patch.object(sys, "argv", arguments), patch.object(builtins, "__import__", side_effect=guarded_import), \
                  patch.object(preparation, "urlopen", side_effect=AssertionError("Pinned cached artifact must not redownload")):
                 self.assertEqual(preparation.main(), 0)
-            result = json.loads((folder / "report.json").read_text())
+            result = json.loads((folder / "report.json").read_text(encoding="utf-8"))
             self.assertEqual(result["mode"], "download-only")
             self.assertFalse(result["models"]["ha"]["models_executed"])
 
@@ -246,7 +246,7 @@ class RealModelTests(unittest.TestCase):
         self.assertEqual(source.shape, (1, 256, 1))
         self.assertEqual(source.dtype, np.float32)
         self.assertGreater(float(np.linalg.norm(source)), .1)
-        config = json.loads((folder / "config.json").read_text())
+        config = json.loads((folder / "config.json").read_text(encoding="utf-8"))
         self.assertEqual(config["source_identity"]["source_sha256"], preparation.digest(folder / "source.npy"))
         self.assertFalse(config["native_pronunciation_verified"])
         self.assertFalse(config["windows_nvda_verified"])

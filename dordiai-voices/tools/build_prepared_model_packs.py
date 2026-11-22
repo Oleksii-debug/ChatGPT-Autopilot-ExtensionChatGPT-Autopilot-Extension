@@ -117,7 +117,7 @@ def build_mms_packs(root=ROOT, output=None, workers=2):
 
 def build_extra_packs(root=ROOT, output=None, workers=2, codes=("sat", "st", "xh", "ig", "ln", "nd")):
     root, output = Path(root), Path(output or Path(root) / "dist/language-packs")
-    labels = {row["id"]: row["name_uk"] for row in json.loads((root / "selected_languages.json").read_text())["languages"]}
+    labels = {row["id"]: row["name_uk"] for row in json.loads((root / "selected_languages.json").read_text(encoding="utf-8"))["languages"]}
 
     def build_one(code):
         candidates = [stage / "kx47Runtime/models/ExtraLanguages" / code
@@ -127,7 +127,7 @@ def build_extra_packs(root=ROOT, output=None, workers=2, codes=("sat", "st", "xh
         directory = next((p for p in candidates if p.is_dir()), None)
         if directory is None:
             raise ValueError("No prepared extra model: " + code)
-        runtime = json.loads((directory / "runtime_config.json").read_text())
+        runtime = json.loads((directory / "runtime_config.json").read_text(encoding="utf-8"))
         model_hash, source_hash = digest(directory / "model.onnx"), digest(directory / "source.npy")
         if runtime.get("format") == "dordiai-simba-onnx-v1":
             proof = runtime["source_identity"]
@@ -141,7 +141,7 @@ def build_extra_packs(root=ROOT, output=None, workers=2, codes=("sat", "st", "xh
             provenance = {key: runtime[key] for key in ("repo_id", "revision", "iso_code")}
         elif code == "sat":
             license_name = "Apache-2.0"
-            provenance = json.loads((directory / "source.json").read_text())
+            provenance = json.loads((directory / "source.json").read_text(encoding="utf-8"))
         else:
             raise ValueError("Unrecognized prepared native model format: " + code)
         names = [p.name for p in directory.iterdir() if p.is_file() and p.suffix != ".wav"
@@ -173,7 +173,7 @@ def build_extra_packs(root=ROOT, output=None, workers=2, codes=("sat", "st", "xh
 def build_omni_packs(root=ROOT, output=None, references_only=False):
     root, output = Path(root), Path(output or Path(root) / "dist/language-packs")
     directory = root / "model-packs/extra-onnx/kx47Runtime/models/SharedOmniONNX"
-    upstream = json.loads((directory / "source.json").read_text())
+    upstream = json.loads((directory / "source.json").read_text(encoding="utf-8"))
     names = ["backbone.int8.onnx", "vocoder.fp32.onnx", "vocoder.fp32.onnx.data", "tokenizer.json",
              "config.json", "tokenizer_config.json", "preprocessor_config.json", "chat_template.jinja",
              "README.md", "LICENSE-HIGGS-AUDIO-2.txt", "LICENSE-LLAMA3.txt", "UPSTREAM-LICENSE-NOTICE.txt", "source.json"]
