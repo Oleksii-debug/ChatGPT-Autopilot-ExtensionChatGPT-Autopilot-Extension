@@ -126,13 +126,13 @@ def cyrillic_word_candidates(word):
         return frozenset()
     if word in SHARED_CYRILLIC_WORDS:
         return frozenset(("uk", "ru"))
-    bits = supplemental_cyrillic_index().get(word)
-    if bits:
-        return frozenset(code for index, code in enumerate(("uk", "ru")) if bits & (1 << index))
     uk_cue = word in UKRAINIAN_CUES
     ru_cue = word in RUSSIAN_CUES
     if uk_cue != ru_cue:
         return frozenset(("uk" if uk_cue else "ru",))
+    bits = supplemental_cyrillic_index().get(word)
+    if bits:
+        return frozenset(code for index, code in enumerate(("uk", "ru")) if bits & (1 << index))
     candidates = set()
     if word in UKRAINIAN_CUES:
         candidates.add("uk")

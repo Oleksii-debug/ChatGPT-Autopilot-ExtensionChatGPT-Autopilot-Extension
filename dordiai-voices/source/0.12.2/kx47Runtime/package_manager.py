@@ -167,7 +167,7 @@ def _resource_path(name):
     if path.suffix.lower() in {".py", ".pyc", ".pyo", ".pth", ".bat", ".cmd", ".ps1"}:
         raise PackageError("Пакет ресурсів не може встановлювати сценарії: " + name)
     # Windows trims spaces/dots, supports device paths and alternate streams.
-    reserved = {"con", "prn", "aux", "nul", *("com" + str(i) for i in range(1, 10)), *("lpt" + str(i) for i in range(1, 10))}
+    reserved = {"con", "prn", "aux", "nul", "clock$", *("com" + str(i) for i in range(1, 10)), *("lpt" + str(i) for i in range(1, 10))}
     for part in path.parts:
         if part.endswith((" ", ".")) or part.split(".")[0].casefold() in reserved:
             raise PackageError("Неприпустимий для Windows шлях: " + name)
@@ -403,7 +403,9 @@ def install_pack(archive_path, addon_root=None):
                     target.parent.mkdir(parents=True, exist_ok=True)
                     digest = hashlib.sha256()
                     written = 0
-                    with archive.open(name) as source, target.open("wb") as output:
+                    # Exclusive creation also catches Windows short-name aliases
+                    # that collide despite having different Unicode spellings.
+                    with archive.open(name) as source, target.open("xb") as output:
                         for block in iter(lambda: source.read(1024 * 1024), b""):
                             written += len(block)
                             if written > record["size_bytes"]:

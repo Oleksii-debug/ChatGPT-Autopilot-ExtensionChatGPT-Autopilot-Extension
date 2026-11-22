@@ -56,6 +56,34 @@ def _signature(path):
         return None
 
 
+@lru_cache(maxsize=4)
+def _shared_resources(index_path, index_signature, manifest_path, manifest_signature):
+    resources = {}
+    if manifest_signature is not None and manifest_signature[1] < 1024 * 1024:
+        for line in Path(manifest_path).read_text(encoding="utf-8-sig").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key.strip() == "version":
+                resources["core"] = value.strip().strip('"')
+                break
+    if index_signature is not None and index_signature[1] <= 2 * 1024 * 1024:
+        try:
+            document = json.loads(Path(index_path).read_text(encoding="utf-8"))
+            packs = document.get("packs", {}) if isinstance(document, dict) else {}
+            if isinstance(packs, dict):
+                for package_id, entry in packs.items():
+                    if isinstance(package_id, str) and isinstance(entry, dict) and isinstance(entry.get("version"), str):
+                        resources[package_id] = entry["version"]
+        except (OSError, ValueError, TypeError):
+            pass
+    return resources
+
+
+def shared_resource_versions():
+    index = Path(__file__).with_name("installed_resource_packs.json")
+    manifest = Path(__file__).resolve().parents[1] / "manifest.ini"
+    return dict(_shared_resources(str(index), _signature(index), str(manifest), _signature(manifest)))
+
+
 def validate_adapter(document):
     """Do not expose prepared assets through an adapter that cannot use them."""
     validate_manifest(document)
@@ -76,9 +104,9 @@ def validate_adapter(document):
 
 
 @lru_cache(maxsize=8)
-def _discovered(root, signature, engine_id):
+def _discovered(root, signature, engine_id, resource_versions):
     result = {}
-    for voice, document in discover_packages(root, engines=ENGINE_ADAPTERS).items():
+    for voice, document in discover_packages(root, engines=ENGINE_ADAPTERS, resources=dict(resource_versions)).items():
         try:
             validate_adapter(document)
         except (ValueError, TypeError):
@@ -91,13 +119,16 @@ def _discovered(root, signature, engine_id):
 def discover_voices(references, engine_id=None):
     root = package_root(references)
     # Installing, rollback and removal all atomically replace the active index.
-    return dict(_discovered(str(root), _signature(root / INDEX_NAME), engine_id))
+    resources = tuple(sorted(shared_resource_versions().items()))
+    return dict(_discovered(str(root), _signature(root / INDEX_NAME), engine_id, resources))
 
 
 def clear_cache():
     _discovered.cache_clear()
     _verified.cache_clear()
     _native_settings.cache_clear()
+    _shared_resources.cache_clear()
+    _active_ids.cache_clear()
 
 
 def install_voice_package(package, references, *, engine_id="holos", resources=None):
@@ -105,6 +136,7 @@ def install_voice_package(package, references, *, engine_id="holos", resources=N
     document = validate_adapter(inspect_package(package))
     if document["engine"]["id"] != engine_id:
         raise PackageError("The voice is incompatible with the active synthesizer engine")
+    resources = shared_resource_versions() if resources is None else resources
     directory = install_package(package, package_root(references),
                                 engines={engine_id: ENGINE_ADAPTERS[engine_id]}, resources=resources)
     clear_cache()
@@ -123,6 +155,7 @@ def activate_voice_version(references, voice, version, *, engine_id="holos", res
     document = validate_adapter(_packages.load_manifest(directory / _packages.MANIFEST_NAME))
     if document["engine"]["id"] != engine_id:
         raise PackageError("The voice version is incompatible with the active engine")
+    resources = shared_resource_versions() if resources is None else resources
     result = _packages.activate_version(package_root(references), voice, version,
                                         engines={engine_id: ENGINE_ADAPTERS[engine_id]}, resources=resources)
     clear_cache()
@@ -133,9 +166,22 @@ def voice_versions(references, voice):
     return _packages.installed_versions(package_root(references), voice)
 
 
+@lru_cache(maxsize=8)
+def _active_ids(root, signature):
+    try:
+        return frozenset(_packages._load_index(Path(root))["active"])
+    except (OSError, ValueError, TypeError):
+        return frozenset()
+
+
 def _profile(references, profile):
     require_voice_allowed(profile)
-    return discover_voices(references).get(profile)
+    document = discover_voices(references).get(profile)
+    if document is None:
+        root = package_root(references)
+        if profile in _active_ids(str(root), _signature(root / INDEX_NAME)):
+            raise PackageError("The installed voice package is unavailable or incompatible: " + profile)
+    return document
 
 
 @lru_cache(maxsize=256)

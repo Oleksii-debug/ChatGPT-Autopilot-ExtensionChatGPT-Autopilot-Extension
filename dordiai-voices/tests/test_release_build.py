@@ -35,6 +35,7 @@ class ReleaseBuildTests(unittest.TestCase):
         self.put(self.baseline, "kx47Runtime/models/voices/core_spelling_2x/inna/letter.wav", b"excluded")
         self.put(self.baseline, "kx47Runtime/models/voices/anna.npy", b"allowed")
         self.put(self.baseline, "kx47Runtime/models/voices/delivery.json", b'{"inna":{},"anna":{"voice":"anna"}}')
+        self.put(self.baseline, "kx47Runtime/models/english_voice_profiles.json", b'{"inna":{},"anna":{"seed":42}}')
         self.put(self.baseline, "kx47Runtime/models/WideLanguages/wide_words.json", b'{"inna":"valid-word"}')
         self.put(self.baseline, "kx47Runtime/models/Piper/de_DE-test.onnx", b"GermanModel")
         self.put(self.baseline, "kx47Runtime/models/Piper/en_US-test.onnx", b"EnglishModel")
@@ -70,6 +71,7 @@ class ReleaseBuildTests(unittest.TestCase):
                     self.assertEqual(archive.read("kx47Runtime/worker.py"), b"UPDATED = True\n")
                     self.assertEqual(set(json.loads(archive.read("kx47Runtime/models/voices/catalog.json"))), {"oleksii", "anna"})
                     self.assertNotIn(b"inna", archive.read("kx47Runtime/models/voices/delivery.json"))
+                    self.assertNotIn(b"inna", archive.read("kx47Runtime/models/english_voice_profiles.json"))
                     self.assertIn(b"0.13.0-dev.1", archive.read("manifest.ini"))
                 if a["group"] == "wide-languages":
                     self.assertEqual(archive.read("kx47Runtime/models/WideLanguages/wide_words.json"), b'{"inna":"valid-word"}')

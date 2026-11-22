@@ -1,24 +1,44 @@
-# dordiai-voices — recovered baseline, 22 November 2026
+# dordiai-voices — розробка модульного синтезатора NVDA
 
-This directory is an isolated workspace inside the temporarily reused Autopilot repository. Its existing application is independent of this work.
+Розробку дозволено користувачем 22 листопада 2026 року. Поточна збірка: **0.13.0-dev.1**, для перевірки. Завершення всього продукту поки не підтверджене.
 
-- `source/0.12.2/`: exact recovered editable Python, documentation and selected JSON configuration from the main NVDA add-on.
-- `source/unified-0.3.10/`: corresponding snapshot from the unified add-on.
-- `AUDIT_UK.md`: findings and next steps in Ukrainian.
-- `evidence/summary.json`: machine-readable validation results.
-- `evidence/archive_inventory.json.gz`: complete file inventory, checksums and duplicate verification.
-- `tools/restore.py`: download and restore the exact binary baselines from the user's shared archive. Uses only Python's standard library. No connected Google Drive account is required.
-- `tools/validate.py`: check syntax, registered resources and voice/language counts without starting NVDA or loading Windows DLLs.
+Ця папка ізольована від іншої програми в тимчасово використаному репозиторії Autopilot. Її код не змінюється.
 
-## Restore and inspect
+- `FINAL_PRODUCT_SPEC_UK.md` — погоджені вимоги кінцевого продукту.
+- `SELECTED_LANGUAGES_UK.md`, `selected_languages.json` — вибраний каталог і порядок роботи без географічних повторів.
+- `WORK_STATE.json` — фактично виконані роботи, відкриті вимоги та перевірки.
+- `source/0.12.2/` — оновлений код основного синтезатора для накладання на перевірені вихідні ресурси.
+- `source/unified-0.3.10/` — збережений окремий експериментальний синтезатор; до поточної розробки не входить.
+- `LANGUAGE_COVERAGE_UK.md`, `LANGUAGE_RESOURCE_GAPS_UK.md` — фактична наявність ресурсів і дослідження відсутніх моделей.
+- `PACKAGING_UK.md` — відтворюване збирання ядра й додаткових мовних пакетів.
+- `VOICE_PACKAGES_UK.md` — підключення підготовлених голосових даних до спільних адаптерів.
+- `tests/` — регресійні перевірки мов, голосів, налаштувань, черг та пакетів.
+- `AUDIT_UK.md`, `evidence/archive_inventory.json.gz` — початковий аудит незмінених архівів.
 
-```sh
-python dordiai-voices/tools/restore.py
-python dordiai-voices/tools/validate.py
+## Перевірка коду
+
+```text
+python -m pip install -r dordiai-voices/tests/requirements.txt
+python -m unittest discover -s dordiai-voices/tests -v
 ```
 
-`restore.py` writes models and bundled Windows dependencies to ignored `packages/`. The source archive contains duplicate copies of the same two add-ons; only one verified copy of each unique package is needed. It checks SHA-256 of the download and both packages and rejects escaping archive paths and symbolic links before extraction. Allow approximately 17 GB of local space when starting from scratch, including retained downloads. Restoration depends on the original shared archive remaining available.
+Ці перевірки не засвідчують правильність вимови чи фізичні затримки аудіопристрою. Для справжнього Windows-рушія та NVDA додано окремі засоби `tools/windows_engine_probe.py` і `tools/windows_nvda_probe.py`. Результати автоматичного сервера відокремлюються від прослуховування носіями мов.
 
-The snapshots are exact baseline files, not a new release. Make future edits in `source/` and overlay them into the corresponding restored package when preparing a candidate. Do not publish a candidate until it has been tested on Windows with NVDA. This Linux session checked code/data only; it did not verify audible quality, startup latency, interruption behavior, DirectML performance or screen-reader interaction.
+## Відновлення ресурсів і збирання
 
-The full original development tree, training material, native build sources and previous session logs were not included. No 1,800 MB installer was found. The included main package registers 121 language variants and 53 voice profiles; the unified package enables 10 languages and 3 voice profiles.
+```text
+python dordiai-voices/tools/restore_main.py --cache LOCAL_DOWNLOAD_CACHE --discard-downloads
+python dordiai-voices/tools/build_release.py
+```
+
+Великі вихідні ресурси зберігаються в `packages/0.12.2`, готові архіви — у `dist`; обидві папки не входять до Git. Відновлення перевіряє SHA-256 вихідного архіву та головного додатка й не використовує підключений обліковий запис Google Drive. Завантаження залежить від доступності початкового спільного архіву.
+
+Для відновлення обох незмінених вихідних пакетів залишається `tools/restore.py`, а `tools/validate.py` перевіряє саме ці початкові пакети. Їхні старі кількості мов і голосів не є показниками нового випуску.
+
+## Поточні межі
+
+Вибрано 135 пунктів каталогу. Для 83 у переданих файлах є зареєстровані ресурси; 52 потребують додаткової інтеграції. Це перевірка складу, а не підтвердження якості 83 мов.
+
+У новому голосовому каталозі залишено 45 дозволених профілів. Вісім виключених ідентичностей блокуються на межі запиту та вилучаються з комплектування. Початковий інсталятор містить три погоджені типові мови, решта встановлюються додатковими пакетами.
+
+Раніше поширений файл 0.12.1 не був отриманий. Його не змінювали. Повна початкова папка розробки, навчальні матеріали та нативні вихідні коди до переданого архіву не входили.

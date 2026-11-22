@@ -122,6 +122,13 @@ class InstalledVoiceAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(voice_packages.PackageError, "checksum"):
             voice_assets.asset_path(self.references, "fresh_voice", "holos_profile")
 
+    def test_missing_installed_asset_cannot_silently_fall_back_to_legacy_profile(self):
+        directory = self.install()
+        (directory / "holos.npy").unlink()
+        voice_assets.clear_cache()
+        with self.assertRaisesRegex(voice_packages.PackageError, "unavailable"):
+            voice_assets.asset_path(self.references, "fresh_voice", "holos_profile")
+
     def test_adapter_rejects_unimplemented_styles_and_incompatible_engine(self):
         document = cli.prepare_manifest(self.source, **self.recipe)
         document["styles"] = ["neutral", "happy"]

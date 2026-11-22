@@ -1,4 +1,5 @@
 """Probe scaffolding tests; these explicitly do not run or simulate NVDA."""
+import ast
 import importlib.util
 import io
 import json
@@ -20,6 +21,15 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         compile(code, "dordiaiProbe.py", "exec")
         self.assertIn("synthDriverHandler.setSynth", code)
         self.assertIn("wx.UIActionSimulator", code)
+
+    def test_percentile_math_is_checked_without_running_nvda_plugin(self):
+        tree = ast.parse(probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", "{}"))
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "percentiles")
+        namespace = {}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "pure-percentiles", "exec"), namespace)
+        result = namespace["percentiles"](list(range(1, 101)))
+        self.assertEqual((result["p50_ms"], result["p95_ms"], result["p99_ms"]), (50, 95, 99))
+        self.assertEqual(namespace["percentiles"]([])["count"], 0)
 
     def test_unverified_installer_cache_is_rejected_without_execution(self):
         with tempfile.TemporaryDirectory() as temporary:

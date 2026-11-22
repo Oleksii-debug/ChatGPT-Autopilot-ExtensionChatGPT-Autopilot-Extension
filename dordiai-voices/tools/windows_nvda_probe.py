@@ -71,6 +71,10 @@ STAGE = "startup"
 FINISHED = False
 DRIVER = None
 ORIGINAL_PLAY = None
+ORIGINAL_FEED = None
+ACTIVE_REQUEST = None
+LATENCY_THREAD = None
+LATENCY_STOP = threading.Event()
 DONE = threading.Event()
 SAMPLE_RATE = 24000
 SAMPLES = {}
@@ -135,11 +139,14 @@ def finish():
     if FINISHED:
         return
     FINISHED = True
+    LATENCY_STOP.set()
     try:
         if DRIVER is not None:
             DRIVER.cancel()
             if ORIGINAL_PLAY is not None:
                 DRIVER._play = ORIGINAL_PLAY
+            if ORIGINAL_FEED is not None:
+                DRIVER._player.feed = ORIGINAL_FEED
         synthDriverHandler.synthDoneSpeaking.unregister(on_done)
     except Exception as error:
         RESULT["cleanup_error"] = repr(error)
@@ -163,7 +170,7 @@ def finish():
 
 
 def begin():
-    global DRIVER, ORIGINAL_PLAY, STAGE, SAMPLE_RATE
+    global DRIVER, ORIGINAL_PLAY, ORIGINAL_FEED, STAGE, SAMPLE_RATE
     STAGE = "driver_selection"
     import versionInfo
     RESULT["nvda_version_actual"] = versionInfo.version
@@ -190,6 +197,12 @@ def begin():
     check("fresh_default_languages", "passed" if set(enabled) == {"uk", "en", "ru"} else "failed", enabled=enabled)
     ORIGINAL_PLAY = DRIVER._play
     DRIVER._play = record_play
+    try:
+        ORIGINAL_FEED = DRIVER._player.feed
+        DRIVER._player.feed = observed_feed
+    except Exception as error:
+        ORIGINAL_FEED = None
+        RESULT["limitations"].append("Real WavePlayer feed boundary could not be instrumented: " + repr(error))
     synthDriverHandler.synthDoneSpeaking.register(on_done)
     later(500, open_settings)
 
@@ -268,6 +281,14 @@ def inspect_tab(dialog, before, emitted):
     if not emitted or not changed or not dialog.language_list.GetCount():
         close_settings(dialog)
         return
+    for index in range(dialog.tabs.GetPageCount()):
+        if dialog.tabs.GetPage(index) is dialog.language_list.GetParent():
+            dialog.tabs.SetSelection(index)
+            break
+    later(150, lambda: start_checkbox_test(dialog))
+
+
+def start_checkbox_test(dialog):
     dialog.language_list.SetFocus()
     dialog.language_list.SetSelection(0)
     before_checked = dialog.language_list.IsChecked(0)
@@ -301,6 +322,7 @@ def start_phrase():
     from speech.commands import LangChangeCommand, IndexCommand
     DRIVER.cancel()
     DONE.clear()
+    DRIVER._dordiai_last_error = None
     RESULT["phrase_requested_ns"] = time.perf_counter_ns()
     DRIVER.speak([LangChangeCommand("uk"), "Кнопка перемикач натиснуто. ",
                   LangChangeCommand("en"), "Open the document. ", IndexCommand(880001)])
@@ -329,6 +351,7 @@ def start_character():
     from speech.commands import CharacterModeCommand, LangChangeCommand, IndexCommand
     DRIVER.cancel()
     DONE.clear()
+    DRIVER._dordiai_last_error = None
     RESULT["character_requested_ns"] = time.perf_counter_ns()
     DRIVER.speak([LangChangeCommand("uk"), CharacterModeCommand(True), "а", CharacterModeCommand(False), IndexCommand(880002)])
     wait_for_stage("character", time.monotonic() + 60.0, start_cancel)
@@ -353,7 +376,159 @@ def measure_cancel():
     check("cancel_api", "passed" if generation is not None and updated > generation else "failed",
           call_duration_ms=elapsed_ms, generation_before=generation, generation_after=updated,
           note="One API observation, not acoustic stop latency or P95/P99 acceptance")
-    later(500, finish)
+    later(500, start_latency)
+
+
+def percentiles(values):
+    import math
+    ordered = sorted(values)
+    if not ordered:
+        return {"count": 0, "p50_ms": None, "p95_ms": None, "p99_ms": None}
+    def quantile(fraction):
+        return ordered[max(0, math.ceil(len(ordered) * fraction) - 1)]
+    return {"count": len(ordered), "p50_ms": quantile(.50), "p95_ms": quantile(.95),
+            "p99_ms": quantile(.99), "minimum_ms": ordered[0], "maximum_ms": ordered[-1]}
+
+
+def observed_feed(data, *args, **kwargs):
+    # Capture the boundary before the REAL WavePlayer feed, and count the
+    # observation only after that real call returns. No audio output stub is used.
+    submitted_ns = time.perf_counter_ns()
+    outcome = ORIGINAL_FEED(data, *args, **kwargs)
+    if isinstance(data, (bytes, bytearray, memoryview)) and any(data):
+        with LOCK:
+            entry = METRICS.setdefault(STAGE, {"pcm_bytes": 0, "nonzero_bytes": 0, "play_calls": 0})
+            entry.setdefault("first_nonzero_feed_ns", submitted_ns)
+            request = ACTIVE_REQUEST
+            if request is not None and request["first_feed_ns"] is None and submitted_ns >= request["started_ns"]:
+                request["first_feed_ns"] = submitted_ns
+                request["event"].set()
+    return outcome
+
+
+def start_latency():
+    global STAGE, ORIGINAL_FEED, LATENCY_THREAD
+    STAGE = "api_latency"
+    RESULT["latency_scope"] = {
+        "boundary": "driver.speak call to first nonzero PCM forwarded to real WavePlayer.feed",
+        "cancel_boundary": "elapsed real driver.cancel API call",
+        "physical_audible_latency": "not measured; no loopback capture",
+        "switch_boundary": "alternating individual language requests, not a continuous audible gap measurement",
+        "warmup": "one isolated letter request per language before repeated samples",
+        "cold_start": "Initial phrase and character timings are recorded separately after driver startup; background preloading and packaged caches mean they are not guaranteed fully cold runs.",
+        "sample_count_target": 100,
+        "hardware": {"platform": platform.platform(), "machine": platform.machine(),
+                     "processor": platform.processor(), "python": sys.version,
+                     "sample_rate": SAMPLE_RATE},
+    }
+    try:
+        import ctypes
+        RESULT["latency_scope"]["hardware"]["logical_cpu_count"] = __import__("os").cpu_count()
+        RESULT["latency_scope"]["hardware"]["wave_out_devices"] = ctypes.windll.winmm.waveOutGetNumDevs()
+        import config
+        RESULT["latency_scope"]["hardware"]["configured_audio_device"] = str(config.conf["audio"]["outputDevice"])
+        if ORIGINAL_FEED is None:
+            ORIGINAL_FEED = DRIVER._player.feed
+            DRIVER._player.feed = observed_feed
+    except Exception as error:
+        check("api_latency_measurement", "blocked", reason="Real feed cannot be instrumented: " + repr(error))
+        finish()
+        return
+    save()
+    LATENCY_THREAD = threading.Thread(target=latency_worker, daemon=True, name="Dordiai real NVDA latency probe")
+    LATENCY_THREAD.start()
+
+
+def latency_worker():
+    global ACTIVE_REQUEST
+    from speech.commands import CharacterModeCommand, LangChangeCommand
+    output = {"first_after_prior_smoke_ms": {}, "warm_letters_ms": [], "cancel_api_ms": [],
+              "warm_switch_requests_ms": [], "timeouts": [], "errors": []}
+    deadline = time.monotonic() + 240.0
+    installed = set(DRIVER._dordiai_all_languages())
+    enabled = set(DRIVER._dordiai_enabled_languages)
+    languages = [code for code in ("uk", "en", "ru") if code in installed and code in enabled]
+    letters = {"uk": "а", "en": "a", "ru": "а"}
+
+    def request_letter(language, wait_done=True):
+        global ACTIVE_REQUEST
+        if LATENCY_STOP.is_set() or time.monotonic() >= deadline:
+            raise TimeoutError("Latency watchdog exhausted")
+        DRIVER.cancel()
+        DONE.clear()
+        pending = {"event": threading.Event(), "started_ns": time.perf_counter_ns(), "first_feed_ns": None}
+        with LOCK:
+            ACTIVE_REQUEST = pending
+        DRIVER.speak([LangChangeCommand(language), CharacterModeCommand(True), letters[language], CharacterModeCommand(False)])
+        if not pending["event"].wait(min(10.0, max(0.0, deadline - time.monotonic()))):
+            output["timeouts"].append({"language": language, "error": getattr(DRIVER, "_dordiai_last_error", None)})
+            DRIVER.cancel()
+            return None
+        latency = (pending["first_feed_ns"] - pending["started_ns"]) / 1000000.0
+        if wait_done and not DONE.wait(min(5.0, max(0.0, deadline - time.monotonic()))):
+            output["errors"].append("No done notification after real PCM for " + language)
+        with LOCK:
+            ACTIVE_REQUEST = None
+        return latency
+
+    try:
+        if not languages:
+            raise RuntimeError("No installed/enabled probe language")
+        for language in languages:
+            output["first_after_prior_smoke_ms"][language] = request_letter(language)
+        primary = languages[0]
+        for _ in range(100):
+            value = request_letter(primary)
+            if value is not None:
+                output["warm_letters_ms"].append(value)
+        if len(languages) >= 2:
+            for index in range(100):
+                value = request_letter(languages[index % len(languages)])
+                if value is not None:
+                    output["warm_switch_requests_ms"].append(value)
+        for _ in range(100):
+            value = request_letter(primary, wait_done=False)
+            started = time.perf_counter_ns()
+            DRIVER.cancel()
+            elapsed = (time.perf_counter_ns() - started) / 1000000.0
+            output["cancel_api_ms"].append(elapsed)
+            if value is None:
+                output["errors"].append("Cancel request had no observed active PCM")
+    except Exception as error:
+        output["errors"].append(repr(error))
+    finally:
+        DRIVER.cancel()
+        with LOCK:
+            ACTIVE_REQUEST = None
+    summary = {"warm_letters": percentiles(output["warm_letters_ms"]),
+               "cancel_api": percentiles(output["cancel_api_ms"]),
+               "warm_switch_requests": percentiles(output["warm_switch_requests_ms"]),
+               "languages": languages, "samples": output}
+    wx.CallAfter(latency_finished, summary)
+
+
+def latency_finished(summary):
+    RESULT["api_latency"] = summary
+    initial = {}
+    for phase in ("phrase", "character"):
+        requested = RESULT.get(phase + "_requested_ns")
+        first = snapshot(phase).get("first_nonzero_feed_ns")
+        initial[phase + "_first_request_to_pcm_ms"] = (first - requested) / 1000000.0 if first and requested else None
+    RESULT["initial_smoke_predevice_latency"] = initial
+    target_complete = summary["warm_letters"]["count"] >= 100 and summary["cancel_api"]["count"] >= 100
+    switch_complete = len(summary["languages"]) < 2 or summary["warm_switch_requests"]["count"] >= 100
+    errors = summary["samples"]["errors"] or summary["samples"]["timeouts"]
+    check("api_latency_measurement", "passed" if target_complete and switch_complete and not errors else "failed",
+          letters=summary["warm_letters"], cancel=summary["cancel_api"], switch=summary["warm_switch_requests"],
+          note="Measurement completion only; API/pre-device values do not certify physical latency acceptance")
+    for name, measurements in (("warm_letter_predevice_target", summary["warm_letters"]),
+                                ("cancel_api_target", summary["cancel_api"])):
+        complete = measurements["count"] >= 100
+        passed = complete and measurements["p95_ms"] <= 20.0 and measurements["p99_ms"] <= 50.0
+        check(name, "passed" if passed else "failed", measurements=measurements,
+              p95_target_ms=20.0, p99_target_ms=50.0,
+              physical_audible_acceptance="not measured")
+    finish()
 
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
@@ -577,6 +752,8 @@ def main(argv=None):
             '[update]\nautoCheck = False\nstartupNotification = False\n'
             '[speech]\nsynth = silence\n', encoding="utf-8")
         log = run / "nvda.log"
+        result["nvda_log"] = str(log)
+        result["probe_json"] = str(run / "nvda-probe.json")
         command = [str(executable), "--config-path=" + str(config), "--log-file=" + str(log),
                    "--debug-logging", "--no-sr-flag", "--minimal", "--lang=en"]
         result["nvda_command"] = command

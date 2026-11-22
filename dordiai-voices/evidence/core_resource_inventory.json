@@ -1,0 +1,14 @@
+{
+  "archive": "dordiai-voices-0.13.0-dev.1.nvda-addon",
+  "verification": "actual-zip-inventory-and-manifest-json;binaryresources-hardlinked-readonly-from-same-size-baseline-payload",
+  "installed_language_count": 3,
+  "voice_count": 45,
+  "compatible_voices_by_language": {
+    "en": 45,
+    "ru": 45,
+    "uk": 45
+  },
+  "hardlinked_binary_files": 8331,
+  "actual_archive_json_files": 114,
+  "windows_audio_verified": false
+}

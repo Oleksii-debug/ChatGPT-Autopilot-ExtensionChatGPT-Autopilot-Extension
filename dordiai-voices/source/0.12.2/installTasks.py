@@ -4,6 +4,19 @@ import globalVars
 
 
 def onInstall():
+    # NVDA unpacks an update into *.pendingInstall before replacing the old
+    # folder. Preserve only verified optional model/voice packages, never old
+    # Python code or arbitrary files. Any error aborts update activation.
+    addon = Path(__file__).resolve().parent
+    previous = Path(globalVars.appArgs.configPath) / "addons/kx47Voices"
+    if previous.resolve() != addon.resolve() and previous.is_dir():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_dordiai_upgrade_packages", addon / "kx47Runtime/upgrade_packages.py",
+        )
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        migration.migrate_installed_packages(previous, addon)
     source = Path(__file__).resolve().parent / "worldVoiceBridge/DordiaiVoices"
     destination = Path(globalVars.appArgs.configPath) / "WorldVoice-workspace/DordiaiVoices/DordiaiVoices"
     destination.mkdir(parents=True, exist_ok=True)

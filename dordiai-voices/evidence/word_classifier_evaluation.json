@@ -33,10 +33,10 @@
     }
   ],
   "label_quality": "Weak lexical labels; this is not a human-annotated language benchmark",
-  "label_policy": "Merge every source's labels per normalised spelling; Latin relative frequency band <=24; shared labels retained",
+  "label_policy": "Merge plausible labels per normalised spelling; Latin encoded frequency band <=24; subtitle Cyrillic labels within2x normalized per-language frequency; shared labels retained",
   "split_policy": "SHA256('dordiai-word-split-v1:' + normalised_word), 80/10/10, global across source/label",
   "normalised_words": 383389,
-  "trained_words": 50883,
+  "trained_words": 52034,
   "training_words_per_language": {
     "af": 186,
     "az": 425,
@@ -149,88 +149,88 @@
   "algorithm": "multinomial naive Bayes, uniform class prior, alpha=.2, quantised log likelihoods",
   "temperature_selected_on_validation": 4.0,
   "validation_nll_by_temperature": {
-    "0.5": 2.8157257272514062,
-    "1.0": 1.5779270869675726,
-    "2.0": 0.9435974658089963,
-    "4.0": 0.8242159741373796,
-    "8.0": 1.172070660190244,
-    "16.0": 1.8267422669083095
+    "0.5": 2.844298786125367,
+    "1.0": 1.5918132209611047,
+    "2.0": 0.9507853903860887,
+    "4.0": 0.8295748927053329,
+    "8.0": 1.1794802765715042,
+    "16.0": 1.8382117627764998
   },
   "confidence_threshold_selected_on_validation": 0.92,
   "threshold_search": [
     {
       "threshold": 0.5,
-      "accepted": 27181,
-      "label_match": 0.8714911151171775
+      "accepted": 27347,
+      "label_match": 0.8694555161443669
     },
     {
       "threshold": 0.6,
-      "accepted": 22880,
-      "label_match": 0.9086538461538461
+      "accepted": 23361,
+      "label_match": 0.9070673344462994
     },
     {
       "threshold": 0.7,
-      "accepted": 19118,
-      "label_match": 0.93812114237891
+      "accepted": 19738,
+      "label_match": 0.938139629141757
     },
     {
       "threshold": 0.8,
-      "accepted": 15447,
-      "label_match": 0.9603159189486632
+      "accepted": 16108,
+      "label_match": 0.960392351626521
     },
     {
       "threshold": 0.85,
-      "accepted": 13463,
-      "label_match": 0.9701403847582263
+      "accepted": 14134,
+      "label_match": 0.9703551719258525
     },
     {
       "threshold": 0.9,
-      "accepted": 11271,
-      "label_match": 0.978440244876231
+      "accepted": 11858,
+      "label_match": 0.9791701804688817
     },
     {
       "threshold": 0.92,
-      "accepted": 10220,
-      "label_match": 0.9827788649706458
+      "accepted": 10762,
+      "label_match": 0.9837390819550269
     },
     {
       "threshold": 0.95,
-      "accepted": 8365,
-      "label_match": 0.9881649731022116
+      "accepted": 8816,
+      "label_match": 0.9884301270417423
     },
     {
       "threshold": 0.97,
-      "accepted": 6827,
-      "label_match": 0.9910648894096968
+      "accepted": 7172,
+      "label_match": 0.9910764082543224
     },
     {
       "threshold": 0.98,
-      "accepted": 5786,
-      "label_match": 0.9920497753197373
+      "accepted": 6079,
+      "label_match": 0.9927619674288535
     },
     {
       "threshold": 0.99,
-      "accepted": 4347,
-      "label_match": 0.9947089947089947
+      "accepted": 4575,
+      "label_match": 0.9951912568306011
     },
     {
       "threshold": 0.995,
-      "accepted": 3288,
-      "label_match": 0.9975669099756691
+      "accepted": 3441,
+      "label_match": 0.997675094449288
     },
     {
       "threshold": 0.999,
-      "accepted": 1791,
+      "accepted": 1849,
       "label_match": 1.0
     }
   ],
   "validation": {
     "words": 38819,
-    "top1_label_match": 0.7457688245446817,
-    "accepted": 10220,
-    "correct_accepted": 10044,
-    "coverage": 0.2632731394420258,
-    "selective_label_match": 0.9827788649706458,
+    "top1_label_match": 0.7444550349055875,
+    "accepted": 10762,
+    "correct_accepted": 10587,
+    "coverage": 0.27723537443004714,
+    "selective_label_match": 0.9837390819550269,
     "per_language": {
       "af": {
         "words": 24,
@@ -354,8 +354,8 @@
       },
       "mk": {
         "words": 49,
-        "accepted": 26,
-        "correct": 26
+        "accepted": 25,
+        "correct": 25
       },
       "mn": {
         "words": 33,
@@ -403,9 +403,9 @@
         "correct": 25
       },
       "ru": {
-        "words": 4776,
-        "accepted": 406,
-        "correct": 370
+        "words": 4686,
+        "accepted": 832,
+        "correct": 802
       },
       "sk": {
         "words": 4763,
@@ -443,9 +443,9 @@
         "correct": 27
       },
       "uk": {
-        "words": 4706,
-        "accepted": 1034,
-        "correct": 1016
+        "words": 3724,
+        "accepted": 1158,
+        "correct": 1139
       },
       "uz": {
         "words": 20,
@@ -461,11 +461,11 @@
   },
   "test": {
     "words": 38378,
-    "top1_label_match": 0.7458700297045182,
-    "accepted": 10204,
-    "correct_accepted": 10018,
-    "coverage": 0.26588149460628485,
-    "selective_label_match": 0.9817718541748334,
+    "top1_label_match": 0.7428474646933139,
+    "accepted": 10737,
+    "correct_accepted": 10545,
+    "coverage": 0.2797696597008703,
+    "selective_label_match": 0.9821179100307349,
     "per_language": {
       "af": {
         "words": 29,
@@ -638,9 +638,9 @@
         "correct": 22
       },
       "ru": {
-        "words": 4707,
-        "accepted": 433,
-        "correct": 408
+        "words": 4616,
+        "accepted": 853,
+        "correct": 824
       },
       "sk": {
         "words": 4630,
@@ -678,9 +678,9 @@
         "correct": 14
       },
       "uk": {
-        "words": 4638,
-        "accepted": 1036,
-        "correct": 1020
+        "words": 3613,
+        "accepted": 1124,
+        "correct": 1110
       },
       "uz": {
         "words": 20,
@@ -694,13 +694,13 @@
       }
     }
   },
-  "model_bytes": 296044,
-  "model_sha256": "c2a4439182df69ffd652df6fe9a2f96eb0540b81fb38172a2e1c2bc7fc8ebbe4",
+  "model_bytes": 296117,
+  "model_sha256": "19c9f7c9c3d63c20dc6f8f1f2cc12384aa29fb565710c886d84f4244eb159d64",
   "supplemental_cyrillic_lexicon": {
     "words": 74834,
-    "ambiguous_words": 21959,
-    "bytes": 271296,
-    "sha256": "190e4cdad6a26877cff5e475072b184c4621f8dae564584d7a8e0d7cdbf94eed"
+    "ambiguous_words": 10363,
+    "bytes": 268689,
+    "sha256": "ce1b5a4333f8b2498f7970390b72a26f6a8a239086aeb2f91afb8046715ce3ba"
   },
   "abstention": "Fewer than 4 characters, mixed/unknown script, low selected confidence, <25% seen grams, disabled predicted language",
   "test_failure_examples": [

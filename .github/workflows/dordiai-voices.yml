@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dordiai-voices-${{ github.ref }}
+  group: dordiai-voices-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[windows]') }}
   cancel-in-progress: true
 
 jobs:
@@ -23,21 +23,39 @@ jobs:
         with:
           python-version: "3.12"
       - name: Runtime regression tests
+        run: python -m pip install -r dordiai-voices/tests/requirements.txt
+      - name: Run runtime regression tests
         run: python -m unittest discover -s dordiai-voices/tests -v
 
   windows-probes:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows]')
     runs-on: windows-latest
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: cmd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Windows runtime regression tests
+        run: python -m pip install -r dordiai-voices/tests/requirements.txt
+      - name: Run Windows runtime regression tests
         run: python -m unittest discover -s dordiai-voices/tests -v
+      - uses: actions/cache/restore@v4
+        id: audited_baseline
+        with:
+          path: dordiai-voices/packages/0.12.2
+          key: dordiai-main-107ed71bf25569c770506acd605ae042d9cae767e0088508b2d5eb03ef3f658c
       - name: Restore audited main baseline
+        if: steps.audited_baseline.outputs.cache-hit != 'true'
         run: python dordiai-voices/tools/restore_main.py --cache "${{ runner.temp }}/dordiai-download" --discard-downloads
+      - uses: actions/cache/save@v4
+        if: steps.audited_baseline.outputs.cache-hit != 'true'
+        with:
+          path: dordiai-voices/packages/0.12.2
+          key: dordiai-main-107ed71bf25569c770506acd605ae042d9cae767e0088508b2d5eb03ef3f658c
       - name: Build modular development release
         run: python dordiai-voices/tools/build_release.py
       - name: Verify archives and prepare engine probe
@@ -54,6 +72,26 @@ jobs:
               archive.extractall(root / "probe-package")
       - name: Actual Windows speech engine probe
         run: python dordiai-voices/tools/windows_engine_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/engine
+      - name: Install optional resources for Windows engine checks
+        shell: python
+        run: |
+          import pathlib, sys
+          root = pathlib.Path("dordiai-voices").resolve()
+          package = root / "probe-package"
+          sys.path.insert(0, str(package / "kx47Runtime"))
+          import package_manager
+          for archive in sorted(root.joinpath("dist").glob("*.zip")):
+              package_manager.install_pack(archive, addon_root=package)
+      - name: Actual additional-language engine probe
+        run: python dordiai-voices/tools/windows_engine_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/extra-engines --all-installed --repetitions 1
+      - name: Reclaim isolated engine probe files
+        if: always()
+        shell: python
+        run: |
+          import pathlib, shutil
+          package = pathlib.Path("dordiai-voices/probe-package").resolve()
+          if package.is_dir():
+              shutil.rmtree(package)
       - name: Actual NVDA integration probe
         if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
         shell: python
@@ -62,6 +100,7 @@ jobs:
           addon = next(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
           subprocess.run([sys.executable, "dordiai-voices/tools/windows_nvda_probe.py", "--addon", str(addon), "--output", "dordiai-voices/windows-results/nvda"], check=True)
       - uses: actions/upload-artifact@v4
+        id: windows_evidence
         if: always()
         with:
           name: dordiai-voices-windows-evidence
@@ -69,9 +108,70 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - uses: actions/upload-artifact@v4
+        id: core_build
         if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
         with:
-          name: dordiai-voices-development-build
-          path: dordiai-voices/dist
+          name: dordiai-voices-development-core
+          path: |
+            dordiai-voices/dist/*.nvda-addon
+            dordiai-voices/dist/release-build.json
+          if-no-files-found: error
           compression-level: 0
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: piper_pack
+        if: always() && hashFiles('dordiai-voices/dist/dordiai-european-piper-*.zip') != ''
+        with:
+          name: dordiai-voices-development-european-piper
+          path: dordiai-voices/dist/dordiai-european-piper-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: slovak_pack
+        if: always() && hashFiles('dordiai-voices/dist/dordiai-slovak-rhvoice-*.zip') != ''
+        with:
+          name: dordiai-voices-development-slovak-rhvoice
+          path: dordiai-voices/dist/dordiai-slovak-rhvoice-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: wide_pack
+        if: always() && hashFiles('dordiai-voices/dist/dordiai-wide-languages-*.zip') != ''
+        with:
+          name: dordiai-voices-development-wide-languages
+          path: dordiai-voices/dist/dordiai-wide-languages-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Development artifact download links
+        if: always()
+        shell: python
+        env:
+          DORDIAI_CORE_URL: ${{ steps.core_build.outputs.artifact-url }}
+          DORDIAI_PIPER_URL: ${{ steps.piper_pack.outputs.artifact-url }}
+          DORDIAI_SLOVAK_URL: ${{ steps.slovak_pack.outputs.artifact-url }}
+          DORDIAI_WIDE_URL: ${{ steps.wide_pack.outputs.artifact-url }}
+          DORDIAI_EVIDENCE_URL: ${{ steps.windows_evidence.outputs.artifact-url }}
+        run: |
+          import json, os, pathlib
+          lines = ["## Збірки dordiai-voices для перевірки", "",
+                   "Це розробницькі артефакти, а не підтверджений публічний випуск. "
+                   "Результати реальних перевірок містяться в окремому артефакті доказів.", "",
+                   "Ядро та додаткові пакети завантажуються окремо. "
+                   "Для завантаження потрібен вхід у GitHub. Артефакти зберігаються 7 днів.", ""]
+          for label, key in [("Основний додаток NVDA", "DORDIAI_CORE_URL"),
+                             ("Додаткові моделі Piper", "DORDIAI_PIPER_URL"),
+                             ("Словацький рушій RHVoice", "DORDIAI_SLOVAK_URL"),
+                             ("Додаткові мовні ресурси", "DORDIAI_WIDE_URL"),
+                             ("Протоколи Windows і NVDA", "DORDIAI_EVIDENCE_URL")]:
+              if os.environ.get(key):
+                  lines.append(f"- [{label}]({os.environ[key]})")
+          report = pathlib.Path("dordiai-voices/dist/release-build.json")
+          if report.is_file():
+              lines += ["", "Фактичні розміри архівів:", ""]
+              for artifact in json.loads(report.read_text(encoding="utf-8"))["artifacts"]:
+                  lines.append(f"- {artifact['filename']}: {artifact['size_bytes']:,} байтів.")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")

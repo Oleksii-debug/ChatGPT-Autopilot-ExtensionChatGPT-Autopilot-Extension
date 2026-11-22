@@ -1,0 +1,2 @@
+# Version exercised by the local regression suite; no acoustic engines needed.
+numpy==2.3.5

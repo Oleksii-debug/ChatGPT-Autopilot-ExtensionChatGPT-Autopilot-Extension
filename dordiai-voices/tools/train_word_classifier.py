@@ -71,6 +71,8 @@ def gather(runtime, baseline=BASELINE, training_data=None):
     cyrillic_lexicon = defaultdict(set)
     training_data = training_data or ROOT / "training-data/word-lid"
     manifest = json.loads((training_data / "sources.json").read_text(encoding="utf8"))
+    frequency_by_language = {}
+    frequency_totals = {}
     for row in manifest["sources"]:
         path = training_data / row["path"]
         stored = path.read_bytes()
@@ -83,6 +85,7 @@ def gather(runtime, baseline=BASELINE, training_data=None):
         sources.append(dict(row, path=str(path.relative_to(ROOT))))
         if code not in allowed:
             continue
+        word_frequencies = Counter()
         for line in original.decode("utf8").splitlines():
             try:
                 raw_word, frequency = line.rsplit(" ", 1)
@@ -94,9 +97,21 @@ def gather(runtime, baseline=BASELINE, training_data=None):
                 continue
             if runtime.word_script(word) != "CYRILLIC":
                 continue
-            cyrillic_lexicon[word].add(code)
-            if len(word) >= 4:
-                corpus[word].add(code)
+            word_frequencies[word] += int(frequency)
+        frequency_by_language[code] = word_frequencies
+        frequency_totals[code] = sum(word_frequencies.values())
+    # Subtitle files contain borrowing and mixed-language tokens. In particular,
+    # the Ukrainian file includes many Russian tokens; presence is not a clean
+    # language label. Retain alternatives within a 2x NORMALISED frequency band.
+    # This remains weak statistical evidence and does not prove lexical absence.
+    for word in sorted(set().union(*(rows.keys() for rows in frequency_by_language.values()))):
+        scores = {code: rows[word] / frequency_totals[code]
+                  for code, rows in frequency_by_language.items() if rows[word]}
+        peak = max(scores.values())
+        labels = {code for code, value in scores.items() if value >= peak / 2.}
+        cyrillic_lexicon[word].update(labels)
+        if len(word) >= 4:
+            corpus[word].update(labels)
     return {word: labels for word, labels in corpus.items() if labels}, sources, cyrillic_lexicon
 
 
@@ -231,7 +246,7 @@ def train(args):
                 set(partition_words["validation"]) & set(partition_words["test"]))
     report = {"format": "dordiai-word-lid-evaluation-v1", "sources": sources,
               "label_quality": "Weak lexical labels; this is not a human-annotated language benchmark",
-              "label_policy": "Merge every source's labels per normalised spelling; Latin relative frequency band <=24; shared labels retained",
+              "label_policy": "Merge plausible labels per normalised spelling; Latin encoded frequency band <=24; subtitle Cyrillic labels within2x normalized per-language frequency; shared labels retained",
               "split_policy": "SHA256('" + SEED + "' + normalised_word), 80/10/10, global across source/label",
               "normalised_words": len(corpus), "trained_words": len(train_words),
               "training_words_per_language": dict(sorted(train_labels.items())),

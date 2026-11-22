@@ -297,6 +297,39 @@ def speech_parts(sequence, fallback, english, mixed=False, detect_russian=False,
                           enabled_languages=enabled_languages, priorities=priorities)
 
 
+def number_language_parts(parts, target):
+    """Route a numeric override before choosing its language-specific voice.
+
+    Keep literal numbers until the isolated speech worker expands them. NVDA
+    itself does not have to import the bundled num2words dependency. The
+    existing number grammar preserves decimal/group separators as one token.
+    Only source grammars already implemented by speech_text are overridden;
+    other languages keep their own model's number normalization.
+    """
+    for kind, value in parts:
+        if kind != "text" or target not in {"uk", "en"}:
+            yield kind, value
+            continue
+        language, text = value
+        source = (language or "uk").lower().replace("_", "-").split("-")[0]
+        if source == target or source not in _speech_text.NUMBER:
+            yield kind, value
+            continue
+        offset = 0
+        for match in _speech_text.NUMBER[source].finditer(text):
+            if text[offset:match.start()].strip():
+                yield kind, (language, text[offset:match.start()])
+            literal = re.sub(r"[\u00a0\u202f ]", "", match.group())
+            if source == "en":
+                literal = literal.replace(",", "")
+            if target == "en":
+                literal = literal.replace(",", ".")
+            yield kind, (target, literal)
+            offset = match.end()
+        if text[offset:].strip():
+            yield kind, (language, text[offset:])
+
+
 def initial_audio(items,minimum=0):
     """Preserve item order, normally delivering the first ready PCM at once.
 
@@ -761,9 +794,6 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         NumericDriverSetting("rateMultiplier", "Множник швидкості", availableInSettingsRing=True,
                              defaultVal=1, minVal=1, maxVal=5, normalStep=1, largeStep=1),
         BooleanDriverSetting("detectRussian", "Розпізнавати російський текст", defaultVal=True),
-        BooleanDriverSetting("nativeEnglish", "Чітка англійська вимова", defaultVal=True, availableInSettingsRing=True),
-        BooleanDriverSetting("nativeProfiles", "Англійська й російська з профілю голосу",
-                             defaultVal=True, availableInSettingsRing=True),
         DriverSetting("foreignPronunciation", "Вимова інших мов", availableInSettingsRing=True, defaultVal="auto"),
         DriverSetting("numberLanguage", "Мова чисел", availableInSettingsRing=True, defaultVal="auto"),
         DriverSetting("spellingLanguage", "Мова кириличних літер", availableInSettingsRing=True, defaultVal="auto"),
@@ -816,6 +846,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         if runtime is None:
             raise RuntimeError("Prepare the KX-47 runtime before selecting this synthesizer.")
         python, models, info = runtime
+        _runtime_module("package_manager").recover_pending_install(RUNTIME.parent)
         self._models = models
         self._language_catalog = _runtime_module("language_catalog")
         self._voice_assets = _runtime_module("voice_assets")
@@ -948,7 +979,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
 
     def _get_availableForeignpronunciations(self):
         return OrderedDict(
-            auto=VoiceInfo("auto", "Звична для вибраного голосу"),
+            auto=VoiceInfo("auto", "Звичайна вимова вибраної мови"),
             native=VoiceInfo("native", "Вимова мовної моделі з тембром вибраного голосу"),
             fast=VoiceInfo("fast", "Швидка вимова"),
         )
@@ -1010,12 +1041,20 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                        native_english=False, same_voice_for_mixed=False, native_profiles=False, number_language="auto",
                        spelling_language="auto", foreign_pronunciation="auto"):
         default_language = self._dordiai_selection[2]
+        forced = self._dordiai_mode == "forced"
+        if forced or (number_language != "auto" and
+                      _prefs.language_key(number_language) not in self._dordiai_enabled_languages):
+            number_language = "auto"
+        if forced or (spelling_language != "auto" and
+                      _prefs.language_key(spelling_language) not in self._dordiai_enabled_languages):
+            spelling_language = "auto"
         parts = speech_parts(
             sequence, default_language, english, detect_russian=russian,
             spelling_language=spelling_language,
             enabled_languages=self._dordiai_enabled_languages,
-            priorities=(default_language,), forced=self._dordiai_mode == "forced",
+            priorities=(default_language,), forced=forced,
         )
+        parts = number_language_parts(parts, number_language)
         # A language profile or the same-voice mode must never use the generic
         # Piper speaker, even if an older configuration enabled that setting.
         native_english = native_english and not (same_voice_for_mixed or native_profiles)
@@ -1055,12 +1094,12 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                        "language": language, "text": text,
                        "controls": dict(controls if role_controls is None else role_controls),
                        "character": kind == "character",
-                       "numberLanguage": number_language,
+                       # The numeric override was split before selecting its
+                       # voice. Do not switch language again inside the worker.
+                       "numberLanguage": "auto",
                        "nativeEnglish": has_foreign_profile and native_english and kind == "text" and language.startswith("en-"),
-                       "nativeProfile": has_foreign_profile and use_native_profiles and (
-                           language in ("en", "en-us", "en-gb", "ru", "ru-ru")
-                           or number_language != "auto" and any(char.isdecimal() for char in text)
-                       )}
+                       "nativeProfile": has_foreign_profile and use_native_profiles and
+                           language in ("en", "en-us", "en-gb", "ru", "ru-ru")}
             if (kind == "text" and language.split("-")[0] == "da" and
                     foreign_pronunciation in {"auto", "native"}):
                 request["danishCommands"] = True
@@ -1069,7 +1108,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 request["nativeEnglish"] = request["nativeProfile"] = False
             if language in CLASSMATE_LOCALES:
                 if kind == "character":
-                    request["nativeLocale"] = role_profile == CLASSMATE_PROFILE or foreign_pronunciation == "native"
+                    request["nativeLocale"] = foreign_pronunciation in {"auto", "native"}
                     if foreign_pronunciation == "auto" and role_profile != CLASSMATE_PROFILE:
                         prepared_name = _letter_names.letter_name(language, text)
                         if prepared_name:
@@ -1084,8 +1123,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                             request["letterCacheText"] = text
                             request["text"] = spoken
                 else:
-                    request["nativeLocale"] = (foreign_pronunciation == "native" or
-                                               foreign_pronunciation == "auto" and role_profile == CLASSMATE_PROFILE)
+                    request["nativeLocale"] = foreign_pronunciation in {"auto", "native"}
             same_delivery = pending is not None and all(pending[key] == request[key] for key in ("profile", "speed", "controls"))
             can_join = (self._canJoin and kind == "text" and same_delivery and
                         not (pending.get("wideLocale") or request.get("wideLocale")) and
@@ -1155,9 +1193,9 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 continuous = bool(sayAll.SayAllHandler and sayAll.SayAllHandler.isRunning())
                 self._jobs.put((self._generation, tuple(speechSequence), self._voice, self._rate, controls,
                                 roles, self.rateMultiplier, self._canJoin and self.detectRussian,
-                                self._hasNativeEnglish and not self._hasNativeProfiles and self.nativeEnglish,
+                                self._hasNativeEnglish and not self._hasNativeProfiles,
                                 self.sameVoiceForMixed,
-                                self._hasNativeProfiles and (self.nativeProfiles or self.numberLanguage != "auto"),
+                                self._hasNativeProfiles,
                                 self.numberLanguage, self.spellingLanguage, self.foreignPronunciation, continuous))
 
     def cancel(self):
@@ -1298,8 +1336,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 (generation, sequence, voice, rate, controls, roles, multiplier, russian,
                  native_english, same_voice_for_mixed, native_profiles, number_language, spelling_language, foreign_pronunciation, continuous) = job
                 _, profile, mode, english = self._voices[voice]
-                render_parts = (self._render_with_lookahead if (foreign_pronunciation == "native" or
-                                foreign_pronunciation == "auto" and profile == CLASSMATE_PROFILE) and
+                render_parts = (self._render_with_lookahead if foreign_pronunciation in {"auto", "native"} and
                                 self._tempo(rate, multiplier) >= 3 and not any(
                                     isinstance(item, CharacterModeCommand) and item.state
                                     for item in sequence) else self._render_parts)

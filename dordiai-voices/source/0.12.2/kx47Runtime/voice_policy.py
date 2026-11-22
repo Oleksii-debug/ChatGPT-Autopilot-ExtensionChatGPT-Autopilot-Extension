@@ -14,8 +14,13 @@ EXCLUDED_VOICE_IDS = frozenset({
 
 def is_voice_allowed(voice_id):
     """Match identities, not display names, and fail closed for empty IDs."""
-    return (isinstance(voice_id, str) and bool(voice_id.strip())
-            and voice_id.strip().casefold() not in EXCLUDED_VOICE_IDS)
+    if (not isinstance(voice_id, str) or not voice_id or len(voice_id) > 255
+            or voice_id != voice_id.strip() or any(ord(c) < 32 for c in voice_id)
+            or any(c in voice_id for c in ("/", "\\", "\x00")) or ".." in voice_id):
+        return False
+    # Legacy built-in choices have profile:mode:accent IDs. Filtering their
+    # profile component must not accidentally disable those normal choices.
+    return voice_id.split(":", 1)[0].casefold() not in EXCLUDED_VOICE_IDS
 
 
 def require_voice_allowed(voice_id):

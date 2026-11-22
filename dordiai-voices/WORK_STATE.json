@@ -7,16 +7,38 @@
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
-  "completed": [],
+  "completed": [
+    "Eight excluded identities blocked in driver, worker, catalogs and release assets",
+    "Language-aware same-voice text/character planning and forced/enabled restrictions",
+    "Compact word-trained classifier with disjoint word holdouts and documented abstention",
+    "Accessible profile settings and per-language compatible voice mappings",
+    "Versioned voice import, adapter asset use, integrity checks, removal and rollback",
+    "Core and three resource packages built; real resource install/list/uninstall round-trip verified",
+    "Fixed imposed startup buffers, cancellation tracking, queued error propagation, bounded cleanup",
+    "Windows engine and actual NVDA probe tools plus GitHub Actions workflow implemented"
+  ],
   "open_requirements": [
-    "135-entry language resource and pronunciation coverage",
-    "Windows/NVDA actual audio and accessibility acceptance",
-    "measured latency requirements",
-    "release packaging and compatibility validation"
+    "52 selected entries require additional integrated resources; 44 have candidates not adopted, 8 have no verified checkpoint found",
+    "Windows/NVDA actual audio, keyboard accessibility and pronunciation acceptance",
+    "Measured P95/P99 latency and audio-underrun acceptance on reference Windows hardware",
+    "Final frozen-source archive verification and durable artifact delivery"
   ],
   "environment": {
     "os": "Linux",
     "windows_nvda_available": false,
-    "windows_verification_route": "Investigating GitHub Windows runner; not yet executed"
-  }
+    "windows_verification_route": "GitHub Actions Windows runner configured; full run pending source freeze"
+  },
+  "verification": {
+    "local_unit_tests": 186,
+    "local_unit_tests_passed": true,
+    "resource_catalog_entries_present": 83,
+    "missing_selected_resource_entries": 52,
+    "windows_audio_verified": false,
+    "nvda_accessibility_verified": false,
+    "latency_targets_verified": false,
+    "first_remote_ci": "Missing NumPy in clean runner; dependency pin added, rerun pending"
+  },
+  "pending_decisions": [
+    "Whether noncommercial-only optional models may be included; async question pending, no such weights adopted"
+  ]
 }

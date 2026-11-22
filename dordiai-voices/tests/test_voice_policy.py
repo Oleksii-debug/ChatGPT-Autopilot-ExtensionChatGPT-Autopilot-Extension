@@ -34,6 +34,10 @@ class VoicePolicyTests(unittest.TestCase):
         self.assertFalse(voice_policy.is_voice_allowed(None))
         self.assertFalse(voice_policy.is_voice_allowed(""))
         self.assertEqual(voice_policy.require_voice_allowed("oleksii"), "oleksii")
+        self.assertTrue(voice_policy.is_voice_allowed("a:uk:en-us"))
+        self.assertFalse(voice_policy.is_voice_allowed("kostia:uk:en-us"))
+        self.assertFalse(voice_policy.is_voice_allowed("../profile"))
+        self.assertFalse(voice_policy.is_voice_allowed("x\\profile"))
 
     def test_no_allowed_fallback_is_an_error(self):
         with self.assertRaisesRegex(ValueError, "No allowed"):

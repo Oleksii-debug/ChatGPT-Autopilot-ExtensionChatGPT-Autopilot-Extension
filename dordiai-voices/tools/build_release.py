@@ -110,6 +110,8 @@ def collect_inputs(baseline, source, version=VERSION):
         original = files.get("kx47Runtime/models/WideLanguages/Hebrew/" + filename)
         if original is not None:
             files.setdefault("doc/third-party/Hebrew/" + filename, original)
+    voice_catalogue = files.get("kx47Runtime/models/voices/catalog.json")
+    voice_count = len(remove_excluded_metadata(json.loads(voice_catalogue.read_bytes()))) if voice_catalogue else 0
     result, excluded = [], []
     casefold = set()
     for name, path in sorted(files.items()):
@@ -121,6 +123,7 @@ def collect_inputs(baseline, source, version=VERSION):
             continue
         content = None
         if path.suffix == ".json" and (name.startswith("kx47Runtime/models/voices/")
+                                      or name == "kx47Runtime/models/english_voice_profiles.json"
                                       or name.startswith("kx47Runtime/models/WideLanguages/navigation/")):
             content = json_bytes(remove_excluded_metadata(json.loads(path.read_bytes())))
         if name == "manifest.ini":
@@ -129,7 +132,7 @@ def collect_inputs(baseline, source, version=VERSION):
             if count != 1:
                 raise ValueError("No addon version in manifest.ini")
             text = re.sub(r'^description\s*=.*$',
-                          'description = "Модульний локальний синтезатор NVDA. 45 дозволених голосових профілів. Додаткові мовні пакети встановлюються окремо."',
+                          f'description = "Модульний локальний синтезатор NVDA. {voice_count} дозволених голосових профілів. Додаткові мовні пакети встановлюються окремо."',
                           text, count=1, flags=re.MULTILINE)
             content = text.replace("\r\n", "\n").encode("utf-8")
         result.append(InputFile(name, path, group_for_path(name), content))
