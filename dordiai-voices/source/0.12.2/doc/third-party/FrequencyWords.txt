@@ -1,0 +1,4 @@
+FrequencyWords 2018 by Hermit Dave. Frequency data derived from OpenSubtitles.
+CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
+https://github.com/hermitdave/FrequencyWords
+Modified for dordiai-voices: filtered to Latin words and stored as per-language log frequencies.

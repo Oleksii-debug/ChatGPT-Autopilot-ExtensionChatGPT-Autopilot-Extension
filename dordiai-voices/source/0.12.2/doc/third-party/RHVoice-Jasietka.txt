@@ -1,0 +1,9 @@
+The private Slovak speech source uses the unmodified RHVoice 1.18.2 library.
+RHVoice source, build instructions and pinned submodules: https://github.com/RHVoice/RHVoice/tree/1.18.2
+Get the tagged source including the submodules with git clone --branch 1.18.2 --recursive https://github.com/RHVoice/RHVoice.git
+The supplied library license is included in kx47Runtime/models/Slovak/lib/COPYING.txt.
+Slovak language data: kx47Runtime/models/Slovak/langdata/LICENSE (LGPL 2.1).
+Jasietka: kx47Runtime/models/Slovak/data/LICENSE (CC0 1.0) and data/attrib.html.
+Speaker: Želmíra Zemčáková. Audio editing: Michal Tkáčik. Audio processing and final mastering: Ondrej Rosík.
+Voice training, language and package creation: Peter Vágner and Zvonimir Stanecic.
+This synthesizer opens its private read-only copy; the separately installed NVDA RHVoice driver is independent.

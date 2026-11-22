@@ -1,0 +1,8 @@
+dordiai-voices fused periodic activation.
+Eigen headers, unchanged, MPL-2.0:
+https://github.com/eigen-mirror/eigen/tree/1d8b82b0740839c0de7f1242a3585e3390ff5f33
+The exact source of the combined native module is included as snake.cpp.
+ONNX Runtime API headers v1.22.0, MIT:
+https://github.com/microsoft/onnxruntime/tree/v1.22.0/include/onnxruntime/core/session
+Build: LLVM-MinGW x64 clang++ -O3 -std=c++17 -ffp-contract=off -shared -static -I <onnx headers> -I <Eigen root> snake.cpp -o dordiai_kernels.dll
+SSE2 only. No approximate replacement for Eigen sine, no reduced-precision weights.

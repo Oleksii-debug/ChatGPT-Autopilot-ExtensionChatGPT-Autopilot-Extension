@@ -1,0 +1,33 @@
+{
+  "sk": {
+    "backend": "rhvoice",
+    "directory": "Slovak",
+    "voice": "Jasietka",
+    "source": "sources/sk-rhvoice.npy",
+    "tempo": 1.2
+  },
+  "pl": {
+    "model": "pl_PL-gosia-medium.onnx",
+    "source": "sources/pl.npy"
+  },
+  "de": {
+    "model": "de_DE-thorsten-medium.onnx",
+    "source": "sources/de.npy"
+  },
+  "fr": {
+    "model": "fr_FR-siwis-medium.onnx",
+    "source": "sources/fr.npy"
+  },
+  "da": {
+    "model": "da_DK-talesyntese-medium.onnx",
+    "source": "sources/da.npy"
+  },
+  "it": {
+    "model": "it_IT-paola-medium.onnx",
+    "source": "sources/it.npy"
+  },
+  "es": {
+    "model": "es_ES-davefx-medium.onnx",
+    "source": "sources/es.npy"
+  }
+}

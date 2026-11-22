@@ -1,0 +1,1 @@
+Lingua 2.2.0, Apache-2.0. https://github.com/pemistahl/lingua-py

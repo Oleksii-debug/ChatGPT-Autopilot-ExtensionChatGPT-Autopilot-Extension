@@ -1,0 +1,359 @@
+{
+  "ar": {
+    "digits": [
+      "صفر",
+      "واحد",
+      "إثنان",
+      "ثلاثة",
+      "أربعة",
+      "خمسة",
+      "ستة",
+      "سبعة",
+      "ثمانية",
+      "تسعة"
+    ],
+    "decimal": "٫",
+    "group": "٬",
+    "point": "فاصلة"
+  },
+  "bg": {
+    "digits": [
+      "нула",
+      "едно",
+      "две",
+      "три",
+      "четири",
+      "пет",
+      "шест",
+      "седем",
+      "осем",
+      "девет"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "запетая"
+  },
+  "cs": {
+    "digits": [
+      "nula",
+      "jeden",
+      "dva",
+      "tři",
+      "čtyři",
+      "pět",
+      "šest",
+      "sedm",
+      "osm",
+      "devět"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "čárka"
+  },
+  "el": {
+    "digits": [
+      "μηδέν",
+      "ένα",
+      "δύο",
+      "τρία",
+      "τέσσερα",
+      "πέντε",
+      "έξι",
+      "επτά",
+      "οκτώ",
+      "εννέα"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "κόμμα"
+  },
+  "et": {
+    "digits": [
+      "null",
+      "üks",
+      "kaks",
+      "kolm",
+      "neli",
+      "viis",
+      "kuus",
+      "seitse",
+      "kaheksa",
+      "üheksa"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "koma"
+  },
+  "fi": {
+    "digits": [
+      "nolla",
+      "yksi",
+      "kaksi",
+      "kolme",
+      "neljä",
+      "viisi",
+      "kuusi",
+      "seitsemän",
+      "kahdeksan",
+      "yhdeksän"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "pilkku"
+  },
+  "hi": {
+    "digits": [
+      "शून्य",
+      "एक",
+      "दो",
+      "तीन",
+      "चार",
+      "पाँच",
+      "छह",
+      "सात",
+      "आठ",
+      "नौ"
+    ],
+    "decimal": ".",
+    "group": ",",
+    "point": "दशमलव"
+  },
+  "hr": {
+    "digits": [
+      "nula",
+      "jedan",
+      "dva",
+      "tri",
+      "četiri",
+      "pet",
+      "šest",
+      "sedam",
+      "osam",
+      "devet"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "zarez"
+  },
+  "hu": {
+    "digits": [
+      "nulla",
+      "egy",
+      "kettő",
+      "három",
+      "négy",
+      "öt",
+      "hat",
+      "hét",
+      "nyolc",
+      "kilenc"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "vessző"
+  },
+  "id": {
+    "digits": [
+      "kosong",
+      "satu",
+      "dua",
+      "tiga",
+      "empat",
+      "lima",
+      "enam",
+      "tujuh",
+      "delapan",
+      "sembilan"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "koma"
+  },
+  "ja": {
+    "digits": [
+      "〇",
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六",
+      "七",
+      "八",
+      "九"
+    ],
+    "decimal": ".",
+    "group": ",",
+    "point": "点"
+  },
+  "ko": {
+    "digits": [
+      "공",
+      "일",
+      "이",
+      "삼",
+      "사",
+      "오",
+      "육",
+      "칠",
+      "팔",
+      "구"
+    ],
+    "decimal": ".",
+    "group": ",",
+    "point": "점"
+  },
+  "nl": {
+    "digits": [
+      "nul",
+      "een",
+      "twee",
+      "drie",
+      "vier",
+      "vijf",
+      "zes",
+      "zeven",
+      "acht",
+      "negen"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "komma"
+  },
+  "pt": {
+    "digits": [
+      "zero",
+      "um",
+      "dois",
+      "três",
+      "quatro",
+      "cinco",
+      "seis",
+      "sete",
+      "oito",
+      "nove"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "vírgula"
+  },
+  "sv": {
+    "digits": [
+      "noll",
+      "ett",
+      "två",
+      "tre",
+      "fyra",
+      "fem",
+      "sex",
+      "sju",
+      "åtta",
+      "nio"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "komma"
+  },
+  "tr": {
+    "digits": [
+      "sıfır",
+      "bir",
+      "iki",
+      "üç",
+      "dört",
+      "beş",
+      "altı",
+      "yedi",
+      "sekiz",
+      "dokuz"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "virgül"
+  },
+  "vi": {
+    "digits": [
+      "không",
+      "một",
+      "hai",
+      "ba",
+      "bốn",
+      "năm",
+      "sáu",
+      "bảy",
+      "tám",
+      "chín"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "phẩy"
+  },
+  "lt": {
+    "digits": [
+      "nulis",
+      "vienas",
+      "du",
+      "trys",
+      "keturi",
+      "penki",
+      "šeši",
+      "septyni",
+      "aštuoni",
+      "devyni"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "kablelis"
+  },
+  "lv": {
+    "digits": [
+      "nulle",
+      "viens",
+      "divi",
+      "trīs",
+      "četri",
+      "pieci",
+      "seši",
+      "septiņi",
+      "astoņi",
+      "deviņi"
+    ],
+    "decimal": ",",
+    "group": " ",
+    "point": "komats"
+  },
+  "ro": {
+    "digits": [
+      "zero",
+      "unu",
+      "doi",
+      "trei",
+      "patru",
+      "cinci",
+      "şase",
+      "şapte",
+      "opt",
+      "nouă"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "virgulă"
+  },
+  "sl": {
+    "digits": [
+      "nič",
+      "ena",
+      "dva",
+      "tri",
+      "štiri",
+      "pet",
+      "šest",
+      "sedem",
+      "osem",
+      "devet"
+    ],
+    "decimal": ",",
+    "group": ".",
+    "point": "vejica"
+  }
+}

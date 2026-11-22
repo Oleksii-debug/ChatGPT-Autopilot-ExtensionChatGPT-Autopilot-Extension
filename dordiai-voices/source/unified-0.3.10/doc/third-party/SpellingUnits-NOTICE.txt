@@ -1,0 +1,5 @@
+Ukrainian letter units were generated offline with explicit IPA using Holos ONNX acoustic profiles.
+English letter units were generated offline using Piper en_US-amy-low, explicit English IPA, and native duration alignment.
+Both were converted with OpenVoice V2 to the same target embeddings used for sentences.
+No additional Holos or English Piper model is loaded for spelling in this package.
+Piper model reference: https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/amy/low

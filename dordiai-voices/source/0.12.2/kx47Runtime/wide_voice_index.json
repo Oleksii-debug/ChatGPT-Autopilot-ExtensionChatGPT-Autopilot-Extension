@@ -1,0 +1,581 @@
+{
+  "af": {
+    "voice": "gmw/af",
+    "name": "Африкаанс",
+    "source": "wide-sources/af.npy"
+  },
+  "am": {
+    "voice": "sem/am",
+    "name": "Амхарська",
+    "source": "wide-sources/am.npy"
+  },
+  "an": {
+    "voice": "roa/an",
+    "name": "Арагонська",
+    "source": "wide-sources/an.npy"
+  },
+  "ar": {
+    "voice": "sem/ar",
+    "name": "Арабська",
+    "source": "wide-sources/ar.npy",
+    "natural": "shared"
+  },
+  "as": {
+    "voice": "inc/as",
+    "name": "Асамська",
+    "source": "wide-sources/as.npy"
+  },
+  "az": {
+    "voice": "trk/az",
+    "name": "Азербайджанська",
+    "source": "wide-sources/az.npy"
+  },
+  "ba": {
+    "voice": "trk/ba",
+    "name": "Башкирська",
+    "source": "wide-sources/ba.npy"
+  },
+  "be": {
+    "voice": "zle/be",
+    "name": "Білоруська",
+    "source": "wide-sources/be.npy"
+  },
+  "bg": {
+    "voice": "zls/bg",
+    "name": "Болгарська",
+    "source": "wide-sources/bg.npy",
+    "natural": "shared"
+  },
+  "bn": {
+    "voice": "inc/bn",
+    "name": "Бенгальська",
+    "source": "wide-sources/bn.npy"
+  },
+  "bpy": {
+    "voice": "inc/bpy",
+    "name": "Бішнупрія-маніпурі",
+    "source": "wide-sources/bpy.npy"
+  },
+  "bs": {
+    "voice": "zls/bs",
+    "name": "Боснійська",
+    "source": "wide-sources/bs.npy"
+  },
+  "ca": {
+    "voice": "roa/ca",
+    "name": "Каталонська",
+    "source": "wide-sources/ca.npy"
+  },
+  "chr": {
+    "voice": "iro/chr",
+    "name": "Черокі",
+    "source": "wide-sources/chr.npy"
+  },
+  "cmn": {
+    "voice": "sit/cmn",
+    "name": "Китайська (мандаринська)",
+    "source": "wide-sources/cmn.npy"
+  },
+  "crh": {
+    "voice": "trk/crh",
+    "name": "Кримськотатарська",
+    "source": "wide-sources/crh.npy"
+  },
+  "cs": {
+    "voice": "zlw/cs",
+    "name": "Чеська",
+    "source": "wide-sources/cs.npy",
+    "natural": "shared"
+  },
+  "cv": {
+    "voice": "trk/cv",
+    "name": "Чуваська",
+    "source": "wide-sources/cv.npy"
+  },
+  "cy": {
+    "voice": "cel/cy",
+    "name": "Валлійська",
+    "source": "wide-sources/cy.npy"
+  },
+  "el": {
+    "voice": "grk/el",
+    "name": "Грецька",
+    "source": "wide-sources/el.npy",
+    "natural": "shared"
+  },
+  "eo": {
+    "voice": "art/eo",
+    "name": "Есперанто",
+    "source": "wide-sources/eo.npy"
+  },
+  "et": {
+    "voice": "urj/et",
+    "name": "Естонська",
+    "source": "wide-sources/et.npy",
+    "natural": "shared"
+  },
+  "eu": {
+    "voice": "eu",
+    "name": "Баскська",
+    "source": "wide-sources/eu.npy"
+  },
+  "fa": {
+    "voice": "ira/fa",
+    "name": "Перська",
+    "source": "wide-sources/fa.npy"
+  },
+  "fi": {
+    "voice": "urj/fi",
+    "name": "Фінська",
+    "source": "wide-sources/fi.npy",
+    "natural": "shared"
+  },
+  "fo": {
+    "voice": "gmq/fo",
+    "name": "Фарерська",
+    "source": "wide-sources/fo.npy"
+  },
+  "ga": {
+    "voice": "cel/ga",
+    "name": "Ірландська",
+    "source": "wide-sources/ga.npy"
+  },
+  "gd": {
+    "voice": "cel/gd",
+    "name": "Шотландська гельська",
+    "source": "wide-sources/gd.npy"
+  },
+  "gn": {
+    "voice": "sai/gn",
+    "name": "Гуарані",
+    "source": "wide-sources/gn.npy"
+  },
+  "grc": {
+    "voice": "grk/grc",
+    "name": "Давньогрецька",
+    "source": "wide-sources/grc.npy"
+  },
+  "gu": {
+    "voice": "inc/gu",
+    "name": "Гуджараті",
+    "source": "wide-sources/gu.npy"
+  },
+  "hak": {
+    "voice": "sit/hak",
+    "name": "Хаккаська",
+    "source": "wide-sources/hak.npy"
+  },
+  "haw": {
+    "voice": "map/haw",
+    "name": "Гавайська",
+    "source": "wide-sources/haw.npy"
+  },
+  "he": {
+    "voice": "sem/he",
+    "name": "Іврит",
+    "source": "wide-sources/he.npy",
+    "backend": "renikud-noa"
+  },
+  "hi": {
+    "voice": "inc/hi",
+    "name": "Гінді",
+    "source": "wide-sources/hi.npy",
+    "natural": "shared"
+  },
+  "hr": {
+    "voice": "zls/hr",
+    "name": "Хорватська",
+    "source": "wide-sources/hr.npy",
+    "natural": "shared"
+  },
+  "ht": {
+    "voice": "roa/ht",
+    "name": "Гаїтянська креольська",
+    "source": "wide-sources/ht.npy"
+  },
+  "hu": {
+    "voice": "urj/hu",
+    "name": "Угорська",
+    "source": "wide-sources/hu.npy",
+    "natural": "shared"
+  },
+  "hy": {
+    "voice": "ine/hy",
+    "name": "Вірменська",
+    "source": "wide-sources/hy.npy"
+  },
+  "hyw": {
+    "voice": "ine/hyw",
+    "name": "Західновірменська",
+    "source": "wide-sources/hyw.npy"
+  },
+  "id": {
+    "voice": "poz/id",
+    "name": "Індонезійська",
+    "source": "wide-sources/id.npy",
+    "natural": "shared"
+  },
+  "is": {
+    "voice": "gmq/is",
+    "name": "Ісландська",
+    "source": "wide-sources/is.npy"
+  },
+  "ja": {
+    "voice": "jpx/ja",
+    "name": "Японська",
+    "source": "wide-sources/ja.npy",
+    "natural": "shared"
+  },
+  "ka": {
+    "voice": "ccs/ka",
+    "name": "Грузинська",
+    "source": "wide-sources/ka.npy"
+  },
+  "kaa": {
+    "voice": "trk/kaa",
+    "name": "Каракалпацька",
+    "source": "wide-sources/kaa.npy"
+  },
+  "kk": {
+    "voice": "trk/kk",
+    "name": "Казахська",
+    "source": "wide-sources/kk.npy"
+  },
+  "kl": {
+    "voice": "esx/kl",
+    "name": "Калааллісут",
+    "source": "wide-sources/kl.npy"
+  },
+  "kn": {
+    "voice": "dra/kn",
+    "name": "Каннада",
+    "source": "wide-sources/kn.npy"
+  },
+  "ko": {
+    "voice": "ko",
+    "name": "Корейська",
+    "source": "wide-sources/ko.npy",
+    "natural": "shared"
+  },
+  "kok": {
+    "voice": "inc/kok",
+    "name": "Конкані",
+    "source": "wide-sources/kok.npy"
+  },
+  "ku": {
+    "voice": "ira/ku",
+    "name": "Курдська",
+    "source": "wide-sources/ku.npy"
+  },
+  "ky": {
+    "voice": "trk/ky",
+    "name": "Киргизька",
+    "source": "wide-sources/ky.npy"
+  },
+  "la": {
+    "voice": "itc/la",
+    "name": "Латинська",
+    "source": "wide-sources/la.npy"
+  },
+  "lb": {
+    "voice": "gmw/lb",
+    "name": "Люксембурзька",
+    "source": "wide-sources/lb.npy"
+  },
+  "lt": {
+    "voice": "bat/lt",
+    "name": "Литовська",
+    "source": "wide-sources/lt.npy",
+    "natural": "shared"
+  },
+  "ltg": {
+    "voice": "bat/ltg",
+    "name": "Латгальська",
+    "source": "wide-sources/ltg.npy"
+  },
+  "lv": {
+    "voice": "bat/lv",
+    "name": "Латиська",
+    "source": "wide-sources/lv.npy",
+    "natural": "shared"
+  },
+  "mi": {
+    "voice": "poz/mi",
+    "name": "Маорі",
+    "source": "wide-sources/mi.npy"
+  },
+  "mk": {
+    "voice": "zls/mk",
+    "name": "Македонська",
+    "source": "wide-sources/mk.npy"
+  },
+  "ml": {
+    "voice": "dra/ml",
+    "name": "Малаялам",
+    "source": "wide-sources/ml.npy"
+  },
+  "mn": {
+    "voice": "xgn/mn",
+    "name": "Монгольська",
+    "source": "wide-sources/mn.npy"
+  },
+  "mr": {
+    "voice": "inc/mr",
+    "name": "Маратхі",
+    "source": "wide-sources/mr.npy"
+  },
+  "ms": {
+    "voice": "poz/ms",
+    "name": "Малайська",
+    "source": "wide-sources/ms.npy"
+  },
+  "mt": {
+    "voice": "sem/mt",
+    "name": "Мальтійська",
+    "source": "wide-sources/mt.npy"
+  },
+  "mto": {
+    "voice": "miz/mto",
+    "name": "Міхе (Тотонтепек)",
+    "source": "wide-sources/mto.npy"
+  },
+  "my": {
+    "voice": "sit/my",
+    "name": "Бірманська",
+    "source": "wide-sources/my.npy"
+  },
+  "nb": {
+    "voice": "gmq/nb",
+    "name": "Норвезька (букмол)",
+    "source": "wide-sources/nb.npy"
+  },
+  "nci": {
+    "voice": "azc/nci",
+    "name": "Класичний науатль",
+    "source": "wide-sources/nci.npy"
+  },
+  "ne": {
+    "voice": "inc/ne",
+    "name": "Непальська",
+    "source": "wide-sources/ne.npy"
+  },
+  "nl": {
+    "voice": "gmw/nl",
+    "name": "Нідерландська",
+    "source": "wide-sources/nl.npy",
+    "natural": "shared"
+  },
+  "nog": {
+    "voice": "trk/nog",
+    "name": "Ногайська",
+    "source": "wide-sources/nog.npy"
+  },
+  "om": {
+    "voice": "cus/om",
+    "name": "Оромо",
+    "source": "wide-sources/om.npy"
+  },
+  "or": {
+    "voice": "inc/or",
+    "name": "Одія",
+    "source": "wide-sources/or.npy"
+  },
+  "pa": {
+    "voice": "inc/pa",
+    "name": "Панджабі",
+    "source": "wide-sources/pa.npy"
+  },
+  "pap": {
+    "voice": "roa/pap",
+    "name": "Папʼяменто",
+    "source": "wide-sources/pap.npy"
+  },
+  "ps": {
+    "voice": "ira/ps",
+    "name": "Пушту",
+    "source": "wide-sources/ps.npy"
+  },
+  "pt": {
+    "voice": "roa/pt",
+    "name": "Португальська",
+    "source": "wide-sources/pt.npy",
+    "natural": "shared"
+  },
+  "qu": {
+    "voice": "qu",
+    "name": "Кечуа",
+    "source": "wide-sources/qu.npy"
+  },
+  "quc": {
+    "voice": "myn/quc",
+    "name": "Кіче",
+    "source": "wide-sources/quc.npy"
+  },
+  "ro": {
+    "voice": "roa/ro",
+    "name": "Румунська",
+    "source": "wide-sources/ro.npy",
+    "natural": "shared"
+  },
+  "rup": {
+    "voice": "roa/rup",
+    "name": "Арумунська",
+    "source": "wide-sources/rup.npy"
+  },
+  "sd": {
+    "voice": "inc/sd",
+    "name": "Синдхі",
+    "source": "wide-sources/sd.npy"
+  },
+  "shn": {
+    "voice": "tai/shn",
+    "name": "Шанська",
+    "source": "wide-sources/shn.npy"
+  },
+  "si": {
+    "voice": "inc/si",
+    "name": "Сингальська",
+    "source": "wide-sources/si.npy"
+  },
+  "sl": {
+    "voice": "zls/sl",
+    "name": "Словенська",
+    "source": "wide-sources/sl.npy",
+    "natural": "shared"
+  },
+  "smj": {
+    "voice": "urj/smj",
+    "name": "Саамська луле",
+    "source": "wide-sources/smj.npy"
+  },
+  "sq": {
+    "voice": "ine/sq",
+    "name": "Албанська",
+    "source": "wide-sources/sq.npy"
+  },
+  "sr": {
+    "voice": "zls/sr",
+    "name": "Сербська",
+    "source": "wide-sources/sr.npy"
+  },
+  "sv": {
+    "voice": "gmq/sv",
+    "name": "Шведська",
+    "source": "wide-sources/sv.npy",
+    "natural": "shared"
+  },
+  "sw": {
+    "voice": "bnt/sw",
+    "name": "Суахілі",
+    "source": "wide-sources/sw.npy"
+  },
+  "ta": {
+    "voice": "dra/ta",
+    "name": "Тамільська",
+    "source": "wide-sources/ta.npy"
+  },
+  "te": {
+    "voice": "dra/te",
+    "name": "Телугу",
+    "source": "wide-sources/te.npy"
+  },
+  "th": {
+    "voice": "tai/th",
+    "name": "Тайська",
+    "source": "wide-sources/th.npy"
+  },
+  "ti": {
+    "voice": "sem/ti",
+    "name": "Тигринья",
+    "source": "wide-sources/ti.npy"
+  },
+  "tk": {
+    "voice": "trk/tk",
+    "name": "Туркменська",
+    "source": "wide-sources/tk.npy"
+  },
+  "tn": {
+    "voice": "bnt/tn",
+    "name": "Тсвана",
+    "source": "wide-sources/tn.npy"
+  },
+  "tr": {
+    "voice": "trk/tr",
+    "name": "Турецька",
+    "source": "wide-sources/tr.npy",
+    "natural": "shared"
+  },
+  "tt": {
+    "voice": "trk/tt",
+    "name": "Татарська",
+    "source": "wide-sources/tt.npy"
+  },
+  "ug": {
+    "voice": "trk/ug",
+    "name": "Уйгурська",
+    "source": "wide-sources/ug.npy"
+  },
+  "ur": {
+    "voice": "inc/ur",
+    "name": "Урду",
+    "source": "wide-sources/ur.npy"
+  },
+  "uz": {
+    "voice": "trk/uz",
+    "name": "Узбецька",
+    "source": "wide-sources/uz.npy"
+  },
+  "vi": {
+    "voice": "aav/vi",
+    "name": "Вʼєтнамська",
+    "source": "wide-sources/vi.npy",
+    "natural": "shared"
+  },
+  "yue": {
+    "voice": "sit/yue",
+    "name": "Кантонська",
+    "source": "wide-sources/yue.npy"
+  },
+  "gl": {
+    "name": "Галісійська",
+    "voice": "gl",
+    "backend": "nos-vits",
+    "source": "wide_extra/gl/source.npy"
+  },
+  "br": {
+    "name": "Бретонська",
+    "voice": "br",
+    "backend": "breton-vits",
+    "source": "wide-sources/br.npy"
+  },
+  "nn": {
+    "name": "Норвезька (нюношк)",
+    "voice": "rules:nn",
+    "source": "wide-sources/nn.npy"
+  },
+  "fy": {
+    "name": "Західнофризька",
+    "voice": "rules:fy",
+    "source": "wide-sources/fy.npy"
+  },
+  "oc": {
+    "name": "Окситанська",
+    "voice": "rules:oc",
+    "source": "wide-sources/oc.npy"
+  },
+  "sro": {
+    "name": "Сардинська (кампіданська)",
+    "voice": "rules:sro",
+    "source": "wide-sources/sro.npy"
+  },
+  "ab": {
+    "name": "Абхазька",
+    "voice": "upstream:cau/ab",
+    "source": "wide-sources/ab.npy"
+  },
+  "lij": {
+    "name": "Лігурійська",
+    "voice": "upstream:roa/lij",
+    "source": "wide-sources/lij.npy"
+  }
+}

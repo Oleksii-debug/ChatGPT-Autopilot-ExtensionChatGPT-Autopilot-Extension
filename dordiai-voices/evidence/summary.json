@@ -1,0 +1,54 @@
+{
+  "platform_scope": "Linux; static code/data checks only; no Windows/NVDA speech execution",
+  "packages": {
+    "0.12.2": {
+      "own_python_files_syntax_passed": 56,
+      "json_files_parsed": 264,
+      "language_variants": 121,
+      "core_languages": [
+        "uk",
+        "ru",
+        "en",
+        "sk",
+        "pl",
+        "de",
+        "fr",
+        "da",
+        "it",
+        "es"
+      ],
+      "additional_languages": 111,
+      "voice_profiles": 53,
+      "validated_source_vectors": 111,
+      "validated_target_vectors": 53,
+      "additional_language_routes": {
+        "espeak_with_voice_conversion": 87,
+        "shared_neural": 21,
+        "renikud-noa": 1,
+        "nos-vits": 1,
+        "breton-vits": 1
+      },
+      "optional_personal_language_pack_included": false
+    },
+    "unified-0.3.10": {
+      "own_python_files_syntax_passed": 40,
+      "json_files_parsed": 12,
+      "language_variants": 10,
+      "languages": [
+        "uk",
+        "ru",
+        "en",
+        "sk",
+        "de",
+        "pl",
+        "fr",
+        "da",
+        "it",
+        "es"
+      ],
+      "voice_profiles": 3,
+      "validated_target_vectors": 3,
+      "acoustic_backend": "Supertonic3 + OpenVoice"
+    }
+  }
+}

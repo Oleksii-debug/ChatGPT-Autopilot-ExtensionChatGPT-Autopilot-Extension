@@ -1,0 +1,4 @@
+Prepared spelling units were synthesized by RHVoice using the isolated Alan and Volodymyr voice models. The optional native English playback uses Piper voices Amy and Ryan, with pitch adjusted towards the selected profile. Ryan source dataset is listed as CC BY-NC-SA 4.0. This build is for personal use.
+https://github.com/RHVoice/RHVoice
+https://huggingface.co/rhasspy/piper-voices/blob/main/en/en_US/amy/low/MODEL_CARD
+https://huggingface.co/rhasspy/piper-voices/blob/main/en/en_US/ryan/low/MODEL_CARD

@@ -1,0 +1,822 @@
+[
+  {
+    "path": "source/0.12.2/doc/en/readme.html",
+    "sha256": "7044f8981047db0adecfc978bb4fe3c77cec9d65f3e5d129ff0e88146f0ee9f4",
+    "size_bytes": 2483
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/COPYING.APACHE",
+    "sha256": "03379001a7b12a2ec997a25554247d985270b353c10d5bafee9ac8d6519820b7",
+    "size_bytes": 11362
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/COPYING.BSD",
+    "sha256": "51928dce36213c5333ba3172e847d735d4c6e9b7ff2722a326c49067155b82eb",
+    "size_bytes": 1517
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/COPYING.MINPACK",
+    "sha256": "c87b7f8ee88f6195e91743820c00354833583aef091b72e2d4a49c8e28e798a0",
+    "size_bytes": 2193
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/COPYING.MPL2",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "size_bytes": 16727
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/COPYING.README",
+    "sha256": "db640ff2bd90c6abd6a4d3fbb351e0ee4d555417cf840492054d1cbb2ea85644",
+    "size_bytes": 264
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/Eigen-MPL-2.0.txt",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "size_bytes": 16727
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/NOTICE.txt",
+    "sha256": "1e3bf913db683d86c0c382c92eba5dce3e5714b8ab6f12c9852e0b624ea55df7",
+    "size_bytes": 598
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/ONNX-Runtime-MIT.txt",
+    "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "size_bytes": 1073
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/DordiaiNative/snake.cpp",
+    "sha256": "5d3aefd85f5c4e5ef6466ff6498323f2e74fb027c079e3290373b626196fe5ab",
+    "size_bytes": 4303
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/FrequencyWords.txt",
+    "sha256": "c2a4b62c5c0e331c0eba94150d9b76d3ad5416e6762f235084ebdd9f8ac0b4bd",
+    "size_bytes": 282
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/Pronunciation-NOTICE.txt",
+    "sha256": "9b48321ebcf0d6e8c342ddc44ca4509c0b05792afc0fb5c3df1df626724083e7",
+    "size_bytes": 505
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/RHVoice-Jasietka.txt",
+    "sha256": "b38798b5822546bd539471525c81b4f36322ef9cada7fb2efbb85bd2d54b97fa",
+    "size_bytes": 870
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/RHVoice-Ukrainian/COPYING.LESSER",
+    "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95",
+    "size_bytes": 26419
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/RHVoice-Ukrainian/NOTICE.txt",
+    "sha256": "0dcad81fba99f2e225ca1bda998649134215d9a75358eeda4aa7909c3bd20855",
+    "size_bytes": 682
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/RHVoice-Ukrainian/dictionary.txt",
+    "sha256": "144be10ed023d3fe797059731ece0f0c49f169b2d18b7fbf4f1e989592f53db7",
+    "size_bytes": 60808
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/RHVoice-Ukrainian/english_phone_mapping.foma",
+    "sha256": "7d602a4cc7fab92676d7079eb799fa0849d3ea7df7ddeadb5696a0babfa8399f",
+    "size_bytes": 2895
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/Sonic/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/Sonic/NOTICE.txt",
+    "sha256": "08cf0f09f3bb65941a3220cad590572dcc6029952907837225835b87b944a1e7",
+    "size_bytes": 445
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/Sonic/sonic.c",
+    "sha256": "4a21d8086f844e3e68cb4f85961623a69d35da8ca93cf6ea704ccd125e64eaf5",
+    "size_bytes": 44899
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/Sonic/sonic.h",
+    "sha256": "a2fc087b68c25141e2fb7ab56e71b111bee79cf311fcc850d492eb574c0eeffe",
+    "size_bytes": 13465
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/langdetect/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358
+  },
+  {
+    "path": "source/0.12.2/doc/third-party/langdetect/NOTICE",
+    "sha256": "bc22bad5907339e12834d91f7809ec35c3c44fa4b812f274ebfefa38de080869",
+    "size_bytes": 655
+  },
+  {
+    "path": "source/0.12.2/doc/uk/languages.txt",
+    "sha256": "ee852f1cf917a9e87d54b55a6f89e6488a5795a4bcb8e62866b943e496b90ee0",
+    "size_bytes": 5533
+  },
+  {
+    "path": "source/0.12.2/doc/uk/readme.html",
+    "sha256": "462d008c1e6891ef05fd84f349b513d9200121982f981a9a0e539304bee566ce",
+    "size_bytes": 7133
+  },
+  {
+    "path": "source/0.12.2/globalPlugins/dordiaiLanguages.py",
+    "sha256": "679546a97bc75481067b1a52daea59d6a2a7ac3db16fdb55f9e45838f8fd77c1",
+    "size_bytes": 2917
+  },
+  {
+    "path": "source/0.12.2/globalPlugins/dordiaiMainPreferences.py",
+    "sha256": "b1e5f7c3d1d49918568bea36864cbd674fa0c92cd96d6b0be842a0037bc4f5e3",
+    "size_bytes": 1604
+  },
+  {
+    "path": "source/0.12.2/installTasks.py",
+    "sha256": "9b64b1412a60c14cf9f27a36ab33593d70ba343ac8e72af2e9dbbf68a764943b",
+    "size_bytes": 1592
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/clean_voice_audio.py",
+    "sha256": "57ae7714ccf63442edd6fcfecc1ce6229754bf4436ca3db8d0b387e23d5e936e",
+    "size_bytes": 2576
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/converted_voices.py",
+    "sha256": "8067d132257df03d6974c592a9f74c33722cac2a6af0c91d9dce574a108ff5ad",
+    "size_bytes": 10971
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/cyrillic_ngrams.json",
+    "sha256": "af35ea13b2304c1b7c7a73f8dddd9ebe6ce09b8c18c580c68554bf4c2a653655",
+    "size_bytes": 46872
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/download_models.py",
+    "sha256": "c726b2fe2708da1c8c263ffec0ec8b1c986654cbde62593cafba435c2c635453",
+    "size_bytes": 2829
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/english_phonetics.py",
+    "sha256": "3a93bbadec3eca4f271014b2fa4542f241965ae137e410b5dab3ec3bba323471",
+    "size_bytes": 3306
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/experiment_letters.py",
+    "sha256": "652e525cc4cf221e950ac351a929f5754e884365cb1d18eda0fe5e52e646aeff",
+    "size_bytes": 2498
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/kx47.py",
+    "sha256": "41e2b8476df17117745729630c2f2bf0e16c0fb576c26cb576835fbbda13e028",
+    "size_bytes": 8813
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/latin_languages.py",
+    "sha256": "bd783d200dc5b2d7aea1401291322749ad71913030ef4e467b3aa18a94e2edc2",
+    "size_bytes": 3626
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/latin_phonetics.py",
+    "sha256": "f25357473a4b10d93cae1efe61628e3eb44338737196a6c685b583063ab08f56",
+    "size_bytes": 1453
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/models/Holos/holos_onnx.json",
+    "sha256": "a9480fa95168180683d5502694227ffa6518743f3ef2352ae02aac46bb6c407d",
+    "size_bytes": 2725
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/models/voices/catalog.json",
+    "sha256": "f4aeebb44596dcdf2dae1b7cd6310d15ee7ffb48076d2aa41806387fabf4342c",
+    "size_bytes": 1588
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/models/voices/classmate_locales/languages.json",
+    "sha256": "1cc22954a2735f81aeb561204593a79e06db4994c32c9ba52e35d4f81173fb68",
+    "size_bytes": 678
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/native_locale.py",
+    "sha256": "787642b108b4cf1fe53cf337d68955d8a25d26fcc7859da3ed77cfa4c7eecd5f",
+    "size_bytes": 9402
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/native_lookahead.py",
+    "sha256": "7680483187b2f1ec8b528419969c408981a48b2c588ea178bfeb945f4dfeded3",
+    "size_bytes": 4668
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/native_multilingual.py",
+    "sha256": "28d4a080ad590d74a6e17190a3a78dc36a7a49c4af2a22c381436cd335c5f463",
+    "size_bytes": 11179
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/navigation_cache.py",
+    "sha256": "3c3a83a567034897d86e938fb59b7a3d90ce796207b0a3b03e9dce1bb469fcb4",
+    "size_bytes": 1088
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/nvda_worker.py",
+    "sha256": "99224f1e632e5cacd0a9d32c519033259d39a8381e2b659726cf17604f89f23e",
+    "size_bytes": 18391
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/personal_catalog.py",
+    "sha256": "d9eb0e1ba731f938cd0f2d1e651e54de7bbef36ee27d3a05f73bd18f96c3730d",
+    "size_bytes": 5675
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/personal_orthography.py",
+    "sha256": "018a2da967633129174887e9816bd375acc5c52cb6fdc91f17b052548935405a",
+    "size_bytes": 992
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/personal_voice.py",
+    "sha256": "93e47f1d93a401637529c9e79e333993d963526a1eea2d256c04b69467de6f34",
+    "size_bytes": 6526
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/piper_family_sessions.py",
+    "sha256": "7a320440a7720fc4e6e5cb4095b7a20b1d0143773fde066b8e0a870c7297ad1c",
+    "size_bytes": 1565
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/pocket_english.py",
+    "sha256": "870aa2e2e6e36a2692844638f255dd2316e96a6f806534ea15d160c9ac51609a",
+    "size_bytes": 9253
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/preferences.py",
+    "sha256": "24f3dbe64049f21c3f6cc9fda03c5899f520181005714252cf3501fa0279843e",
+    "size_bytes": 12167
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/reference_prosody.py",
+    "sha256": "83b5b10ed5c473dcf3de609526df76bf97bcb9cf7d9c9eec9db266810754fa69",
+    "size_bytes": 1034
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/reference_voices.py",
+    "sha256": "c5fb70bc5a0a581f841f7db06626de3036dd17185ae1e17f32c4c788d2202807",
+    "size_bytes": 2151
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/requirements.txt",
+    "sha256": "b83cbb1d48bea521f53d0128219e839d4a9667a84926eef16bd2f2f07d724e05",
+    "size_bytes": 57
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/rhvoice_carrier.py",
+    "sha256": "b589018a35539ba75f216a69b74008090dfef69e68fd5befa4b376b8434fc900",
+    "size_bytes": 3653
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/rhvoice_stress.json",
+    "sha256": "b260a380e47482c8cbcc26729c131a097a22664536f8db65861fd1c5c1b7080d",
+    "size_bytes": 47294
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/russian_phonetics.py",
+    "sha256": "02b0300583799367b8b464adf3de2b28fab88ff26b0ce369aaeeb61cd9a58ce3",
+    "size_bytes": 728
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/session_control.py",
+    "sha256": "ae8bd58d7811987a770e2aa79f4c7de2e9a77667d3ff17ecc7004e7cc7a81683",
+    "size_bytes": 1590
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/speech_tempo.py",
+    "sha256": "100218779ee930079c9742169caa90a58b6150e99920025385a1545a7fa66a9d",
+    "size_bytes": 3325
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/speech_text.py",
+    "sha256": "9f4c2666a4219e0aad5e6d1124c21f316c8dd15dcb193b97f08bd0a668cc8eec",
+    "size_bytes": 12042
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/spelling_audio.py",
+    "sha256": "6a8579f2d3f3f569e10452e7e4c3b06aed02c865fb88606b0b771306895dae05",
+    "size_bytes": 3832
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/streaming_resample.py",
+    "sha256": "8c4953670bc0d15598c6b878aa5942324c824c5606f8fd8739daea1102e08760",
+    "size_bytes": 1770
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/ukrainian_stress.py",
+    "sha256": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933",
+    "size_bytes": 7989
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/ukrainian_voices.py",
+    "sha256": "3fa3785de9ed617b87cb009330fbc654bfcfbc199d46443964acae0b1872c50f",
+    "size_bytes": 16571
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/voice_catalog.py",
+    "sha256": "4fb4a23ecd65b90a53781f923f14043d41efe595ae40fb6d2b1cf4f885a7dd21",
+    "size_bytes": 2481
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/voice_controls.py",
+    "sha256": "d464e5a2a03a0b60911033277d38f00d9f256792219444d44a6ca1e1b4898eff",
+    "size_bytes": 3468
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/voice_delivery.py",
+    "sha256": "2d5a1877622f6d7e95babc12685f88f69999263fa0a6fd32748f2093cda2ea93",
+    "size_bytes": 7398
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_breton.py",
+    "sha256": "6699f2aea9f0139669a77d751aff5441f07a90279f5cf8b554c595323b82294b",
+    "size_bytes": 2538
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_carrier.py",
+    "sha256": "336fa9463665f116bf3c2f66c445fa30df3696987388f5dd3f770e85ba416362",
+    "size_bytes": 5054
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_common.py",
+    "sha256": "55eea8508b15e4c3c8a6845f02617a66a00fd71b89ec26001df7312b81700e2a",
+    "size_bytes": 1169
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_common_carrier.py",
+    "sha256": "59ed90e97016feb090bfed0f80d5720187a24c687fafe5dc54a4fdd56840b558",
+    "size_bytes": 3092
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_common_helpers.py",
+    "sha256": "41e69f2bfd2de02bb15915f141459bc47e61b06ddd690bec10849a0f8a80e7b7",
+    "size_bytes": 15781
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_extra.py",
+    "sha256": "ec71557f3e0b7315c9b84b62537ef4e71a23460a4dc06b1d2b388aaab0286e00",
+    "size_bytes": 6427
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_hebrew.py",
+    "sha256": "2a346efe61bc4c2861ab9221ea830d89dd9904c8d6226cfc9b86a3ef19bdcad5",
+    "size_bytes": 4587
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_hebrew_niqqud.py",
+    "sha256": "df4705b1da04d76bfc7e3e2a8472b4603ab4ecd6c6bd51b658556a487ee85d27",
+    "size_bytes": 15521
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_japanese.py",
+    "sha256": "b75d54d901ea9da1a3683bce14252ef0f03dccffeeb52154f78a31027f9f7795",
+    "size_bytes": 1758
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_languages.py",
+    "sha256": "3572a80d5e14edc37423d28d6c8ca6e638dedc8fef53e06872077b668c56853c",
+    "size_bytes": 13806
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_loading.py",
+    "sha256": "0c0c1855ddc88e25e9adbcd8ea54629af713c5e34dc2186383becd2d3d2972ae",
+    "size_bytes": 1958
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_nordic.py",
+    "sha256": "19ca7c92b4112bd82a98ea07a6c3bc62ae07fc240b3f3787ffc101d4bc62ebd9",
+    "size_bytes": 1678
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_number_words.json",
+    "sha256": "ec9d02676ac64c7c0101728ed455cae7a5e937830bdc009c28199a89e7677c0b",
+    "size_bytes": 5622
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_numbers.py",
+    "sha256": "1e195fa81d578369682e861855f8654f713c20515af89602031c273cca244fdf",
+    "size_bytes": 5030
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_phonetics.py",
+    "sha256": "6c496542013385b93873451e68c9e966726d0c593071bfc8ebdcbee944366f0c",
+    "size_bytes": 2963
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_profiles.py",
+    "sha256": "13c979be734ccee298864b26db7c08d158cbd320d06e401692b2aebea9eef18a",
+    "size_bytes": 5527
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_voice.py",
+    "sha256": "eccfaa4f70b9d7b581280e752707404c3c9b2ea0acef95a1f4fd564febd1c5eb",
+    "size_bytes": 9249
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_voice_index.json",
+    "sha256": "826b8c31c5c311d44fd1c6f7003341ae8408d8194fae9b23d336148cc1ea3b52",
+    "size_bytes": 13453
+  },
+  {
+    "path": "source/0.12.2/kx47Runtime/wide_warmup.py",
+    "sha256": "35db19883df0241ccb231f39b19604571350c48a5a68c9ff9f5c866301b692ab",
+    "size_bytes": 3550
+  },
+  {
+    "path": "source/0.12.2/manifest.ini",
+    "sha256": "79a6f5b2d99ee3ae0c0488b367b9bbc9f868e3b0361fcdbd8817675709a18500",
+    "size_bytes": 412
+  },
+  {
+    "path": "source/0.12.2/synthDrivers/_dordiai_audio.py",
+    "sha256": "b1c9a59216d61a854762a0a2f44baa8458e33147032db06f4dc8674b7923a765",
+    "size_bytes": 2352
+  },
+  {
+    "path": "source/0.12.2/synthDrivers/_dordiai_letter_bank.py",
+    "sha256": "52b3f40ceea96a66f7c9bf833b786ce7290f8af4cf89f3beda1611f36e4446d4",
+    "size_bytes": 1554
+  },
+  {
+    "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+    "sha256": "b4f71e2d5132dda04ff48cc6909be4affba4a85190bb52e48cca3b520e12bde6",
+    "size_bytes": 62127
+  },
+  {
+    "path": "source/unified-0.3.10/doc/en/readme.html",
+    "sha256": "8516a8c0681fbabfad85f7031ac524b294fca4529f423e579b8ca131b38c0ebc",
+    "size_bytes": 1439
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/COPYING.APACHE",
+    "sha256": "03379001a7b12a2ec997a25554247d985270b353c10d5bafee9ac8d6519820b7",
+    "size_bytes": 11362
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/COPYING.BSD",
+    "sha256": "51928dce36213c5333ba3172e847d735d4c6e9b7ff2722a326c49067155b82eb",
+    "size_bytes": 1517
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/COPYING.MINPACK",
+    "sha256": "c87b7f8ee88f6195e91743820c00354833583aef091b72e2d4a49c8e28e798a0",
+    "size_bytes": 2193
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/COPYING.MPL2",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "size_bytes": 16727
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/COPYING.README",
+    "sha256": "db640ff2bd90c6abd6a4d3fbb351e0ee4d555417cf840492054d1cbb2ea85644",
+    "size_bytes": 264
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/Eigen-MPL-2.0.txt",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "size_bytes": 16727
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/NOTICE.txt",
+    "sha256": "1e3bf913db683d86c0c382c92eba5dce3e5714b8ab6f12c9852e0b624ea55df7",
+    "size_bytes": 598
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/ONNX-Runtime-MIT.txt",
+    "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "size_bytes": 1073
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/DordiaiNative/snake.cpp",
+    "sha256": "5d3aefd85f5c4e5ef6466ff6498323f2e74fb027c079e3290373b626196fe5ab",
+    "size_bytes": 4303
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Lingua-LICENSE.txt",
+    "sha256": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",
+    "size_bytes": 11558
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Lingua-NOTICE.txt",
+    "sha256": "35de82c73dbe30e1ec3e84537832c53abf68f118a8c83e936cf75c4ec5ca1948",
+    "size_bytes": 65
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/OpenVoice-LICENSE.txt",
+    "sha256": "bb3541f421e6273d3a3e3dd5bdba2bd3b79a3c2eadca65cde9c62c2467903ac0",
+    "size_bytes": 1057
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Piper-German-LICENSE.txt",
+    "sha256": "839e83403012b52b1507510f28da2e782654b25d618aa99cabae5ae1a5e1a3b3",
+    "size_bytes": 388
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Piper-Polish-LICENSE.txt",
+    "sha256": "6b4de033dfff0da758bbe4d438fd87fbd917ab843bdd83f591fa0f32b8eb5780",
+    "size_bytes": 275
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Piper-Slovak-LICENSE.txt",
+    "sha256": "adabb92f43f3a02b2312e328731cd2d0161126c028988fa77cd4939cf91253d1",
+    "size_bytes": 453
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Pronunciation-NOTICE.txt",
+    "sha256": "9b48321ebcf0d6e8c342ddc44ca4509c0b05792afc0fb5c3df1df626724083e7",
+    "size_bytes": 505
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/RHVoice-Ukrainian/COPYING.LESSER",
+    "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95",
+    "size_bytes": 26419
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/RHVoice-Ukrainian/NOTICE.txt",
+    "sha256": "0dcad81fba99f2e225ca1bda998649134215d9a75358eeda4aa7909c3bd20855",
+    "size_bytes": 682
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/RHVoice-Ukrainian/dictionary.txt",
+    "sha256": "144be10ed023d3fe797059731ece0f0c49f169b2d18b7fbf4f1e989592f53db7",
+    "size_bytes": 60808
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/RHVoice-Ukrainian/english_phone_mapping.foma",
+    "sha256": "7d602a4cc7fab92676d7079eb799fa0849d3ea7df7ddeadb5696a0babfa8399f",
+    "size_bytes": 2895
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Sonic/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Sonic/NOTICE.txt",
+    "sha256": "08cf0f09f3bb65941a3220cad590572dcc6029952907837225835b87b944a1e7",
+    "size_bytes": 445
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Sonic/sonic.c",
+    "sha256": "4a21d8086f844e3e68cb4f85961623a69d35da8ca93cf6ea704ccd125e64eaf5",
+    "size_bytes": 44899
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Sonic/sonic.h",
+    "sha256": "a2fc087b68c25141e2fb7ab56e71b111bee79cf311fcc850d492eb574c0eeffe",
+    "size_bytes": 13465
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/SpellingUnits-NOTICE.txt",
+    "sha256": "dd5fe9ed2c65be6d11126eba317da4e0330e1949710ef3deb6591def65358b18",
+    "size_bytes": 489
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Supertonic3-CODE-LICENSE.txt",
+    "sha256": "0dfe0d0ba84416fe3879d9a34f4909d8d0137c78d1e95834177b0414ac096fa2",
+    "size_bytes": 1070
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Supertonic3-MODEL-LICENSE.txt",
+    "sha256": "0d944a9110fed9a9602d60e0423a272903e7bd21ab060490774efc77c2275e9f",
+    "size_bytes": 15007
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/Supertonic3-NOTICE.txt",
+    "sha256": "299190bc18dbe25ea2d1d8cdfb30597c852b700c78bbe1c1a82468bd513504cd",
+    "size_bytes": 469
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/langdetect/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358
+  },
+  {
+    "path": "source/unified-0.3.10/doc/third-party/langdetect/NOTICE",
+    "sha256": "bc22bad5907339e12834d91f7809ec35c3c44fa4b812f274ebfefa38de080869",
+    "size_bytes": 655
+  },
+  {
+    "path": "source/unified-0.3.10/doc/uk/readme.html",
+    "sha256": "f081e3eb8d27a22b2fc0640e56b6a6ab5db4b29494d9fb0a2742fadb395a3e13",
+    "size_bytes": 11936
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/buffered_converter.py",
+    "sha256": "119d0fed0dbeda9713c6b6679df4d61de0347d019a1ace89913696ef1cd2e804",
+    "size_bytes": 1201
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/common_carrier.py",
+    "sha256": "55ad72d4387bb284e48882d1caf3af1830e47c14cd981195afd9f2323421be8f",
+    "size_bytes": 3036
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/converted_voices.py",
+    "sha256": "eecb537b12122166412ef822ed674113dc4be4045f66873e20cbe18e0ce3527e",
+    "size_bytes": 12434
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/data_registry.py",
+    "sha256": "977ce7394c98c2886599a4776410e1cf13cbcc6feef46f80b4d377fb186d4997",
+    "size_bytes": 5154
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/english_phonetics.py",
+    "sha256": "3a93bbadec3eca4f271014b2fa4542f241965ae137e410b5dab3ec3bba323471",
+    "size_bytes": 3306
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/grouped_words.py",
+    "sha256": "de5628c390f859cbbd446a897e29023a4624953a0fc07cf827d83867c65d1c84",
+    "size_bytes": 1755
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/holos_speech.py",
+    "sha256": "24b7039e04d87be2b2cb4f41c23b51f78f48b46fee37dcdbb1ed150198ba6b70",
+    "size_bytes": 26890
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/language_words.py",
+    "sha256": "798fc71934c727cc74c6cd1a1930efad5da6d90f86e50025a662a6b79cffe55e",
+    "size_bytes": 1654
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/latin_languages.py",
+    "sha256": "a00a95fac4eb8a340f4f8494fc9f8a34cf6e0ff73c15d2f5ae584e7a2b2c27a9",
+    "size_bytes": 4017
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/mixed_runs.py",
+    "sha256": "b92bda50d0eb8a453a3b6d4d32f117ef1049a4518ff9c9aed4ac41a7b09d8937",
+    "size_bytes": 1572
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/models/voices/catalog.json",
+    "sha256": "8974ebf5c7517eace2c980bd15cd3a01776d48544a0435c31b81c5b759b66459",
+    "size_bytes": 9406
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/native_multilingual.py",
+    "sha256": "28d4a080ad590d74a6e17190a3a78dc36a7a49c4af2a22c381436cd335c5f463",
+    "size_bytes": 11179
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/nvda_numbers.py",
+    "sha256": "f11d3b417d4373d42e927ba1c44a3c1b74241a1fd8d00032832538367d9d7db3",
+    "size_bytes": 1166
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/nvda_worker.py",
+    "sha256": "76eceb05e9adc6ff08cbeb4974d70817bf7162ecb2a0e267a992798188c5bad4",
+    "size_bytes": 4320
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/phrase_pauses.py",
+    "sha256": "5a8c35e007aba4c59469ceb97e2c475c48a1c40cd61329aa27049bd1ad2c5fd9",
+    "size_bytes": 1327
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/pocket_english.py",
+    "sha256": "870aa2e2e6e36a2692844638f255dd2316e96a6f806534ea15d160c9ac51609a",
+    "size_bytes": 9253
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/preferences.py",
+    "sha256": "24f3dbe64049f21c3f6cc9fda03c5899f520181005714252cf3501fa0279843e",
+    "size_bytes": 12167
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/radeon_decoder.py",
+    "sha256": "77c5f1825f08fe69cb23c021aea305bf7618a9ec71de0eed6ae9cda899720a15",
+    "size_bytes": 4782
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/radeon_worker.py",
+    "sha256": "aa905ba2bcf288f87a732b90d5fb2e7e141545ec858ae2b1ba2d8d1e602a7937",
+    "size_bytes": 1897
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/reading_style.py",
+    "sha256": "e47327bf31e9c16b7318664cac02b40b86a13697bab5a712f7871c26398ede97",
+    "size_bytes": 5965
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/reference_prosody.py",
+    "sha256": "83b5b10ed5c473dcf3de609526df76bf97bcb9cf7d9c9eec9db266810754fa69",
+    "size_bytes": 1034
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/reference_voices.py",
+    "sha256": "c5fb70bc5a0a581f841f7db06626de3036dd17185ae1e17f32c4c788d2202807",
+    "size_bytes": 2151
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/rhvoice_carrier.py",
+    "sha256": "a6230f686343c89827c331d412181c4319620bbf8af635f1a1d7124764a7daaf",
+    "size_bytes": 3627
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/russian_phonetics.py",
+    "sha256": "1cf70e69599cbdf30e798bcd0523098691738595e50d518845deba7f48995b20",
+    "size_bytes": 586
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/session_control.py",
+    "sha256": "ae8bd58d7811987a770e2aa79f4c7de2e9a77667d3ff17ecc7004e7cc7a81683",
+    "size_bytes": 1590
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/shared_identity.py",
+    "sha256": "304e30fe6b3a978d59f549ec586b4cd22603ab49f0b87bc927b2ed849f7f18e0",
+    "size_bytes": 7480
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/speech_tempo.py",
+    "sha256": "9ec07255ec2b211e326160ab85eda30831d281ffb28a7102e9491f489e1973bd",
+    "size_bytes": 3418
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/speech_text.py",
+    "sha256": "79fead68eb7a43cf08b2b63562d1e17e45b88fe7d9582195612d3442b948e49a",
+    "size_bytes": 14295
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/spelling_audio.py",
+    "sha256": "6a8579f2d3f3f569e10452e7e4c3b06aed02c865fb88606b0b771306895dae05",
+    "size_bytes": 3832
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/streaming_resample.py",
+    "sha256": "8c4953670bc0d15598c6b878aa5942324c824c5606f8fd8739daea1102e08760",
+    "size_bytes": 1770
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/supertonic_helpers.py",
+    "sha256": "41e69f2bfd2de02bb15915f141459bc47e61b06ddd690bec10849a0f8a80e7b7",
+    "size_bytes": 15781
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/ukrainian_stress.py",
+    "sha256": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933",
+    "size_bytes": 7989
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/ukrainian_voices.py",
+    "sha256": "2aaefd3c965621e17f77f3916bd025b50109bfa9b1489049d5804606c8de8a71",
+    "size_bytes": 16474
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/unified_model.py",
+    "sha256": "cbb8c5bcaab838b5a53c6a2662e81e19be71b93149e2302d83bb24a40fe311dc",
+    "size_bytes": 5763
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/voice_catalog.py",
+    "sha256": "4fb4a23ecd65b90a53781f923f14043d41efe595ae40fb6d2b1cf4f885a7dd21",
+    "size_bytes": 2481
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/voice_controls.py",
+    "sha256": "f2566480752682fb815159b4a257845575f2dee17be2c119c5f19b8c24c38029",
+    "size_bytes": 3533
+  },
+  {
+    "path": "source/unified-0.3.10/dordiaiUnifiedRuntime/voice_delivery.py",
+    "sha256": "6476d462dd8ad047930d0debc82612cee52911ed9bb0bce3a5c5c85cab924778",
+    "size_bytes": 8872
+  },
+  {
+    "path": "source/unified-0.3.10/globalPlugins/dordiaiUnifiedPreferences.py",
+    "sha256": "d6e20ca428cbac2467b94c05a73a4d95ac49857bf8026041022b0fd23fda657a",
+    "size_bytes": 1610
+  },
+  {
+    "path": "source/unified-0.3.10/globalPlugins/dordiaiUnifiedWarmup.py",
+    "sha256": "12b2cfd8a7cbdb26d17471cae73a43066cfef8abc61fafd99e6948dcad90f4ae",
+    "size_bytes": 614
+  },
+  {
+    "path": "source/unified-0.3.10/manifest.ini",
+    "sha256": "71c852bb89c28af6f7ea68f7fbc4d7713b5b7872ce5241181dd54139fd3fead2",
+    "size_bytes": 585
+  },
+  {
+    "path": "source/unified-0.3.10/synthDrivers/_dordiai_audio.py",
+    "sha256": "b1c9a59216d61a854762a0a2f44baa8458e33147032db06f4dc8674b7923a765",
+    "size_bytes": 2352
+  },
+  {
+    "path": "source/unified-0.3.10/synthDrivers/dordiaiUnified.py",
+    "sha256": "43294f784db025f6691d24a2b7628236c63e5e9be9cbd98f3765eb49faff70d4",
+    "size_bytes": 67235
+  }
+]

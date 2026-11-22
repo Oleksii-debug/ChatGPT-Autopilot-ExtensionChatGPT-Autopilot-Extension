@@ -1,0 +1,11 @@
+RHVoice Ukrainian pronunciation dictionary
+https://github.com/RHVoice/Ukrainian
+Copyright 2017-2025 Synthesizer of Ukrainian Speech team. LGPL-2.1-or-later.
+dordiai-voices modification: exact single-word stress rules expanded into rhvoice_stress.json.
+Wildcard, replacement, abbreviation and ambiguous rules are not imported.
+
+English phonetic mapping reference: english_phone_mapping.foma
+Copyright (C) 2017 Olga Yakovleva. LGPL-2.1-or-later.
+The modified Python implementation is shipped as kx47Runtime/english_phonetics.py.
+It maps eSpeak IPA through stressed Ukrainian orthography for HolosTTS;
+substitutions for th, ae and short i differ from the reference mapping.

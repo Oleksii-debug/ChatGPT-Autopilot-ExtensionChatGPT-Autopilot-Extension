@@ -1,0 +1,6 @@
+Sonic library, Copyright 2010 Bill Cox, Apache License 2.0.
+Upstream: https://github.com/waywardgeek/sonic
+The included sonic.c and sonic.h are the exact sources used for sonic.dll.
+Windows x64 build: clang --target=x86_64-w64-mingw32 -O3 -shared sonic.c -o sonic.dll -Wl,--export-all-symbols
+This DLL adjusts generated waveform duration while preserving pitch.
+The NVDA driver uses NVDA's own synthDrivers._sonic for prepared navigation clips.
