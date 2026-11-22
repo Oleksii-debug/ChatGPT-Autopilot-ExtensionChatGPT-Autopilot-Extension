@@ -441,9 +441,102 @@ def run(args):
     return 0 if report["status"]=="native-fp32-safestate-onnx-pass-human-review-pending" else 2
 
 
+def layout_diagnose(args):
+    """Bounded actual native acoustic diagnostic; no vocoder or ONNX export."""
+    state=state_tool()
+    h=state.helper()
+    h.MAX_REPORT=MAX_REPORT
+    validate_stages(args.archive,args.inputs,args.output)
+    output=fresh_directory(args.output)
+    writer=h.OwnedReport(output/"layout-proof.json")
+    inputs=Path(args.inputs).absolute()
+    for name in native.PINS:
+        native.read_source(inputs/"sources",name)
+    report={"format":"dordiai-native-mni-layout-diagnostic","format_version":1,
+      "status":"preparing","archive":{"sha256":state.ARCHIVE_SHA256,"size_bytes":state.ARCHIVE_SIZE},
+      "tool_sha256":sha256(Path(__file__).read_bytes()).hexdigest(),
+      "source_revision":native.REVISION,"production_integrated":False,
+      "onnx_exported":False,"vocoder_executed":False,"cases":[]}
+    writer.write(report)
+    try:
+        with tempfile.TemporaryDirectory(prefix="dordiai-mni-layout-") as temporary:
+            stage=state.extract(args.archive,Path(temporary)/"weights")
+            cfg=json.loads((stage/"mni/fastpitch/config.json").read_text(encoding="utf-8"),object_pairs_hook=h.unique_pairs)
+            report["network_guard"]=state.deny_network()
+            import torch
+            import numpy as np
+            from types import SimpleNamespace
+            state.torch_version(torch)
+            torch.set_num_threads(1)
+            torch.set_num_interop_threads(1)
+            torch.manual_seed(0)
+            torch.use_deterministic_algorithms(True)
+            namespace=native.build_namespace(inputs/"sources",torch)
+            checkpoint,_=state.safe_load(torch,stage/"mni/fastpitch/best_model.pth")
+            model=namespace["ForwardTTS"](native.config_tree(cfg),
+                speaker_manager=SimpleNamespace(num_speakers=2))
+            model.load_state_dict(checkpoint["model"],strict=True)
+            model.eval()
+            del checkpoint
+            gc.collect()
+            tokenizer=native.make_tokenizer(namespace,cfg)
+            sample=cfg["test_sentences"][0].split()[0].strip(",.")
+            _,token_ids=native.strict_ids(tokenizer,sample)
+            # Generator is never invoked: wrappers only use encoder and decoder.
+            encoder,decoder,_=build_export_wrappers(torch,model,torch.nn.Identity())
+            for speaker,speaker_id in (("female",0),("male",1)):
+                with torch.inference_mode():
+                    ids=torch.tensor([token_ids],dtype=torch.long)
+                    sid=torch.tensor([speaker_id],dtype=torch.long)
+                    encoded,duration=encoder(ids,sid)
+                    xmask=torch.ones((1,1,len(token_ids)),dtype=torch.float32)
+                    ylengths=duration.sum(1)
+                    ymask=namespace["sequence_mask"](ylengths,None).unsqueeze(1).to(encoded.dtype)
+                    original_expanded,_=model.expand_encoder_outputs(encoded,duration,xmask,ymask)
+                    contiguous=expand_numpy(encoded.numpy(),duration.numpy(),np)
+                    original_layout=np.ascontiguousarray(contiguous.transpose(0,2,1)).transpose(0,2,1)
+                    native_output=model.inference(ids,{"speaker_ids":sid,"d_vectors":None})["model_outputs"]
+                    direct_original=decoder(original_expanded)
+                    variants={}
+                    for name,array in (("contiguous_repeat",contiguous),("original_layout_repeat",original_layout)):
+                        tensor=torch.from_numpy(array)
+                        mel=decoder(tensor)
+                        variants[name]={
+                            "expanded_shape":list(tensor.shape),"expanded_stride":list(tensor.stride()),
+                            "expanded_values_bit_exact":tensor_bits_equal(torch,original_expanded,tensor),
+                            "mel":comparison(native_output.numpy(),mel.numpy(),np),
+                            "mel_sha256":sha256(mel.numpy().tobytes()).hexdigest()}
+                    report["cases"].append({"speaker":speaker,"speaker_id":speaker_id,"text":sample,
+                        "token_ids":token_ids,"duration":duration.numpy().tolist(),
+                        "original_expanded_stride":list(original_expanded.stride()),
+                        "original_decoder_equals_full_inference_bits":tensor_bits_equal(torch,native_output,direct_original),
+                        "original_mel_sha256":sha256(native_output.numpy().tobytes()).hexdigest(),
+                        "variants":variants})
+                    writer.write(report)
+            proved=all(case["original_decoder_equals_full_inference_bits"]
+                and case["variants"]["contiguous_repeat"]["expanded_values_bit_exact"]
+                and case["variants"]["original_layout_repeat"]["expanded_values_bit_exact"]
+                and case["variants"]["original_layout_repeat"]["mel"]["bit_exact"]
+                for case in report["cases"])
+            report["original_layout_preserves_original_mel_bits"]=bool(proved)
+            report["status"]="actual-layout-diagnostic-complete" if proved else "actual-layout-hypothesis-not-proven"
+    except Exception as error:
+        report.update(status="actual-layout-diagnostic-failed",error_type=type(error).__name__,
+            error=str(error)[:6000],traceback=traceback.format_exc(limit=12))
+    writer.write(report)
+    encoded=base64.b64encode(gzip.compress(h.json_bytes(report),mtime=0)).decode("ascii")
+    parts=[encoded[start:start+4096] for start in range(0,len(encoded),4096)]
+    for index,part in enumerate(parts,1):
+        print("MNI_LAYOUT_REPORT_GZIP_B64_PART %d/%d %s"%(index,len(parts),part),flush=True)
+    print("MNI_LAYOUT_SUMMARY "+json.dumps({"status":report["status"],
+        "cases":report["cases"],"error":report.get("error")},sort_keys=True),flush=True)
+    return 0 if report["status"]=="actual-layout-diagnostic-complete" else 2
+
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command",choices=("prepare","run"))
+    parser.add_argument("command",choices=("prepare","run","diagnose-layout"))
     parser.add_argument("--archive",type=Path,required=True)
     parser.add_argument("--inputs",type=Path,required=True)
     parser.add_argument("--output",type=Path)
@@ -453,7 +546,7 @@ def main(argv=None):
         return 0
     if args.output is None:
         parser.error("run requires --output")
-    return run(args)
+    return layout_diagnose(args) if args.command=="diagnose-layout" else run(args)
 
 
 if __name__=="__main__":

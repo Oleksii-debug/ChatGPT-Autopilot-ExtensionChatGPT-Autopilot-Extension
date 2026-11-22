@@ -118,6 +118,25 @@ class TrialGuards(unittest.TestCase):
         self.assertEqual(m.check_audio_service_receipt(report,0),"existing-endpoint")
 
 
+    def test_observed_pack46_speakers_vendor_endpoint_and_capture_selected(self):
+        before={"out":[],"in":[]}
+        after={"out":[{"index":0,"error":0,"name":"Speakers (VB-Audio Virtual Cabl","channels":2},
+                      {"index":1,"error":0,"name":"CABLE In 16 Ch (VB-Audio Virtua","channels":2}],
+               "in":[{"index":0,"error":0,"name":"CABLE Output (VB-Audio Virtual ","channels":2}]}
+        render,capture=m.select_new_vendor_endpoints(before,after)
+        self.assertEqual(render["index"],0)
+        self.assertEqual(capture["index"],0)
+        self.assertEqual(m.select_new_vendor_endpoints(after,after),(None,None))
+
+    def test_generic_speakers_or_ambiguous_vendor_endpoints_never_selected(self):
+        after={"out":[{"index":0,"error":0,"name":"Speakers (Other Audio)","channels":2}],
+               "in":[{"index":0,"error":0,"name":"CABLE Output (VB-Audio Virtual ","channels":2}]}
+        self.assertEqual(m.select_new_vendor_endpoints({},after),(None,None))
+        vendor={"index":1,"error":0,"name":"Speakers (VB-Audio Virtual Cabl","channels":2}
+        after["out"]=[vendor,dict(vendor,index=2)]
+        self.assertEqual(m.select_new_vendor_endpoints({},after),(None,None))
+
+
 class OwnedPnPContracts(unittest.TestCase):
     def fake(self,reboot=False,preexisting=False):
         pnp=object.__new__(m.WindowsPnP)

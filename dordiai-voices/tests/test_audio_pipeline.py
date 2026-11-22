@@ -36,7 +36,7 @@ def standalone_driver_parts():
                  and node.name in {"initial_audio", "buffered_items"}]
     driver = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "SynthDriver")
     methods = [node for node in driver.body if isinstance(node, ast.FunctionDef)
-               and node.name in {"_play", "_render_parts", "cancel", "terminate", "_run"}]
+               and node.name in {"_play", "_render_parts", "cancel", "terminate", "_run", "_release_native_membership"}]
     stub = ast.ClassDef(name="Playback", bases=[], keywords=[], body=methods, decorator_list=[])
     module = ast.fix_missing_locations(ast.Module(body=functions + [stub], type_ignores=[]))
     namespace = dict(Queue=Queue, Empty=Empty, Full=Full, Thread=Thread, closing=closing,
@@ -453,18 +453,25 @@ class PlaybackTests(unittest.TestCase):
         playback._worker_lease = object()
         playback._warm = False
         playback._english_engine = None
-        stopped, closed, released = [], [], []
+        stopped, closed, released, native_released = [], [], [], []
+        native_token = object()
+        playback._native_membership_token = native_token
+        playback._native_membership_runtime = types.SimpleNamespace(
+            release=lambda token: native_released.append(token))
         playback._engine = types.SimpleNamespace(close=lambda: self.fail("idle shared worker must stay warm"))
         playback._player = types.SimpleNamespace(stop=lambda: stopped.append(True), close=lambda: closed.append(True))
         with patch.dict(self.api, release_shared_worker=lambda token: released.append(token)):
             playback.terminate()
             self.assertEqual(released, [])
+            self.assertEqual(native_released, [])
             self.assertEqual(stopped, [True])
             self.assertEqual(playback._jobs.qsize(), 1)
             playback.terminate()
             self.assertEqual(playback._jobs.qsize(), 1)
             playback._run()
         self.assertEqual(released, [playback._worker_lease])
+        self.assertEqual(native_released, [native_token])
+        self.assertIsNone(playback._native_membership_token)
         self.assertEqual(closed, [True])
 
 

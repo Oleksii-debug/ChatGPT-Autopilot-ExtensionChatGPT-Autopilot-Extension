@@ -298,6 +298,20 @@ def endpoints():
     return result
 
 
+def select_new_vendor_endpoints(before, during):
+    """Select only newly appeared vendor endpoints; generic Speakers never qualifies."""
+    def new(kind, prefix):
+        prior={(row.get("name"),row.get("channels")) for row in before.get(kind,[]) if row.get("error")==0}
+        return [row for row in during.get(kind,[])
+                if row.get("error")==0 and row.get("channels")==2
+                and isinstance(row.get("name"),str) and row["name"].startswith(prefix)
+                and (row["name"],row["channels"]) not in prior]
+    render=new("out","Speakers (VB-Audio Virtual Cabl")
+    render+=new("out","CABLE Input (VB-Audio Virtual")
+    capture=new("in","CABLE Output (VB-Audio Virtual")
+    return (render[0],capture[0]) if len(render)==1 and len(capture)==1 else (None,None)
+
+
 def run(args):
     report = {"format":"dordiai-owned-virtual-audio-endpoint-trial","format_version":1,
               "status":"blocked","virtual_audio_verified":False,"physical_audio_verified":False,
@@ -322,12 +336,11 @@ def run(args):
             deadline = time.monotonic()+20
             while True:
                 observed = endpoints()
-                render = [x for x in observed["out"] if x["error"]==0 and x["name"].startswith("CABLE Input")]
-                capture = [x for x in observed["in"] if x["error"]==0 and x["name"].startswith("CABLE Output")]
+                render,capture = select_new_vendor_endpoints(report["endpoints_before"],observed)
                 report["endpoints_during"] = observed
                 if render and capture:
                     report.update(status="software-endpoints-present-not-audio-verified",
-                                  render_endpoint=render[0],capture_endpoint=capture[0])
+                                  render_endpoint=render,capture_endpoint=capture)
                     break
                 if time.monotonic()>=deadline:
                     raise TrialBlocked("No usable render/capture endpoints appeared without a reboot")

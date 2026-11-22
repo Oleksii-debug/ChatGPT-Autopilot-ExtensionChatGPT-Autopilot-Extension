@@ -2,6 +2,12 @@ name: Dordiai native Manipuri FP32 CPU and ONNX proof
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Isolated full proof or bounded native layout diagnosis
+        type: choice
+        options: [proof, diagnose-layout]
+        default: proof
   push:
     branches: [dordiai-voices/audit-20261122]
     paths:
@@ -19,7 +25,7 @@ concurrency:
 
 jobs:
   native-proof:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mni-native]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mni-native]') || contains(github.event.head_commit.message, '[mni-layout]')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -65,16 +71,26 @@ jobs:
           MNI_PINNED_SOURCE_DIRECTORY: ${{ runner.temp }}/dordiai-mni-native-inputs/sources
         run: python -m unittest discover -s dordiai-voices/tests -p test_mni_native_proof.py -v
       - name: Actual native MNI both speakers then exact FP32 safe-state and ONNX parity
+        if: inputs.mode == 'proof' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[mni-native]'))
         run: >-
           python dordiai-voices/tools/research/probe_mni_native.py run
           --archive "${{ runner.temp }}/dordiai-mni-official-raw/mni.zip"
           --inputs "${{ runner.temp }}/dordiai-mni-native-inputs"
           --output "${{ github.workspace }}/output/mni-native-proof"
+      - name: Bound exact original native layout diagnosis without vocoder or export
+        if: inputs.mode == 'diagnose-layout' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[mni-layout]'))
+        run: >-
+          python dordiai-voices/tools/research/probe_mni_native.py diagnose-layout
+          --archive "${{ runner.temp }}/dordiai-mni-official-raw/mni.zip"
+          --inputs "${{ runner.temp }}/dordiai-mni-native-inputs"
+          --output "${{ github.workspace }}/output/mni-layout-proof"
       - name: Preserve actual completed or partial proof, WAVs and lossless model-only exports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dordiai-mni-native-proof-${{ github.run_id }}
-          path: output/mni-native-proof/
+          path: |
+            output/mni-native-proof/
+            output/mni-layout-proof/
           if-no-files-found: warn
           compression-level: 0
