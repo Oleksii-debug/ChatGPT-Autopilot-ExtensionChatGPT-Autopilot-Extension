@@ -539,20 +539,87 @@ class RequiredResourceProbeScaffoldingTests(unittest.TestCase):
             script = runtime / "nvda_worker.py"
             script.write_text("# unit path fixture, never executed\n", encoding="utf-8")
             record = probe.quarantine_required_resource(addon, owned, "a" * 32)
-            namespace = self.embedded({"validate_required_resource_probe_ownership"})
+            namespace = self.embedded({"validate_required_resource_probe_ownership",
+                "required_probe_windows_path_text", "required_probe_io_path",
+                "required_probe_canonical_directory", "required_resource_path_observations"})
             driver_class = type("OwnedPathFixture", (), {"__module__": "owned_path_fixture"})
             driver = driver_class()
             driver._engine = SimpleNamespace(_command=[
                 str(executable), "-I", "-B", "-u", str(script), str(runtime / "models")])
-            namespace.update(Path=Path, sys=sys, OUTPUT=owned, DRIVER=driver,
+            namespace.update(Path=Path, sys=sys, OUTPUT=owned, DRIVER=driver, RESULT={}, save=lambda: None,
                              SETTINGS={"run_id": "a" * 32, "required_resource_quarantine": record})
             with patch.dict(sys.modules, {"owned_path_fixture": SimpleNamespace(RUNTIME=runtime)}):
-                self.assertEqual(namespace["validate_required_resource_probe_ownership"](), target)
+                self.assertEqual(namespace["validate_required_resource_probe_ownership"](),
+                                 namespace["required_probe_io_path"](target))
                 driver._engine._command[4] = str(executable)
                 with self.assertRaises(ValueError):
                     namespace["validate_required_resource_probe_ownership"]()
             probe.restore_required_resource(record)
             self.assertEqual(target.read_bytes(), original)
+
+
+    def test_scoped_windows_namespace_normalization_handles_drive_unc_and_mixed_separators(self):
+        namespace = self.embedded({"required_probe_windows_path_text"})
+        normalize = namespace["required_probe_windows_path_text"]
+        self.assertEqual(normalize("D:/owned/a/../b/model.onnx"), "\\\\?\\D:\\owned\\b\\model.onnx")
+        self.assertEqual(normalize("\\\\?\\D:\\owned\\b\\model.onnx"), "\\\\?\\D:\\owned\\b\\model.onnx")
+        self.assertEqual(normalize("\\\\server\\share\\owned\\model.onnx"),
+                         "\\\\?\\UNC\\server\\share\\owned\\model.onnx")
+        self.assertEqual(normalize("\\\\?\\UNC\\server\\share\\owned\\model.onnx"),
+                         "\\\\?\\UNC\\server\\share\\owned\\model.onnx")
+        self.assertEqual(normalize("\\\\?\\D:\\owned\\model.onnx", namespace=False),
+                         "D:\\owned\\model.onnx")
+        for unsafe in ("relative/model.onnx", "D:relative", "\\\\.\\PhysicalDrive0",
+                       "\\\\?\\GLOBALROOT\\Device\\HarddiskVolume1\\model.onnx"):
+            with self.subTest(unsafe=unsafe), self.assertRaises(ValueError):
+                normalize(unsafe)
+
+    def test_fixed_path_observations_hash_only_owned_file_head_and_report_missing(self):
+        namespace = self.embedded({"required_probe_windows_path_text", "required_probe_io_path",
+                                   "required_resource_path_observations"})
+        namespace["Path"] = Path
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "owned-file"
+            target.write_bytes(b"fixed owned fixture" * 500)
+            observations = namespace["required_resource_path_observations"](target)
+            for row in observations.values():
+                self.assertTrue(row["is_file"])
+                self.assertEqual(row["read_head_bytes"], 4096)
+                self.assertEqual(row["stat_bytes"], target.stat().st_size)
+                self.assertNotIn("error", row)
+            target.unlink()
+            missing = namespace["required_resource_path_observations"](target)
+            for row in missing.values():
+                self.assertFalse(row["exists"])
+                self.assertEqual(row["error"]["type"], "FileNotFoundError")
+                self.assertNotIn("read_head_sha256", row)
+
+    @unittest.skipUnless(probe.os.name == "nt", "Actual Windows extended-path file I/O proof")
+    def test_windows_owned_deep_file_reads_and_alias_canonicalization(self):
+        namespace = self.embedded({"required_probe_windows_path_text", "required_probe_io_path",
+                                   "required_probe_canonical_directory", "required_resource_path_observations"})
+        namespace["Path"] = Path
+        with tempfile.TemporaryDirectory() as temporary:
+            plain = Path(temporary) / ("deep-a" * 12) / ("deep-b" * 12) / ("deep-c" * 12) / "model.onnx"
+            io_path = namespace["required_probe_io_path"](plain)
+            self.assertGreater(len(str(plain)), 260)
+            io_path.parent.mkdir(parents=True)
+            try:
+                io_path.write_bytes(b"actual owned Windows long-path fixture")
+                self.assertEqual(namespace["required_probe_canonical_directory"](plain),
+                                 namespace["required_probe_canonical_directory"](io_path))
+                observations = namespace["required_resource_path_observations"](io_path)
+                # A long-path-aware test Python may also read the plain spelling.
+                # The actual NVDA host report establishes that host's behavior.
+                self.assertTrue(observations["namespace"]["is_file"])
+                self.assertGreater(observations["namespace"]["read_head_bytes"], 0)
+            finally:
+                io_path.unlink(missing_ok=True)
+                current = io_path.parent
+                while current != namespace["required_probe_io_path"](temporary):
+                    parent = current.parent
+                    current.rmdir()
+                    current = parent
 
     def test_probe_acceptance_requires_all_recovery_evidence_not_only_selected_synth(self):
         namespace = self.embedded({"required_resource_worker_diagnostic", "required_resource_recovery_passed"})

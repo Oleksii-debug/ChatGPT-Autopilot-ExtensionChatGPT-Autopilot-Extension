@@ -214,7 +214,8 @@ def validate_output(path, protected, overwrite):
     if path.is_symlink():
         raise ValueError("Evidence destination cannot be a symbolic link")
     path = path.resolve()
-    if any(path.is_relative_to(Path(root).resolve()) for root in protected):
+    if any(path.is_relative_to(Path(root).resolve()) or Path(root).resolve().is_relative_to(path)
+           for root in protected):
         raise ValueError("Evidence output must be outside runtime/model/reference directories")
     if path.exists() and not overwrite:
         raise FileExistsError("Evidence output already exists; use --overwrite explicitly: " + str(path))

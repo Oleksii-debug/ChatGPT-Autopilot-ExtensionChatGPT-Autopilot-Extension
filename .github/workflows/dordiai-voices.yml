@@ -58,7 +58,13 @@ jobs:
 
   nvda-diagnostics:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[probe-nvda]')
+    strategy:
+      fail-fast: false
+      matrix:
+        proof: [required-resource, typing]
     runs-on: windows-latest
+    env:
+      DORDIAI_NVDA_PROBE_KIND: ${{ matrix.proof }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -100,13 +106,14 @@ jobs:
               manifest=json.loads(archive.read("dordiai-release.json"))
           if manifest.get("version")!="0.13.1-dev.8":
               raise RuntimeError("Diagnostic core version does not match pinned build run")
-      - name: Prove actual missing-resource worker failure and genuine NVDA recovery
+      - name: Prove actual owned keyboard or required-resource NVDA behavior
         shell: python
         run: |
-          import json, pathlib, subprocess, sys
+          import json, os, pathlib, subprocess, sys
           root = pathlib.Path("dordiai-voices")
           subprocess.run([sys.executable, str(root / "tools/setup_audio_endpoint.py"), "--output", str(root / "windows-results/audio"), "--ephemeral-ci", "--start-existing-services"], check=False)
-          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.8.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--required-resource-recovery-probe", "--timeout", "240"]
+          probe_flag = "--typing-probe" if os.environ["DORDIAI_NVDA_PROBE_KIND"] == "typing" else "--required-resource-recovery-probe"
+          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.8.nvda-addon"), "--output", str(root / "windows-results/nvda"), probe_flag, "--timeout", "240"]
           audio = root / "windows-results/audio/audio-endpoint.json"
           if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               command.append("--headless-ui-probe")
@@ -130,7 +137,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dordiai-voices-nvda-required-resource-diagnostics
+          name: dordiai-voices-nvda-${{ matrix.proof }}-diagnostics
           path: dordiai-voices/windows-evidence
           if-no-files-found: warn
           retention-days: 7

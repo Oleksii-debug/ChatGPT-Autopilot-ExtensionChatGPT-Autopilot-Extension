@@ -515,7 +515,8 @@ def inspect_space(dialog, before_checked):
 def close_settings(dialog):
     if dialog is not None:
         dialog.onCancel(None)
-    later(500, start_required_resource_recovery_probe if SETTINGS.get("required_resource_recovery_probe") else start_phrase)
+    later(500, start_required_resource_recovery_probe if SETTINGS.get("required_resource_recovery_probe") else
+          start_actual_typing_probe if SETTINGS.get("typing_probe") else start_phrase)
 
 
 def start_phrase():
@@ -897,36 +898,109 @@ def finish_fatal_recovery_probe():
     finish()
 
 
+
+def required_probe_windows_path_text(value, *, namespace=True):
+    """Normalize an absolute drive/UNC path without changing process policy."""
+    import ntpath
+    value = str(value)
+    if value.startswith("\\\\?\\UNC\\"):
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
+        value = value[4:]
+    if value.startswith("\\\\.\\") or not ntpath.isabs(value):
+        raise ValueError("Owned probe I/O requires an absolute ordinary Windows path")
+    value = ntpath.normpath(value)
+    drive, tail = ntpath.splitdrive(value)
+    if drive.startswith("\\\\") and len(drive.split("\\")) == 4:
+        return "\\\\?\\UNC\\" + value[2:] if namespace else value
+    if len(drive) == 2 and drive[0].isalpha() and drive[1] == ":" and tail.startswith("\\"):
+        return "\\\\?\\" + value if namespace else value
+    raise ValueError("Unsupported Windows device namespace in owned probe path")
+
+
+def required_probe_io_path(value):
+    import os
+    return Path(required_probe_windows_path_text(value)) if os.name == "nt" else Path(value)
+
+
+def required_probe_canonical_directory(value):
+    return required_probe_io_path(required_probe_io_path(value).resolve(strict=True))
+
+
+def required_resource_path_observations(value):
+    """Fixed owned asset evidence only; never scan or read a user directory."""
+    import os
+    import hashlib
+    namespaced = required_probe_io_path(value)
+    plain = (Path(required_probe_windows_path_text(namespaced, namespace=False))
+             if os.name == "nt" else Path(value))
+    result = {}
+    for label, path in (("plain", plain), ("namespace", namespaced)):
+        row = {"path": str(path), "path_length": len(str(path))}
+        try:
+            row.update(exists=path.exists(), is_file=path.is_file())
+            info = path.stat()
+            row["stat_bytes"] = info.st_size
+            if path.is_file():
+                with path.open("rb") as source:
+                    head = source.read(4096)
+                row["read_head_bytes"] = len(head)
+                row["read_head_sha256"] = hashlib.sha256(head).hexdigest()
+        except OSError as error:
+            row["error"] = {"type": type(error).__name__, "errno": error.errno,
+                            "winerror": getattr(error, "winerror", None)}
+        result[label] = row
+    return result
+
+
 def validate_required_resource_probe_ownership():
-    """Verify controller ownership without changing or fabricating model errors."""
+    """Verify controller ownership using scoped namespace-safe ordinary I/O."""
     import hashlib
     import re
     record = SETTINGS.get("required_resource_quarantine")
     if not isinstance(record, dict) or record.get("asset_missing_before_nvda_launch") is not True:
         raise ValueError("No controller-attested pre-launch resource quarantine")
-    owned = OUTPUT.resolve(strict=True)
-    if Path(record["run_root"]).resolve(strict=True) != owned or record["run_id"] != SETTINGS["run_id"]:
+    owned = required_probe_canonical_directory(OUTPUT)
+    if (required_probe_canonical_directory(record["run_root"]) != owned
+            or record["run_id"] != SETTINGS["run_id"]):
         raise ValueError("Required-resource quarantine belongs to a different probe")
-    addon = Path(record["addon_root"]).resolve(strict=True)
-    runtime = Path(record["runtime_root"]).resolve(strict=True)
+    raw_addon = required_probe_io_path(record["addon_root"])
+    raw_runtime = required_probe_io_path(record["runtime_root"])
+    for candidate in (raw_addon, raw_runtime):
+        if candidate.is_symlink() or (hasattr(candidate, "is_junction") and candidate.is_junction()):
+            raise ValueError("Linked required-resource add-on or runtime")
+    addon = required_probe_canonical_directory(raw_addon)
+    runtime = required_probe_canonical_directory(raw_runtime)
     if addon.parent != owned / "config" / "addons" or runtime != addon / "kx47Runtime":
         raise ValueError("Required-resource quarantine is outside the owned add-on")
     module = sys.modules.get(type(DRIVER).__module__)
-    if module is None or Path(module.RUNTIME).resolve(strict=True) != runtime:
+    if module is None or required_probe_canonical_directory(module.RUNTIME) != runtime:
         raise ValueError("Selected driver does not use the controller's owned runtime")
     relative = "models/PocketTTS/stress/ru_ruaccent/nn_omograph/model.onnx"
     if record.get("asset_relative") != relative:
         raise ValueError("Unexpected required-resource asset")
     target = runtime / relative
     quarantine = target.with_name(target.name + "." + SETTINGS["run_id"] + ".quarantine")
-    if Path(record["quarantine_path"]) != quarantine:
+    if required_probe_io_path(record["quarantine_path"]) != quarantine:
         raise ValueError("Unexpected required-resource quarantine path")
     current = addon
     for component in target.relative_to(addon).parts:
         current = current / component
         if current.is_symlink() or (hasattr(current, "is_junction") and current.is_junction()):
             raise ValueError("Linked required-resource asset path")
-    if target.exists() or not quarantine.is_file() or quarantine.is_symlink():
+    # These are three fixed paths in the attested owned runtime. Record both
+    # spellings before the guard, so a real NVDA long-path failure is observable.
+    navigation_name = hashlib.sha256("uk\0а".encode("utf-8")).hexdigest()[:24] + ".wav"
+    RESULT["required_resource_path_diagnostics"] = {
+        "runtime": required_resource_path_observations(runtime),
+        "asset": required_resource_path_observations(target),
+        "quarantine": required_resource_path_observations(quarantine),
+        "known_uk_a_navigation": required_resource_path_observations(
+            runtime / "models/voices/navigation/sara" / navigation_name),
+    }
+    save()
+    if (target.exists() or not quarantine.is_file() or quarantine.is_symlink()
+            or (hasattr(quarantine, "is_junction") and quarantine.is_junction())):
         raise ValueError("Required resource was not quarantined before this request")
     checksum = record.get("asset_sha256")
     if not isinstance(checksum, str) or re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
@@ -938,9 +1012,9 @@ def validate_required_resource_probe_ownership():
     if digest.hexdigest() != checksum or quarantine.stat().st_size != record["asset_bytes"]:
         raise ValueError("Required-resource quarantine bytes changed")
     command = getattr(getattr(DRIVER, "_engine", None), "_command", [])
-    if (len(command) < 6 or Path(command[0]).resolve(strict=True) != runtime / "python/python.exe"
-            or Path(command[4]).resolve(strict=True) != runtime / "nvda_worker.py"
-            or Path(command[5]).resolve(strict=True) != runtime / "models"):
+    if (len(command) < 6 or required_probe_canonical_directory(command[0]) != runtime / "python/python.exe"
+            or required_probe_canonical_directory(command[4]) != runtime / "nvda_worker.py"
+            or required_probe_canonical_directory(command[5]) != runtime / "models"):
         raise ValueError("Speech worker is not private to the owned packaged runtime")
     return target
 
@@ -1348,6 +1422,8 @@ def main(argv=None):
                         help="Optional injected fatal-notification recovery check after normal speech/latency; not a real model-import failure proof")
     recovery_modes.add_argument("--required-resource-recovery-probe", action="store_true",
                         help="Isolated real missing RuAccent file/worker/fallback proof; skips normal speech benchmarks and restores the owned asset in finally")
+    recovery_modes.add_argument("--typing-probe", action="store_true",
+                        help="Owned wx.TextCtrl real SendInput/NVDA typing echo and route checks; skips direct speech benchmarks")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
@@ -1416,6 +1492,9 @@ def main(argv=None):
             result["required_resource_quarantine"] = required_resource_quarantine
             result["scope"] = "actual-isolated-required-resource-worker-and-fallback-proof"
             result["normal_performance_benchmark_skipped"] = True
+        if args.typing_probe:
+            result["scope"] = "actual-isolated-keyboard-NVDA-typing-and-model-PCM-proof"
+            result["normal_performance_benchmark_skipped"] = True
         probe_addon = config / "addons" / "dordiaiProbe"
         plugins = probe_addon / "globalPlugins"
         plugins.mkdir(parents=True)
@@ -1423,12 +1502,20 @@ def main(argv=None):
             'name = "dordiaiProbe"\nsummary = "Isolated dordiai integration probe"\n'
             'version = "1.0.0"\nauthor = "dordiai-voices"\n'
             'minimumNVDAVersion = "2026.1"\nlastTestedNVDAVersion = "2026.3.1"\n', encoding="utf-8")
-        (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__NATIVE_IMPORT_DIAGNOSTIC__", repr(NATIVE_IMPORT_DIAGNOSTIC)).replace("__PROBE_SETTINGS__", repr({
+        plugin_source = PROBE_PLUGIN.replace("__NATIVE_IMPORT_DIAGNOSTIC__", repr(NATIVE_IMPORT_DIAGNOSTIC)).replace("__PROBE_SETTINGS__", repr({
             "output": str(run), "run_id": run_id, "headless_ui_probe": args.headless_ui_probe,
             "fatal_recovery_probe": args.fatal_recovery_probe,
             "required_resource_recovery_probe": args.required_resource_recovery_probe,
+            "typing_probe": args.typing_probe,
             "required_resource_quarantine": required_resource_quarantine,
-        })), encoding="utf-8")
+        }))
+        if args.typing_probe:
+            from importlib.util import module_from_spec, spec_from_file_location
+            typing_spec = spec_from_file_location("_dordiai_typing_probe_controller", Path(__file__).with_name("windows_nvda_typing_probe.py"))
+            typing_module = module_from_spec(typing_spec)
+            typing_spec.loader.exec_module(typing_module)
+            plugin_source = typing_module.extend_plugin(plugin_source)
+        (plugins / "dordiaiProbe.py").write_text(plugin_source, encoding="utf-8")
         (config / "nvda.ini").write_text(
             '[general]\nshowWelcomeDialog = False\naskToExit = False\nsaveConfigurationOnExit = False\n'
             'playStartAndExitSounds = False\nlanguage = en\n'

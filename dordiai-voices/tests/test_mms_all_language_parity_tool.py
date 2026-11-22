@@ -158,6 +158,17 @@ class EvidenceFileSafetyTests(unittest.TestCase):
         paths[1].unlink()
         self.assertEqual(set(tool.changed_fingerprints(expected)), {str(paths[0]), str(paths[1])})
 
+    def test_audio_output_directory_cannot_contain_protected_identity_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "evidence"
+            directory.mkdir()
+            metadata = directory / "ha-original-native.wav"
+            metadata.write_text('{"profile_id":"future_voice_50"}', encoding="utf-8")
+            before = metadata.read_bytes()
+            with self.assertRaises(ValueError):
+                tool.validate_output(directory, (metadata,), overwrite=True)
+            self.assertEqual(metadata.read_bytes(), before)
+
 
 sys.path.insert(0, str(ROOT / "source/0.12.2/kx47Runtime"))
 import voice_policy
