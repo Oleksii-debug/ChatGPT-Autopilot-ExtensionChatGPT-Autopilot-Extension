@@ -1,0 +1,103 @@
+name: Dordiai isolated Swati Venda native Sherpa proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-afri-sherpa.yml"
+      - "dordiai-voices/tools/research/afri_sherpa_probe.py"
+      - "dordiai-voices/tools/research/requirements-afri-sherpa.txt"
+      - "dordiai-voices/tests/test_afri_sherpa_probe.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-afri-sherpa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-ssw-ven:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[afri-sherpa]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CACHE: ${{ github.workspace }}/ci-afri-model-cache
+      REPORTS: ${{ github.workspace }}/dordiai-voices/afri-sherpa-results
+      G2P_SOURCE: ${{ github.workspace }}/ci-africa-g2p
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout the exact native G2P training source
+        uses: actions/checkout@v4
+        with:
+          repository: AfriSpeech/africa-g2p
+          ref: 76b53a8fa2a688812e369837d179d4710c111a7a
+          path: ci-africa-g2p
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: dordiai-voices/tools/research/requirements-afri-sherpa.txt
+      - name: Install isolated official CPU wheels only
+        run: |
+          mkdir -p "$REPORTS"
+          python -m pip install --only-binary=:all: --index-url https://pypi.org/simple -r dordiai-voices/tools/research/requirements-afri-sherpa.txt
+          python -m pip freeze > "$REPORTS/python-packages.txt"
+      - name: Test pinning, strict language selection and actual kernel network denial
+        run: python -m unittest discover -s dordiai-voices/tests -p test_afri_sherpa_probe.py -v
+      - uses: actions/cache/restore@v4
+        id: model_cache
+        with:
+          path: ${{ env.CACHE }}
+          key: dordiai-africa-pocket-d47667a3bb03d0d6db924e789648abd7d55d828b-v1
+      - name: Verify immutable model inventory and acquire only the required native assets
+        run: |
+          python dordiai-voices/tools/research/afri_sherpa_probe.py acquire \
+            --cache "$CACHE" --report "$REPORTS/source-acquisition.json"
+      - name: Cache verified publisher bytes before inference
+        if: steps.model_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CACHE }}
+          key: dordiai-africa-pocket-d47667a3bb03d0d6db924e789648abd7d55d828b-v1
+      - name: Generate six exact-language cases under native network denial
+        timeout-minutes: 15
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          DO_NOT_TRACK: "1"
+          CUDA_VISIBLE_DEVICES: ""
+        run: |
+          python dordiai-voices/tools/research/afri_sherpa_probe.py worker \
+            --cache "$CACHE" --g2p-source "$G2P_SOURCE" --threads 2 --cases-per-language 3 \
+            --report "$REPORTS/native-cpu-proof.json"
+      - name: Preserve exact native technical report in logs
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path(os.environ["REPORTS"])/"native-cpu-proof.json"
+          if path.is_file():
+              raw=path.read_bytes()
+              report=json.loads(raw)
+              print("DORDIAI_AFRI_NATIVE_SUMMARY "+json.dumps({key:report.get(key) for key in ("status","all_selected_frontend_bytes_match_training","all_cases_passed","inputs_unchanged","process_peak_rss_bytes","publisher_six_layer_claim_matches_named_graph_layers","product_integrated","native_listener_verified")}),flush=True)
+              compressed=gzip.compress(raw,mtime=0)
+              if len(compressed)>512*1024:
+                  raise RuntimeError("Unexpectedly large report; artifact remains available")
+              encoded=base64.b64encode(compressed).decode("ascii")
+              chunks=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              print("DORDIAI_AFRI_REPORT_GZIP_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):
+                  print("DORDIAI_AFRI_REPORT_GZIP_B64_PART "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+          else:
+              print("DORDIAI_AFRI_NATIVE_SUMMARY "+json.dumps({"status":"native-report-not-generated"}),flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-afri-sherpa-native-${{ github.run_id }}
+          path: ${{ env.REPORTS }}
+          if-no-files-found: warn
+          retention-days: 7

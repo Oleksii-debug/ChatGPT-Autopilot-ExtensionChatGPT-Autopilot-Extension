@@ -1,0 +1,6 @@
+# Isolated official CPU prototype; no Torch, CUDA or african-tts PyTorch package.
+numpy==2.3.5
+sherpa-onnx==2.0.1
+sherpa-onnx-core==2.0.1
+soundfile==0.14.0
+onnx==1.17.0
