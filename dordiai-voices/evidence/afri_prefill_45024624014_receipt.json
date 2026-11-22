@@ -1,0 +1,207 @@
+{
+  "format": "dordiai-five-native-lossless-prefill-receipt",
+  "run": 45024624014,
+  "job": 137214828443,
+  "source_commit": "46dd8b5a61a348b6354807245559b6dd19070a2f",
+  "artifact": [
+    {
+      "id": 14754819197,
+      "name": "dordiai-afri-native-prefill-ort-45024624014",
+      "size_bytes": 3057400,
+      "sha256": "2ac1ca69224bf424eac86e3a48294632b22558242c9191a5c80e32b6aadcb321"
+    }
+  ],
+  "all_fifteen_golden_cases_bit_identical": true,
+  "all_five_native_word_cases_bit_identical": true,
+  "all_five_post_eviction_replays_bit_identical": true,
+  "cache": {
+    "budget_bytes": 167772160,
+    "retained_array_bytes": 147456144,
+    "peak_retained_array_bytes": 147456144,
+    "max_entries": 3,
+    "entry_count": 3,
+    "hits": 30,
+    "misses": 15,
+    "evictions": [
+      "ssw",
+      "ven",
+      "zul",
+      "nso",
+      "wol",
+      "ssw",
+      "ven",
+      "zul",
+      "nso",
+      "wol",
+      "ssw",
+      "ven"
+    ],
+    "entries": [
+      {
+        "native_language": "zul",
+        "reference_sha256": "c8331d61fe1615f0b5dfb034956cd3df5d98089f1c77e95845b107f6a4e5c50f",
+        "array_bytes": 49152048,
+        "readonly": true
+      },
+      {
+        "native_language": "nso",
+        "reference_sha256": "7868837b0a288685dcce07d75bd2f9df07a940b132bd18ae67dc1cecd9783af7",
+        "array_bytes": 49152048,
+        "readonly": true
+      },
+      {
+        "native_language": "wol",
+        "reference_sha256": "b02fdd0656229a0904420f5d6bb73b280174880db1d55174195b874760eb1545",
+        "array_bytes": 49152048,
+        "readonly": true
+      }
+    ]
+  },
+  "private_files": {
+    "all_original_private_files_unchanged": true,
+    "changed_files": [],
+    "checked_files": 1597,
+    "pip_or_dll_upgrade_performed": false,
+    "product_integrated": false
+  },
+  "model_load_seconds": 1.8259486000000038,
+  "process_peak_rss_bytes": 1270272000,
+  "words": [
+    {
+      "language": "ssw",
+      "text": "KUCOLELA",
+      "baseline_seconds": 2.2393591000000015,
+      "cached_seconds": 1.932545800000014,
+      "baseline_stages": {
+        "reference_encoder": 0.16989699999999175,
+        "text_conditioner": 0.00008070000001225708,
+        "voice_prefill": 0.0920095000000174,
+        "text_prefill": 0.05815890000002355,
+        "ar_lm": 1.5247967000001381,
+        "ar_flow": 0.0884471999996208,
+        "decoder": 0.2949555999999802
+      },
+      "cached_stages": {
+        "prefill_clone": 0.01631320000001324,
+        "text_conditioner": 0.00009010000002263041,
+        "text_prefill": 0.06144130000001269,
+        "ar_lm": 1.4800111000002403,
+        "ar_flow": 0.08986299999992298,
+        "decoder": 0.27415189999999257
+      },
+      "float32_sha256": "2a6406ee5ebc59b9742ac3f0eec114bbca681c190247aab0c9d5a17ebabc09f1",
+      "pcm16_sha256": "c391ece299aeab2ae96d95ecc73660ba92888d0b28b46d715be0be3e007e8c49"
+    },
+    {
+      "language": "ven",
+      "text": "Tshivhi",
+      "baseline_seconds": 1.200551800000028,
+      "cached_seconds": 0.7674225000000092,
+      "baseline_stages": {
+        "reference_encoder": 0.31302070000003823,
+        "text_conditioner": 0.00008259999998472267,
+        "voice_prefill": 0.08875109999996766,
+        "text_prefill": 0.0427766000000247,
+        "ar_lm": 0.6072395999999571,
+        "ar_flow": 0.030438300000071195,
+        "decoder": 0.11139080000003787
+      },
+      "cached_stages": {
+        "prefill_clone": 0.016447800000037205,
+        "text_conditioner": 0.00008719999999584616,
+        "text_prefill": 0.039238399999987905,
+        "ar_lm": 0.569166800000005,
+        "ar_flow": 0.03336539999997967,
+        "decoder": 0.10253240000002961
+      },
+      "float32_sha256": "faee527e7ad79269583bd65f4d1507780ea870bb371552d080f1f8751c2bab80",
+      "pcm16_sha256": "68dc0084e67f0598d8221a670d9f3f10461b51a7e2e88d513d135a4ca0fd0b72"
+    },
+    {
+      "language": "zul",
+      "text": "Usizo",
+      "baseline_seconds": 1.4570487999999955,
+      "cached_seconds": 0.8985763999999676,
+      "baseline_stages": {
+        "reference_encoder": 0.4248575000000301,
+        "text_conditioner": 0.00008189999999785869,
+        "voice_prefill": 0.13573310000003858,
+        "text_prefill": 0.05129110000001447,
+        "ar_lm": 0.6526991000000066,
+        "ar_flow": 0.03897080000007236,
+        "decoder": 0.14601430000004711
+      },
+      "cached_stages": {
+        "prefill_clone": 0.016396200000031058,
+        "text_conditioner": 0.00008239999999659631,
+        "text_prefill": 0.06744000000003325,
+        "ar_lm": 0.6055334999999786,
+        "ar_flow": 0.048844999999971606,
+        "decoder": 0.15331359999998995
+      },
+      "float32_sha256": "15d290e2b2928aa7860c0c9f641ae6a302f3898916402592d96645740846028f",
+      "pcm16_sha256": "8a7a8c2229d46a3a675cd53cb992bfd1ff38881b70aa6e48a3cb32ea416f312c"
+    },
+    {
+      "language": "nso",
+      "text": "Dilo",
+      "baseline_seconds": 1.1100634000000014,
+      "cached_seconds": 0.6172733999999878,
+      "baseline_stages": {
+        "reference_encoder": 0.3004622999999924,
+        "text_conditioner": 0.0000774000000092201,
+        "voice_prefill": 0.13959199999999328,
+        "text_prefill": 0.03341610000001083,
+        "ar_lm": 0.5298456000001579,
+        "ar_flow": 0.024123900000006415,
+        "decoder": 0.07619270000003553
+      },
+      "cached_stages": {
+        "prefill_clone": 0.016470499999968524,
+        "text_conditioner": 0.00008719999999584616,
+        "text_prefill": 0.03414739999999483,
+        "ar_lm": 0.4437539000002175,
+        "ar_flow": 0.025029400000164514,
+        "decoder": 0.09159740000001193
+      },
+      "float32_sha256": "5cd4b2526af7fe74990fdc374ecb74b35d27bb5514ed49ad08fd0762f6faf68e",
+      "pcm16_sha256": "0c50e40be341215cdfb49a90e0e76b58a3d49eef8223ffdb336a8339df859369"
+    },
+    {
+      "language": "wol",
+      "text": "Bul",
+      "baseline_seconds": 1.272508500000015,
+      "cached_seconds": 0.8959030999999982,
+      "baseline_stages": {
+        "reference_encoder": 0.24504949999999326,
+        "text_conditioner": 0.0000799000000029082,
+        "voice_prefill": 0.1464402000000291,
+        "text_prefill": 0.05258579999997437,
+        "ar_lm": 0.6476421000001551,
+        "ar_flow": 0.03844900000007101,
+        "decoder": 0.13536379999999326
+      },
+      "cached_stages": {
+        "prefill_clone": 0.01677689999996801,
+        "text_conditioner": 0.0000759999999786487,
+        "text_prefill": 0.05525259999996024,
+        "ar_lm": 0.6473124000000325,
+        "ar_flow": 0.03249460000000681,
+        "decoder": 0.1372372000000155
+      },
+      "float32_sha256": "6bcc0dccd00fcc526e978f7cd10646f20d9da6ecd791a57f1ec34f296e229832",
+      "pcm16_sha256": "e3b52a04caca16021a3f9269bb0ba2d2b3f09b08bf5c281021ec6256130c1818"
+    }
+  ],
+  "cautions": [
+    "Wolof has only0.56h in this checkpoint; publisher warns that languages below2h are weak.",
+    "Religious read-speech dominates training; spontaneous and technical pronunciation remains unaccepted.",
+    "Literal digits are unsupported by training; no number fallback is introduced here.",
+    "Native carrier timings are completed-wave CPU measurements, not streaming first PCM, NVDA or acoustic latency."
+  ],
+  "product_integrated": false,
+  "native_pronunciation_verified": false,
+  "nvda_verified": false,
+  "physical_audio_verified": false,
+  "timing_scope": "Completed native CPU waves; instrumentation overhead retained; not first packet/NVDA/physical audio"
+}

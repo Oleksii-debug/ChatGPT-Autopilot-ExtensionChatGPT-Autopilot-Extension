@@ -89,6 +89,9 @@ def validate_manifest(document):
     if len({row["id"] for row in rows}) != len(rows):
         raise ValueError("Duplicate source lock IDs")
     for row in rows:
+        if (not isinstance(row, dict) or not isinstance(row.get("id"), str)
+                or re.fullmatch(r"[a-z0-9_-]{1,80}", row["id"]) is None):
+            raise ValueError("Source ID must be a bounded safe cache basename")
         if row["kind"] not in {"aksharantar-jsonl-zip", "wikipedia-train-parquet"}:
             raise ValueError("Unsupported acquisition source kind")
         parts = urllib.parse.urlsplit(row["url"])

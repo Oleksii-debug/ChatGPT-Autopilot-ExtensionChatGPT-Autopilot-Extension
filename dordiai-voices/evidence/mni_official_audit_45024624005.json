@@ -1,0 +1,230 @@
+{
+  "archive": {
+    "filename": "mni.zip",
+    "first_raw_hash_acquisition": true,
+    "prior_raw_hash_was_available": false,
+    "sha256": "f689abf7d7398b99b40e589350beae6ceee62bdde880eb8c217b2d076e6683e5",
+    "size_bytes": 1518195233
+  },
+  "archive_code_executed": false,
+  "asset": {
+    "browser_download_url": "https://github.com/AI4Bharat/Indic-TTS/releases/download/v1-checkpoints-release/mni.zip",
+    "created_at": "2023-01-18T12:45:25Z",
+    "id": 92143512,
+    "name": "mni.zip",
+    "published_digest": null,
+    "published_digest_available": false,
+    "size": 1518195233,
+    "state": "uploaded",
+    "updated_at": "2023-01-18T12:47:20Z"
+  },
+  "checked_at": "2026-11-22T12:53:47.345332+00:00",
+  "cpu_inference_speed_measured": false,
+  "format": "dordiai-native-manipuri-official-acquisition",
+  "format_version": 1,
+  "inspection": {
+    "archive_code_executed": false,
+    "both_native_configs_parsed": true,
+    "checkpoint_licence_document_present": false,
+    "checkpoint_licence_scope_requires_review": true,
+    "configs": {
+      "mni/fastpitch/config.json": {
+        "audio": {
+          "clip_norm": true,
+          "db_level": null,
+          "do_amp_to_db_linear": true,
+          "do_amp_to_db_mel": true,
+          "do_rms_norm": false,
+          "do_sound_norm": false,
+          "do_trim_silence": true,
+          "fft_size": 1024,
+          "frame_length_ms": null,
+          "frame_shift_ms": null,
+          "griffin_lim_iters": 60,
+          "hop_length": 256,
+          "log_func": "np.log",
+          "max_norm": 4.0,
+          "mel_fmax": 8000,
+          "mel_fmin": 0.0,
+          "min_level_db": -100,
+          "num_mels": 80,
+          "pitch_fmax": 640.0,
+          "pitch_fmin": 0.0,
+          "power": 1.5,
+          "preemphasis": 0.0,
+          "ref_level_db": 20,
+          "resample": false,
+          "sample_rate": 22050,
+          "signal_norm": false,
+          "spec_gain": 1.0,
+          "stats_path": null,
+          "stft_pad_mode": "reflect",
+          "symmetric_norm": true,
+          "trim_db": 60.0,
+          "win_length": 1024
+        },
+        "characters": {
+          "blank": "<BLNK>",
+          "bos": "<BOS>",
+          "characters": " ,-./0123456789acefghkmnoprvw\u0981\u0982\u0985\u0986\u0987\u0988\u0989\u098a\u098f\u0990\u0993\u0994\u0995\u0996\u0997\u0998\u0999\u099a\u099b\u099c\u099d\u099e\u099f\u09a0\u09a1\u09a3\u09a4\u09a5\u09a6\u09a7\u09a8\u09aa\u09ab\u09ac\u09ad\u09ae\u09af\u09b0\u09b2\u09b6\u09b7\u09b8\u09b9\u09bc\u09be\u09bf\u09c0\u09c1\u09c2\u09c3\u09c7\u09c8\u09cb\u09cc\u09cd\u09ce\u09df\u09e6\u09e7\u09e8\u09e9\u09ea\u09eb\u09ec\u09ed\u09ee\u09ef\u09f0\u09f1\u09f7",
+          "characters_class": "TTS.tts.models.vits.VitsCharacters",
+          "eos": "<EOS>",
+          "is_sorted": true,
+          "is_unique": true,
+          "pad": "<PAD>",
+          "phonemes": null,
+          "punctuations": "!\u00a1'(),-.:;\u00bf? ",
+          "vocab_dict": null
+        },
+        "model": "fast_pitch",
+        "model_args": {
+          "d_vector_dim": 512,
+          "d_vector_file": null,
+          "decoder_params": {
+            "dropout_p": 0.1,
+            "hidden_channels_ffn": 1024,
+            "num_heads": 1,
+            "num_layers": 6
+          },
+          "decoder_type": "fftransformer",
+          "detach_duration_predictor": false,
+          "duration_predictor_dropout_p": 0.1,
+          "duration_predictor_hidden_channels": 256,
+          "duration_predictor_kernel_size": 3,
+          "encoder_params": {
+            "dropout_p": 0.1,
+            "hidden_channels_ffn": 1024,
+            "num_heads": 1,
+            "num_layers": 6
+          },
+          "encoder_type": "fftransformer",
+          "hidden_channels": 512,
+          "length_scale": 1,
+          "max_duration": 75,
+          "num_chars": 114,
+          "num_speakers": 2,
+          "out_channels": 80,
+          "pitch_embedding_kernel_size": 3,
+          "pitch_predictor_dropout_p": 0.1,
+          "pitch_predictor_hidden_channels": 256,
+          "pitch_predictor_kernel_size": 3,
+          "poisitonal_encoding_use_scale": true,
+          "positional_encoding": true,
+          "speaker_encoder_config_path": "",
+          "speaker_encoder_model_path": "",
+          "speakers_file": "models/v1/mni/fastpitch/speakers.pth",
+          "use_aligner": true,
+          "use_d_vector_file": false,
+          "use_pitch": true,
+          "use_separate_optimizers": false,
+          "use_speaker_embedding": true,
+          "use_speaker_encoder_as_loss": false,
+          "vocoder_config_path": null,
+          "vocoder_path": null
+        },
+        "num_speakers": 2,
+        "phoneme_language": "en-us",
+        "run_name": "mni_fastpitch_indictts_all_align_off",
+        "speakers_file": "models/v1/mni/fastpitch/speakers.pth",
+        "text_cleaner": "multilingual_cleaners",
+        "use_phonemes": false
+      },
+      "mni/hifigan/config.json": {
+        "audio": {
+          "clip_norm": true,
+          "db_level": null,
+          "do_amp_to_db_linear": true,
+          "do_amp_to_db_mel": true,
+          "do_rms_norm": false,
+          "do_sound_norm": false,
+          "do_trim_silence": true,
+          "fft_size": 1024,
+          "frame_length_ms": null,
+          "frame_shift_ms": null,
+          "griffin_lim_iters": 60,
+          "hop_length": 256,
+          "log_func": "np.log",
+          "max_norm": 4.0,
+          "mel_fmax": 8000,
+          "mel_fmin": 0.0,
+          "min_level_db": -100,
+          "num_mels": 80,
+          "pitch_fmax": 640.0,
+          "pitch_fmin": 0.0,
+          "power": 1.5,
+          "preemphasis": 0.0,
+          "ref_level_db": 20,
+          "resample": false,
+          "sample_rate": 22050,
+          "signal_norm": false,
+          "spec_gain": 1.0,
+          "stats_path": null,
+          "stft_pad_mode": "reflect",
+          "symmetric_norm": true,
+          "trim_db": 60.0,
+          "win_length": 1024
+        },
+        "model": "hifigan",
+        "run_name": "mni_hifigan_all"
+      }
+    },
+    "expanded_bytes": 1653913872,
+    "expected_native_pairs_present": true,
+    "files": {
+      "mni/fastpitch/best_model.pth": {
+        "sha256": "562a1762314ed4f5507bf8ad9ae289f0eed1eadea6637da4ba464ce5b498cada",
+        "size_bytes": 637534809
+      },
+      "mni/fastpitch/config.json": {
+        "sha256": "53d00ea2e6ef1fd19ecc2a1739be23d091e4d8b7f4af3ec06332e9de6c106acf",
+        "size_bytes": 7187
+      },
+      "mni/fastpitch/speakers.pth": {
+        "sha256": "f665e358b34b232fb27f7c8cd3968fcd47784a7be065ae127f611c33ee809bea",
+        "size_bytes": 431
+      },
+      "mni/hifigan/best_model.pth": {
+        "sha256": "1ff283526aa765ce54e31c3597850a2012a45275b1ebdbd2b9d2be8da31f61b8",
+        "size_bytes": 1016366844
+      },
+      "mni/hifigan/config.json": {
+        "sha256": "1e3270337e3545d6b99aa38b75b3772cd90db7dbc7fbc051a0c5bb72c917e975",
+        "size_bytes": 4601
+      }
+    },
+    "layout_verified": true,
+    "licence_documents": {},
+    "missing_expected_files": [],
+    "native_inference_verified": false,
+    "weights_deserialized": false
+  },
+  "licence_note": "Pinned SOURCE CODE is MIT; checkpoint-specific licence text recorded if present, no new weights licence asserted.",
+  "model_pickle_executed": false,
+  "model_weights_loaded": false,
+  "native_pronunciation_verified": false,
+  "native_script_note": "Official source says training uses Bengali/Eastern-Nagari; MeeteiMayek transliterates to Bengali before the SAME Manipuri model.",
+  "official_meetei_to_bengali_source_marker_present": true,
+  "product_integrated": false,
+  "selected_voice_projection_verified": false,
+  "source_code_licence_text": "MIT License\n\nCopyright (c) 2023 AI4Bh\u0101rat\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+  "source_files": {
+    "LICENSE.txt": {
+      "git_blob": "3200d2d480d31d2d24429aa16511ae478d89f643",
+      "sha256": "e2cd4cec54f7dbfefdcd5c213dab5eedd665cf134ba84606ce819a34a802e8c3",
+      "size_bytes": 1067
+    },
+    "inference/README.md": {
+      "git_blob": "de668b32ceb5a7aeedc6ffa37e652da1c938d63c",
+      "sha256": "010c4145102a512aa2872503c2f6bc9f35e4c65f679187d8c94a5c5dc1f18a64",
+      "size_bytes": 3161
+    },
+    "inference/src/inference.py": {
+      "git_blob": "a57192b67a33358f88685fab8175a38e98744172",
+      "sha256": "7909393dd6b64aa5b625b36b1f78bb330506286e6bd4c46c253b7a908c8fb964",
+      "size_bytes": 9774
+    }
+  },
+  "source_repository": "AI4Bharat/Indic-TTS",
+  "source_revision": "ad2461c22c373f89a140c5d9fb617b101219bdad",
+  "status": "actual-official-manipuri-checkpoints-hashed-not-inferred"
+}

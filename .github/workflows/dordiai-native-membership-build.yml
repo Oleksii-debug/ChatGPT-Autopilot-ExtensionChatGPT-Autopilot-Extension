@@ -1,0 +1,139 @@
+name: Build and measure compact native word membership
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[membership-build]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test finite format integrity, normalization, identity, cancellation and cache bounds
+        run: |
+          python -m py_compile dordiai-voices/source/0.12.2/kx47Runtime/native_word_membership.py dordiai-voices/tools/build_native_word_membership.py dordiai-voices/tools/probe_native_membership.py
+          python -m unittest discover -s dordiai-voices/tests -p "test_native_word_membership.py" -v
+          python -m unittest discover -s dordiai-voices/tests -p "test_morphology_sources.py" -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: dordiai-primary-native-word-membership
+          run-id: 45022418783
+          github-token: ${{ github.token }}
+          path: dordiai-voices/native-membership-acquisition
+      - name: Authenticate actual source snapshot and compact every native membership
+        shell: python
+        run: |
+          import hashlib,json,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          source=root/"native-membership-acquisition"
+          report=source/"acquisition-report.json"
+          raw=report.read_bytes();document=json.loads(raw)
+          lock={"uk":("uk-native-words.txt.gz",11315850,"9ebae5ebdfb8cdf7f6ed85f216bbc3c480925f1f87ad6c6133e1885af3bb7d11",3775231),
+                "ru":("ru-native-words.txt.gz",9140117,"d005ac488f46ce8fb4fe72582955d18ed89a8d2a7a4587a6194204dbb7b326b5",3063828)}
+          if document.get("status")!="source-membership-acquired" or document["counts"]["union"]!=6642550 or document["counts"]["shared_spellings"]!=196509:
+              raise RuntimeError("Pinned acquisition counts/status differ")
+          for code,(name,size,digest,count) in lock.items():
+              item=document["word_files"][code]
+              if (item["filename"],item["bytes"],item["sha256"],item["word_count"])!=(name,size,digest,count):
+                  raise RuntimeError("Source word receipt differs from successful immutable acquisition")
+              with (source/name).open("rb") as stream:
+                  actual_digest=hashlib.file_digest(stream,"sha256").hexdigest()
+              if (source/name).stat().st_size!=size or actual_digest!=digest:
+                  raise RuntimeError("Source normalized payload hash differs")
+          manifest=root/"training-data/native-word-membership/sources.json"
+          if hashlib.sha256(manifest.read_bytes()).hexdigest()!=document["source_manifest_sha256"]:
+              raise RuntimeError("Source acquisition manifest changed")
+          output=root/"native-membership-build";output.mkdir()
+          (output/"acquisition-report.json").write_bytes(raw)
+          (output/"SOURCE-NOTICES.json").write_bytes((source/"SOURCE-NOTICES.json").read_bytes())
+          subprocess.run([sys.executable,str(root/"tools/build_native_word_membership.py"),
+              "--acquisition-report",str(report),"--expected-report-sha256",hashlib.sha256(raw).hexdigest(),
+              "--output",str(output/"native-word-membership.bin"),"--report",str(output/"build-report.json")],check=True)
+      - name: Preserve bounded exact build JSON receipt
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/native-membership-build")
+          files={}
+          for path in sorted(root.glob("*.json")):
+              raw=path.read_bytes()
+              if len(raw)>1024*1024:raise ValueError("Build evidence exceeds JSON quota")
+              files[path.name]={"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}
+          doc={"format":"dordiai-exact-native-membership-build-json","format_version":1,"run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],"source_run":45022418783,"files":files}
+          encoded=json.dumps(doc,sort_keys=True,separators=(",",":")).encode()
+          payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode("ascii")
+          print("DORDIAI_MEMBERSHIP_BUILD_JSON_SHA256 "+hashlib.sha256(encoded).hexdigest(),flush=True)
+          for i in range(0,len(payload),24000):print("DORDIAI_MEMBERSHIP_BUILD_GZIP_B64_%03d "%(i//24000)+payload[i:i+24000],flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-compact-native-word-membership
+          path: dordiai-voices/native-membership-build
+          if-no-files-found: warn
+          retention-days: 30
+
+  host-lookup:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Preserve exact source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify pure stdlib host reader tests
+        run: python -m unittest discover -s dordiai-voices/tests -p "test_native_word_membership.py" -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: dordiai-compact-native-word-membership
+          path: dordiai-voices/native-membership-build
+      - name: Actual fresh-process Python3.13 finite-source lookup and RAM benchmark
+        shell: python
+        run: |
+          import json,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices");data=root/"native-membership-build"
+          build=json.loads((data/"build-report.json").read_text(encoding="utf-8"))
+          output=root/"native-membership-host";output.mkdir()
+          subprocess.run([sys.executable,str(root/"tools/probe_native_membership.py"),
+              "--lexicon",str(data/"native-word-membership.bin"),"--sha256",build["artifact"]["sha256"],
+              "--source-report",str(data/"acquisition-report.json"),"--output",str(output/"host-report.json")],check=True)
+          report=json.loads((output/"host-report.json").read_text(encoding="utf-8"))
+          if report["statistics"]["cached_blocks"]>32 or report["statistics"]["cache_bytes_charged"]>4*1024*1024:
+              raise RuntimeError("Real cache exceeded its configured bound")
+          if report["working_set_increase_bytes"] is not None and report["working_set_increase_bytes"]>128*1024*1024:
+              raise RuntimeError("Finite lookup process grew by more than its128MiB gross guard")
+      - name: Preserve exact host benchmark JSON without any model or binary payload
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path("dordiai-voices/native-membership-host/host-report.json")
+          if not path.is_file():print("Actual host lookup report absent: UNVERIFIED.",flush=True);raise SystemExit(0)
+          raw=path.read_bytes()
+          if len(raw)>4*1024*1024:raise ValueError("Host benchmark evidence exceeds quota")
+          document={"format":"dordiai-exact-native-membership-host-json","format_version":1,"run_id":os.environ["GITHUB_RUN_ID"],"platform":os.environ["RUNNER_OS"],"file":{"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}}
+          encoded=json.dumps(document,sort_keys=True,separators=(",",":")).encode()
+          payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode("ascii")
+          print("DORDIAI_MEMBERSHIP_HOST_JSON_SHA256 "+hashlib.sha256(encoded).hexdigest(),flush=True)
+          for i in range(0,len(payload),24000):print("DORDIAI_MEMBERSHIP_HOST_GZIP_B64_%03d "%(i//24000)+payload[i:i+24000],flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-native-membership-host-${{ runner.os }}-py313
+          path: dordiai-voices/native-membership-host
+          if-no-files-found: warn
+          retention-days: 30

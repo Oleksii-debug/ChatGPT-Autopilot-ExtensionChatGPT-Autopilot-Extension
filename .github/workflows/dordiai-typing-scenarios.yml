@@ -1,0 +1,129 @@
+name: Actual isolated typing scenarios
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  typing-scenario:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[typing-scenarios]')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [standard, characters-only, navigation, forced-uk, disabled-ru]
+    env:
+      PYTHONUTF8: '1'
+      CORE_SHA256: '437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8'
+      TYPING_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - name: Preserve exact source bytes during checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify probe scaffolding
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m py_compile dordiai-voices/tools/windows_nvda_typing_scenarios.py dordiai-voices/tools/windows_nvda_typing_probe.py dordiai-voices/tools/windows_nvda_probe.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s dordiai-voices/tests -p "test_windows_nvda_typing*.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s dordiai-voices/tests -p "test_windows_nvda_probe.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        with:
+          name: dordiai-voices-banks10-development-core
+          run-id: 45021069771
+          github-token: ${{ github.token }}
+          path: dordiai-voices/dist
+      - name: Verify immutable core10 archive
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib
+          files=list(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
+          if len(files)!=1 or files[0].name!="dordiai-voices-0.13.1-dev.10.nvda-addon" or files[0].stat().st_size!=1974796411:
+              raise RuntimeError("Expected the exact immutable core10 addon")
+          with files[0].open("rb") as stream:
+              digest=hashlib.file_digest(stream,"sha256").hexdigest()
+          if digest!=os.environ["CORE_SHA256"]:
+              raise RuntimeError("Immutable core10 archive hash mismatch")
+          print(json.dumps({"source_run":45021069771,"archive":files[0].name,"sha256":digest,"scenario":os.environ["TYPING_SCENARIO"]}),flush=True)
+      - name: Probe actual existing audio endpoints
+        run: python dordiai-voices/tools/setup_audio_endpoint.py --output dordiai-voices/windows-results/audio --ephemeral-ci --start-existing-services
+        continue-on-error: true
+      - name: Actual owned NVDA keyboard and normal editing scenario
+        shell: python
+        run: |
+          import json,os,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          output=root/"windows-results/nvda"
+          command=[sys.executable,str(root/"tools/windows_nvda_probe.py"),
+              "--addon",str(root/"dist/dordiai-voices-0.13.1-dev.10.nvda-addon"),
+              "--output",str(output),"--typing-probe","--typing-scenario",os.environ["TYPING_SCENARIO"],
+              "--timeout","300"]
+          audio=root/"windows-results/audio/audio-endpoint.json"
+          headless=audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after")==0
+          if headless:
+              command.append("--headless-ui-probe")
+          completed=subprocess.run(command,check=False)
+          if completed.returncode==2 and headless:
+              report=json.loads((output/"windows-nvda-probe.json").read_text(encoding="utf-8"))
+              allowed={"windows_audio_output_enumeration","physical_audio_output"}
+              unexpected=[row for doc in (report,report.get("probe",{})) for row in doc.get("checks",[])
+                  if row.get("status")!="passed" and not(row.get("status")=="blocked" and row.get("name") in allowed)]
+              if (report.get("status")!="partial" or unexpected or
+                  report.get("recording_pcm_sink_test_double") is not True or
+                  report.get("physical_audio_verified") is not False or report.get("product_ready") is not False):
+                  raise RuntimeError("Actual typing scenario failed: "+json.dumps(unexpected))
+              print("Genuine keyboard/NVDA/driver/model checks passed; recording output double leaves physical/acoustic acceptance blocked.",flush=True)
+          elif completed.returncode:
+              raise subprocess.CalledProcessError(completed.returncode,command)
+      - name: Collect bounded diagnostic reports
+        if: always()
+        run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
+      - name: Preserve exact JSON evidence and print compact scenario rows
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/windows-evidence")
+          files={}
+          for path in sorted(root.rglob("*.json")):
+              raw=path.read_bytes()
+              if len(raw)>4*1024*1024:raise ValueError("Report exceeds evidence quota")
+              files[path.relative_to(root).as_posix()]={"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}
+              document=json.loads(raw)
+              if path.name=="nvda-probe.json":
+                  typed=document.get("actual_typing") or {}
+                  print("TYPING_SCENARIO_SUMMARY "+json.dumps({key:typed.get(key) for key in ("scenario","cleanup","preference_application","preference_restoration")},ensure_ascii=True),flush=True)
+                  for row in typed.get("cases",[])+typed.get("navigation_cases",[]):
+                      fields=("language","input_language","glyph","action","status","routing_status","expected_language","expected_label","emitted_languages","effective_languages","first_pcm_ms","word_echo_matches","symbol_label_matches","actual_control_value","actual_insertion_point","queued_utterances","driver_utterances")
+                      print("TYPING_SCENARIO_CASE "+json.dumps({key:row.get(key) for key in fields},ensure_ascii=True),flush=True)
+          document={"format":"dordiai-exact-typing-scenario-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "core_run_id":45021069771,"core_archive_sha256":os.environ["CORE_SHA256"],
+              "scenario":os.environ["TYPING_SCENARIO"],"scope":"Exact engineering evidence; never acoustic or physical-device acceptance","files":files}
+          encoded=json.dumps(document,sort_keys=True,ensure_ascii=True,separators=(",",":")).encode()
+          if len(encoded)>16*1024*1024:raise ValueError("Exact JSON bundle exceeds quota")
+          compressed=gzip.compress(encoded,mtime=0)
+          payload=base64.b64encode(compressed).decode("ascii")
+          if len(payload)>1024*1024:raise ValueError("Compressed exact JSON exceeds log quota")
+          chunks=[payload[index:index+24000] for index in range(0,len(payload),24000)]
+          print("DORDIAI_TYPING_SCENARIO_JSON_META "+json.dumps({"encoding":"gzip+base64","chunks":len(chunks),"json_sha256":hashlib.sha256(encoded).hexdigest(),"gzip_sha256":hashlib.sha256(compressed).hexdigest(),"json_size_bytes":len(encoded)}),flush=True)
+          for index,part in enumerate(chunks):
+              print("DORDIAI_TYPING_SCENARIO_GZIP_B64_%03d "%index+part,flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-voices-typing-scenario-${{ matrix.scenario }}
+          path: dordiai-voices/windows-evidence
+          if-no-files-found: warn
+          retention-days: 14

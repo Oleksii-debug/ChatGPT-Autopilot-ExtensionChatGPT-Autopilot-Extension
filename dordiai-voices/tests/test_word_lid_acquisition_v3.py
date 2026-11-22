@@ -187,6 +187,14 @@ class AcquisitionTests(unittest.TestCase):
         self.assertEqual({row["language"] for row in m.validate_manifest(document)}, {"gn", "ht", "mni", "ks", "as", "or"})
         self.assertNotIn("sd", document["pilot_languages"])
 
+    def test_custom_manifest_source_id_cannot_escape_the_source_cache(self):
+        original = json.loads((ROOT / "tools/data/word_lid_sources_v3_acquisition.json").read_text(encoding="utf-8"))
+        for value in ("../outside", "/absolute", "a/b", "a\\b", "x" * 81):
+            document = deepcopy(original)
+            document["sources"][0]["id"] = value
+            with self.subTest(source_id=value), self.assertRaisesRegex(ValueError, "safe cache basename"):
+                m.validate_manifest(document)
+
     def test_native_wikipedia_parquet_first_rows_and_min_document_frequency(self):
         try:
             import pyarrow as arrow
