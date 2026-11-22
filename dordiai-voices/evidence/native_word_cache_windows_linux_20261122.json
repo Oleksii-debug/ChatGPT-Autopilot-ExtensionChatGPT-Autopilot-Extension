@@ -1,0 +1,273 @@
+{
+  "format": "dordiai-exact-word-cache-windows-linux-actual-review",
+  "format_version": 1,
+  "baseline_git_blob": "0eec65f898977bbd1c1de6561ddbff2014c0eea2",
+  "candidate_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+  "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+  "dataset_bytes": 18661227,
+  "finite_words": 6642550,
+  "actual_runs": [
+    {
+      "name": "windows",
+      "run": 45036190641,
+      "job": 137250354355,
+      "git_blob": "7d77a92c5b55c1c4cdfb2d494f6e44d514337698",
+      "report_keys": [
+        "baseline_module",
+        "candidate_module",
+        "comparisons",
+        "dataset_sha256",
+        "first_pass_unique_improvement_claimed",
+        "format",
+        "format_version",
+        "fresh_child_process_per_variant",
+        "iterations",
+        "nvda_verified",
+        "order_reversed_alternate_rounds",
+        "os_file_cache_evicted",
+        "physical_audio_verified",
+        "product_ready",
+        "production_integrated",
+        "pronunciation_verified",
+        "rounds",
+        "source_receipt_sha256",
+        "status"
+      ],
+      "raw_bytes": 28839,
+      "raw_sha256": "00b8f135521e2e0df61ac263e9e875235b6a8379c213b138fccf4df73c7f4162",
+      "gzip_sha256": "518fa3c063433f8207a0bd9d329608861749afcce079aacb8f42448a56a4a618",
+      "gzip_bytes": 6439,
+      "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+      "status": "passed-all-finite-membership-comparisons",
+      "comparisons": [
+        {
+          "round": 1,
+          "variant": "original",
+          "first97_total_ms": 86.7532,
+          "warm1000_median_ms": 0.88225,
+          "warm1000_p95_ms": 1.0481,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 1,
+          "variant": "candidate-cache0",
+          "first97_total_ms": 86.6244,
+          "warm1000_median_ms": 0.878,
+          "warm1000_p95_ms": 1.0125,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 1,
+          "variant": "candidate-default",
+          "first97_total_ms": 86.8351,
+          "warm1000_median_ms": 0.0185,
+          "warm1000_p95_ms": 0.0202,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 2,
+          "variant": "candidate-default",
+          "first97_total_ms": 87.2176,
+          "warm1000_median_ms": 0.0188,
+          "warm1000_p95_ms": 0.0209,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 2,
+          "variant": "candidate-cache0",
+          "first97_total_ms": 100.9048,
+          "warm1000_median_ms": 0.9024,
+          "warm1000_p95_ms": 1.3778,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 2,
+          "variant": "original",
+          "first97_total_ms": 97.606,
+          "warm1000_median_ms": 0.9382999999999999,
+          "warm1000_p95_ms": 2.1532,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 3,
+          "variant": "original",
+          "first97_total_ms": 95.3594,
+          "warm1000_median_ms": 0.92125,
+          "warm1000_p95_ms": 1.4586,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 3,
+          "variant": "candidate-cache0",
+          "first97_total_ms": 89.1861,
+          "warm1000_median_ms": 0.8936999999999999,
+          "warm1000_p95_ms": 1.0335,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 3,
+          "variant": "candidate-default",
+          "first97_total_ms": 93.1873,
+          "warm1000_median_ms": 0.0185,
+          "warm1000_p95_ms": 0.0207,
+          "closed": true,
+          "words_after_close": 0
+        }
+      ],
+      "gzip_path": "evidence/native_word_cache_windows_45036190641.json.gz",
+      "actual_fixture_tests_passed": 54
+    },
+    {
+      "name": "linux",
+      "run": 45035639189,
+      "job": 137248670463,
+      "git_blob": "27f9d6ec4d61dd0f9b789d9a139eaa8f1db5b654",
+      "report_keys": [
+        "baseline_module",
+        "candidate_module",
+        "comparisons",
+        "dataset_sha256",
+        "first_pass_unique_improvement_claimed",
+        "format",
+        "format_version",
+        "fresh_child_process_per_variant",
+        "iterations",
+        "nvda_verified",
+        "order_reversed_alternate_rounds",
+        "os_file_cache_evicted",
+        "physical_audio_verified",
+        "product_ready",
+        "production_integrated",
+        "pronunciation_verified",
+        "rounds",
+        "source_receipt_sha256",
+        "status"
+      ],
+      "raw_bytes": 28648,
+      "raw_sha256": "0fb4108f924e36ba3f4d193a3fbba77d095de1ea9824456e80fe6f88102ccde0",
+      "gzip_sha256": "6961089c0d7a0249b3fa144109448665a2c574534d0b759662161835f31a071d",
+      "gzip_bytes": 6367,
+      "python": "3.13.18 (main, Oct 26 2026, 14:19:33) [GCC 15.2.0]",
+      "status": "passed-all-finite-membership-comparisons",
+      "comparisons": [
+        {
+          "round": 1,
+          "variant": "original",
+          "first97_total_ms": 99.423567,
+          "warm1000_median_ms": 1.0049135,
+          "warm1000_p95_ms": 1.347967,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 1,
+          "variant": "candidate-cache0",
+          "first97_total_ms": 100.034035,
+          "warm1000_median_ms": 1.0032915,
+          "warm1000_p95_ms": 1.205842,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 1,
+          "variant": "candidate-default",
+          "first97_total_ms": 96.902543,
+          "warm1000_median_ms": 0.0119785,
+          "warm1000_p95_ms": 0.01323,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 2,
+          "variant": "candidate-default",
+          "first97_total_ms": 97.800881,
+          "warm1000_median_ms": 0.011557,
+          "warm1000_p95_ms": 0.012819,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 2,
+          "variant": "candidate-cache0",
+          "first97_total_ms": 98.39616,
+          "warm1000_median_ms": 1.024568,
+          "warm1000_p95_ms": 1.527057,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 2,
+          "variant": "original",
+          "first97_total_ms": 100.558812,
+          "warm1000_median_ms": 1.0200765,
+          "warm1000_p95_ms": 1.163958,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 3,
+          "variant": "original",
+          "first97_total_ms": 99.085875,
+          "warm1000_median_ms": 1.0093100000000002,
+          "warm1000_p95_ms": 1.177759,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 3,
+          "variant": "candidate-cache0",
+          "first97_total_ms": 102.532654,
+          "warm1000_median_ms": 1.0298515,
+          "warm1000_p95_ms": 1.478043,
+          "closed": true,
+          "words_after_close": 0
+        },
+        {
+          "round": 3,
+          "variant": "candidate-default",
+          "first97_total_ms": 100.301343,
+          "warm1000_median_ms": 0.011938,
+          "warm1000_p95_ms": 0.01303,
+          "closed": true,
+          "words_after_close": 0
+        }
+      ],
+      "gzip_path": "evidence/native_word_cache_linux_45035639189.json.gz",
+      "actual_fixture_tests_passed": 54
+    }
+  ],
+  "experiment": {
+    "same_source96plus_valid_shaped_unknown": true,
+    "rounds": 3,
+    "fresh_child_per_variant": true,
+    "reversed_alternate_order": true,
+    "all_memberships_checked_every_request": true,
+    "all_closed": true,
+    "word_cache_entries": 1024,
+    "word_cache_byte_limit": 524288,
+    "observed_cached_words": 97,
+    "observed_charged_bytes": 56607
+  },
+  "windows_first_failed_fixture": {
+    "run": 45035639189,
+    "job": 137248670137,
+    "cause": "Test wb truncation of Windows mapped file is rejected. Same-size r+b byte mutation fixture fixed in d206c0b5b7fb7fa2a4f68fbeb32fa6baefc8d9eb; candidate unchanged.",
+    "benchmark_executed": false
+  },
+  "scope": "Standalone interpreter finite membership only. First-use unchanged. Actual frozen NVDA Resource wrapper comparison still pending. No production/addon change.",
+  "first_use_unique_improvement_claimed": false,
+  "nvda_verified": false,
+  "production_integrated": false,
+  "typing_verified": false,
+  "pronunciation_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

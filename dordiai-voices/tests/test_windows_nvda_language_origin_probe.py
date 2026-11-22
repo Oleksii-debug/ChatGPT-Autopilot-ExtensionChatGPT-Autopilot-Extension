@@ -1,5 +1,6 @@
 """Contract tests for tool-only actual host queue proof."""
 import ast
+from hashlib import sha1
 import importlib.util
 from pathlib import Path
 import unittest
@@ -11,8 +12,9 @@ spec.loader.exec_module(probe)
 
 class TransportProbeTests(unittest.TestCase):
     def test_embedded_helper_is_exact_candidate(self):
-        self.assertEqual(probe.LANGUAGE_ORIGIN_SOURCE,
-            (ROOT/"source/0.12.2/kx47Runtime/language_origin.py").read_text(encoding="utf-8"))
+        raw=probe.LANGUAGE_ORIGIN_SOURCE.encode("utf-8")
+        self.assertEqual(sha1(b"blob "+str(len(raw)).encode("ascii")+b"\0"+raw).hexdigest(),
+            "381ad8005b98c41c54249a3460be0542acc4ef24")
     def test_compilation_and_anchor_fail_closed(self):
         base=type("Base",(),{"PROBE_PLUGIN":"def later(*a): pass\ndef close_settings():\n"+probe.ANCHOR+"def finish(): pass\n"})()
         original=base.PROBE_PLUGIN

@@ -1,0 +1,140 @@
+name: Genuine ZGH isolated private native and selected-profile proof
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-zgh-native.yml'
+      - 'dordiai-voices/tools/research/probe_zgh_omni.py'
+      - 'dordiai-voices/tools/data/zgh_native_probe_fixture.json'
+      - 'dordiai-voices/tests/test_zgh_omni_probe.py'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-zgh-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  actual-private-zgh-unintegrated:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[zgh-native]')
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: '1'
+      PYTHONUNBUFFERED: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      CUDA_VISIBLE_DEVICES: ''
+      ZGH_ASSETS: ${{ github.workspace }}/ci-zgh-pinned-assets
+      ZGH_REPORTS: ${{ github.workspace }}/dordiai-voices/zgh-native-results
+    steps:
+      - name: Preserve exact fixture source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Define short owned private extraction root
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP ('dordiai-zgh-source11-' + $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $root) { throw 'Private research root already exists' }
+          "ZGH_CORE_ROOT=$root" >> $env:GITHUB_ENV
+          ("ZGH_PRIVATE=" + (Join-Path $root 'kx47Runtime')) >> $env:GITHUB_ENV
+      - name: Check bounded metadata orchestration without host ML packages
+        working-directory: dordiai-voices
+        run: |
+          python -m py_compile tools/research/probe_zgh_omni.py
+          if ($LASTEXITCODE -ne 0) { throw 'ZGH tool compilation failed' }
+          python -m unittest discover -s tests -p test_zgh_omni_probe.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'ZGH unit contracts failed' }
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ci-zgh-pinned-assets
+          key: dordiai-zgh-omni-efddec1-ref34d010c-exact-files-v1
+      - name: Hash-verify original ONNX bytes and exact original training-language table
+        shell: pwsh
+        run: |
+          python dordiai-voices/tools/research/probe_zgh_omni.py prepare --assets "$env:ZGH_ASSETS" --report "$env:ZGH_REPORTS/pinned-acquisition.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned ZGH model acquisition failed' }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: '14757229220'
+          run-id: 45029834209
+          github-token: ${{ github.token }}
+          path: ci-zgh-original-source11
+      - name: Check entire original source11 SHA and extract only unchanged private runtime and projection assets
+        shell: pwsh
+        run: |
+          $archives = @(Get-ChildItem ci-zgh-original-source11 -Recurse -Filter '*.nvda-addon')
+          if ($archives.Count -ne 1) { throw 'Expected one immutable source11 addon' }
+          python dordiai-voices/tools/research/probe_zgh_omni.py extract-core --addon $archives[0].FullName --output "$env:ZGH_CORE_ROOT" --report "$env:ZGH_REPORTS/private-core-inventory.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Original core extraction failed' }
+      - name: Execute literal ZGH with authentic Tifinagh reference and actual allowed-profile projection
+        timeout-minutes: 25
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = (Resolve-Path (Join-Path $env:ZGH_PRIVATE 'python/python.exe')).Path
+          $programs = @(& $python -I -B -c 'import json,sys; print(json.dumps(sorted(set((sys.executable,sys._base_executable)))))' | ConvertFrom-Json)
+          if ($LASTEXITCODE -ne 0 -or $programs.Count -lt 1) { throw 'Private executable identity inspection failed' }
+          $profiles = @(Get-NetFirewallProfile)
+          if ($profiles.Count -lt 1 -or @($profiles | Where-Object { -not $_.Enabled }).Count -gt 0) { throw 'Firewall profiles must already be enabled; no global changes permitted' }
+          $rules = @()
+          $exitCode = 1
+          try {
+            $i = 0
+            foreach ($program in $programs) {
+              $name = "DordiaiZghNative-$env:GITHUB_RUN_ID-$i"
+              $rules += $name
+              New-NetFirewallRule -Name $name -DisplayName $name -Direction Outbound -Action Block -Program $program -Enabled True -Profile Any | Out-Null
+              $rule = Get-NetFirewallRule -Name $name
+              if ($rule.Action -ne 'Block' -or $rule.Direction -ne 'Outbound' -or $rule.Enabled -ne 'True') { throw 'Scoped outbound denial did not become effective' }
+              $i++
+            }
+            @{ action='Block'; direction='Outbound'; enabled=$true; programs=$programs; all_firewall_profiles_enabled=$true; names=$rules; scope='own-ephemeral-CI-private-python-only' } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 "$env:ZGH_REPORTS/network-policy.json"
+            & $python -I -B dordiai-voices/tools/research/probe_zgh_omni.py probe --runtime "$env:ZGH_PRIVATE" --inventory "$env:ZGH_REPORTS/private-core-inventory.json" --assets "$env:ZGH_ASSETS" --network-policy "$env:ZGH_REPORTS/network-policy.json" --output "$env:ZGH_REPORTS/actual-private"
+            $exitCode = $LASTEXITCODE
+          } finally {
+            foreach ($name in $rules) { Remove-NetFirewallRule -Name $name -ErrorAction Continue }
+          }
+          if ($exitCode -ne 0) { throw "Actual ZGH native/projection proof failed with exit $exitCode" }
+      - name: Recheck every original private runtime and extracted core file after child exit
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:ZGH_REPORTS/private-core-inventory.json") {
+            python dordiai-voices/tools/research/probe_zgh_omni.py verify-core --runtime "$env:ZGH_PRIVATE" --inventory "$env:ZGH_REPORTS/private-core-inventory.json" --report "$env:ZGH_REPORTS/private-core-integrity.json"
+            if ($LASTEXITCODE -ne 0) { throw 'Unchanged private core verification failed' }
+          }
+      - name: Preserve bounded exact metadata even on native failure
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ['ZGH_REPORTS'])
+          for path in sorted(root.rglob('*.json')):
+              if path.name=='private-core-inventory.json':
+                  continue
+              raw=path.read_bytes()
+              if len(raw)>8*1024**2:raise RuntimeError('Unexpectedly large research report')
+              value=json.loads(raw.decode('utf-8-sig'))
+              print('ZGH_NATIVE_SUMMARY '+path.relative_to(root).as_posix()+' '+json.dumps({key:value.get(key) for key in ('status','language','not_alias_of','native_model_execution_verified','selected_profile_projection_mechanically_verified','all_original_private_files_unchanged','product_integrated','resource_count_increment','cases','process_memory','error_type','error','traceback')}),flush=True)
+              packed=gzip.compress(raw,mtime=0)
+              if len(packed)>524288:raise RuntimeError('Unexpectedly large compressed proof')
+              text=base64.b64encode(packed).decode('ascii')
+              chunks=[text[i:i+12000] for i in range(0,len(text),12000)]
+              name=path.relative_to(root).as_posix()
+              print('ZGH_NATIVE_GZIP_SHA256 '+name+' '+hashlib.sha256(packed).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):print('ZGH_NATIVE_GZIP_B64 '+name+' '+str(i)+'/'+str(len(chunks))+' '+chunk,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-zgh-actual-private-native-projection-${{ github.run_id }}
+          path: ${{ env.ZGH_REPORTS }}
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: warn
