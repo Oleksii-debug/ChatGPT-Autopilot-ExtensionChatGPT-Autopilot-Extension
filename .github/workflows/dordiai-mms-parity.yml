@@ -1,0 +1,178 @@
+name: Dordiai all29 MMS native and projected parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-mms-parity.yml"
+      - "dordiai-voices/tools/prepare_mms_parity_ci.py"
+      - "dordiai-voices/tools/probe_mms_all_language_parity.py"
+      - "dordiai-voices/tools/requirements-mms-parity.txt"
+      - "dordiai-voices/tools/mms_model_sources.json"
+      - "dordiai-voices/tests/test_mms_parity_ci.py"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dordiai-mms-parity-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  all29-parity:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mms-parity]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CORE_INPUTS: ${{ github.workspace }}/ci-mms-cache/core8-inputs
+      RAW_CACHE: ${{ github.workspace }}/ci-mms-cache/native-raw
+      REPORTS: ${{ github.workspace }}/dordiai-voices/mms-parity-results
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: dordiai-voices/tools/requirements-mms-parity.txt
+      - name: Install only pinned CPU preparation dependencies
+        run: |
+          mkdir -p "$REPORTS"
+          python -m pip install --only-binary=:all: -r dordiai-voices/tools/requirements-mms-parity.txt
+          python -m pip freeze > "$REPORTS/python-packages.txt"
+      - name: Record and verify the known offline inference runtime
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,sys
+          import numpy as np
+          import onnxruntime as ort
+          if ort.__version__ != "1.27.0":
+              raise RuntimeError("This isolated CPU recipe requires ORT1.27.0")
+          ort.disable_telemetry_events()
+          binaries={}
+          forbidden=(b"onecollector",b"mobile.events.data.microsoft.com")
+          for path in pathlib.Path(ort.__file__).parent.rglob("*.so"):
+              data=path.read_bytes()
+              if any(marker in data.lower() for marker in forbidden):
+                  raise RuntimeError("Unexpected telemetry implementation in the selected wheel")
+              binaries[str(path.relative_to(pathlib.Path(ort.__file__).parent))]=hashlib.sha256(data).hexdigest()
+          if not binaries:
+              raise RuntimeError("No native ONNX Runtime binary was found")
+          record={"python":sys.version,"numpy":np.__version__,"onnxruntime":ort.__version__,
+                  "onnxruntime_module":str(ort.__file__),"binary_sha256":binaries,
+                  "telemetry_disabled_before_sessions":True,"selected_providers":["CPUExecutionProvider"]}
+          pathlib.Path(os.environ["REPORTS"],"python-runtime.json").write_text(json.dumps(record,indent=2)+"\n",encoding="utf-8")
+      - name: Check only the new orchestration helpers
+        run: python -m unittest discover -s dordiai-voices/tests -p test_mms_parity_ci.py -v
+      - uses: actions/cache/restore@v4
+        id: core_inputs
+        with:
+          path: ${{ env.CORE_INPUTS }}
+          key: dordiai-mms-core8-selected-568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6-v1
+      - name: Download the immutable core only on selected-input cache miss
+        if: steps.core_inputs.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: dordiai-voices-development-core
+          run-id: 45005894766
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dordiai-mms-core8-download
+      - name: Copy only checksum-verified converter and retained target data
+        if: steps.core_inputs.outputs.cache-hit != 'true'
+        run: |
+          python dordiai-voices/tools/prepare_mms_parity_ci.py stage-core \
+            --addon "${{ runner.temp }}/dordiai-mms-core8-download/dordiai-voices-0.13.1-dev.8.nvda-addon" \
+            --output "$CORE_INPUTS" --report "$REPORTS/core-input-extraction.json"
+      - name: Verify selected core inputs on every run including cache hits
+        run: |
+          python dordiai-voices/tools/prepare_mms_parity_ci.py verify-core \
+            --output "$CORE_INPUTS" --report "$REPORTS/core-input-verification.json"
+      - uses: actions/cache/save@v4
+        if: steps.core_inputs.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.CORE_INPUTS }}
+          key: dordiai-mms-core8-selected-568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6-v1
+      - name: Remove only the temporary downloaded archive copy after verification
+        if: steps.core_inputs.outputs.cache-hit != 'true'
+        shell: python
+        run: |
+          import os,pathlib
+          # Published artifact stays immutable; only this job's disposable copy is removed.
+          path=pathlib.Path(os.environ["RUNNER_TEMP"])/"dordiai-mms-core8-download/dordiai-voices-0.13.1-dev.8.nvda-addon"
+          path.unlink(missing_ok=True)
+      - uses: actions/cache/restore@v4
+        id: native_raw
+        with:
+          path: ${{ env.RAW_CACHE }}
+          key: dordiai-mms29-fp32-raw-v1-${{ hashFiles('dordiai-voices/tools/mms_model_sources.json') }}-ref3dd4918cab90e1ac
+          restore-keys: dordiai-mms29-fp32-raw-v1-
+      - name: Acquire or verify pinned native weights and same-checkpoint references
+        run: |
+          python dordiai-voices/tools/prepare_reference_encoder.py --variant fp32 \
+            --output "$RAW_CACHE/reference-encoder" --metadata "$REPORTS/reference-encoder-acquisition.json"
+          python dordiai-voices/tools/prepare_mms_models.py --download-only --languages all --workers 2 \
+            --output "$RAW_CACHE/MMS" --audio-evidence "$RAW_CACHE/audio" \
+            --report "$REPORTS/mms-native-acquisition.json"
+      - name: Save verified raw bytes before calibration or parity can fail
+        if: steps.native_raw.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.RAW_CACHE }}
+          key: dordiai-mms29-fp32-raw-v1-${{ hashFiles('dordiai-voices/tools/mms_model_sources.json') }}-ref3dd4918cab90e1ac
+      - name: Measure genuine source references in29 fresh serial CPU processes
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          DO_NOT_TRACK: "1"
+          DORDIAI_MMS_SHARED_GRAPH: "0"
+        run: |
+          python dordiai-voices/tools/prepare_mms_parity_ci.py prepare-all \
+            --models "$RAW_CACHE/MMS" \
+            --reference-encoder "$RAW_CACHE/reference-encoder/tone_ref_encoder.onnx" \
+            --audio-evidence "$RAW_CACHE/audio" --timeout-seconds 90 \
+            --logs "$REPORTS/preparation" --report "$REPORTS/fresh-reference-preparation.json"
+      - name: Compare all29 original and strict shared native and projected arrays
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          DO_NOT_TRACK: "1"
+        run: |
+          python dordiai-voices/tools/probe_mms_all_language_parity.py \
+            --runtime dordiai-voices/source/0.12.2/kx47Runtime \
+            --models "$RAW_CACHE/MMS" --converter-models "$CORE_INPUTS/OpenVoiceV2" \
+            --target-embedding "$CORE_INPUTS/voices/viktoriia.npy" --target-profile viktoriia \
+            --target-metadata "$CORE_INPUTS/target-profile.json" \
+            --languages all --require-ort-version 1.27.0 --require-bit-exact \
+            --output "$REPORTS/all29-runtime-parity.json"
+      - name: Preserve actual final or partial numerical evidence in bounded logs
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ["REPORTS"])
+          path=root/"all29-runtime-parity.json"
+          if path.is_file():
+              raw=path.read_bytes()
+              report=json.loads(raw)
+              summary={key:report.get(key) for key in ("status","requested_all29","all_requested_numerical_guards_passed","all_requested_native_bitwise_equal","all_requested_projected_bitwise_equal","shared_raw_graph_instances","fingerprinted_inputs_unchanged")}
+              summary["measured_languages"]=len(report.get("languages",[]))
+              print("DORDIAI_ALL29_SUMMARY "+json.dumps(summary),flush=True)
+              compressed=gzip.compress(raw,mtime=0)
+              if len(compressed)>512*1024:
+                  raise RuntimeError("Unexpectedly large parity report; artifact remains available")
+              encoded=base64.b64encode(compressed).decode("ascii")
+              chunks=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              print("DORDIAI_PARITY_JSON_GZIP_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):
+                  print("DORDIAI_PARITY_JSON_GZIP_B64_PART "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+          else:
+              print("DORDIAI_ALL29_SUMMARY "+json.dumps({"status":"parity-report-not-generated","preparation_report_present":(root/"fresh-reference-preparation.json").is_file()}),flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-mms-all29-parity-${{ github.run_id }}
+          path: ${{ env.REPORTS }}
+          if-no-files-found: warn
+          retention-days: 7

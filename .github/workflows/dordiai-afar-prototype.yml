@@ -1,0 +1,80 @@
+name: Dordiai isolated Afar CPU prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dordiai-voices/audit-20261122
+    paths:
+      - .github/workflows/dordiai-afar-prototype.yml
+      - dordiai-voices/tools/research/afar_voxcpm_probe.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-afar-prototype
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[afar-probe]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONUNBUFFERED: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      DO_NOT_TRACK: "1"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+    steps:
+      - name: Check out research source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Check out audited CPU runtime
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: OpenBMB/VoxCPM
+          ref: 300e4260b509066151d623dc9c0aa922cf82232b
+          path: .afar-runtime
+          persist-credentials: false
+          lfs: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: Compile isolated probe before downloading weights
+        run: python -m py_compile dordiai-voices/tools/research/afar_voxcpm_probe.py
+      - name: Install CPU inference dependencies only
+        timeout-minutes: 8
+        run: |
+          python -m pip install --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --no-cache-dir numpy==2.2.6 scipy==1.15.3 soundfile==0.13.1 librosa==0.11.0 einops==0.8.1 pydantic==2.11.7 transformers==4.51.3 tokenizers==0.21.4 huggingface-hub==0.34.4 safetensors==0.5.3 tqdm==4.67.1 sentencepiece==0.2.0 protobuf==5.29.5
+      - name: Restore only exact candidate model assets
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ runner.temp }}/dordiai-afar-model
+          key: afar-voxcpm-e3d25f78-0b25598a-5b93f34c-v1
+      - name: Acquire immutable candidate assets with weight hashes
+        timeout-minutes: 8
+        run: |
+          python dordiai-voices/tools/research/afar_voxcpm_probe.py acquire --models "$RUNNER_TEMP/dordiai-afar-model" --output research-results/afar
+      - name: Generate actual Afar native-text PCM with network blocked
+        timeout-minutes: 15
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+        run: |
+          timeout --signal=TERM --kill-after=20s 850s python dordiai-voices/tools/research/afar_voxcpm_probe.py probe --models "$RUNNER_TEMP/dordiai-afar-model" --runtime .afar-runtime --output research-results/afar
+      - name: Preserve research evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-afar-candidate-${{ github.run_id }}
+          path: research-results/afar/
+          if-no-files-found: warn
+          retention-days: 30

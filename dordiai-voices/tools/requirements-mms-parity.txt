@@ -1,0 +1,4 @@
+# Isolated Ubuntu CPU parity/preparation only; no Torch, CUDA or training.
+numpy==2.3.5
+onnxruntime==1.27.0
+soundfile==0.14.0
