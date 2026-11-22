@@ -56,6 +56,26 @@ class ErrorDiagnosticsTests(unittest.TestCase):
             worker._receive(1)
         self.assertEqual(diagnostics.safe_error(caught.exception)["worker"], child)
 
+    def test_numeric_os_errors_are_retained_without_exception_message(self):
+        error = OSError(13, "PRIVATE-REQUEST-TEXT")
+        error.winerror = 126
+        result = diagnostics.safe_error(error)
+        self.assertEqual((result["errno"], result["winerror"]), (13, 126))
+        self.assertNotIn("PRIVATE-REQUEST-TEXT", json.dumps(result))
+
+    def test_numeric_cause_is_retained_without_exception_messages(self):
+        try:
+            try:
+                error = OSError(126, "PRIVATE-NATIVE-TEXT")
+                error.winerror = 126
+                raise error
+            except OSError as cause:
+                raise ImportError("PRIVATE-IMPORT-TEXT", name="marisa_trie") from cause
+        except ImportError as caught:
+            result = diagnostics.safe_error(caught)
+        self.assertEqual(result["cause"]["winerror"], 126)
+        self.assertNotIn("PRIVATE-", json.dumps(result))
+
     def test_worker_popen_uses_its_trusted_script_directory(self):
         namespace = worker_methods("_send")
         observed = {}

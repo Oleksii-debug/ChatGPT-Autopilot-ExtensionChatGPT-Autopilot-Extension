@@ -396,6 +396,7 @@ def start_phrase():
 
 def wait_for_stage(stage, deadline, continuation):
     stats = snapshot(stage)
+    RESULT["worker_bootstrap"] = getattr(getattr(DRIVER, "_engine", None), "_worker_bootstrap", None)
     details = getattr(DRIVER, "_dordiai_last_error_details", None)
     if permanent_speech_failure(details):
         check(stage + "_pcm_submission", "failed", reason="Permanent speech import failure; further requests stopped",

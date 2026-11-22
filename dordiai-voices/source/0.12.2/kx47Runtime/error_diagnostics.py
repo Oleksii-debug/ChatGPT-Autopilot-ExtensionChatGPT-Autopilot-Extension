@@ -6,9 +6,13 @@ def _identifier(value):
     return value[:160] if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.<>-]{1,160}", value) else None
 
 
-def safe_error(error):
+def safe_error(error, _depth=0):
     """Never format the exception or read source lines (both may contain text)."""
     result = {"type": type(error).__name__}
+    for attribute in ("errno", "winerror"):
+        value = getattr(error, attribute, None)
+        if isinstance(value, int) and not isinstance(value, bool):
+            result[attribute] = value
     if isinstance(error, ImportError):
         result["import_name"] = _identifier(error.name)
     frames = []
@@ -24,4 +28,9 @@ def safe_error(error):
     worker = getattr(error, "dordiai_worker_error", None)
     if isinstance(worker, dict):
         result["worker"] = worker
+    cause = error.__cause__
+    if cause is None and not error.__suppress_context__:
+        cause = error.__context__
+    if cause is not None and cause is not error and _depth < 2:
+        result["cause"] = safe_error(cause, _depth + 1)
     return result

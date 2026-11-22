@@ -20,6 +20,39 @@ SPEC.loader.exec_module(probe)
 
 
 class ProbeHelpersTests(unittest.TestCase):
+    def test_dictionary_regression_word_cannot_use_override_shortcuts(self):
+        runtime = ROOT / "source/0.12.2/kx47Runtime"
+        spec = importlib.util.spec_from_file_location("stress_fixture_under_test", runtime / "ukrainian_stress.py")
+        stress = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(stress)
+        word = probe.DICTIONARY_REGRESSION_WORD
+        self.assertIn(word, probe.DICTIONARY_REGRESSION_TEXT.lower())
+        self.assertNotIn(word, stress.OVERRIDES)
+        self.assertNotIn(word, stress.HOMOGRAPHS)
+        self.assertNotIn(word, stress.rhvoice_dictionary())
+        self.assertGreaterEqual(sum(char in stress.VOWELS for char in word), 2)
+
+    def test_preflight_runs_bundled_python_in_both_loader_modes(self):
+        result = types.SimpleNamespace(stdout=b'{"status":"passed","dictionary_constructed":true}', stderr=b"", returncode=0)
+        with tempfile.TemporaryDirectory() as temporary, patch.object(probe.subprocess, "run", return_value=result) as run:
+            folder = Path(temporary)
+            reports = probe.native_extension_preflight(folder, folder, 10)
+        self.assertEqual([test["bootstrap_mode"] for test in reports], ["inherited", "reset"])
+        self.assertEqual(run.call_count, 2)
+        for call in run.call_args_list:
+            self.assertEqual(call.args[0][0], str(folder / "python/python.exe"))
+            self.assertEqual(call.kwargs["cwd"], folder)
+        self.assertIn("from marisa_trie import RecordTrie", probe.NATIVE_EXTENSION_PREFLIGHT)
+        self.assertIn("dictionary()", probe.NATIVE_EXTENSION_PREFLIGHT)
+
+    def test_preflight_invalid_json_or_native_process_failure_never_passes(self):
+        for result in (types.SimpleNamespace(stdout=b"", stderr=b"DLL load failure", returncode=1),
+                       types.SimpleNamespace(stdout=b'{"status":"passed"}', stderr=b"", returncode=3)):
+            with self.subTest(code=result.returncode), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(probe.subprocess, "run", return_value=result):
+                reports = probe.native_extension_preflight(Path(temporary), Path(temporary), 1)
+            self.assertTrue(all(test["status"] == "failed" for test in reports))
+
     def test_short_timing_run_does_not_claim_tail_guarantees(self):
         summary = probe.timing_summary([2, 4, 3])
         self.assertEqual(summary["median_ms"], 3)
@@ -138,6 +171,16 @@ class PipeProtocolHarnessTests(unittest.TestCase):
         worker = self.worker([{"chunk": "AQACAA=="}])
         with self.assertRaisesRegex(probe.ProbeError, "not rejected"):
             worker.check_excluded_voice("veronika", 1)
+
+    def test_excluded_voice_allows_safe_diagnostics_but_never_pcm(self):
+        worker = self.worker([{"error": "ValueError", "diagnostics": {"type": "ValueError", "frames": []}}])
+        self.assertEqual(worker.check_excluded_voice("veronika", 1)["status"], "passed")
+        for reply in ({"error": "ValueError", "chunk": "AQACAA=="},
+                      {"error": "ValueError", "pcm": "AQACAA=="},
+                      {"error": "ImportError", "diagnostics": {}},
+                      {"error": "ValueError", "unexpected": True}):
+            with self.subTest(reply=reply), self.assertRaises(probe.ProbeError):
+                self.worker([reply]).check_excluded_voice("veronika", 1)
 
     def test_cancel_drop_does_not_mislabel_buffered_chunk_as_audible_stop(self):
         worker = self.worker([{"chunk": "AQACAA=="}, {"finished": True}])

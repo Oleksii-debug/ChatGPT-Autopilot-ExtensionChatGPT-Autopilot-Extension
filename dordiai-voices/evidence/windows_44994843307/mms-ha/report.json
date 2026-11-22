@@ -1,0 +1,225 @@
+{
+  "format": "dordiai-windows-new-mms-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T06:45:59.814382+00:00",
+  "status": "passed-engine-smoke",
+  "scope": "actual embedded Windows MMS carrier plus same-speaker voice-conversion worker",
+  "language": "ha",
+  "native_pronunciation_verified": false,
+  "nvda_verified": false,
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "host_acoustic_dependencies_installed": false,
+  "runs": [
+    {
+      "first_pcm_ms": 3284.7496999999635,
+      "completed_ms": 3961.239999999975,
+      "real_time_factor": 2.6447202826383123,
+      "audio": {
+        "frames": 35947,
+        "duration_seconds": 1.4977916666666666,
+        "peak": 0.68701171875,
+        "rms": 0.1669628440068838,
+        "nonzero_samples": 35558
+      },
+      "chunks": [
+        {
+          "time_ms": 3284.7496999999635,
+          "bytes": 16206
+        },
+        {
+          "time_ms": 3631.6241000000105,
+          "bytes": 31208
+        },
+        {
+          "time_ms": 3953.098799999964,
+          "bytes": 16800
+        },
+        {
+          "time_ms": 3953.8139999999657,
+          "bytes": 7680
+        }
+      ],
+      "loading_stages": [
+        {
+          "stage": "language-source",
+          "time_ms": 618.8270999999759
+        },
+        {
+          "stage": "language-phonetics",
+          "time_ms": 622.8122999999641
+        },
+        {
+          "stage": "selected-voice",
+          "time_ms": 2207.7213999999685
+        },
+        {
+          "stage": "voice-decoder",
+          "time_ms": 2710.4891999999836
+        }
+      ],
+      "renderers": [
+        {
+          "engine": "wide:ha",
+          "profile": "sara",
+          "speaker": "sara"
+        }
+      ],
+      "wave_file": "ha-sara-1.wav",
+      "warm_repeat": false,
+      "wave_sha256": "d45d0103bd36a6ce1fc2283789cf5ad3ea972fb3508e693c511cbf61d4672ca8"
+    },
+    {
+      "first_pcm_ms": 1028.319100000033,
+      "completed_ms": 1778.010600000016,
+      "real_time_factor": 1.1562103232449232,
+      "audio": {
+        "frames": 36907,
+        "duration_seconds": 1.5377916666666667,
+        "peak": 0.62701416015625,
+        "rms": 0.15791776232838609,
+        "nonzero_samples": 36398
+      },
+      "chunks": [
+        {
+          "time_ms": 1028.319100000033,
+          "bytes": 14286
+        },
+        {
+          "time_ms": 1372.7895000000103,
+          "bytes": 31208
+        },
+        {
+          "time_ms": 1769.6117000000413,
+          "bytes": 20640
+        },
+        {
+          "time_ms": 1770.335799999998,
+          "bytes": 7680
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "wide:ha",
+          "profile": "sara",
+          "speaker": "sara"
+        }
+      ],
+      "wave_file": "ha-sara-2.wav",
+      "warm_repeat": true,
+      "wave_sha256": "5479ace5c6d1687e65f731856803f5b7d9ccdd16b7ab7c2ad5cb91fa63658df7"
+    }
+  ],
+  "fixture_sha256": "a210309699d9180cd2a0b59a151a0f5e64c5439c95e5280b073e8f0ee3c765c1",
+  "resource_preparation": {
+    "downloaded": {
+      "model.onnx": {
+        "bytes": 114013956,
+        "sha256": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32",
+        "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/model.onnx"
+      },
+      "tokens.txt": {
+        "bytes": 304,
+        "sha256": "78b39313ddfc60be59cc12a957f11bf0f5dd4d1cdd3d5c16fe0bf3fae165d0c9",
+        "url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/tokens.txt"
+      }
+    },
+    "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+    "source_preparation_platform": "Linux; pinned measured same-checkpoint identity",
+    "source_identity": {
+      "basis": "publisher-sample-from-same-pinned-checkpoint",
+      "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/sample.wav",
+      "reference_wav_sha256": "a164ed01dc2548802fdd466600c05d98afbcdbceaa6d27850a10924700c9b0e6",
+      "reference_sample_rate": 16000,
+      "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+      "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+      "source_shape": [
+        1,
+        256,
+        1
+      ],
+      "source_norm": 11.689874649047852,
+      "source_dtype": "float32",
+      "unit_normalized": false,
+      "generated_calibration_noise_scale": 0.0,
+      "generated_calibration_noise_scale_w": 0.0
+    }
+  },
+  "embedded_runtime": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "executable": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\python\\python.exe",
+    "onnxruntime": "1.26.0",
+    "ort_module": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\python\\Lib\\site-packages\\onnxruntime\\__init__.py",
+    "providers": [
+      "AzureExecutionProvider",
+      "CPUExecutionProvider"
+    ]
+  },
+  "native_carrier_probe": {
+    "sample_rate": 16000,
+    "frames": 33024,
+    "duration_seconds": 2.064,
+    "peak": 0.7113924622535706,
+    "rms": 0.16703565418720245,
+    "noise_scale": 0.0,
+    "noise_scale_w": 0.0,
+    "providers": [
+      "CPUExecutionProvider"
+    ],
+    "wave_file": "ha-native-carrier.wav",
+    "wave_sha256": "ff202dcb7b54f6f8ec96e94b2407cca72dc2daa5ee722276bf2d6b09ca9a7786"
+  },
+  "resource_archive": {
+    "filename": "windows-mms-ha-probe.zip",
+    "size_bytes": 105521052,
+    "sha256": "a2d12804effbd7ac1b20b817ed9f9826bbe94083e38acbab4a9b849dbc63647a",
+    "payload_files": 5,
+    "installed_bytes": 114017955
+  },
+  "resource_installation": {
+    "id": "windows-mms-ha-probe",
+    "version": "1.0.0",
+    "restart_required": true,
+    "installed_files": 5,
+    "installed_bytes": 114017955,
+    "provided_by_core_files": 0
+  },
+  "installed_language_status": {
+    "id": "ha",
+    "name_uk": "Хауса",
+    "regions": [
+      "Африка"
+    ],
+    "first_priority_region": "Африка",
+    "runtime_code": "ha",
+    "registered": true,
+    "backend": "mms-neural+voice-conversion",
+    "resources_present": true,
+    "status": "resources-present-unverified",
+    "missing_resources": [],
+    "settings_label_uk": "Хауса (лише текст; назви символів не перевірені)",
+    "character_names_ready": false,
+    "number_normalization_ready": false,
+    "capabilities": {
+      "character_names": false,
+      "number_normalization": false
+    },
+    "windows_audio_verified": false
+  },
+  "voice": "sara",
+  "text": "Wannan gwajin murya ne.",
+  "waveform_bitwise_determinism": "not asserted; actual production MMS noise settings remain active",
+  "first_pcm": {
+    "count": 2,
+    "minimum_ms": 1028.319100000033,
+    "median_ms": 2156.534399999998,
+    "maximum_ms": 3284.7496999999635
+  },
+  "worker_shutdown": {
+    "exit_code": 0,
+    "forced_termination": false
+  },
+  "completed_utc": "2026-11-22T06:46:20.236427+00:00"
+}

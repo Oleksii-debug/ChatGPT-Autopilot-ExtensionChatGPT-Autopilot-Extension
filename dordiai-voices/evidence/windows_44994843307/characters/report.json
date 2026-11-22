@@ -1,0 +1,660 @@
+{
+  "format": "dordiai-windows-character-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T06:45:51.498627+00:00",
+  "status": "partial",
+  "scope": "actual worker PCM/renderer structure, not pronunciation, raw-glyph resolution or NVDA typing acceptance",
+  "pronunciation_verified": false,
+  "nvda_typing_verified": false,
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "cases": [
+    {
+      "id": "uk-cyrillic-letter",
+      "language": "uk",
+      "glyph": "ї",
+      "resolver": "installed-name",
+      "voice": "sara",
+      "text": "ї",
+      "character": true,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/symbols.dic",
+          "sha256": "fda8dbb2de2576436d1891038f2b4aaa40dbe8ccee70c895aed9361d3557c7df",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/characterDescriptions.dic",
+          "sha256": "5fbe3fe07400f4db0fdac213361d36952c3b9ce77e6fd44d6dd39b9c0fb41704",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/uk/annotations.json",
+          "sha256": "33a612c15a1a715511817c56d6c1319ebffd60e62d25d4a158eacfb769bbdff6",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/uk/characters.json",
+          "sha256": "bc26b99f38e405aa494476b4ed7c7cdf4a2b6d19bb6f5c5b7438f25be3acf1e8",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "first_pcm_ms": 1975.160800000026,
+      "completed_ms": 1977.3592000000235,
+      "real_time_factor": 4.943398000000059,
+      "audio": {
+        "frames": 9600,
+        "duration_seconds": 0.4,
+        "peak": 0.198883056640625,
+        "rms": 0.054735181605332174,
+        "nonzero_samples": 9334
+      },
+      "chunks": [
+        {
+          "time_ms": 1975.160800000026,
+          "bytes": 19200
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "baseline",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "uk-cyrillic-letter.wav",
+      "wave_sha256": "39d9717fa27cd5544182656e1138f8b6b9bde0606da2425e9ffed67a741d4e31",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "ru-cyrillic-letter",
+      "language": "ru",
+      "glyph": "ж",
+      "resolver": "installed-name",
+      "voice": "sara",
+      "text": "жэ",
+      "character": true,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/ru/symbols.dic",
+          "sha256": "7bce0808a00328bcf187c2c93603ff94c9b8a8e7c9a3445a6a63c76366aceae4",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/ru/characterDescriptions.dic",
+          "sha256": "2fa335f0a5f6005165d94bf379f7fd6d2d510f2e475d152227a7dc10194f4967",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/ru/annotations.json",
+          "sha256": "21120cb44093843460276e571d1671a322f2bd2399cceaab4531d362ad75f62a",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/ru/characters.json",
+          "sha256": "20cf33325d0d66e82cbd234087d57749314361b2227c295498bae49232f22d44",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "first_pcm_ms": 1111.116299999992,
+      "completed_ms": 1375.3962000000115,
+      "real_time_factor": 1.748107228724264,
+      "audio": {
+        "frames": 18883,
+        "duration_seconds": 0.7867916666666667,
+        "peak": 0.3818359375,
+        "rms": 0.0936896173878849,
+        "nonzero_samples": 18124
+      },
+      "chunks": [
+        {
+          "time_ms": 1111.116299999992,
+          "bytes": 2400
+        },
+        {
+          "time_ms": 1263.4898999999677,
+          "bytes": 12960
+        },
+        {
+          "time_ms": 1369.3892000000005,
+          "bytes": 22008
+        },
+        {
+          "time_ms": 1371.6997999999876,
+          "bytes": 398
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "profile",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "ru-cyrillic-letter.wav",
+      "wave_sha256": "08b5b944b9b1ca53d214c2a9863ec59ad5f1c65518f78e930451d7fcd07d9d86",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "en-latin-letter",
+      "language": "en",
+      "glyph": "b",
+      "resolver": "installed-name",
+      "voice": "sara",
+      "text": "bee",
+      "character": true,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/en/symbols.dic",
+          "sha256": "483a98ff1c9b895902dbeed1761f333d0a4db054adcdc7986097b2e88fa517c8",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/en/characterDescriptions.dic",
+          "sha256": "1a79103bb8ecafea396b2f1692228292714f47783d6c2814aa0efae867523073",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/en/annotations.json",
+          "sha256": "6b6b6e0e5f211bc31cf3fa39f385d80dea6cd19ee19bbc6db9071fce3ae5d360",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/en/characters.json",
+          "sha256": "58439b6515f5dcba75ab7c1a59b737220deddadcaf6abba0fdd6d45611cb7aab",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "first_pcm_ms": 1232.7622999999903,
+      "completed_ms": 1368.1509999999548,
+      "real_time_factor": 3.9853894890155255,
+      "audio": {
+        "frames": 8239,
+        "duration_seconds": 0.34329166666666666,
+        "peak": 0.42413330078125,
+        "rms": 0.0932741631311294,
+        "nonzero_samples": 7683
+      },
+      "chunks": [
+        {
+          "time_ms": 1232.7622999999903,
+          "bytes": 3998
+        },
+        {
+          "time_ms": 1262.6854000000094,
+          "bytes": 7680
+        },
+        {
+          "time_ms": 1314.0919999999596,
+          "bytes": 1440
+        },
+        {
+          "time_ms": 1366.2804999999594,
+          "bytes": 3360
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "profile",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "en-latin-letter.wav",
+      "wave_sha256": "b6d110a789fa8f0ca88a3f84d82354195a040c6c5664f2c37fc7132230970fc4",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "fr-accented-letter",
+      "language": "fr",
+      "glyph": "é",
+      "resolver": "project-latin-name",
+      "status": "unsupported",
+      "reason": "Actual same-language resources are not installed"
+    },
+    {
+      "id": "de-accented-letter",
+      "language": "de",
+      "glyph": "ä",
+      "resolver": "project-latin-name",
+      "status": "unsupported",
+      "reason": "Actual same-language resources are not installed"
+    },
+    {
+      "id": "uk-punctuation",
+      "language": "uk",
+      "glyph": "?",
+      "resolver": "installed-name",
+      "voice": "sara",
+      "text": "знак питання",
+      "character": false,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/symbols.dic",
+          "sha256": "fda8dbb2de2576436d1891038f2b4aaa40dbe8ccee70c895aed9361d3557c7df",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/characterDescriptions.dic",
+          "sha256": "5fbe3fe07400f4db0fdac213361d36952c3b9ce77e6fd44d6dd39b9c0fb41704",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/uk/annotations.json",
+          "sha256": "33a612c15a1a715511817c56d6c1319ebffd60e62d25d4a158eacfb769bbdff6",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/uk/characters.json",
+          "sha256": "bc26b99f38e405aa494476b4ed7c7cdf4a2b6d19bb6f5c5b7438f25be3acf1e8",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "first_pcm_ms": 234.37020000000075,
+      "completed_ms": 608.65670000004,
+      "real_time_factor": 0.4475416911765,
+      "audio": {
+        "frames": 32640,
+        "duration_seconds": 1.36,
+        "peak": 0.414794921875,
+        "rms": 0.08307710868384711,
+        "nonzero_samples": 31366
+      },
+      "chunks": [
+        {
+          "time_ms": 234.37020000000075,
+          "bytes": 22080
+        },
+        {
+          "time_ms": 450.93700000001036,
+          "bytes": 28800
+        },
+        {
+          "time_ms": 601.7415000000028,
+          "bytes": 14400
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "baseline",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "uk-punctuation.wav",
+      "wave_sha256": "ceb4a011051edbca3a77c7e19ab0be9014f270d1eec697c04bcdb960b837c943",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "en-punctuation",
+      "language": "en",
+      "glyph": "!",
+      "resolver": "installed-name",
+      "voice": "sara",
+      "text": "bang",
+      "character": false,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/en/symbols.dic",
+          "sha256": "483a98ff1c9b895902dbeed1761f333d0a4db054adcdc7986097b2e88fa517c8",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/en/characterDescriptions.dic",
+          "sha256": "1a79103bb8ecafea396b2f1692228292714f47783d6c2814aa0efae867523073",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/en/annotations.json",
+          "sha256": "6b6b6e0e5f211bc31cf3fa39f385d80dea6cd19ee19bbc6db9071fce3ae5d360",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/en/characters.json",
+          "sha256": "58439b6515f5dcba75ab7c1a59b737220deddadcaf6abba0fdd6d45611cb7aab",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "first_pcm_ms": 27.31749999998101,
+      "completed_ms": 154.8721999999998,
+      "real_time_factor": 0.3139566517442347,
+      "audio": {
+        "frames": 11839,
+        "duration_seconds": 0.4932916666666667,
+        "peak": 0.411376953125,
+        "rms": 0.08431804215240153,
+        "nonzero_samples": 11415
+      },
+      "chunks": [
+        {
+          "time_ms": 27.31749999998101,
+          "bytes": 3998
+        },
+        {
+          "time_ms": 55.782700000008845,
+          "bytes": 7680
+        },
+        {
+          "time_ms": 104.82309999997597,
+          "bytes": 8640
+        },
+        {
+          "time_ms": 152.34010000000353,
+          "bytes": 3360
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "profile",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "en-punctuation.wav",
+      "wave_sha256": "81d0d86cade1e3e2eec17bc5c7275952e5ebffca366dfcc876c1af2cc4f230d5",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "uk-supplementary-arrow",
+      "language": "uk",
+      "glyph": "🡺",
+      "resolver": "installed-name",
+      "voice": "sara",
+      "text": "стрілка вправо",
+      "character": false,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/symbols.dic",
+          "sha256": "fda8dbb2de2576436d1891038f2b4aaa40dbe8ccee70c895aed9361d3557c7df",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/characterDescriptions.dic",
+          "sha256": "5fbe3fe07400f4db0fdac213361d36952c3b9ce77e6fd44d6dd39b9c0fb41704",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/uk/annotations.json",
+          "sha256": "33a612c15a1a715511817c56d6c1319ebffd60e62d25d4a158eacfb769bbdff6",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/uk/characters.json",
+          "sha256": "bc26b99f38e405aa494476b4ed7c7cdf4a2b6d19bb6f5c5b7438f25be3acf1e8",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "first_pcm_ms": 223.74510000003056,
+      "completed_ms": 588.8964000000101,
+      "real_time_factor": 0.43301205882353677,
+      "audio": {
+        "frames": 32640,
+        "duration_seconds": 1.36,
+        "peak": 0.3775634765625,
+        "rms": 0.07534030239003262,
+        "nonzero_samples": 31452
+      },
+      "chunks": [
+        {
+          "time_ms": 223.74510000003056,
+          "bytes": 22080
+        },
+        {
+          "time_ms": 450.0854000000345,
+          "bytes": 28800
+        },
+        {
+          "time_ms": 582.0961000000011,
+          "bytes": 14400
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "baseline",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "uk-supplementary-arrow.wav",
+      "wave_sha256": "e100b41187e7f16f763d2eaaed02847ab1b0bea6d4f9523480a9855d5fa32cd5",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "en-supplementary-emoji-name",
+      "language": "en",
+      "glyph": "😀",
+      "resolver": "pinned-cldr-probe-name",
+      "voice": "sara",
+      "text": "grinning face",
+      "character": false,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/en/symbols.dic",
+          "sha256": "483a98ff1c9b895902dbeed1761f333d0a4db054adcdc7986097b2e88fa517c8",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/en/characterDescriptions.dic",
+          "sha256": "1a79103bb8ecafea396b2f1692228292714f47783d6c2814aa0efae867523073",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/en/annotations.json",
+          "sha256": "6b6b6e0e5f211bc31cf3fa39f385d80dea6cd19ee19bbc6db9071fce3ae5d360",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/en/characters.json",
+          "sha256": "58439b6515f5dcba75ab7c1a59b737220deddadcaf6abba0fdd6d45611cb7aab",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "production_mapping_gap": false,
+      "first_pcm_ms": 28.49319999995714,
+      "completed_ms": 210.75779999995348,
+      "real_time_factor": 0.26468797488220214,
+      "audio": {
+        "frames": 19110,
+        "duration_seconds": 0.79625,
+        "peak": 0.44140625,
+        "rms": 0.08271227487909594,
+        "nonzero_samples": 18899
+      },
+      "chunks": [
+        {
+          "time_ms": 28.49319999995714,
+          "bytes": 3990
+        },
+        {
+          "time_ms": 56.87689999996337,
+          "bytes": 7680
+        },
+        {
+          "time_ms": 106.6304999999943,
+          "bytes": 15510
+        },
+        {
+          "time_ms": 155.65349999997125,
+          "bytes": 7680
+        },
+        {
+          "time_ms": 206.65089999999964,
+          "bytes": 3360
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "profile",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "en-supplementary-emoji-name.wav",
+      "wave_sha256": "46b3bd13bb2affba4c2718b4d30532d6e858ba3d27d9af413877057066a52de7",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "uk-supplementary-emoji-name",
+      "language": "uk",
+      "glyph": "😀",
+      "resolver": "pinned-cldr-probe-name",
+      "voice": "sara",
+      "text": "широко всміхнене обличчя",
+      "character": false,
+      "name_source": "installed same-language explicit character-name resource",
+      "sources": {
+        "nvda_symbols": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/symbols.dic",
+          "sha256": "fda8dbb2de2576436d1891038f2b4aaa40dbe8ccee70c895aed9361d3557c7df",
+          "license": "GPL-2.0-or-later"
+        },
+        "nvda_descriptions": {
+          "url": "https://raw.githubusercontent.com/nvaccess/nvda/c295c817dae5f44f9fe9f9f7e8ce1ed8cd6bb350/source/locale/uk/characterDescriptions.dic",
+          "sha256": "5fbe3fe07400f4db0fdac213361d36952c3b9ce77e6fd44d6dd39b9c0fb41704",
+          "license": "GPL-2.0-or-later"
+        },
+        "cldr_annotations": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-annotations-full/annotations/uk/annotations.json",
+          "sha256": "33a612c15a1a715511817c56d6c1319ebffd60e62d25d4a158eacfb769bbdff6",
+          "license": "Unicode-3.0"
+        },
+        "cldr_characters": {
+          "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/uk/characters.json",
+          "sha256": "bc26b99f38e405aa494476b4ed7c7cdf4a2b6d19bb6f5c5b7438f25be3acf1e8",
+          "license": "Unicode-3.0"
+        },
+        "project_core_alphabet": {
+          "path": "source/0.12.2/synthDrivers/kx47Preview.py",
+          "sha256": "b456c3ccb3b5dd711b5e5cef2b1ec94fa6f15fecc704d8bc84fd259d0f78e3ae",
+          "license": "Existing project source terms",
+          "meaning": "Existing three core alphabet name tables, not a new multilingual validation claim"
+        }
+      },
+      "reviewed_spoken_name": true,
+      "raw_glyph_resolution_verified": false,
+      "production_mapping_gap": false,
+      "first_pcm_ms": 248.19420000000036,
+      "completed_ms": 712.6852000000099,
+      "real_time_factor": 0.3831640860215107,
+      "audio": {
+        "frames": 44640,
+        "duration_seconds": 1.86,
+        "peak": 0.350830078125,
+        "rms": 0.07815049220228802,
+        "nonzero_samples": 43424
+      },
+      "chunks": [
+        {
+          "time_ms": 248.19420000000036,
+          "bytes": 22080
+        },
+        {
+          "time_ms": 492.43310000002793,
+          "bytes": 28800
+        },
+        {
+          "time_ms": 703.4391000000255,
+          "bytes": 38400
+        }
+      ],
+      "loading_stages": [],
+      "renderers": [
+        {
+          "engine": "baseline",
+          "profile": "sara"
+        }
+      ],
+      "wave_file": "uk-supplementary-emoji-name.wav",
+      "wave_sha256": "eb7579d8e75ecef699671fa2b400680c693e024d17b94f3f594576babdeb5dc8",
+      "status": "passed-structure-only"
+    },
+    {
+      "id": "nb-native-bmp-character",
+      "language": "nb",
+      "glyph": "ø",
+      "resolver": "native-raw-bmp",
+      "status": "unsupported",
+      "reason": "Actual same-language resources are not installed"
+    },
+    {
+      "id": "nb-raw-supplementary-exploratory",
+      "language": "nb",
+      "glyph": "😀",
+      "resolver": "raw-supplementary",
+      "exploratory": true,
+      "status": "unsupported",
+      "reason": "Actual same-language resources are not installed"
+    }
+  ],
+  "failed_cases": 0,
+  "unsupported_required_cases": 3,
+  "worker_shutdown": {
+    "exit_code": 0,
+    "forced_termination": false
+  },
+  "completed_utc": "2026-11-22T06:45:59.586944+00:00"
+}

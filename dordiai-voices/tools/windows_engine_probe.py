@@ -32,6 +32,8 @@ MAX_REPLY_BYTES = 16 * 1024 * 1024
 MAX_AUDIO_BYTES = OUTPUT_RATE * 2 * 180
 EXCLUDED = ("kostia", "inna", "dina", "vira", "innesa", "veronika_classmate", "anatolii", "veronika")
 CORE = ("uk", "en", "ru")
+DICTIONARY_REGRESSION_WORD = "лексикографічний"
+DICTIONARY_REGRESSION_TEXT = "Кнопка перемикач натиснуто. Експериментальний лексикографічний словник."
 NATIVE_LOCALES = frozenset(("sk", "pl", "de", "fr", "da", "it", "es"))
 # Engineering smoke text, not a pronunciation evaluation corpus.
 SAMPLES = {
@@ -151,6 +153,56 @@ def make_request(language, profile, text):
     return request
 
 
+NATIVE_EXTENSION_PREFLIGHT = r'''
+import contextlib, importlib.util, json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from error_diagnostics import safe_error
+result = {"python_version": sys.version.split()[0], "bootstrap_mode": sys.argv[2]}
+try:
+    with contextlib.redirect_stdout(sys.stderr):
+        if sys.argv[2] == "reset":
+            from windows_runtime import reset_inherited_dll_directory
+            result["bootstrap"] = reset_inherited_dll_directory()
+        spec = importlib.util.find_spec("marisa_trie")
+        result["extension_basename"] = Path(spec.origin).name if spec and spec.origin else None
+        import marisa_trie
+        from marisa_trie import RecordTrie
+        from ukrainian_stress import dictionary, OVERRIDES, HOMOGRAPHS, rhvoice_dictionary
+        word = sys.argv[3]
+        if word in OVERRIDES or word in HOMOGRAPHS or word in rhvoice_dictionary():
+            raise ValueError("Dictionary regression word bypasses the native dictionary")
+        dictionary()
+        result["dictionary_constructed"] = True
+        result["nonoverride_word_checked"] = True
+    result["status"] = "passed"
+except Exception as error:
+    result.update(status="failed", diagnostics=safe_error(error))
+print(json.dumps(result))
+'''
+
+
+def native_extension_preflight(runtime, output, timeout):
+    """Import the exact PYD and construct stress dictionary in fresh children."""
+    tests = []
+    for mode in ("inherited", "reset"):
+        completed = subprocess.run([str(runtime / "python/python.exe"), "-I", "-B", "-u", "-c",
+            NATIVE_EXTENSION_PREFLIGHT, str(runtime), mode, DICTIONARY_REGRESSION_WORD],
+            cwd=runtime, capture_output=True, timeout=timeout)
+        (output / ("native-extension-" + mode + "-stderr.log")).write_bytes(completed.stderr[-262144:])
+        try:
+            result = json.loads(completed.stdout)
+            if not isinstance(result, dict):
+                raise ValueError("Expected JSON object")
+        except (ValueError, TypeError):
+            result = {"status": "failed", "reason": "Embedded native-extension preflight returned no valid JSON"}
+        result.update(kind="native-extension-preflight", bootstrap_mode=mode, exit_code=completed.returncode)
+        if completed.returncode:
+            result["status"] = "failed"
+        tests.append(result)
+    return tests
+
+
 class PipeWorker:
     """One persistent packaged process, with finite reply and shutdown waits."""
 
@@ -264,7 +316,8 @@ class PipeWorker:
     def check_excluded_voice(self, voice, timeout):
         self.send(make_request("uk", voice, "Перевірка."))
         result = self.receive(timeout)
-        if result != {"error": "ValueError"}:
+        if (result.get("error") != "ValueError" or "pcm" in result or "chunk" in result
+                or set(result) - {"error", "diagnostics"}):
             raise ProbeError("Excluded voice was not rejected before audio: " + str(result.keys()))
         return {"voice": voice, "status": "passed", "reply": result}
 
@@ -398,9 +451,11 @@ def run_probe(args):
         if release_manifest.is_file():
             release = json.loads(release_manifest.read_text(encoding="utf-8"))
             report["package_version"] = release.get("version")
+        preflights = native_extension_preflight(runtime, output, args.timeout)
+        report["tests"].extend(preflights)
         worker = PipeWorker(runtime, output / "worker-stderr.log")
         report["worker_command"] = worker.command
-        failures = 0
+        failures = sum(test["status"] != "passed" for test in preflights)
         for language in languages:
             test = {"kind": "language-engine", "language": language, "runs": []}
             report["tests"].append(test)
@@ -460,6 +515,22 @@ def run_probe(args):
         cancel_voice = catalogue.compatible_voice_ids(models, "uk", allowed)
         if cancel_voice:
             voice = "sara" if "sara" in cancel_voice else cancel_voice[0]
+            dictionary_test = {"kind": "uk-dictionary-regression", "language": "uk", "voice": voice}
+            report["tests"].append(dictionary_test)
+            request = make_request("uk", voice, DICTIONARY_REGRESSION_TEXT)
+            # Segment mode prevents a full-phrase navigation cache shortcut.
+            request["segments"] = [["uk", DICTIONARY_REGRESSION_TEXT]]
+            try:
+                pcm, observed = worker.render(request, args.timeout)
+                save_wave(output / "uk-dictionary-regression.wav", pcm)
+                dictionary_test.update(status="passed", nonoverride_word=DICTIONARY_REGRESSION_WORD,
+                    segments=True, observations=observed, wave_file="uk-dictionary-regression.wav")
+            except ProbeError as error:
+                dictionary_test.update(status="failed", error=str(error))
+                failures += 1
+                if isinstance(error, ProbeTimeout):
+                    raise
+            save_report(report_path, report)
             cancel = {"kind": "cancel-and-recover", "language": "uk", "voice": voice}
             report["tests"].append(cancel)
             try:

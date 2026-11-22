@@ -119,7 +119,7 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         definitions = [node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef) and node.name in names]
         events = []
         details = {"type": "RuntimeError", "worker": {"type": "ImportError", "import_name": "native"}}
-        namespace = {"snapshot": lambda stage: {"pcm_bytes": 0},
+        namespace = {"RESULT": {}, "snapshot": lambda stage: {"pcm_bytes": 0},
                      "DRIVER": SimpleNamespace(_dordiai_last_error_details=details, cancel=lambda: events.append("cancel")),
                      "check": lambda *args, **kw: events.append((args, kw)), "finish": lambda: events.append("finish"),
                      "later": lambda *args: self.fail("permanent error must not schedule more requests")}

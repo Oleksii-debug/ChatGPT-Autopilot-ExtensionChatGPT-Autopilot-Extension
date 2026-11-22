@@ -1,0 +1,74 @@
+{
+  "format": "dordiai-core-backup-verification",
+  "format_version": 1,
+  "version": "0.13.1-dev.3",
+  "source_filename": "dordiai-voices-0.13.1-dev.3.nvda-addon",
+  "source_size_bytes": 1767222592,
+  "source_sha256": "315fa139b3715034e43a7e35c1e50818f0703bb1f536f1fdebfaa43a1e372401",
+  "parts": [
+    {
+      "index": 1,
+      "offset_bytes": 0,
+      "zip_filename": "dordiai-core-0.13.1-dev.3-backup-001.zip",
+      "zip_size_bytes": 441805844,
+      "zip_sha256": "ed0db21421189fa8ab63f06bf7877481a9faad219cab21cff4538dfac6e3e565",
+      "member_name": "dordiai-core-0.13.1-dev.3-chunk-001.bin",
+      "raw_size_bytes": 441805648,
+      "raw_sha256": "4a4ad8a43ec198ea4c706643fdfd6f4486b73612bdbaafc70052a89550423f56"
+    },
+    {
+      "index": 2,
+      "offset_bytes": 441805648,
+      "zip_filename": "dordiai-core-0.13.1-dev.3-backup-002.zip",
+      "zip_size_bytes": 441805844,
+      "zip_sha256": "60023e6b5ab2c4b274b44c8e151032b25184b03b74d29c14b0398e2ea9baf053",
+      "member_name": "dordiai-core-0.13.1-dev.3-chunk-002.bin",
+      "raw_size_bytes": 441805648,
+      "raw_sha256": "e146699c2f9200148319e57f4d5ad00d6fb647389fb57de04fcb0a184a4ca507"
+    },
+    {
+      "index": 3,
+      "offset_bytes": 883611296,
+      "zip_filename": "dordiai-core-0.13.1-dev.3-backup-003.zip",
+      "zip_size_bytes": 441805844,
+      "zip_sha256": "979604f53faacbf64554f8d742db51b44e42224391279618f74643f9f9611beb",
+      "member_name": "dordiai-core-0.13.1-dev.3-chunk-003.bin",
+      "raw_size_bytes": 441805648,
+      "raw_sha256": "cf0004ade756c89b2404b7400505b88a0a71febb3863875f9ca91d7556d55080"
+    },
+    {
+      "index": 4,
+      "offset_bytes": 1325416944,
+      "zip_filename": "dordiai-core-0.13.1-dev.3-backup-004.zip",
+      "zip_size_bytes": 441805844,
+      "zip_sha256": "4543c004547b728e2c0794c57e038e3a5cc44797d820c3ced9da7e2598d27640",
+      "member_name": "dordiai-core-0.13.1-dev.3-chunk-004.bin",
+      "raw_size_bytes": 441805648,
+      "raw_sha256": "98472f8fffd6b2a9fde8735cd904ece6cfeb2ffd7c5e5baf219f23a4c8e9aafb"
+    }
+  ],
+  "maximum_zip_bytes": 441805844,
+  "real_stream_reconstruction_verified": true,
+  "reconstructed_sha256": "315fa139b3715034e43a7e35c1e50818f0703bb1f536f1fdebfaa43a1e372401",
+  "verification_output_file_created": false,
+  "original_core_modified": false,
+  "restore_unit_tests": {
+    "passed": 6,
+    "cases": [
+      "restore + idempotency",
+      "preserve wrong existing output",
+      "ordering + traversal",
+      "outer corruption + temporary cleanup",
+      "raw + whole checksum corruption",
+      "unsafe inner ZIP path"
+    ]
+  },
+  "helper_bundle": {
+    "path": "dist/core-backup-0.13.1-dev.3/dordiai-core-0.13.1-dev.3-backup-tools.zip",
+    "size_bytes": 12787,
+    "sha256": "44c22ac745b32657299fe245c0728eea02776aff439b6cc0759b431b34efc7d1"
+  },
+  "restore_tool_sha256": "23a3152b3fd2180abb70351e972e3194a9b87250a5c511ec7cbc0faf6d00b572",
+  "manifest_sha256": "77d88675d39258759b17e04198a3471ff581008f8179a83b13782b2b1cec230b",
+  "backup_parts_are_not_standalone_installers": true
+}

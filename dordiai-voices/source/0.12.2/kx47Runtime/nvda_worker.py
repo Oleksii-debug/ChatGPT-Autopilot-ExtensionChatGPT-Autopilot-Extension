@@ -6,13 +6,14 @@ import json
 import os
 from pathlib import Path
 import sys
-import traceback
 from queue import Queue
 from threading import Thread
 
 # The embedded interpreter is launched with -I and a restricted ._pth file;
 # sibling modules must be reachable before importing request-control helpers.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from windows_runtime import reset_inherited_dll_directory
+WORKER_BOOTSTRAP = reset_inherited_dll_directory()
 from session_control import RequestCancellation, SynthesisCancelled
 from voice_policy import require_voice_allowed
 from error_diagnostics import safe_error
@@ -214,7 +215,7 @@ def main():
                             native_loader.start()
                         except Exception as error:
                             print(f"Voice profile setup failed: {error}", file=sys.stderr)
-                    replies.write('{"ready": true}\n')
+                    replies.write(json.dumps({"ready": True, "workerBootstrap": WORKER_BOOTSTRAP}) + "\n")
                     replies.flush()
                     continue
                 controls = request.get("controls") or {}
@@ -371,8 +372,10 @@ def main():
                 except Exception as cleanup_error:
                     print(f"Speech stream cleanup failed: {type(cleanup_error).__name__}", file=sys.stderr)
                 cancellations.release(cancellation)
+                details = safe_error(error)
+                details["bootstrap"] = WORKER_BOOTSTRAP
                 response = {"finished": True} if isinstance(error, SynthesisCancelled) else {
-                    "error": type(error).__name__, "diagnostics": safe_error(error)}
+                    "error": type(error).__name__, "diagnostics": details}
             replies.write(json.dumps(response) + "\n")
             replies.flush()
         close_stream()

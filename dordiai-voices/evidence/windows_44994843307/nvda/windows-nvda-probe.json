@@ -1,0 +1,371 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "run_id": "d80f2657520443fa95a7625552db12ab",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "status": "failed",
+  "run_directory": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf",
+  "nvda_version": "2026.3.1",
+  "installer_url": "https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe",
+  "installer_sha256": "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052",
+  "checks": [
+    {
+      "name": "windows_audio_output_enumeration",
+      "status": "blocked",
+      "reason": "Windows waveOut reports zero output devices; physical audio cannot be verified"
+    },
+    {
+      "name": "official_installer_checksum",
+      "status": "passed"
+    },
+    {
+      "name": "portable_nvda_created",
+      "status": "passed",
+      "bootstrap_exit_code": 0
+    }
+  ],
+  "limitations": [
+    "Not a full release acceptance or acoustic/linguistic assessment",
+    "Explicit headless output double: no WavePlayer/device/acoustic acceptance"
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "audio_environment": {
+    "wave_out_devices": 0
+  },
+  "addon_path": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\dist\\dordiai-voices-0.13.1-dev.3.nvda-addon",
+  "addon_sha256": "315fa139b3715034e43a7e35c1e50818f0703bb1f536f1fdebfaa43a1e372401",
+  "portable_creation_command": [
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda_2026.3.1.exe",
+    "--create-portable-silent",
+    "--portable-path=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\portable",
+    "--config-path=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\config",
+    "--no-sr-flag",
+    "--minimal",
+    "--log-file=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\portable-creation.log"
+  ],
+  "extracted_addon": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\config\\addons\\kx47Voices",
+  "nvda_log": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\nvda.log",
+  "probe_json": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\nvda-probe.json",
+  "nvda_command": [
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\portable\\nvda.exe",
+    "--config-path=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\config",
+    "--log-file=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-qhm9u0yf\\nvda.log",
+    "--debug-logging",
+    "--no-sr-flag",
+    "--minimal",
+    "--lang=en"
+  ],
+  "probe": {
+    "format_version": 1,
+    "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+    "status": "failed",
+    "run_id": "d80f2657520443fa95a7625552db12ab",
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "nvda_version_expected": "2026.3.1",
+    "checks": [
+      {
+        "name": "physical_audio_output",
+        "status": "blocked",
+        "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+      },
+      {
+        "name": "select_dordiai",
+        "status": "passed",
+        "driver_name": "kx47Preview"
+      },
+      {
+        "name": "host_sonic_import_and_dll",
+        "status": "passed",
+        "module": "synthDrivers._sonic"
+      },
+      {
+        "name": "allowed_voice_catalog",
+        "status": "passed",
+        "count": 45,
+        "voices": [
+          "adam",
+          "agnieszka",
+          "alex",
+          "alice_day1",
+          "astra_day2",
+          "bella",
+          "brian",
+          "brian_studio",
+          "brianna",
+          "callum_day1",
+          "charlie_day1",
+          "chris",
+          "claude_day2",
+          "daniel",
+          "daniel_day1",
+          "david",
+          "elis",
+          "gemini_day2",
+          "george",
+          "george_unpacked",
+          "gpt_day2",
+          "grok_day2",
+          "harry",
+          "hazel",
+          "keeper",
+          "laura_day1",
+          "laura_unpacked",
+          "lian",
+          "liza",
+          "liza_talk",
+          "mark",
+          "mykola",
+          "oksana",
+          "oleksii",
+          "oleksii_day1",
+          "oleksii_day2",
+          "oleksii_unpacked",
+          "olena",
+          "sara",
+          "sara_archive",
+          "studio_day1",
+          "veren",
+          "viktoriia",
+          "will",
+          "yevhen"
+        ],
+        "excluded_present": []
+      },
+      {
+        "name": "fresh_default_languages",
+        "status": "passed",
+        "enabled": [
+          "en",
+          "ru",
+          "uk"
+        ]
+      },
+      {
+        "name": "settings_dialog",
+        "status": "passed",
+        "title": "dordiai-voices — налаштування",
+        "visible": true,
+        "pages": [
+          "Мовлення",
+          "Голоси",
+          "Мови",
+          "Пакети"
+        ],
+        "labels": [
+          "dordiai-voices — налаштування",
+          "panel",
+          "Основний голос",
+          "Визначення мови",
+          "Швидкість, відсотків",
+          "Множник швидкості",
+          "Гучність, відсотків",
+          "Висота, відсотків",
+          "Тембр, відсотків",
+          "Мова чисел",
+          "Мова кириличних літер",
+          "panel",
+          "Доступні голоси",
+          "Увімкнути всі",
+          "Вимкнути всі",
+          "panel",
+          "Мови для перемикання",
+          "Увімкнути всі",
+          "Вимкнути всі",
+          "Основна мова",
+          "Мова для призначення голосу",
+          "Голос для цієї мови",
+          "Показано встановлені мови. Галочка вмикає мову, але не видаляє її файли. Нові мови\nпотрібно вмикати окремо. Текст вимкненою мовою читається основною мовою.\nВиберіть мову й сумісний голос. У примусовому режимі весь текст читається основною\nмовою.",
+          "panel",
+          "Установлені додаткові пакети",
+          "Установити пакет із ZIP-файла…",
+          "Видалити вибраний пакет…",
+          "Вибрати попередню версію голосу…",
+          "Основний комплект не видаляється тут. Під час роботи з пакетом навігацію озвучує\nвбудований eSpeak. Потім dordiai-voices автоматично перезавантажиться, і можна буде\nввімкнути нові мови на вкладці «Мови».",
+          "OK",
+          "Cancel",
+          "&Apply"
+        ],
+        "checked_languages": [
+          "en",
+          "ru",
+          "uk"
+        ],
+        "voice_rows": 45,
+        "missing_controls": []
+      },
+      {
+        "name": "settings_hotkey_binding",
+        "status": "passed",
+        "scripts": [
+          "script_preferences"
+        ]
+      },
+      {
+        "name": "keyboard_tab",
+        "status": "passed",
+        "events_emitted": true,
+        "changed_focus": true,
+        "focused_type": "WxCtrlWithEnableEvnt",
+        "reason": null
+      },
+      {
+        "name": "keyboard_checkbox_space",
+        "status": "passed",
+        "changed": true,
+        "reason": null
+      },
+      {
+        "name": "phrase_pcm_submission",
+        "status": "failed",
+        "reason": "Permanent speech import failure; further requests stopped",
+        "metrics": {},
+        "diagnostics": {
+          "type": "RuntimeError",
+          "frames": [
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "_run",
+              "line": 1509
+            },
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "buffered_items",
+              "line": 451
+            },
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "fill",
+              "line": 417
+            },
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "_render_parts",
+              "line": 1443
+            },
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "stream",
+              "line": 774
+            },
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "_stream",
+              "line": 795
+            },
+            {
+              "module": "synthDrivers.kx47Preview",
+              "function": "_receive",
+              "line": 714
+            }
+          ],
+          "worker": {
+            "type": "ImportError",
+            "import_name": "marisa_trie",
+            "frames": [
+              {
+                "module": "__main__",
+                "function": "delivered_audio",
+                "line": 51
+              },
+              {
+                "module": "voice_controls",
+                "function": "apply_stream_controls",
+                "line": 37
+              },
+              {
+                "module": "voice_delivery",
+                "function": "clean_onset",
+                "line": 140
+              },
+              {
+                "module": "voice_delivery",
+                "function": "equalize_voice",
+                "line": 130
+              },
+              {
+                "module": "ukrainian_voices",
+                "function": "chunks",
+                "line": 227
+              },
+              {
+                "module": "speech_tempo",
+                "function": "stream_tempo",
+                "line": 43
+              },
+              {
+                "module": "voice_delivery",
+                "function": "condition_shared",
+                "line": 81
+              },
+              {
+                "module": "ukrainian_voices",
+                "function": "_natural_chunks",
+                "line": 313
+              },
+              {
+                "module": "ukrainian_voices",
+                "function": "_ukrainian",
+                "line": 180
+              },
+              {
+                "module": "ukrainian_stress",
+                "function": "accent_text",
+                "line": 135
+              },
+              {
+                "module": "ukrainian_stress",
+                "function": "_stress_edits",
+                "line": 126
+              },
+              {
+                "module": "ukrainian_stress",
+                "function": "word_stress",
+                "line": 110
+              },
+              {
+                "module": "ukrainian_stress",
+                "function": "dictionary_word",
+                "line": 80
+              },
+              {
+                "module": "ukrainian_stress",
+                "function": "dictionary",
+                "line": 69
+              },
+              {
+                "module": "ukrainian_word_stress",
+                "function": "<module>",
+                "line": 1
+              },
+              {
+                "module": "ukrainian_word_stress.stressify_",
+                "function": "<module>",
+                "line": 12
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "limitations": [
+      "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+      "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+      "One keyboard smoke check is not a complete accessibility assessment.",
+      "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+    ],
+    "wave_player_verified": false,
+    "physical_audio_verified": false,
+    "acoustic_latency_verified": false,
+    "product_ready": false,
+    "recording_pcm_sink_test_double": true,
+    "nvda_version_actual": "2026.3.1",
+    "phrase_requested_ns": 515913939500,
+    "pcm_metrics": {},
+    "finished_at_ns": 1795330048204535800
+  },
+  "finished_at_ns": 1795330048724554700
+}

@@ -705,6 +705,8 @@ class SpeechWorker:
             if line is None:
                 raise RuntimeError("Speech worker closed its response pipe.")
             result = json.loads(line)
+            if "workerBootstrap" in result:
+                self._worker_bootstrap = result["workerBootstrap"]
         except (OSError, Empty, ValueError, RuntimeError):
             self.close()
             raise
