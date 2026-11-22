@@ -1,0 +1,105 @@
+{
+  "format": "dordiai-runtime14-priority-independent-review",
+  "format_version": 1,
+  "created_utc": "2026-11-22T20:22:13.345284+00:00",
+  "conclusion_uk": "У перевіреній scheduler-only зміні нової акустичної або RU pipe protocol регресії не виявлено. Actual AB доводить обмежене прискорення під заданим навантаженням, але не кінцеву latency/NVDA/фонетичну прийомку. Є неблокувальний robustness follow-up для помилки відновлення Windows priority API.",
+  "review_mode": "Read-only independent review; no candidate/runtime/test edits, no model synthesis, no real process-priority changes, no helper build/playback/capture.",
+  "reviewed_sources_sha256": {
+    "source/0.12.2/kx47Runtime/wide_warmup.py": "a5c51ce277842c148ff956f934ca758e4519f58592a8b7cf9ddb10241426a478",
+    "source/0.12.2/kx47Runtime/nvda_worker.py": "8b8860c97f2fdd87bf42b476e803a7f4ac756718afc5e70816268bcd5085123b",
+    "source/0.12.2/kx47Runtime/native_multilingual.py": "5d02545ebd1e5102babd68e242c36a70d69a5d4b90a1ac2fdb58bdfa2882a2da",
+    "tests/test_runtime_priority.py": "d64b776969b95541a5018b3780df0621968ce9a7e04b594df4a628e46e6a93a9"
+  },
+  "reviewed_snapshot_matches_actual_bundle": true,
+  "actual_bundle": {
+    "path": "evidence\\local_core14_priority_candidate_20261122.json.gz",
+    "bytes": 59486,
+    "sha256": "d3bae1f765f03eba84ae83899cf0a9cc272143ba9d3144d3775cce57c1edcb68",
+    "all_member_base64_size_sha_verified": true,
+    "members": 14
+  },
+  "checks": {
+    "generator_lifecycle": "foreground_priority finally restores before PCM yield; StopIteration/exception/SynthesisCancelled flow leaves scope first. foreground_blocks finally closes source, including tuple/cache iterators; dispatcher close_stream also releases request cancellation state. 12 current tests independently rerun and passed.",
+    "owned_handles": "Only GetCurrentProcess pseudo-handle or int(self.process._handle) from the held Popen child is used; no PID scan/OpenProcess/reopen introduced. Native _russian_lock serializes warm/actual Russian stream accesses. Normal lifecycle retains Popen object and its handle until close; no PID-reuse selection introduced.",
+    "priority_ceiling": "Only BELOW_NORMAL0x4000 -> NORMAL0x20 is assigned. Existing NORMAL or other classes are unchanged; finally avoids overwriting an intervening external priority change. It does not introduce ABOVE_NORMAL/HIGH/REALTIME. This does not promise arbitrary pre-existing elevated classes are forcibly capped.",
+    "RU_protocol": "First JSON bytes, profile/text/optional seed, little-endian length/PCM decoding, next consumer backpressure, size0 completion, error sentinel and stop/zero-ACK semantics preserved. Promotion wraps the same send/read transaction and stop ACK; no extra next, buffering or PCM crop introduced. A malformed/incomplete packet closes the owned child conservatively.",
+    "acoustic_inputs": "Patch does not alter models, prompts, profile selection, text/seed/gain/tempo/controls or phoneme normalization. Dispatcher adds foreground wrapper around the same delivered_audio iterator; no reportLoading prerequisite remains. Actual UK/EN PCM hashes identical in all tested pairs.",
+    "actual_restoration": "AB trace has470 observed priority calls across2handles, no errors, both final BELOW_NORMAL. Dedicated cleanup repeat has82calls/2handles both restored, known native children polled reaped and stdio closed. Original transient active-job observation/forced cleanup remains preserved; repeat reached natural zero after20.5ms.",
+    "actual_cancel_recovery": "Raw actual dispatcher error -> recovery and RU firstchunk -> cancel/drop -> finished ACK -> subsequent UK PCM path verified in archived report; this is software pipe recovery, not physical audible cancellation."
+  },
+  "independently_reproduced": {
+    "runtime_priority_tests": 12,
+    "tests_passed": true,
+    "command": "python -B -m unittest discover -s tests -p test_runtime_priority.py -v",
+    "archived_AB_requests": 24,
+    "all24_requests_load_controlled": true,
+    "cancel_drop_acknowledged": true,
+    "comparison": {
+      "uk": {
+        "baseline": {
+          "n": 4,
+          "first_pcm_median_ms": 1446.3899999973364,
+          "completed_pcm_median_ms": 5498.268549992645
+        },
+        "candidate": {
+          "n": 4,
+          "first_pcm_median_ms": 719.2649999997229,
+          "completed_pcm_median_ms": 2771.6868499992415
+        },
+        "combined_unique_pcm_sha256": 1
+      },
+      "en": {
+        "baseline": {
+          "n": 4,
+          "first_pcm_median_ms": 102.17465000459924,
+          "completed_pcm_median_ms": 1043.3864500082564
+        },
+        "candidate": {
+          "n": 4,
+          "first_pcm_median_ms": 51.68759999651229,
+          "completed_pcm_median_ms": 578.9351499988697
+        },
+        "combined_unique_pcm_sha256": 1
+      },
+      "ru": {
+        "baseline": {
+          "n": 4,
+          "first_pcm_median_ms": 985.5231999972602,
+          "completed_pcm_median_ms": 7003.04944999516
+        },
+        "candidate": {
+          "n": 4,
+          "first_pcm_median_ms": 517.0894999973825,
+          "completed_pcm_median_ms": 3544.8804500119877
+        },
+        "combined_unique_pcm_sha256": 8
+      }
+    }
+  },
+  "follow_up_findings": [
+    {
+      "severity": "P2 robustness bound; not observed in actual Windows trace",
+      "location": "source/0.12.2/kx47Runtime/wide_warmup.py foreground_priority finally",
+      "finding": "Restore SetPriorityClass return value is ignored. Injected fake kernel allowing promotion but returningFalse on restore leaves the fake live process atNORMAL without an exception/error receipt. This is an API failure branch, not a normal-path regression or actual handle-ownership escape.",
+      "reproduced_without_OS_mutation": true,
+      "fake_final_priority": 32,
+      "fake_calls": [
+        32,
+        16384
+      ],
+      "action": "A subsequent separately reviewed change should record restoration failure with GetLastError and current held-handle state; define bounded retry only while exact owned process is still live and NORMAL. Do not mask it by claiming guaranteed restoration. Frozen files were not edited."
+    }
+  ],
+  "open_bounds": [
+    "Cold preload can hold _russian_lock while a BELOW_NORMAL child does blocking startup; actual first request may wait for that lock. This remains separate from the successful prewarmed AB result.",
+    "Native RU _size/_read/startup and stop-ACK remain blocking; cancellation cannot interrupt a native read already in progress. Current finally cleanup helps only when control returns. No P95/P99 or sub20ms cancellation claim.",
+    "Overlapping foreground scopes from different threads on one handle are not reference-counted. Current dispatcher is single consumer and RU work/preload is serialized; a future concurrent scheduling caller requires its own scoped/refcount design. Concurrent external close of RussianPipe is not made safe by this patch.",
+    "Non-stream reference/synthesize branches are outside the new foreground_blocks wrapper; speedup is established for the NVDA streaming worker path tested here.",
+    "Four observations per AB cell on one selected logicalCPU and requested60%duty synthetic competitor cannot establish general real-world throughput or tail latency. Requested duty is not a measured machine-wide utilization percentage.",
+    "RU produced8distinct waveform hashes across8AB utterances despite seed42. Same request/model inputs and preserved protocol do not prove native waveform identity or no spoken word loss; listening/phonetic alignment remains unverified.",
+    "No physical audio device, user NVDA, typing/Backspace, profiles/settings or user-level hotkeys tested in this independent review. Hardware clock helper was neither built nor executed."
+  ],
+  "blocking_new_protocol_or_acoustic_defect_found": false,
+  "candidate_is_product_acceptance": false,
+  "product_ready": false
+}

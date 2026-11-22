@@ -1,0 +1,115 @@
+{
+  "format": "dordiai-own-audio-clock-design-review",
+  "format_version": 1,
+  "created_utc": "2026-11-22T20:02:25.674171+00:00",
+  "status": "design-and-no-device-selftest-source-ready-for-root-review",
+  "actual_run_implemented": false,
+  "actual_run_approved_by_root": false,
+  "audio_client_activated": false,
+  "playback_performed": false,
+  "capture_performed": false,
+  "cpp_compiled": false,
+  "cpp_selftest_executed": false,
+  "related_inventory": "evidence/local_audio_clock_feasibility_20261122.json",
+  "scope_uk": "Окремий інженерний transport harness для короткого власного non-speech marker: own process render у явно обраний наявний hardware endpoint, own-process ApplicationLoopback tap і незалежна render IAudioClock clock-вісь. Жодна частина цього дизайну не є реальним NVDA-тестом чи фізично чутним вимірюванням. Поточний C++ target містить тільки no-device --self-test; actual render/capture path відсутній і буде окремо reviewed/pinned.",
+  "official_api_findings": [
+    {
+      "topic": "device-frequency",
+      "finding_uk": "Позиція IAudioClock має невизначені одиниці. GetFrequency повертає сумісні одиниці за секунду; p/f дає stream-relative секунди. Не підставляти sample rate замість цієї частоти.",
+      "source": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclock-getfrequency"
+    },
+    {
+      "topic": "render-position-and-QPC",
+      "finding_uk": "GetPosition дає позицію та корельований QPC у 100-нс одиницях. Raw QueryPerformanceCounter спочатку конвертувати через QueryPerformanceFrequency; API QPC не конвертувати вдруге. S_OK означає точне читання, S_FALSE зберігати як менш точне й не підвищувати до точного. Після Start початкова позиція може залишатись нульовою кілька мілісекунд; наступні читання не повинні зменшуватись. Stop зупиняє позицію, Reset її обнуляє.",
+      "source": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclock-getposition"
+    },
+    {
+      "topic": "stream-latency",
+      "finding_uk": "GetStreamLatency після Initialize повертає максимальну затримку поточного stream у 100-нс одиницях. Це стабільна властивість stream object, а не замір слухового onset, фактичного часу кожного packet або NVDA-відгуку. Не віднімати її мовчки від QPC і не називати latency ціль прийнятою.",
+      "source": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-getstreamlatency"
+    },
+    {
+      "topic": "clock-lifetime",
+      "finding_uk": "IAudioClock отримується через IAudioClient::GetService. Release виконувати на тому самому thread, де викликано GetService.",
+      "source": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nn-audioclient-iaudioclock"
+    },
+    {
+      "topic": "capture-packet-timing",
+      "finding_uk": "GetBuffer повертає позицію першого frame packet у frames від початку capture stream і корельований QPC у 100-нс одиницях. Frame byte size визначається nBlockAlign. Після успішного packet GetBuffer потрібний парний ReleaseBuffer на тому самому thread; BUFFER_EMPTY не надає нових timestamps.",
+      "source": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudiocaptureclient-getbuffer"
+    },
+    {
+      "topic": "packet-validity",
+      "finding_uk": "TIMESTAMP_ERROR позначає невизначений час packet; DATA_DISCONTINUITY позначає втрату кореляції з попереднім packet. SILENT вимагає ігнорування фактичних data bytes і трактування їх як тиші. Зберігати flags і raw timestamps; не створювати clock-доказ із помилкових timestamps.",
+      "source": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/ne-audioclient-_audclnt_bufferflags"
+    },
+    {
+      "topic": "process-isolation-and-endpoint-independence",
+      "finding_uk": "ApplicationLoopback може обмежити capture одним process tree; стороннє аудіо тоді не входить. Цей capture не прив’язаний до конкретного endpoint. Потрібна Windows build 20348+. Звідси інженерний висновок: hardware render не гарантує ненульових process-tap DevicePositions, це треба виміряти окремо.",
+      "source": "https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/",
+      "last_sentence_is_inference": true
+    }
+  ],
+  "proposed_root_review_gates": [
+    "1. Review цього scope, contract і no-device selftest. Старі windows_process_loopback.cpp та process_loopback_guard.py не редагувати, CI-environment checks не підробляти.",
+    "2. Окремий reviewed actual-run source patch. До його схвалення будь-який --run/--capture/--render аргумент відхиляється до COM/device API. Поточний дизайн навмисно не може відтворювати чи захоплювати звук.",
+    "3. CI-only build artifact із trusted already-installed MSVC+SDK без installation/download dependencies. Локально перевірити source SHA, binary SHA/bytes, compiler signature provenance, exact CI repository/ref/commit/run/artifact до запуску.",
+    "4. Root окремо погоджує конкретний inventoried endpoint ID і bounded actual-run command. Це review між агентами, не запит додаткового налаштування користувачем. До нього жодного playback/capture."
+  ],
+  "ci_build_provenance_plan": {
+    "ci_scope": "Compile only the separate design/then-reviewed target; never audio playback/capture, drivers, endpoint changes or installation on CI. No-device --self-test may run as a separate clearly labelled step.",
+    "compiler": "Find already-installed VS through official vswhere path; choose x64 cl.exe/link.exe and Windows SDK. Require Get-AuthenticodeSignature Status=Valid and signer O=Microsoft Corporation for compiler before execution. Record full compiler path/version/signature subject/thumbprint, tool SHA, SDK version and exact flags. Abort if unavailable.",
+    "flags": "cl /nologo /std:c++17 /EHsc /W4 /WX /utf-8 /DUNICODE /D_UNICODE /O2 /MT windows_owned_audio_clock_design.cpp /link /Brepro /out:owned-clock-design.exe",
+    "artifact": "Small source.cpp, own EXE, build-receipt.json, optional selftest.json and compiler metadata; exact path list and SHA256+size for each. No models/voice/audio/userdata in artifact.",
+    "receipt_fields": [
+      "format/version",
+      "repository",
+      "workflow commit SHA and workflow path",
+      "source commit and source file SHA",
+      "CI run id + attempt",
+      "artifact id/name/size",
+      "compiler file hash and Authenticode result",
+      "linker/sdk versions",
+      "flags",
+      "binary SHA256/size",
+      "selftest device_api_called=false"
+    ],
+    "local_verification": "Use known GitHub connector artifact identity and trusted source/ref from root; verify all exact bytes before executing owned EXE. A locally built project EXE need not be Microsoft-signed; trust comes from reviewed source, authenticated CI transport and exact checksums, not an invented executable signature."
+  },
+  "future_actual_run_guards_uk": [
+    "Тільки x64 Windows20348+; тільки власний helper child із parent-observed PID, process starttime та exact executable SHA. У native activation TargetProcessId завжди GetCurrentProcessId; довільний --pid, excludetree та системний loopback синтаксис відсутні. Helper не створює дітей.",
+    "Активація тільки VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK із INCLUDE_TARGET_PROCESS_TREE; окремий render client тільки через IMMDeviceEnumerator::GetDevice(explicit reviewed endpoint ID). У capture не використовувати endpoint-wide LOOPBACK initialization без process activation.",
+    "Запуск у fresh D:\\DordiaiTestTemp\\owned-clock-<random32hex> без symlinks/reparse ancestors. Parent створює nonce/receipt і фіксує child PID; native receipt повторює власні PID, starttime, nonce та endpoint ID. Вхідні/output names лише bounded owned files, без сторонніх шляхів.",
+    "Не запускати жодну NVDA. Не відкривати userdata/userconfig, не змінювати звук NVDA, defaultdevice, endpoint/session volume, hardware format, registry, privacy, services або drivers. Snapshot default IDs read-only до/після; на зовнішню зміну не реагувати відновленням налаштувань.",
+    "У shared mode використовувати незмінний native mix format, який прочитано й перевірено. Спершу підтримати тільки stereo float32/PCM16 із bounded rate; непідтримуваний format означає відмову, а не зміну endpoint format.",
+    "Власний детермінований non-speech marker100ms із peak0.03 і короткими fade edges, потім нульові samples; це waveform gain, не зміна system/session volume. Audio interval≤1500ms, activation timeout≤5000ms, parent watchdog≤8000ms. Native-format PCM budget≤8MiB, packets/clock records≤4096, output metadata≤1MiB.",
+    "Отримати render IAudioClock/GetFrequency та IAudioClient::GetStreamLatency на тому самому control thread. На кожному спостереженні фіксувати raw QPC before/after, raw HRESULT, device position і API QPC100ns. Окремо зберігати capture GetBuffer frames/flags/position/QPC; не змішувати осі.",
+    "Зупинити обидва власні streams у finally, ReleaseBuffer для acquired packets, release IAudioClock на GetService thread, звільнити COM/event resources, reap тільки власний helper PID. Ніколи не завершувати користувацький NVDA або сторонні процеси."
+  ],
+  "future_evidence_interpretation_uk": [
+    "Ненульові зростаючі render IAudioClock readings при S_OK і узгоджений QPC можуть підтвердити власну stream clock-вісь. Колонки IAudioClock position_device_units і capture device_position_frames зберігати під різними назвами.",
+    "Усі нульові capture positions залишаються нулями та означають відсутній capture-position proof. Не підставляти render position, cumulative frames, expected positions чи synthetic QPC замість фактичних API outputs.",
+    "Для clock consistency порівнювати delta(position)/frequency із delta(API-QPC)/1e7 та audit тривалість calls. Зберігати реальну похибку без підгонки acceptance targets. S_FALSE, TIMESTAMP_ERROR, discontinuity і назадні timestamps відхиляють відповідні точні оцінки.",
+    "Кореляція власного marker доводить capture власного stream, але process tap може спостерігати audio до фактичного DAC. GetStreamLatency і render clock не є вимірюванням фізичного звуку, акустичного stop або NVDA P95/P99. Ці приймальні вимоги лишаються відкритими."
+  ],
+  "local_tests": {
+    "count": 14,
+    "status": "passed on real Windows host Python3.13.9",
+    "command": "python -B -m unittest discover -s tests -p test_owned_audio_clock_contract.py -v",
+    "synthetic_contract_only": true,
+    "device_api_called": false
+  },
+  "non_goals": [
+    "NVDA integration acceptance",
+    "physical audible latency acceptance",
+    "generic microphone/system conversation capture",
+    "changing endpoint/default/session/volume or installing drivers",
+    "weakening legacy hosted CI guards"
+  ],
+  "product_ready": false,
+  "design_file_sha256": {
+    "tools\\windows_owned_audio_clock_design.cpp": "68ae8904ce58deabe656a3f1a97939924639b1c6e66f98ce40444a6093d2ff1c",
+    "tools\\owned_audio_clock_contract.py": "724164b7f52df76a6a9b16978ab9757efddadd3fee34157c747614821d73835f",
+    "tests\\test_owned_audio_clock_contract.py": "6e21e3b083245720e316067ab7f138466a2f6de5f3f83711919ea552320c4cf9"
+  }
+}

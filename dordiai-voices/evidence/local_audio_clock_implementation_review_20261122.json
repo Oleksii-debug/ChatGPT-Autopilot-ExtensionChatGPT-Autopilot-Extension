@@ -1,0 +1,103 @@
+{
+  "format": "dordiai-owned-clock-actual-code-review",
+  "format_version": 1,
+  "created_utc": "2026-11-22T20:13:52.627556+00:00",
+  "root_design_review": "approved; parent authorized separate actual source implementation",
+  "actual_code_review": "Root reviewed ownership/marker/clock axes/cleanup. Final freeze adds100ms normal Stop margin and measured-session>1500ms fail-closed audit; waiting final root binary/artifact review before any local execution.",
+  "build_dispatched": false,
+  "cpp_compiled": false,
+  "native_selftest_executed": false,
+  "actual_run_executed": false,
+  "playback_performed": false,
+  "capture_performed": false,
+  "files": [
+    {
+      "path": "dordiai-voices\\tools\\windows_owned_audio_clock.cpp",
+      "bytes": 23162,
+      "sha256": "dea9c3c9e54b09ec9622400f8448ec9b2ee478c7cdc366109cd5e8d878edbbac"
+    },
+    {
+      "path": "dordiai-voices\\tools\\owned_audio_clock_contract.py",
+      "bytes": 8909,
+      "sha256": "bde89dbfdee8be4b8c8e59912c32cf0824f645bdfbc40bce320c737528737352"
+    },
+    {
+      "path": "dordiai-voices\\tests\\test_owned_audio_clock_native_contract.py",
+      "bytes": 6767,
+      "sha256": "d1014a8046e50957f0958022b08b97250183bfc94390169e00d2a7cc3ee582e7"
+    },
+    {
+      "path": ".github\\workflows\\dordiai-owned-clock-build.yml",
+      "bytes": 8626,
+      "sha256": "dcb38f9e9d600f3ee2fcd0b3ace05a6dfc8f10b3058b7ddf8115230ceb36684a"
+    }
+  ],
+  "frozen_include": {
+    "path": "tools/windows_process_loopback.cpp",
+    "sha256": "eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012",
+    "unchanged": true,
+    "legacy_entrypoint": "renamed at include to dordiai_frozen_hosted_main_not_an_entrypoint and never called; old CLI/environment/device ownership guards unmodified"
+  },
+  "entrypoints": {
+    "self_test": "Only primitive native format, marker peak/size and QPC arithmetic checks; no COM/device API. Pending trusted build and actual selftest execution.",
+    "describe": "Exact source/executable/nonce-directory/own-PID-start-time parent-pipe permit before COM. Reads exact inventoried endpoint native format through IAudioClient::GetMixFormat; never Initialize/Start/capture.",
+    "run": "Same ownership gates plus syntactically validated bounded expected-format bytes before COM. Native exact format must match before Initialize/Start. Current-process-only ApplicationLoopback and explicit hardware shared render."
+  },
+  "parent_protocol": {
+    "directory": "Parent creates a fresh regular non-reparse D:\\DordiaiTestTemp\\owned-clock-<random32lowerhex> with only exact verified own-clock.exe inside. Native compares final path, checks no reparse ancestors, takes a directory lease and rejects all other entries.",
+    "executable": "Parent verifies CI receipt/source/exe hashes before copying to nonce directory. Native hashes its own loaded module path and compares --expected-exe-sha256 before COM.",
+    "args": "own-clock.exe --mode describe|run --nonce <32hex> --directory <exact nonce path> --expected-exe-sha256 <64hex> --endpoint-id <one of 2 inventoried exact IDs>; run additionally --expected-format-hex <exact reviewed native bytes from prior describe>. No arbitrary PID/exclude/system-capture argument exists.",
+    "ready": "Native requires inherited anonymous/named parent stdin PIPE, emits one bounded JSON line: format=dordiai-owned-clock-ready, nonce,current_pid,process_start_filetime,executable_sha256,audio_api_called=false. No audio client/COM has been opened at this point.",
+    "permit": "Within1000ms parent verifies ready.pid equals actual spawned child.pid and independently reads the child process creation FILETIME, then sends ASCII nonce|pid|process_start_filetime|exe_sha256 plus LF. Native compares this exact line to its own GetCurrentProcessId/GetProcessTimes/hash, otherwise rejects beforeCOM.",
+    "watchdog": "Native owned thread starts before hashing/handshake and terminates only GetCurrentProcess() with exit124 after8000ms. Parent must independently use a bounded watchdog and reap only its exact Popen child; no user-NVDA process enumeration/termination.",
+    "outputs": "describe emits second JSON line with unchanged native_format and exact selected_endpoint; run writes only CREATE_NEW reference.pcm/captured.pcm/clock.json in the owned directory and emits bounded status. No overwritten existing evidence allowed."
+  },
+  "implemented_actual_limits": {
+    "marker_duration_ms": 100,
+    "marker_peak": 0.03,
+    "marker_source": "Deterministic generated non-speech chirp with8ms fade envelope; never supplied user audio. No volume/session APIs.",
+    "capture_render_session_ms": 1500,
+    "activation_wait_ms": 5000,
+    "parent_permit_wait_ms": 1000,
+    "own_watchdog_ms": 8000,
+    "captured_pcm_max_bytes": 8388608,
+    "capture_packet_records_max": 4096,
+    "render_clock_records_max": 4096,
+    "clock_json_max_bytes": 1048576,
+    "supported_native_format": "Unchanged bounded8k–192k stereo PCM16 or float32, extensible subtype/validbits checked; all other formats fail closed rather than changing device format.",
+    "normal_loop_target_ms": 1400,
+    "actual_through_both_Stop_audit": "session_through_both_stops_seconds is measured without clamping; >1.5seconds makes transport status failed. OS/native API stalls are still bounded by8s own watchdog, not falsely described as<=1500ms."
+  },
+  "actual_clock_semantics": {
+    "render": "IAudioClock GetFrequency arbitrary device units/sec; GetPosition raw HRESULT, position_device_units, api_qpc_100ns and before/after raw QPC ticks kept. IAudioClient::GetStreamLatency recorded as maximum stream property100ns, never called measured audible onset.",
+    "capture": "Process-tap GetBuffer frames, flags, device_position_frames, api_qpc_100ns and observed raw QPC bracket retained exactly; SILENT data treated as zeros. No synthetic positions or QPC replacement.",
+    "assessment": "Pure assess_native_receipt verifies exact own process/nonce/time/hash/endpoint/format, then reports render and process-capture axes separately. Render success cannot replace allzero process capture positions. S_FALSE excluded from accurate rows; TIMESTAMP_ERROR/discontinuity packets not promoted to accurate capture axis.",
+    "cleanup": "Stop only own render/capture clients; release IAudioClock/GetService interfaces on original main thread, preserve callback/activation result and cleanup-error evidence. Timeout/failed callback not claimed clean."
+  },
+  "ci": {
+    "workflow": ".github/workflows/dordiai-owned-clock-build.yml",
+    "scope": "Exact repository/audit branch. Push requires explicit [owned-clock-build] head-commit marker and frozen literal reviewed source SHA; manual dispatch may supply reviewed source SHA. Set core.autocrlf=false before pinned checkout of dispatched github.sha. Verify frozen include hash and trusted already installed signed Microsoft vswhere/cl/link+SDK; no installers or dependencies.",
+    "actions": "checkout11bd71901bbe5b1630ceea73d27597364c9af683; upload-artifactea165f8d65b6e75b540449e92b4886f43607fa02",
+    "executes_helper": "Only --self-test with no COM/device calls after a successful build. Never --mode describe/run or any playback/capture.",
+    "artifact": "Own EXE, actual/frozen source.cpp, build.log, self-test.json and build-receipt.json. Receipt helper_executed=true only after genuine successful --self-test execution, with native_selftest and exact output inventory. This workflow has not been dispatched by this agent."
+  },
+  "validation": {
+    "tests": 23,
+    "result": "passed real Windows host Python3.13.9",
+    "command": "python -B -m unittest discover -s tests -p test_owned_audio_clock*.py -v",
+    "scope": "pure arithmetic/native receipt contracts + source/static safety checks only; no C++ compilation or native execution yet",
+    "powershell_workflow_runblock_syntax": "All multiline run blocks parsed by System.Management.Automation.Language.Parser; zero errors. No workflow commands executed locally."
+  },
+  "known_limits": [
+    "Native C++/SDK compilation remains unverified until root reviews and dispatches build-only workflow.",
+    "No local MSVC/SDK installation; no helper execution before code review.",
+    "Actual session wall limit is checked in native loop; API calls/OS scheduling can overrun the nominal1500ms before finally Stop. An independent8s own-process watchdog is the hard child lifetime bound; measured session_wall_seconds must be audited, not silently clamped.",
+    "Parent launcher implementation must independently verify the emitted PID/starttime/executable/CI receipt and enforce its own exact-child watchdog before any run. Native permit comparison is not proof that an arbitrary external caller performed that parent verification.",
+    "This source targets only two reviewed local hardware IDs; unavailable/changed endpoint or unsupported format fails, no default selection or system reconfiguration.",
+    "Process tap may still produce allzero DevicePositions even on real hardware render. Nonzero render IAudioClock is a separate clock axis and is not physical-audible or live-NVDA acceptance."
+  ],
+  "product_ready": false,
+  "updated_utc": "2026-11-22T20:16:35.542257+00:00",
+  "frozen_actual_source_sha256": "dea9c3c9e54b09ec9622400f8448ec9b2ee478c7cdc366109cd5e8d878edbbac",
+  "root_next_action": "Review final frozen source/workflow hashes, then root commit with [owned-clock-build] marker. This agent neither committed/pushed nor dispatched workflow. Local helper execution remains prohibited until artifact readback/root binary review."
+}

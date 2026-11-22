@@ -1,0 +1,154 @@
+{
+  "format": "dordiai-local-audio-clock-feasibility",
+  "format_version": 1,
+  "created_utc": "2026-11-22T19:58:03.557460+00:00",
+  "status": "read-only-inventory-complete; trusted local compiler/SDK not discovered; playback/capture not attempted",
+  "windows": {
+    "osversion": "Microsoft Windows NT 10.0.26200.0",
+    "is_64_bit_os": true,
+    "process_loopback_os_build_potentially_supported": true,
+    "actual_process_loopback_activation_tested": false
+  },
+  "endpoint_inventory": {
+    "method": "ctypes COM: CoInitializeEx/CoCreateInstance(IMMDeviceEnumerator), EnumAudioEndpoints(eRender,DEVICE_STATEMASK_ALL), collection GetCount/Item, IMMDevice GetId/GetState; GetDefaultAudioEndpoint(eRender,roles0/1/2); finally Release/CoUninitialize. HKLM MMDevices Audio Render Properties read for description/adapter metadata only.",
+    "com_result": "success",
+    "enumerated_endpoints": [
+      {
+        "id": "{0.0.0.00000000}.{5e6d1d97-9981-4bab-87dc-902105537e2b}",
+        "state": 4,
+        "state_name": "NOTPRESENT",
+        "registry_description": "Digital Output"
+      },
+      {
+        "id": "{0.0.0.00000000}.{ab77274c-f0dc-481f-9ac9-17587c2edff8}",
+        "state": 1,
+        "state_name": "ACTIVE",
+        "registry_description": "Speakers",
+        "registry_adapter": "Realtek(R) Audio",
+        "registry_bus": "HDAUDIO",
+        "registry_driver": "oem10.inf; IntcAzAudModel.NTamd64; 6.0.9448.1"
+      },
+      {
+        "id": "{0.0.0.00000000}.{acb64db5-5a75-455d-bb61-9d290f8443b8}",
+        "state": 8,
+        "state_name": "UNPLUGGED",
+        "registry_description": "Headphones"
+      },
+      {
+        "id": "{0.0.0.00000000}.{b8880068-e466-4e15-a983-439bc8bbf16d}",
+        "state": 4,
+        "state_name": "NOTPRESENT",
+        "registry_description": "Headphones"
+      },
+      {
+        "id": "{0.0.0.00000000}.{c7e83546-0f49-4141-8f97-14038164515c}",
+        "state": 4,
+        "state_name": "NOTPRESENT",
+        "registry_description": "Headphones"
+      },
+      {
+        "id": "{0.0.0.00000000}.{cf6549c6-9385-4aae-b475-947f200745cf}",
+        "state": 4,
+        "state_name": "NOTPRESENT",
+        "registry_description": "Speakers"
+      },
+      {
+        "id": "{0.0.0.00000000}.{fc1f7846-3543-4cff-aaee-de24d7de09b4}",
+        "state": 1,
+        "state_name": "ACTIVE",
+        "registry_description": "Speakers",
+        "registry_adapter": "AB13X USB Audio",
+        "registry_bus": "USB",
+        "registry_driver": "wdma_usb.inf; USBAudio; 10.0.26100.9457"
+      }
+    ],
+    "active_count": 2,
+    "default_roles": {
+      "console": "{0.0.0.00000000}.{fc1f7846-3543-4cff-aaee-de24d7de09b4}",
+      "multimedia": "{0.0.0.00000000}.{fc1f7846-3543-4cff-aaee-de24d7de09b4}",
+      "communications": "{0.0.0.00000000}.{fc1f7846-3543-4cff-aaee-de24d7de09b4}"
+    },
+    "interpretation": "Real hardware driver metadata and ACTIVE render endpoint objects are present; this does not prove render client activation, functioning playback, usable device clock, physical audibility, or NVDA acceptance.",
+    "IAudioClient_activated": false,
+    "IAudioRenderClient_created": false,
+    "IAudioCaptureClient_created": false,
+    "process_loopback_activated": false
+  },
+  "compiler_inventory": {
+    "commands_not_found_on_PATH": [
+      "cl.exe",
+      "clang-cl.exe",
+      "link.exe",
+      "vswhere.exe",
+      "csc.exe"
+    ],
+    "absent_paths": [
+      "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe",
+      "C:/Program Files/Microsoft Visual Studio",
+      "C:/Program Files (x86)/Microsoft Visual Studio",
+      "C:/Program Files (x86)/Windows Kits",
+      "C:/Program Files/LLVM",
+      "D:/Microsoft Visual Studio",
+      "D:/Program Files/Microsoft Visual Studio",
+      "C:/BuildTools"
+    ],
+    "absent_registry_keys": [
+      "HKLM/SOFTWARE/Microsoft/VisualStudio/SxS/VS7",
+      "HKLM/SOFTWARE/WOW6432Node/Microsoft/VisualStudio/SxS/VS7",
+      "HKLM/SOFTWARE/Microsoft/Windows Kits/Installed Roots",
+      "HKLM/SOFTWARE/WOW6432Node/Microsoft/Windows Kits/Installed Roots"
+    ],
+    "compiler_executed": false,
+    "compiler_authenticode_checked": false,
+    "compiler_found": false,
+    "sdk_found": false,
+    "interpretation": "No discoverable existing trusted Microsoft C++ toolchain/Windows SDK in PATH, standard install roots or installer registry. This is bounded discovery, not an exhaustive whole-disk proof of absence. No compiler or SDK installation performed."
+  },
+  "query_limits": [
+    "Win32_OperatingSystem and Win32_SoundDevice CIM queries returned: Access to a CIM resource was not available to the client. Direct read-only COM endpoint enumeration and OSVersion/registry fallback succeeded."
+  ],
+  "existing_guards_review": {
+    "source": "tools/windows_process_loopback.cpp",
+    "python_guard": "tools/process_loopback_guard.py",
+    "checks": [
+      "Exact github-hosted current repository/run/x64 environment; local mode is intentionally rejected.",
+      "Exact ROOT\\DORDIAI_VBCABLE_<32hex>\\<hex> owned started device with verified vbaudiovacwdm hardware identity.",
+      "Exact known owned vendor render endpoint name; arbitrary default/user endpoints are rejected.",
+      "Only GetCurrentProcessId INCLUDE_TARGET_PROCESS_TREE; no caller-supplied arbitrary PID/exclude mode, and helper creates no children.",
+      "Output/reference paths must be current RUNNER_TEMP/current run, regular/fresh, no links/reparse ancestors.",
+      "Python verify_build requires matching source/binary SHA, exact current run, valid Microsoft compiler signature receipt.",
+      "Parent verifies helper PID==target/current PID, exact endpoint, no children/exclude mode, activation callback completed; finite owned-child watchdog reaps child."
+    ],
+    "unchanged": true,
+    "spoofed_CI_environment": false,
+    "local_bypass_attempted": false
+  },
+  "proposed_next_engineering_step_uk": [
+    "Чинний CI-only C++ helper локально не запускати і не послаблювати його захист. За окремим рішенням root підготувати окремий local engineering target зі строгими current-process ownership guards та exact endpoint ID.",
+    "Потрібен наявний перевірений Microsoft toolchain або перевірене CI-збирання окремого reviewed target із source/binary/compiler provenance. Нічого не встановлювати мовчки; поточний локальний trusted compiler/SDK не знайдено.",
+    "Після повідомлення root і окремого продовження запускати лише власний bounded child, який сам генерує короткий non-speech marker/PCM, не створює нащадків і capture виконує тільки INCLUDE_CURRENT_PROCESS_TREE. Ніколи не підставляти PID NVDA або інших програм.",
+    "Користувачеву NVDA, default endpoint, volume/session volume, endpoint format і drivers не змінювати. Не використовувати endpoint-wide loopback або microphone capture; процесний tap ізолює власний marker від сторонньої розмови.",
+    "Перед будь-яким marker render ще раз перевірити точний ACTIVE endpoint і format read-only. Native shared stream не означає зміну системного format. Відтворення через наявний USB endpoint потенційно чутне, тому інвентаризація сама не починає playback.",
+    "Для packet GetBuffer зберігати frame count, flags (особливо TIMESTAMP_ERROR), device position, packet QPC та власний QPC. Окремо отримувати IAudioClock render-clock GetFrequency/GetPosition/QPC. Ці два clock domains не ототожнювати без калібрування.",
+    "Реальний render endpoint не гарантує ненульовий DevicePosition у VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK: capture tap є окремим віртуальним stream. Якщо DevicePositions знову нульові або timestamp flags недійсні, чесно відхилити цей clock proof; не підміняти нулі лічильником і не оголошувати hardware/NVDA latency виміряною.",
+    "Кореляція тільки відомого власного marker і live clock consistency — окремий transport engineering evidence; вона не доводить слухову акустику, озвучення NVDA чи прийомку користувацьких latency targets."
+  ],
+  "actions_not_performed": {
+    "playback": true,
+    "capture": true,
+    "second_NVDA_start": true,
+    "live_NVDA_or_userconfig_mutation": true,
+    "volume_or_defaultdevice_mutation": true,
+    "driver_installation": true,
+    "compiler_sdk_installation": true
+  },
+  "device_positions_measured": false,
+  "physical_audible_acceptance": false,
+  "actual_NVDA_acceptance": false,
+  "product_ready": false,
+  "reviewed_source_sha256": {
+    "tools\\windows_process_loopback.cpp": "eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012",
+    "tools\\process_loopback_guard.py": "c9b1bbe2bddd5f8c926129c23c99d3fd171c5e10fecc5852cf038ca87bd60811",
+    "tests\\test_process_loopback_guard.py": "bebc8fb8d7acc11c154314826c7089ab3ffc76fc0337773a105161cfd6a743ed"
+  }
+}

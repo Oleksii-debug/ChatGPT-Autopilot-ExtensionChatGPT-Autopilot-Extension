@@ -1,0 +1,6840 @@
+{
+  "format": "dordiai-keyboard-settings-supplement",
+  "format_version": 1,
+  "status": "passed-functional-only",
+  "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "product_ready": false,
+  "physical_audio_verified": false,
+  "named_profile_switching_verified": false,
+  "file_chooser_keyboard_verified": false,
+  "phases": {
+    "edit": {
+      "format_version": 1,
+      "scope": "actual-owned-NVDA-keyboard-settings-and-restart-supplement",
+      "run_id": "e88c14ec78fd444884f906d4377fd67b",
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "status": "passed",
+      "run_directory": "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2",
+      "nvda_version": "2026.3.1",
+      "installer_url": "https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe",
+      "installer_sha256": "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052",
+      "checks": [
+        {
+          "name": "windows_audio_output_enumeration",
+          "status": "passed",
+          "reason": null
+        },
+        {
+          "name": "official_installer_checksum",
+          "status": "passed"
+        },
+        {
+          "name": "portable_nvda_created",
+          "status": "passed",
+          "bootstrap_exit_code": 0
+        }
+      ],
+      "limitations": [
+        "Not a full release acceptance or acoustic/linguistic assessment"
+      ],
+      "wave_player_verified": false,
+      "physical_audio_verified": false,
+      "acoustic_latency_verified": false,
+      "product_ready": false,
+      "recording_pcm_sink_test_double": false,
+      "audio_environment": {
+        "wave_out_devices": 2
+      },
+      "addon_path": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\dist-settings\\dordiai-voices-0.13.1-dev.13.nvda-addon",
+      "addon_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+      "long_installed_config_requested": true,
+      "config_directory": "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\config-native-host",
+      "portable_creation_command": [
+        "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda_2026.3.1.exe",
+        "--create-portable-silent",
+        "--portable-path=D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\portable",
+        "--config-path=D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\config-native-host",
+        "--no-sr-flag",
+        "--minimal",
+        "--log-file=D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\portable-creation.log"
+      ],
+      "extracted_addon": "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\config-native-host\\addons\\kx47Voices",
+      "nvda_log": "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\nvda.log",
+      "probe_json": "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\nvda-probe.json",
+      "nvda_command": [
+        "D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\portable\\nvda.exe",
+        "--config-path=D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\config-native-host",
+        "--log-file=D:\\a\\_temp\\dordiai-settings-keyboard-45064826893\\edit\\nvda-probe-cq03pix2\\nvda.log",
+        "--debug-logging",
+        "--no-sr-flag",
+        "--minimal",
+        "--lang=en"
+      ],
+      "probe": {
+        "format_version": 1,
+        "scope": "isolated-real-windows-nvda-smoke",
+        "status": "passed",
+        "run_id": "e88c14ec78fd444884f906d4377fd67b",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "nvda_version_expected": "2026.3.1",
+        "checks": [
+          {
+            "name": "select_dordiai",
+            "status": "passed",
+            "driver_name": "kx47Preview"
+          },
+          {
+            "name": "host_sonic_import_and_dll",
+            "status": "passed",
+            "module": "synthDrivers._sonic"
+          },
+          {
+            "name": "allowed_voice_catalog",
+            "status": "passed",
+            "count": 45,
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ],
+            "excluded_present": []
+          },
+          {
+            "name": "settings_phase_initial_languages",
+            "status": "passed",
+            "enabled": [
+              "en",
+              "ru",
+              "uk"
+            ]
+          },
+          {
+            "name": "actual_keyboard_settings",
+            "status": "passed",
+            "phase": "edit",
+            "scope": "Actual injected native keys, genuine wx/NVDA save and owned-profile disk receipt; no physical keyboard or acoustic claim"
+          },
+          {
+            "name": "keyboard_settings_cleanup",
+            "status": "passed",
+            "errors": []
+          }
+        ],
+        "limitations": [
+          "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+          "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+          "One keyboard smoke check is not a complete accessibility assessment."
+        ],
+        "wave_player_verified": false,
+        "physical_audio_verified": false,
+        "acoustic_latency_verified": false,
+        "product_ready": false,
+        "recording_pcm_sink_test_double": false,
+        "keyboard_startup_synth": {
+          "observed_before_probe_begin": true,
+          "configured_synth": "silence",
+          "actual_synth": "silence",
+          "actual_module": "synthDrivers.silence",
+          "player_class": "NoneType",
+          "output_device": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+          "real_wave_player": false,
+          "settings": null,
+          "saved_synth_automatic_startup_verified": false,
+          "status": "observed-before-reselection"
+        },
+        "nvda_version_actual": "2026.3.1",
+        "keyboard_settings": {
+          "phase": "edit",
+          "status": "passed-functional-only",
+          "events": [
+            {
+              "name": "send_input",
+              "time_ns": 298228085900,
+              "label": "NVDA+control+shift+f10",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    45,
+                    true
+                  ],
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    16,
+                    false
+                  ],
+                  [
+                    121,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "actual_hotkey_opened_settings",
+              "time_ns": 299070533300,
+              "dialog": {
+                "languages": [
+                  "en",
+                  "ru",
+                  "uk"
+                ],
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ],
+                "default_language": "uk",
+                "voice_map": {},
+                "pages": [
+                  "Мовлення",
+                  "Голоси",
+                  "Мови",
+                  "Пакети"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 299073550200,
+              "label": "Ctrl+Tab to page",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 299696562700,
+              "label": "Home/Down select voice agnieszka",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 300071215200,
+              "label": "Space voice agnieszka",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "checkbox",
+              "time_ns": 300443537500,
+              "kind": "voice",
+              "code": "agnieszka",
+              "before": true,
+              "after": false,
+              "speech_requests_since_key": 0,
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Агнешка",
+                "role": "15",
+                "states": [
+                  "16777216",
+                  "2",
+                  "4",
+                  "8388608"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 300569732400,
+              "label": "Home/Down select voice agnieszka",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 300943786600,
+              "label": "Space voice agnieszka",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "checkbox",
+              "time_ns": 301319310300,
+              "kind": "voice",
+              "code": "agnieszka",
+              "before": false,
+              "after": true,
+              "speech_requests_since_key": 0,
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Агнешка",
+                "role": "15",
+                "states": [
+                  "16777216",
+                  "2",
+                  "4",
+                  "8388608"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 301322045400,
+              "label": "Ctrl+Tab to page",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 301946215100,
+              "label": "Home/Down select language ru",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 302320685300,
+              "label": "Space language ru",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "checkbox",
+              "time_ns": 302696041100,
+              "kind": "language",
+              "code": "ru",
+              "before": true,
+              "after": false,
+              "speech_requests_since_key": 0,
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Російська",
+                "role": "15",
+                "states": [
+                  "16777216",
+                  "2",
+                  "4",
+                  "8388608"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 302823111000,
+              "label": "Home/Down select language uk",
+              "events_expected": 6,
+              "events_sent": 6,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 303195907900,
+              "label": "Space language uk",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "checkbox",
+              "time_ns": 303568817900,
+              "kind": "language",
+              "code": "uk",
+              "before": true,
+              "after": false,
+              "speech_requests_since_key": 0,
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Українська",
+                "role": "15",
+                "states": [
+                  "16777216",
+                  "2",
+                  "4",
+                  "8388608"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 303571251700,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 303944288400,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 304321871600,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 304837732900,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 305338223000,
+              "label": "Alt+Down/Home/Down/Enter Mapping language English",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    18,
+                    false
+                  ],
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    13,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "choice",
+              "time_ns": 305708495000,
+              "label": "Mapping language English",
+              "index": 0,
+              "text": "Англійська",
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Мова для призначення голосу",
+                "role": "13",
+                "states": [
+                  "16777216",
+                  "2",
+                  "512"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 305711276100,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 306246566700,
+              "label": "Alt+Down/Home/Down/Enter English compatible voice",
+              "events_expected": 94,
+              "events_sent": 94,
+              "chords": [
+                [
+                  [
+                    18,
+                    false
+                  ],
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    13,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "choice",
+              "time_ns": 306623666600,
+              "label": "English compatible voice",
+              "index": 43,
+              "text": "Вікторія",
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Голос для цієї мови",
+                "role": "13",
+                "states": [
+                  "16777216",
+                  "2",
+                  "512"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 306627051400,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 307119894400,
+              "label": "Space on actual OK",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "keyboard_ok_applied",
+              "time_ns": 307620957800,
+              "restore": false,
+              "settings": {
+                "languages": [
+                  "en"
+                ],
+                "default_language": "en",
+                "mode": "auto",
+                "voice": "adam",
+                "voice_map": {
+                  "en": "viktoriia"
+                },
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 307627532300,
+              "label": "NVDA+control+shift+f10",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    45,
+                    true
+                  ],
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    16,
+                    false
+                  ],
+                  [
+                    121,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "keyboard_reopen_verified",
+              "time_ns": 308114604900,
+              "restore": false,
+              "dialog": {
+                "languages": [
+                  "en"
+                ],
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ],
+                "default_language": "en",
+                "voice_map": {
+                  "en": "viktoriia"
+                },
+                "pages": [
+                  "Мовлення",
+                  "Голоси",
+                  "Мови",
+                  "Пакети"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 308118287900,
+              "label": "Escape",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    27,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 308624310300,
+              "label": "NVDA+control+c",
+              "events_expected": 6,
+              "events_sent": 6,
+              "chords": [
+                [
+                  [
+                    45,
+                    true
+                  ],
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    67,
+                    false
+                  ]
+                ]
+              ]
+            }
+          ],
+          "raw_keys": [
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 160,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 121,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 121,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 160,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 160,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 121,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 121,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 160,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 27,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 27,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 67,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 67,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            }
+          ],
+          "speech_requests": [
+            {
+              "text": [
+                "Owned keyboard settings fixture  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "edit  ",
+                "selected Owned settings keyboard test  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "dordiai-voices — налаштування  ",
+                "dialog  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "tab control  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основний голос  ",
+                "combo box  ",
+                "Адам  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Доступні голоси  ",
+                "list  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Адам  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Адам  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Агнешка  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Помилка dordiai-voices. Previous speech workers have not acknowledged cancellation  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            },
+            {
+              "text": [
+                "Адам  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Агнешка  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Мови для перемикання  ",
+                "list  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Англійська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Англійська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Російська  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Англійська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Російська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Українська  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Увімкнути всі  ",
+                "button  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Вимкнути всі  ",
+                "button  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основна мова  ",
+                "combo box  ",
+                "Англійська  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Мова для призначення голосу  ",
+                "combo box  ",
+                "Англійська  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Голос для цієї мови  ",
+                "combo box  ",
+                "Основний сумісний голос  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Вікторія  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            },
+            {
+              "text": [
+                "OK  ",
+                "button  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Owned keyboard settings fixture  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "edit  ",
+                "selected Owned settings keyboard test  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "dordiai-voices — налаштування  ",
+                "dialog  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "tab control  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основний голос  ",
+                "combo box  ",
+                "Адам  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Owned keyboard settings fixture  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "edit  ",
+                "selected Owned settings keyboard test  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Configuration saved  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            }
+          ],
+          "gesture_scripts": [
+            {
+              "identifiers": [
+                "kb(desktop):NVDA",
+                "kb:NVDA"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA+leftControl",
+                "kb:NVDA+leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+leftShift",
+                "kb:control+NVDA+leftShift"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+shift+f10",
+                "kb:control+NVDA+shift+f10"
+              ],
+              "script_name": "script_preferences",
+              "script_module": "globalPlugins.dordiaiMainPreferences"
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftControl",
+                "kb:leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+tab",
+                "kb:control+tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftControl",
+                "kb:leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+tab",
+                "kb:control+tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftAlt",
+                "kb:leftAlt"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):alt+downArrow",
+                "kb:alt+downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):enter",
+                "kb:enter"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftAlt",
+                "kb:leftAlt"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):alt+downArrow",
+                "kb:alt+downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):enter",
+                "kb:enter"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA",
+                "kb:NVDA"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA+leftControl",
+                "kb:NVDA+leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+leftShift",
+                "kb:control+NVDA+leftShift"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+shift+f10",
+                "kb:control+NVDA+shift+f10"
+              ],
+              "script_name": "script_preferences",
+              "script_module": "globalPlugins.dordiaiMainPreferences"
+            },
+            {
+              "identifiers": [
+                "kb(desktop):escape",
+                "kb:escape"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA",
+                "kb:NVDA"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA+leftControl",
+                "kb:NVDA+leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+c",
+                "kb:control+NVDA+c"
+              ],
+              "script_name": "script_saveConfiguration",
+              "script_module": "globalCommands"
+            }
+          ],
+          "public_post_configSave_count": 1,
+          "original_settings": {
+            "languages": [
+              "en",
+              "ru",
+              "uk"
+            ],
+            "default_language": "uk",
+            "mode": "auto",
+            "voice": "adam",
+            "voice_map": {},
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ]
+          },
+          "owned_virtual_endpoint_id": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+          "real_wave_player_initialized": true,
+          "physical_keyboard_verified": false,
+          "full_accessibility_verified": false,
+          "named_profile_switching_verified": false,
+          "file_chooser_keyboard_verified": false,
+          "pronunciation_verified": false,
+          "physical_audio_verified": false,
+          "public_TALK_then_cancel_before_keyboard": true,
+          "saved_settings": {
+            "languages": [
+              "en"
+            ],
+            "default_language": "en",
+            "mode": "auto",
+            "voice": "adam",
+            "voice_map": {
+              "en": "viktoriia"
+            },
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ]
+          },
+          "profile_disk_sha256": "58bf775a01622c8a1f24434dc976568811200e23f3e160b67a05c9a1edc802c2",
+          "configuration_saved_by_real_NVDA_keyboard_command": true,
+          "cleanup": {
+            "errors": [],
+            "observers_unregistered": true,
+            "normal_user_profile_untouched": true
+          }
+        },
+        "pcm_metrics": {
+          "keyboard_settings": {
+            "pcm_bytes": 246778,
+            "nonzero_bytes": 231496,
+            "play_calls": 518,
+            "first_nonzero_feed_ns": 301595657900,
+            "first_play_return_ns": 301597588600
+          }
+        },
+        "finished_at_ns": 1795378314660535100
+      },
+      "finished_at_ns": 1795378315423420000
+    },
+    "resume": {
+      "addon_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+      "checks": [],
+      "probe": {
+        "format_version": 1,
+        "scope": "isolated-real-windows-nvda-smoke",
+        "status": "passed",
+        "run_id": "4417e8e624ca40eeb9f3651467388659",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "nvda_version_expected": "2026.3.1",
+        "checks": [
+          {
+            "name": "saved_synth_automatic_startup",
+            "status": "passed",
+            "observation": {
+              "observed_before_probe_begin": true,
+              "configured_synth": "kx47Preview",
+              "actual_synth": "kx47Preview",
+              "actual_module": "synthDrivers.kx47Preview",
+              "player_class": "WavePlayer",
+              "output_device": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+              "real_wave_player": true,
+              "settings": {
+                "languages": [
+                  "en"
+                ],
+                "default_language": "en",
+                "mode": "auto",
+                "voice": "adam",
+                "voice_map": {
+                  "en": "viktoriia"
+                },
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ]
+              },
+              "saved_synth_automatic_startup_verified": true,
+              "status": "passed-functional-only",
+              "at_begin_synth": "kx47Preview",
+              "same_startup_instance_at_begin": true,
+              "at_begin_real_wave_player": true,
+              "at_begin_output_device": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+              "at_begin_settings": {
+                "languages": [
+                  "en"
+                ],
+                "default_language": "en",
+                "mode": "auto",
+                "voice": "adam",
+                "voice_map": {
+                  "en": "viktoriia"
+                },
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ]
+              }
+            }
+          },
+          {
+            "name": "select_dordiai",
+            "status": "passed",
+            "driver_name": "kx47Preview"
+          },
+          {
+            "name": "host_sonic_import_and_dll",
+            "status": "passed",
+            "module": "synthDrivers._sonic"
+          },
+          {
+            "name": "allowed_voice_catalog",
+            "status": "passed",
+            "count": 45,
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ],
+            "excluded_present": []
+          },
+          {
+            "name": "settings_phase_initial_languages",
+            "status": "passed",
+            "enabled": [
+              "en"
+            ]
+          },
+          {
+            "name": "actual_keyboard_settings",
+            "status": "passed",
+            "phase": "resume",
+            "scope": "Actual injected native keys, genuine wx/NVDA save and owned-profile disk receipt; no physical keyboard or acoustic claim"
+          },
+          {
+            "name": "keyboard_settings_cleanup",
+            "status": "passed",
+            "errors": []
+          }
+        ],
+        "limitations": [
+          "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+          "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+          "One keyboard smoke check is not a complete accessibility assessment."
+        ],
+        "wave_player_verified": false,
+        "physical_audio_verified": false,
+        "acoustic_latency_verified": false,
+        "product_ready": false,
+        "recording_pcm_sink_test_double": false,
+        "keyboard_startup_synth": {
+          "observed_before_probe_begin": true,
+          "configured_synth": "kx47Preview",
+          "actual_synth": "kx47Preview",
+          "actual_module": "synthDrivers.kx47Preview",
+          "player_class": "WavePlayer",
+          "output_device": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+          "real_wave_player": true,
+          "settings": {
+            "languages": [
+              "en"
+            ],
+            "default_language": "en",
+            "mode": "auto",
+            "voice": "adam",
+            "voice_map": {
+              "en": "viktoriia"
+            },
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ]
+          },
+          "saved_synth_automatic_startup_verified": true,
+          "status": "passed-functional-only",
+          "at_begin_synth": "kx47Preview",
+          "same_startup_instance_at_begin": true,
+          "at_begin_real_wave_player": true,
+          "at_begin_output_device": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+          "at_begin_settings": {
+            "languages": [
+              "en"
+            ],
+            "default_language": "en",
+            "mode": "auto",
+            "voice": "adam",
+            "voice_map": {
+              "en": "viktoriia"
+            },
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ]
+          }
+        },
+        "nvda_version_actual": "2026.3.1",
+        "keyboard_settings": {
+          "phase": "resume",
+          "status": "passed-functional-only",
+          "events": [
+            {
+              "name": "actual_process_restart_loaded_settings",
+              "time_ns": 323922105400,
+              "settings": {
+                "languages": [
+                  "en"
+                ],
+                "default_language": "en",
+                "mode": "auto",
+                "voice": "adam",
+                "voice_map": {
+                  "en": "viktoriia"
+                },
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ]
+              }
+            },
+            {
+              "name": "native_menu_target",
+              "time_ns": 324544078900,
+              "menu_item_id": -31958,
+              "target_index": 10,
+              "item_label": "dordiai-voices — голоси, мови й мовлення…",
+              "observer": "wx-taskbar-popup-owner"
+            },
+            {
+              "name": "send_input",
+              "time_ns": 324548928300,
+              "label": "NVDA+n",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    45,
+                    true
+                  ],
+                  [
+                    78,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 324919010500,
+              "label": "Navigate NVDA Tools submenu",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    84,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 324931296200,
+              "menu_item_id": -31984
+            },
+            {
+              "name": "send_input",
+              "time_ns": 325300637100,
+              "label": "Select dordiai Tools item",
+              "events_expected": 22,
+              "events_sent": 22,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325305278500,
+              "menu_item_id": -31983
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325307767700,
+              "menu_item_id": -31982
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325309971800,
+              "menu_item_id": -31981
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325312310400,
+              "menu_item_id": -31980
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325314911100,
+              "menu_item_id": -31979
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325317067500,
+              "menu_item_id": -31978
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325319684900,
+              "menu_item_id": -31977
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325322465500,
+              "menu_item_id": -31976
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325324885400,
+              "menu_item_id": -31959
+            },
+            {
+              "name": "native_menu_highlight",
+              "time_ns": 325327383700,
+              "menu_item_id": -31958
+            },
+            {
+              "name": "native_menu_selection_verified",
+              "time_ns": 325794730000,
+              "menu_item_id": -31958,
+              "observed_menu_item_id": -31958
+            },
+            {
+              "name": "send_input",
+              "time_ns": 325797299100,
+              "label": "Activate dordiai Tools item",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    13,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "NVDA_tools_menu_opened_settings",
+              "time_ns": 326499172700,
+              "dialog": {
+                "languages": [
+                  "en"
+                ],
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ],
+                "default_language": "en",
+                "voice_map": {
+                  "en": "viktoriia"
+                },
+                "pages": [
+                  "Мовлення",
+                  "Голоси",
+                  "Мови",
+                  "Пакети"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 326503428500,
+              "label": "Ctrl+Tab to page",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    9,
+                    false
+                  ]
+                ],
+                [
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 327118382700,
+              "label": "Home/Down select language uk",
+              "events_expected": 6,
+              "events_sent": 6,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 327495838500,
+              "label": "Space language uk",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "checkbox",
+              "time_ns": 327871598700,
+              "kind": "language",
+              "code": "uk",
+              "before": false,
+              "after": true,
+              "speech_requests_since_key": 0,
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Українська",
+                "role": "15",
+                "states": [
+                  "16777216",
+                  "2",
+                  "4",
+                  "8388608"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 328001936400,
+              "label": "Home/Down select language ru",
+              "events_expected": 4,
+              "events_sent": 4,
+              "chords": [
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 328370974700,
+              "label": "Space language ru",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "checkbox",
+              "time_ns": 328746942200,
+              "kind": "language",
+              "code": "ru",
+              "before": false,
+              "after": true,
+              "speech_requests_since_key": 0,
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Російська",
+                "role": "15",
+                "states": [
+                  "16777216",
+                  "2",
+                  "4",
+                  "8388608"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 328749418300,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 329116698900,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 329491838100,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 330125379200,
+              "label": "Alt+Down/Home/Down/Enter Restore primary language",
+              "events_expected": 12,
+              "events_sent": 12,
+              "chords": [
+                [
+                  [
+                    18,
+                    false
+                  ],
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    13,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "choice",
+              "time_ns": 330498657900,
+              "label": "Restore primary language",
+              "index": 2,
+              "text": "Українська",
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Основна мова",
+                "role": "13",
+                "states": [
+                  "16777216",
+                  "2",
+                  "512"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 330501916900,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 330998357300,
+              "label": "Alt+Down/Home/Down/Enter Mapping language English",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    18,
+                    false
+                  ],
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    13,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "choice",
+              "time_ns": 331370566500,
+              "label": "Mapping language English",
+              "index": 0,
+              "text": "Англійська",
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Мова для призначення голосу",
+                "role": "13",
+                "states": [
+                  "16777216",
+                  "2",
+                  "512"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 331373180300,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 331874010600,
+              "label": "Alt+Down/Home/Down/Enter English compatible voice",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    18,
+                    false
+                  ],
+                  [
+                    40,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    36,
+                    true
+                  ]
+                ],
+                [
+                  [
+                    13,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "choice",
+              "time_ns": 332245577400,
+              "label": "English compatible voice",
+              "index": 0,
+              "text": "Основний сумісний голос",
+              "focus": {
+                "wx_class": "WxCtrlWithEnableEvnt",
+                "name": "Голос для цієї мови",
+                "role": "13",
+                "states": [
+                  "16777216",
+                  "2",
+                  "512"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 332248935700,
+              "label": "Tab",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    9,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 332750912300,
+              "label": "Space on actual OK",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    32,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "keyboard_ok_applied",
+              "time_ns": 333244855500,
+              "restore": true,
+              "settings": {
+                "languages": [
+                  "en",
+                  "ru",
+                  "uk"
+                ],
+                "default_language": "uk",
+                "mode": "auto",
+                "voice": "adam",
+                "voice_map": {},
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 333250030500,
+              "label": "NVDA+control+shift+f10",
+              "events_expected": 8,
+              "events_sent": 8,
+              "chords": [
+                [
+                  [
+                    45,
+                    true
+                  ],
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    16,
+                    false
+                  ],
+                  [
+                    121,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "keyboard_reopen_verified",
+              "time_ns": 333742964300,
+              "restore": true,
+              "dialog": {
+                "languages": [
+                  "en",
+                  "ru",
+                  "uk"
+                ],
+                "voices": [
+                  "adam",
+                  "agnieszka",
+                  "alex",
+                  "alice_day1",
+                  "astra_day2",
+                  "bella",
+                  "brian",
+                  "brian_studio",
+                  "brianna",
+                  "callum_day1",
+                  "charlie_day1",
+                  "chris",
+                  "claude_day2",
+                  "daniel",
+                  "daniel_day1",
+                  "david",
+                  "elis",
+                  "gemini_day2",
+                  "george",
+                  "george_unpacked",
+                  "gpt_day2",
+                  "grok_day2",
+                  "harry",
+                  "hazel",
+                  "keeper",
+                  "laura_day1",
+                  "laura_unpacked",
+                  "lian",
+                  "liza",
+                  "liza_talk",
+                  "mark",
+                  "mykola",
+                  "oksana",
+                  "oleksii",
+                  "oleksii_day1",
+                  "oleksii_day2",
+                  "oleksii_unpacked",
+                  "olena",
+                  "sara",
+                  "sara_archive",
+                  "studio_day1",
+                  "veren",
+                  "viktoriia",
+                  "will",
+                  "yevhen"
+                ],
+                "default_language": "uk",
+                "voice_map": {},
+                "pages": [
+                  "Мовлення",
+                  "Голоси",
+                  "Мови",
+                  "Пакети"
+                ]
+              }
+            },
+            {
+              "name": "send_input",
+              "time_ns": 333746499700,
+              "label": "Escape",
+              "events_expected": 2,
+              "events_sent": 2,
+              "chords": [
+                [
+                  [
+                    27,
+                    false
+                  ]
+                ]
+              ]
+            },
+            {
+              "name": "send_input",
+              "time_ns": 334253097400,
+              "label": "NVDA+control+c",
+              "events_expected": 6,
+              "events_sent": 6,
+              "chords": [
+                [
+                  [
+                    45,
+                    true
+                  ],
+                  [
+                    17,
+                    false
+                  ],
+                  [
+                    67,
+                    false
+                  ]
+                ]
+              ]
+            }
+          ],
+          "raw_keys": [
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 78,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 78,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 84,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 84,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 40,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 164,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 36,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 13,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 9,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 32,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 160,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 121,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 121,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 160,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 27,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 27,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 67,
+              "scan": 0,
+              "extended": false,
+              "pressed": true,
+              "injected": true
+            },
+            {
+              "vk": 67,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 162,
+              "scan": 0,
+              "extended": false,
+              "pressed": false,
+              "injected": true
+            },
+            {
+              "vk": 45,
+              "scan": 0,
+              "extended": true,
+              "pressed": false,
+              "injected": true
+            }
+          ],
+          "speech_requests": [
+            {
+              "text": [
+                "Owned keyboard settings fixture  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "edit  ",
+                "selected Owned settings keyboard test  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "NVDA  ",
+                "menu  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "View log  ",
+                "l"
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "CharacterModeCommand",
+                "CharacterModeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "dordiai-voices — голоси, мови й мовлення...  ",
+                "d"
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "CharacterModeCommand",
+                "CharacterModeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "dordiai-voices — налаштування  ",
+                "dialog  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "tab control  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основний голос  ",
+                "combo box  ",
+                "Адам  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Мови для перемикання  ",
+                "list  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Англійська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Англійська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Російська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Українська  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Помилка dordiai-voices. Previous speech workers have not acknowledged cancellation  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            },
+            {
+              "text": [
+                "Англійська  ",
+                "not selected  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Російська  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Увімкнути всі  ",
+                "button  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Вимкнути всі  ",
+                "button  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основна мова  ",
+                "combo box  ",
+                "Англійська  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Українська  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            },
+            {
+              "text": [
+                "Мова для призначення голосу  ",
+                "combo box  ",
+                "Англійська  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Голос для цієї мови  ",
+                "combo box  ",
+                "Вікторія  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основний сумісний голос  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            },
+            {
+              "text": [
+                "OK  ",
+                "button  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Owned keyboard settings fixture  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "edit  ",
+                "selected Owned settings keyboard test  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "dordiai-voices — налаштування  ",
+                "dialog  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "tab control  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Основний голос  ",
+                "combo box  ",
+                "Адам  ",
+                "collapsed  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Owned keyboard settings fixture  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "edit  ",
+                "selected Owned settings keyboard test  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand",
+                "FocusLossCancellableSpeechCommand"
+              ]
+            },
+            {
+              "text": [
+                "Configuration saved  "
+              ],
+              "commands": [
+                "LanguageOriginCommand",
+                "LangChangeCommand"
+              ]
+            }
+          ],
+          "gesture_scripts": [
+            {
+              "identifiers": [
+                "kb(desktop):NVDA",
+                "kb:NVDA"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA+n",
+                "kb:NVDA+n"
+              ],
+              "script_name": "script_showGui",
+              "script_module": "globalCommands"
+            },
+            {
+              "identifiers": [
+                "kb(desktop):t",
+                "kb:t"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):enter",
+                "kb:enter"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftControl",
+                "kb:leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+tab",
+                "kb:control+tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftControl",
+                "kb:leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+tab",
+                "kb:control+tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftAlt",
+                "kb:leftAlt"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):alt+downArrow",
+                "kb:alt+downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):downArrow",
+                "kb:downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):enter",
+                "kb:enter"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftAlt",
+                "kb:leftAlt"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):alt+downArrow",
+                "kb:alt+downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):enter",
+                "kb:enter"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):leftAlt",
+                "kb:leftAlt"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):alt+downArrow",
+                "kb:alt+downArrow"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):home",
+                "kb:home"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):enter",
+                "kb:enter"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):tab",
+                "kb:tab"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):space",
+                "kb:space"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA",
+                "kb:NVDA"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA+leftControl",
+                "kb:NVDA+leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+leftShift",
+                "kb:control+NVDA+leftShift"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+shift+f10",
+                "kb:control+NVDA+shift+f10"
+              ],
+              "script_name": "script_preferences",
+              "script_module": "globalPlugins.dordiaiMainPreferences"
+            },
+            {
+              "identifiers": [
+                "kb(desktop):escape",
+                "kb:escape"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA",
+                "kb:NVDA"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):NVDA+leftControl",
+                "kb:NVDA+leftControl"
+              ],
+              "script_name": null,
+              "script_module": null
+            },
+            {
+              "identifiers": [
+                "kb(desktop):control+NVDA+c",
+                "kb:control+NVDA+c"
+              ],
+              "script_name": "script_saveConfiguration",
+              "script_module": "globalCommands"
+            }
+          ],
+          "public_post_configSave_count": 1,
+          "original_settings": {
+            "languages": [
+              "en",
+              "ru",
+              "uk"
+            ],
+            "default_language": "uk",
+            "mode": "auto",
+            "voice": "adam",
+            "voice_map": {},
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ]
+          },
+          "owned_virtual_endpoint_id": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+          "real_wave_player_initialized": true,
+          "physical_keyboard_verified": false,
+          "full_accessibility_verified": false,
+          "named_profile_switching_verified": false,
+          "file_chooser_keyboard_verified": false,
+          "pronunciation_verified": false,
+          "physical_audio_verified": false,
+          "public_TALK_then_cancel_before_keyboard": true,
+          "saved_settings": {
+            "languages": [
+              "en",
+              "ru",
+              "uk"
+            ],
+            "default_language": "uk",
+            "mode": "auto",
+            "voice": "adam",
+            "voice_map": {},
+            "voices": [
+              "adam",
+              "agnieszka",
+              "alex",
+              "alice_day1",
+              "astra_day2",
+              "bella",
+              "brian",
+              "brian_studio",
+              "brianna",
+              "callum_day1",
+              "charlie_day1",
+              "chris",
+              "claude_day2",
+              "daniel",
+              "daniel_day1",
+              "david",
+              "elis",
+              "gemini_day2",
+              "george",
+              "george_unpacked",
+              "gpt_day2",
+              "grok_day2",
+              "harry",
+              "hazel",
+              "keeper",
+              "laura_day1",
+              "laura_unpacked",
+              "lian",
+              "liza",
+              "liza_talk",
+              "mark",
+              "mykola",
+              "oksana",
+              "oleksii",
+              "oleksii_day1",
+              "oleksii_day2",
+              "oleksii_unpacked",
+              "olena",
+              "sara",
+              "sara_archive",
+              "studio_day1",
+              "veren",
+              "viktoriia",
+              "will",
+              "yevhen"
+            ]
+          },
+          "profile_disk_sha256": "1bf98f1b193d0d3b791a374a15d25fec85d60c00462b883d7ecf9a5ff4290e00",
+          "configuration_saved_by_real_NVDA_keyboard_command": true,
+          "cleanup": {
+            "errors": [],
+            "observers_unregistered": true,
+            "normal_user_profile_untouched": true
+          }
+        },
+        "pcm_metrics": {
+          "keyboard_settings": {
+            "pcm_bytes": 226806,
+            "nonzero_bytes": 212687,
+            "play_calls": 476,
+            "first_nonzero_feed_ns": 328222601600,
+            "first_play_return_ns": 328223377700
+          }
+        },
+        "finished_at_ns": 1795378340288196800
+      }
+    }
+  },
+  "owned_virtual_render": {
+    "requested": true,
+    "endpoint_kind": "owned-signed-vendor-virtual-render",
+    "recording_pcm_sink_test_double": false,
+    "physical_audio_verified": false,
+    "product_ready": false,
+    "system_default_device_changed": false,
+    "system_format_changed": false,
+    "privacy_policy_changed": false,
+    "signature_policy_changed": false,
+    "reboot_performed": false,
+    "vendor_installer_executed": false,
+    "capture_or_microphone_api_requested": false,
+    "vendor_verification": {
+      "format": "dordiai-vb46-catalogue-verification",
+      "package_sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
+      "catalogue_members": {
+        "vbMmeCable64_win10.inf": true,
+        "vbaudio_cable64_win10.sys": true,
+        "vbaudio_cable64arm_win10.sys": true
+      },
+      "authenticode_valid": true,
+      "signtool_authenticode_valid": true,
+      "signtool": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\signtool.exe",
+      "vendor_finalization_reboot_instruction": true,
+      "installer_executed": false,
+      "certificates_imported": false,
+      "physical_audio_verified": false,
+      "product_ready": false
+    },
+    "native_helper_build": {
+      "source_sha256": "eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012",
+      "executable_sha256": "a291ac1ba05f65c2913f64ec7e30024eff8250260a43db83e77ac10e257f7c0c",
+      "executable_size_bytes": 459776,
+      "compiler_authenticode_valid": true,
+      "compiler_signer_subject": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+    },
+    "endpoints_before": {
+      "out": [],
+      "in": []
+    },
+    "owned_instance_id": "ROOT\\DORDIAI_VBCABLE_FA567A713D7B4652AA777A70F3F0A2C6\\0000",
+    "driver_install_returned_success": true,
+    "windows_install_error": 0,
+    "windows_requires_reboot": false,
+    "device_status": {
+      "configret": 0,
+      "flags": 25174027,
+      "problem": 0
+    },
+    "endpoints_during": {
+      "out": [
+        {
+          "index": 0,
+          "error": 0,
+          "name": "Speakers (VB-Audio Virtual Cabl",
+          "channels": 2
+        },
+        {
+          "index": 1,
+          "error": 0,
+          "name": "CABLE In 16 Ch (VB-Audio Virtua",
+          "channels": 2
+        }
+      ],
+      "in": [
+        {
+          "index": 0,
+          "error": 0,
+          "name": "CABLE Output (VB-Audio Virtual ",
+          "channels": 2
+        }
+      ]
+    },
+    "native_description": {
+      "capture_mode": "process-include-current-pid",
+      "native_format": {
+        "average_bytes_per_second": 384000,
+        "bits_per_sample": 32,
+        "block_align": 8,
+        "channels": 2,
+        "extra_bytes": 22,
+        "format_tag": 65534,
+        "native_encoding": "float32le",
+        "raw_format_hex": "feff020080bb000000dc05000800200016002000030000000300000000001000800000aa00389b71",
+        "sample_rate": 48000
+      },
+      "selected_endpoint": {
+        "id": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+        "name": "Speakers (VB-Audio Virtual Cable)"
+      },
+      "target_pid": 1108
+    },
+    "describe_helper": {
+      "pid": 1108,
+      "returncode": 0,
+      "reaped": true,
+      "mode": "describe-only-no-playback-or-capture"
+    },
+    "endpoint": {
+      "id": "{0.0.0.00000000}.{aa3451b4-6027-471e-b59e-a4aaa54b9bfc}",
+      "name": "Speakers (VB-Audio Virtual Cable)",
+      "owned_instance_id": "ROOT\\DORDIAI_VBCABLE_FA567A713D7B4652AA777A70F3F0A2C6\\0000"
+    },
+    "cleanup": {
+      "attempted": true,
+      "scope": "Only this call's exact owned device instance",
+      "driver_store_purge_attempted": false,
+      "removal_requested": true,
+      "removed": true,
+      "absence_verified": true,
+      "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence"
+    }
+  },
+  "runtime_after_disable": {
+    "verified_files": 10220,
+    "verified_bytes": 2408393531,
+    "all_match_immutable_core_manifest": true,
+    "scope": "Read-only installed runtime/model/private-Python bytes; no checkbox deletion or modification"
+  },
+  "actual_second_process_pid": 2880,
+  "actual_second_process_started_at_ns": 1795378320667169400,
+  "resume_process_exit": {
+    "pid": 2880,
+    "returncode": 0,
+    "windows_status_hex": "0x00000000",
+    "reaped": true,
+    "normal_shutdown_verified": true
+  },
+  "runtime_after_restart_and_restore": {
+    "verified_files": 10220,
+    "verified_bytes": 2408393531,
+    "all_match_immutable_core_manifest": true,
+    "scope": "Read-only installed runtime/model/private-Python bytes; no checkbox deletion or modification"
+  },
+  "same_owned_profile_path": true,
+  "profile_ini_before_restart_sha256": "58bf775a01622c8a1f24434dc976568811200e23f3e160b67a05c9a1edc802c2",
+  "actual_keyboard_settings_and_parameter_reload_verified": true,
+  "saved_synth_automatic_startup_verified": true,
+  "unresolved_requirements": [],
+  "scope": "Genuine injected Windows keys, live NVDA wx controls and base-profile parameter reload after process restart. Saved-synth automatic startup has a separate pre-reselection observation/gate. Not physical input, file chooser, named profile switching, native pronunciation or acoustic acceptance",
+  "owned_process_cleanup": {
+    "children": [
+      {
+        "pid": 3912,
+        "executable": "nvda_2026.3.1.exe",
+        "returncode": 0,
+        "reaped": true
+      },
+      {
+        "pid": 4240,
+        "executable": "nvda.exe",
+        "returncode": 0,
+        "reaped": true
+      },
+      {
+        "pid": 2880,
+        "executable": "nvda.exe",
+        "returncode": 0,
+        "reaped": true
+      }
+    ],
+    "errors": [],
+    "all_reaped_before_device_cleanup": true,
+    "owned_nvda_jobs": [
+      {
+        "pid": 4240,
+        "active_before_cleanup": 0,
+        "active_after_cleanup": 0,
+        "forced_tree_termination": false,
+        "all_owned_workers_reaped": true
+      },
+      {
+        "pid": 2880,
+        "active_before_cleanup": 0,
+        "active_after_cleanup": 0,
+        "forced_tree_termination": false,
+        "all_owned_workers_reaped": true
+      }
+    ],
+    "all_owned_nvda_descendants_reaped": true,
+    "actual_nvda_process_count": 2
+  }
+}

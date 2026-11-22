@@ -1,0 +1,112 @@
+name: Dordiai own-process clock build only
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - .github/workflows/dordiai-owned-clock-build.yml
+      - dordiai-voices/tools/windows_owned_audio_clock.cpp
+      - dordiai-voices/tools/windows_process_loopback.cpp
+  workflow_dispatch:
+    inputs:
+      reviewed_source_sha256:
+        description: Exact reviewed windows_owned_audio_clock.cpp SHA256
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.repository == 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension' && github.ref == 'refs/heads/dordiai-voices/audit-20261122' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[owned-clock-build]')))
+    runs-on: windows-2025
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      REVIEWED_SOURCE_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.reviewed_source_sha256 || 'dea9c3c9e54b09ec9622400f8448ec9b2ee478c7cdc366109cd5e8d878edbbac' }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Keep exact LF source hashes on Windows before checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Check exact reviewed source and frozen include
+        run: |
+          $ErrorActionPreference='Stop'
+          if($env:REVIEWED_SOURCE_SHA256 -cnotmatch '^[0-9a-f]{64}$'){throw 'Exact reviewed source SHA required'}
+          $source=Join-Path $env:GITHUB_WORKSPACE 'dordiai-voices/tools/windows_owned_audio_clock.cpp'
+          $frozen=Join-Path $env:GITHUB_WORKSPACE 'dordiai-voices/tools/windows_process_loopback.cpp'
+          if((Get-FileHash -LiteralPath $source).Hash.ToLowerInvariant() -cne $env:REVIEWED_SOURCE_SHA256){throw 'Reviewed actual source differs'}
+          if((Get-FileHash -LiteralPath $frozen).Hash.ToLowerInvariant() -cne 'eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012'){throw 'Frozen hosted source differs'}
+          if((git rev-parse HEAD).Trim() -cne $env:GITHUB_SHA){throw 'Checkout commit differs from dispatched workflow SHA'}
+      - name: Verify existing trusted Microsoft toolchain and compile only
+        run: |
+          $ErrorActionPreference='Stop'
+          function TrustedMicrosoft([string]$path) {
+            if(-not (Test-Path -LiteralPath $path -PathType Leaf)){throw "Required installed tool absent: $path"}
+            $sig=Get-AuthenticodeSignature -LiteralPath $path
+            if($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation'){throw "Trusted existing Microsoft signature required: $path"}
+            return [ordered]@{path=$path;sha256=(Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant();signature_status=[string]$sig.Status;signer_subject=$sig.SignerCertificate.Subject;signer_thumbprint=$sig.SignerCertificate.Thumbprint;file_version=(Get-Item -LiteralPath $path).VersionInfo.FileVersion}
+          }
+          $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vswhereTrust=TrustedMicrosoft $vswhere
+          $vs=(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+          if(-not $vs){throw 'Already installed MSVC x64 required; no installation permitted'}
+          $version=(Get-Content -LiteralPath (Join-Path $vs 'VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt') -Raw).Trim()
+          $cl=Join-Path $vs "VC/Tools/MSVC/$version/bin/Hostx64/x64/cl.exe"
+          $link=Join-Path $vs "VC/Tools/MSVC/$version/bin/Hostx64/x64/link.exe"
+          $clTrust=TrustedMicrosoft $cl
+          $linkTrust=TrustedMicrosoft $link
+          $kits=(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots').KitsRoot10
+          $sdk=Get-ChildItem -LiteralPath (Join-Path $kits 'Include') -Directory | Sort-Object Name -Descending | Where-Object {Test-Path -LiteralPath (Join-Path $_.FullName 'um/audioclientactivationparams.h')} | Select-Object -First 1
+          if(-not $sdk){throw 'Already installed Windows SDK ApplicationLoopback header required'}
+          $output=Join-Path $env:RUNNER_TEMP "owned-clock-build-$env:GITHUB_RUN_ID"
+          if(Test-Path -LiteralPath $output){throw 'Fresh build directory required'}
+          New-Item -ItemType Directory -Path $output | Out-Null
+          $env:CLOCK_VCVARS=Join-Path $vs 'VC/Auxiliary/Build/vcvars64.bat'
+          $env:CLOCK_COMPILER=$cl
+          $env:CLOCK_SOURCE=Join-Path $env:GITHUB_WORKSPACE 'dordiai-voices/tools/windows_owned_audio_clock.cpp'
+          $env:CLOCK_OUTPUT=$output
+          $env:CLOCK_SDK=$sdk.Name
+          $command=Join-Path $output 'build.cmd'
+          @'
+          @echo off
+          call "%CLOCK_VCVARS%" %CLOCK_SDK%
+          if errorlevel 1 exit /b %errorlevel%
+          "%CLOCK_COMPILER%" /nologo /std:c++17 /EHsc /W4 /utf-8 /DUNICODE /D_UNICODE /O2 /MT "%CLOCK_SOURCE%" /Fe:"%CLOCK_OUTPUT%\owned-clock.exe" /Fo:"%CLOCK_OUTPUT%\owned-clock.obj" /link /Brepro
+          exit /b %errorlevel%
+          '@ | Set-Content -LiteralPath $command -Encoding ascii
+          & cmd.exe /d /c $command 2>&1 | Tee-Object -FilePath (Join-Path $output 'build.log')
+          if($LASTEXITCODE -ne 0){throw 'Owned helper compilation failed'}
+          $exe=Join-Path $output 'owned-clock.exe'
+          $selftestOutput=& $exe --self-test
+          if($LASTEXITCODE -ne 0){throw 'No-device native primitive self-test failed'}
+          $selftest=$selftestOutput | ConvertFrom-Json
+          if($selftest.status -ne 'self-test-passed' -or $selftest.audio_device_api_called -ne $false -or $selftest.render_started -ne $false -or $selftest.capture_started -ne $false -or $selftest.children_created -ne $false){throw 'No-device self-test receipt differs'}
+          $selftestOutput | Set-Content -LiteralPath (Join-Path $output 'self-test.json') -Encoding utf8
+          Copy-Item -LiteralPath $env:CLOCK_SOURCE -Destination (Join-Path $output 'windows_owned_audio_clock.cpp')
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'dordiai-voices/tools/windows_process_loopback.cpp') -Destination (Join-Path $output 'windows_process_loopback.cpp')
+          $inventory=[ordered]@{}
+          foreach($name in @('owned-clock.exe','windows_owned_audio_clock.cpp','windows_process_loopback.cpp','build.log','self-test.json')) {
+            $path=Join-Path $output $name
+            $inventory[$name]=[ordered]@{size_bytes=(Get-Item -LiteralPath $path).Length;sha256=(Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()}
+          }
+          $receipt=[ordered]@{format='dordiai-owned-hardware-clock-build';format_version=1;repository=$env:GITHUB_REPOSITORY;commit=$env:GITHUB_SHA;workflow_ref=$env:GITHUB_WORKFLOW_REF;run_id=$env:GITHUB_RUN_ID;run_attempt=$env:GITHUB_RUN_ATTEMPT;runner_os=$env:RUNNER_OS;runner_arch=$env:RUNNER_ARCH;source_sha256=$env:REVIEWED_SOURCE_SHA256;frozen_source_sha256='eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012';compiler=$clTrust;linker=$linkTrust;vswhere=$vswhereTrust;msvc_version=$version;sdk_version=$sdk.Name;sdk_root=$kits;flags='/std:c++17 /EHsc /W4 /utf-8 /DUNICODE /D_UNICODE /O2 /MT /link /Brepro';files=$inventory;helper_executed=$true;helper_execution_mode='--self-test-only-no-devices';native_selftest=$selftest;audio_api_called=$false;drivers_installed=$false;dependencies_installed=$false;product_ready=$false}
+          $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $output 'build-receipt.json') -Encoding utf8
+          "CLOCK_ARTIFACT_PATH=$output" | Out-File -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Upload only small exact-source compiler provenance artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-owned-clock-build-${{ github.run_id }}
+          path: |
+            ${{ env.CLOCK_ARTIFACT_PATH }}/owned-clock.exe
+            ${{ env.CLOCK_ARTIFACT_PATH }}/windows_owned_audio_clock.cpp
+            ${{ env.CLOCK_ARTIFACT_PATH }}/windows_process_loopback.cpp
+            ${{ env.CLOCK_ARTIFACT_PATH }}/build.log
+            ${{ env.CLOCK_ARTIFACT_PATH }}/build-receipt.json
+            ${{ env.CLOCK_ARTIFACT_PATH }}/self-test.json
+          if-no-files-found: error
+          retention-days: 14
