@@ -1,0 +1,1279 @@
+{
+  "format": "dordiai-word-lid-source-lock-v2",
+  "created_utc": "2026-11-22",
+  "status": "source-acquisition-candidate-not-trained-language-coverage",
+  "selection_pin": "3710977109ac774959971b9efbcdaa5e711a0866",
+  "sources": [
+    {
+      "id": "ud-el-validation",
+      "kind": "conllu",
+      "language": "el",
+      "source_language": "el",
+      "expected_scripts": [
+        "GREEK"
+      ],
+      "publisher_role": "validation",
+      "repository": "UniversalDependencies/UD_Greek-GDT",
+      "revision": "67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Greek-GDT/67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a/el_gdt-ud-dev.conllu",
+      "git_blob_sha1": "b5df489f454bdcb75fee125e1ab177d168982c78",
+      "bytes": 962466,
+      "license": "CC-BY-NC-SA-3.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Greek-GDT/blob/67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a/README.md",
+      "attribution": "UniversalDependencies/UD_Greek-GDT contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-el-test",
+      "kind": "conllu",
+      "language": "el",
+      "source_language": "el",
+      "expected_scripts": [
+        "GREEK"
+      ],
+      "publisher_role": "test",
+      "repository": "UniversalDependencies/UD_Greek-GDT",
+      "revision": "67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Greek-GDT/67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a/el_gdt-ud-test.conllu",
+      "git_blob_sha1": "a0ce4503f35a4dc193cede25ece33d5a426c607c",
+      "bytes": 979881,
+      "license": "CC-BY-NC-SA-3.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Greek-GDT/blob/67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a/README.md",
+      "attribution": "UniversalDependencies/UD_Greek-GDT contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-el-train",
+      "kind": "conllu",
+      "language": "el",
+      "source_language": "el",
+      "expected_scripts": [
+        "GREEK"
+      ],
+      "publisher_role": "train",
+      "repository": "UniversalDependencies/UD_Greek-GDT",
+      "revision": "67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Greek-GDT/67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a/el_gdt-ud-train.conllu",
+      "git_blob_sha1": "ed529e94654c65e784f9185e513a6a7a66980b96",
+      "bytes": 3883203,
+      "license": "CC-BY-NC-SA-3.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Greek-GDT/blob/67b2e8539d0ea3bfa4c359f0b91cb0a2fd97ff1a/README.md",
+      "attribution": "UniversalDependencies/UD_Greek-GDT contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-hr-validation",
+      "kind": "conllu",
+      "language": "hr",
+      "source_language": "hr",
+      "expected_scripts": [
+        "LATIN",
+        "CYRILLIC"
+      ],
+      "publisher_role": "validation",
+      "repository": "UniversalDependencies/UD_Croatian-SET",
+      "revision": "9a49ebed4310ae8ed16b477cc8d2ca3f567160c7",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Croatian-SET/9a49ebed4310ae8ed16b477cc8d2ca3f567160c7/hr_set-ud-dev.conllu",
+      "git_blob_sha1": "5d05510cc04d0f4d67443d2148073c6174d2840d",
+      "bytes": 1703792,
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Croatian-SET/blob/9a49ebed4310ae8ed16b477cc8d2ca3f567160c7/README.md",
+      "attribution": "UniversalDependencies/UD_Croatian-SET contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-hr-test",
+      "kind": "conllu",
+      "language": "hr",
+      "source_language": "hr",
+      "expected_scripts": [
+        "LATIN",
+        "CYRILLIC"
+      ],
+      "publisher_role": "test",
+      "repository": "UniversalDependencies/UD_Croatian-SET",
+      "revision": "9a49ebed4310ae8ed16b477cc8d2ca3f567160c7",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Croatian-SET/9a49ebed4310ae8ed16b477cc8d2ca3f567160c7/hr_set-ud-test.conllu",
+      "git_blob_sha1": "cd5103f1055c2d16ee34d0e93b1084a89405d081",
+      "bytes": 1853985,
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Croatian-SET/blob/9a49ebed4310ae8ed16b477cc8d2ca3f567160c7/README.md",
+      "attribution": "UniversalDependencies/UD_Croatian-SET contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-hr-train",
+      "kind": "conllu",
+      "language": "hr",
+      "source_language": "hr",
+      "expected_scripts": [
+        "LATIN",
+        "CYRILLIC"
+      ],
+      "publisher_role": "train",
+      "repository": "UniversalDependencies/UD_Croatian-SET",
+      "revision": "9a49ebed4310ae8ed16b477cc8d2ca3f567160c7",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Croatian-SET/9a49ebed4310ae8ed16b477cc8d2ca3f567160c7/hr_set-ud-train.conllu",
+      "git_blob_sha1": "13308c60c2b7251d3fe95cfdd4860c29002d832b",
+      "bytes": 11600204,
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Croatian-SET/blob/9a49ebed4310ae8ed16b477cc8d2ca3f567160c7/README.md",
+      "attribution": "UniversalDependencies/UD_Croatian-SET contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-sr-validation",
+      "kind": "conllu",
+      "language": "sr",
+      "source_language": "sr",
+      "expected_scripts": [
+        "LATIN",
+        "CYRILLIC"
+      ],
+      "publisher_role": "validation",
+      "repository": "UniversalDependencies/UD_Serbian-SET",
+      "revision": "45cdc805dc832c27e983ae8cf69be99a0ee5442e",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Serbian-SET/45cdc805dc832c27e983ae8cf69be99a0ee5442e/sr_set-ud-dev.conllu",
+      "git_blob_sha1": "68641f2a9443e276ba75209fbb8a423d5ca7eede",
+      "bytes": 923291,
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Serbian-SET/blob/45cdc805dc832c27e983ae8cf69be99a0ee5442e/README.md",
+      "attribution": "UniversalDependencies/UD_Serbian-SET contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-sr-test",
+      "kind": "conllu",
+      "language": "sr",
+      "source_language": "sr",
+      "expected_scripts": [
+        "LATIN",
+        "CYRILLIC"
+      ],
+      "publisher_role": "test",
+      "repository": "UniversalDependencies/UD_Serbian-SET",
+      "revision": "45cdc805dc832c27e983ae8cf69be99a0ee5442e",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Serbian-SET/45cdc805dc832c27e983ae8cf69be99a0ee5442e/sr_set-ud-test.conllu",
+      "git_blob_sha1": "4089e159299ac38c1b01291436200ad18c8e21d2",
+      "bytes": 881138,
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Serbian-SET/blob/45cdc805dc832c27e983ae8cf69be99a0ee5442e/README.md",
+      "attribution": "UniversalDependencies/UD_Serbian-SET contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "ud-sr-train",
+      "kind": "conllu",
+      "language": "sr",
+      "source_language": "sr",
+      "expected_scripts": [
+        "LATIN",
+        "CYRILLIC"
+      ],
+      "publisher_role": "train",
+      "repository": "UniversalDependencies/UD_Serbian-SET",
+      "revision": "45cdc805dc832c27e983ae8cf69be99a0ee5442e",
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Serbian-SET/45cdc805dc832c27e983ae8cf69be99a0ee5442e/sr_set-ud-train.conllu",
+      "git_blob_sha1": "0904af11b23e3a67c46cee0d8ca513b4f46b403d",
+      "bytes": 5653018,
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://github.com/UniversalDependencies/UD_Serbian-SET/blob/45cdc805dc832c27e983ae8cf69be99a0ee5442e/README.md",
+      "attribution": "UniversalDependencies/UD_Serbian-SET contributors; Universal Dependencies r2.19",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "aksharantar-hin",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "hi",
+      "source_language": "hin",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/hin.zip",
+      "sha256": "208c2d1b128234e6dc777b750779b4f5e6214ab43244039349b530bf9868bdaf",
+      "max_bytes": 134217728,
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "license_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ]
+    },
+    {
+      "id": "aksharantar-mar",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "mr",
+      "source_language": "mar",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/mar.zip",
+      "sha256": "47aab4119094f44e907d017a26aff5a33590bb42e115f19e79b957c5eb0056ef",
+      "max_bytes": 134217728,
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "license_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ]
+    },
+    {
+      "id": "aksharantar-nep",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "ne",
+      "source_language": "nep",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/nep.zip",
+      "sha256": "8bdcc5957d701ea36b63c00c713b43bc30902774b70736737d480e77929de92c",
+      "max_bytes": 134217728,
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "license_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ]
+    },
+    {
+      "id": "aksharantar-mai",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "mai",
+      "source_language": "mai",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/mai.zip",
+      "sha256": "bef959e8b98c981d22c03c4a0e23cac25ca69b74c2cbc5bf8e5d0a2061ce3dfd",
+      "max_bytes": 134217728,
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "license_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ]
+    },
+    {
+      "id": "aksharantar-doi",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "doi",
+      "source_language": "doi",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/doi.zip",
+      "sha256": "a5f79317baa51be6815d89b1e10fd86c5456fb2877b26bdfb5b979b102b33885",
+      "max_bytes": 134217728,
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "license_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ]
+    },
+    {
+      "id": "aksharantar-brx",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "brx",
+      "source_language": "brx",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/brx.zip",
+      "sha256": "4117f9dab514ca613174fd0af6c79fcd74233c6f2a1916e8cc73de0f8ffc0d1b",
+      "max_bytes": 134217728,
+      "license": "Manual: CC-BY (version unspecified by publisher); mined/existing packaging: CC0-1.0; source-text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "license_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar",
+      "attribution": "AI4Bharat; Madhani et al., Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ]
+    },
+    {
+      "id": "masakhapos-bam-validation",
+      "kind": "pos",
+      "language": "bm",
+      "source_language": "bam",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/bam/dev.txt",
+      "git_blob_sha1": "206e96e42450c2e9592f4e97572d5031c3fb7a15",
+      "bytes": 44196,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-bam-test",
+      "kind": "pos",
+      "language": "bm",
+      "source_language": "bam",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/bam/test.txt",
+      "git_blob_sha1": "be07d2acbb3f5b987167b2e3e9632d170e1a7580",
+      "bytes": 156308,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-bam-train",
+      "kind": "pos",
+      "language": "bm",
+      "source_language": "bam",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/bam/train.txt",
+      "git_blob_sha1": "4483a4cec974b5e95d2969c06ccfd12e4d633130",
+      "bytes": 216098,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-hau-validation",
+      "kind": "pos",
+      "language": "ha",
+      "source_language": "hau",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/hau/dev.txt",
+      "git_blob_sha1": "75d82cb3d6fd4dc5b317b16b63d68c3693b8ee6a",
+      "bytes": 37947,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-hau-test",
+      "kind": "pos",
+      "language": "ha",
+      "source_language": "hau",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/hau/test.txt",
+      "git_blob_sha1": "d6b00a82f2be86b03f2ef40a788f0cb365811176",
+      "bytes": 157993,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-hau-train",
+      "kind": "pos",
+      "language": "ha",
+      "source_language": "hau",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/hau/train.txt",
+      "git_blob_sha1": "455b9c9ef88820b4008f5d88be006a3738b9447f",
+      "bytes": 224886,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-ibo-validation",
+      "kind": "pos",
+      "language": "ig",
+      "source_language": "ibo",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/ibo/dev.txt",
+      "git_blob_sha1": "9d8117bb597f647f37e56d13eec893bff12810f8",
+      "bytes": 50304,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-ibo-test",
+      "kind": "pos",
+      "language": "ig",
+      "source_language": "ibo",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/ibo/test.txt",
+      "git_blob_sha1": "72659355cc504ab73b1d0b3fc66952592178796a",
+      "bytes": 235715,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-ibo-train",
+      "kind": "pos",
+      "language": "ig",
+      "source_language": "ibo",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/ibo/train.txt",
+      "git_blob_sha1": "d91aaa4f56a229ce4a86e8db786bd915ce50ba2b",
+      "bytes": 269634,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-kin-validation",
+      "kind": "pos",
+      "language": "rw",
+      "source_language": "kin",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/kin/dev.txt",
+      "git_blob_sha1": "b843af176bb89039dd4b8ff23a01d421b0e88841",
+      "bytes": 50521,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-kin-test",
+      "kind": "pos",
+      "language": "rw",
+      "source_language": "kin",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/kin/test.txt",
+      "git_blob_sha1": "9f6c9e6c0a4567717779a09262a6bd9c7e71b92e",
+      "bytes": 191769,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-kin-train",
+      "kind": "pos",
+      "language": "rw",
+      "source_language": "kin",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/kin/train.txt",
+      "git_blob_sha1": "18975bd3249c899ebcc02ee1f82adaac7452d706",
+      "bytes": 211700,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-mos-validation",
+      "kind": "pos",
+      "language": "mos",
+      "source_language": "mos",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/mos/dev.txt",
+      "git_blob_sha1": "b608ae074534efb11788a3c122e0b9be02bcc91f",
+      "bytes": 28120,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-mos-test",
+      "kind": "pos",
+      "language": "mos",
+      "source_language": "mos",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/mos/test.txt",
+      "git_blob_sha1": "cf6e70b92de65fce5afa3d66c3f66787ceccea71",
+      "bytes": 125602,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-mos-train",
+      "kind": "pos",
+      "language": "mos",
+      "source_language": "mos",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/mos/train.txt",
+      "git_blob_sha1": "54c088dfad8e6cbb8dd359fb1e39a76d30079ac5",
+      "bytes": 188556,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-nya-validation",
+      "kind": "pos",
+      "language": "ny",
+      "source_language": "nya",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/nya/dev.txt",
+      "git_blob_sha1": "764b6f55c81c9535f96ac4f74391dd3eb9717228",
+      "bytes": 31874,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-nya-test",
+      "kind": "pos",
+      "language": "ny",
+      "source_language": "nya",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/nya/test.txt",
+      "git_blob_sha1": "5832dbb9f01fe3d8ae847df7432af2008ffa49a0",
+      "bytes": 116862,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-nya-train",
+      "kind": "pos",
+      "language": "ny",
+      "source_language": "nya",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/nya/train.txt",
+      "git_blob_sha1": "1254c532c9a6079d47c45543f610f6f86382df4d",
+      "bytes": 137928,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-sna-validation",
+      "kind": "pos",
+      "language": "sn",
+      "source_language": "sna",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/sna/dev.txt",
+      "git_blob_sha1": "5b8a3f525a4870958a649b849cc0a17e91067b07",
+      "bytes": 40426,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-sna-test",
+      "kind": "pos",
+      "language": "sn",
+      "source_language": "sna",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/sna/test.txt",
+      "git_blob_sha1": "a8f7bd89211674e083020aec56419e28fcb21c8f",
+      "bytes": 175014,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-sna-train",
+      "kind": "pos",
+      "language": "sn",
+      "source_language": "sna",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/sna/train.txt",
+      "git_blob_sha1": "da6c13480591b2ae8569b47186b5c4bfd4668ea8",
+      "bytes": 234367,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-tsn-validation",
+      "kind": "pos",
+      "language": "tn",
+      "source_language": "tsn",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/tsn/dev.txt",
+      "git_blob_sha1": "dfd44908fd9ff608a399381c73b2a954efac1ec0",
+      "bytes": 40665,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-tsn-test",
+      "kind": "pos",
+      "language": "tn",
+      "source_language": "tsn",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/tsn/test.txt",
+      "git_blob_sha1": "a9f361b4a9f27b8ff3bb8759e1007fe7cacea825",
+      "bytes": 154747,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-tsn-train",
+      "kind": "pos",
+      "language": "tn",
+      "source_language": "tsn",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/tsn/train.txt",
+      "git_blob_sha1": "d1cecfbd997b40b2f258de904aa05759227c1a87",
+      "bytes": 219713,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-wol-validation",
+      "kind": "pos",
+      "language": "wo",
+      "source_language": "wol",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/wol/dev.txt",
+      "git_blob_sha1": "817298a0ab660b225e6bed0d9bdffe1c6e6c85ac",
+      "bytes": 44242,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-wol-test",
+      "kind": "pos",
+      "language": "wo",
+      "source_language": "wol",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/wol/test.txt",
+      "git_blob_sha1": "d8b5409b4c34a768fd90e9cbb18ed0fb04d95c1c",
+      "bytes": 172611,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-wol-train",
+      "kind": "pos",
+      "language": "wo",
+      "source_language": "wol",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/wol/train.txt",
+      "git_blob_sha1": "da25e4c638485297fdee95f45b939e834b9fef28",
+      "bytes": 217310,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-xho-validation",
+      "kind": "pos",
+      "language": "xh",
+      "source_language": "xho",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/xho/dev.txt",
+      "git_blob_sha1": "39d2b2f15310b1cb178276e7c26cfa443d1f4216",
+      "bytes": 30102,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-xho-test",
+      "kind": "pos",
+      "language": "xh",
+      "source_language": "xho",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/xho/test.txt",
+      "git_blob_sha1": "5bca460873aaf576de4976e171b7b1b412e6fcb8",
+      "bytes": 125111,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-xho-train",
+      "kind": "pos",
+      "language": "xh",
+      "source_language": "xho",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/xho/train.txt",
+      "git_blob_sha1": "2db25a8371572bbb9fa55d2dbec8c65136b7894c",
+      "bytes": 167518,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-yor-validation",
+      "kind": "pos",
+      "language": "yo",
+      "source_language": "yor",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/yor/dev.txt",
+      "git_blob_sha1": "ff386ba2f0f085a20b9042fc40697a657a0a0d90",
+      "bytes": 52362,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-yor-test",
+      "kind": "pos",
+      "language": "yo",
+      "source_language": "yor",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/yor/test.txt",
+      "git_blob_sha1": "eb40d15a9191ccfdb01f7a4a6d2490360644531f",
+      "bytes": 218920,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-yor-train",
+      "kind": "pos",
+      "language": "yo",
+      "source_language": "yor",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/yor/train.txt",
+      "git_blob_sha1": "0c62cda92fb893e5a7fe5e12526995e3c382eebf",
+      "bytes": 276543,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-zul-validation",
+      "kind": "pos",
+      "language": "zu",
+      "source_language": "zul",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "validation",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/zul/dev.txt",
+      "git_blob_sha1": "6737e0793a798b7f4fbd0b865bc2957e1872c6c1",
+      "bytes": 29901,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-zul-test",
+      "kind": "pos",
+      "language": "zu",
+      "source_language": "zul",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "test",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/zul/test.txt",
+      "git_blob_sha1": "39775aa3ab1dd79ee16d3ea8a00fc1d5dbfebc3b",
+      "bytes": 115558,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    },
+    {
+      "id": "masakhapos-zul-train",
+      "kind": "pos",
+      "language": "zu",
+      "source_language": "zul",
+      "expected_scripts": [
+        "LATIN"
+      ],
+      "publisher_role": "train",
+      "repository": "masakhane-io/masakhane-pos",
+      "revision": "376f4161f0425584d4bd7664122b56fa026926d3",
+      "url": "https://raw.githubusercontent.com/masakhane-io/masakhane-pos/376f4161f0425584d4bd7664122b56fa026926d3/data/zul/train.txt",
+      "git_blob_sha1": "3bb86eb3a5f9e6a3c86c9e544d48fb3868295d74",
+      "bytes": 155053,
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://github.com/masakhane-io/masakhane-pos/blob/376f4161f0425584d4bd7664122b56fa026926d3/README.md",
+      "attribution": "Masakhane; Dione et al., MasakhaPOS (ACL 2023)",
+      "exclude_upos": [
+        "PROPN",
+        "X",
+        "NUM",
+        "PUNCT",
+        "SYM"
+      ]
+    }
+  ],
+  "known_open": [
+    "bs",
+    "cnr",
+    "rm",
+    "ay",
+    "ito",
+    "ak"
+  ],
+  "policy": {
+    "labels": "Publisher-native language labels only; preserve every observed label for shared spellings. No neighbor-language proxies.",
+    "holdout": "Publisher test spellings globally override validation/train; publisher validation spellings globally override train, including audited baseline resources. Other spellings retain existing global SHA256 80/10/10 policy.",
+    "license": "Dataset terms are recorded separately from repository software licenses. NC data permitted by task scope; no blanket commercial-use claim.",
+    "inherent_limit": "Sentence/lexicon membership is weak word-language evidence; an isolated shared spelling may remain ambiguous."
+  }
+}

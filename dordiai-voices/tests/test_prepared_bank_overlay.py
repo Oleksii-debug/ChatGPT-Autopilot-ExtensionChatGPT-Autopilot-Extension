@@ -51,6 +51,8 @@ class OverlayTests(unittest.TestCase):
             "kx47Runtime/python/Lib/test.py": b"# synthetic private runtime\n",
             "kx47Runtime/nvda_worker.py": b"# synthetic worker\n",
             "kx47Runtime/speech_text.py": b"# synthetic renderer\n",
+            "kx47Runtime/native_locale.py": b"# synthetic native carrier\n",
+            "kx47Runtime/pocket_english.py": b"# synthetic native pocket engine\n",
             "manifest.ini": b'version = "synthetic"\n',
         }
         for profile in self.profiles:
@@ -172,6 +174,8 @@ class OverlayTests(unittest.TestCase):
         identities = overlay.identity_inputs(self.release)
         self.assertIn("kx47Runtime/python/Lib/test.py", identities)
         self.assertIn("kx47Runtime/speech_text.py", identities)
+        self.assertIn("kx47Runtime/native_locale.py", identities)
+        self.assertIn("kx47Runtime/pocket_english.py", identities)
         self.assertIn("kx47Runtime/models/test/model.bin", identities)
         self.assertNotIn("manifest.ini", identities)
         self.assertFalse(any("/native_commands/" in name for name in identities))
@@ -183,6 +187,20 @@ class OverlayTests(unittest.TestCase):
         with self.assertRaisesRegex(overlay.OverlayError, "identity changed"):
             with overlay.apply_to_inputs(self.inputs, self.output, InputFile):
                 self.fail("Changed renderer accepted")
+
+    def test_changed_native_carriers_rejected_despite_unchanged_models(self):
+        self.build()
+        for name in ("native_locale", "pocket_english"):
+            with self.subTest(module=name):
+                item = next(x for x in self.inputs if x.path == "kx47Runtime/" + name + ".py")
+                original = item.source.read_bytes()
+                item.source.write_bytes(original + b"# changed synthesis code\n")
+                try:
+                    with self.assertRaisesRegex(overlay.OverlayError, "identity changed"):
+                        with overlay.apply_to_inputs(self.inputs, self.output, InputFile):
+                            self.fail("Changed native acoustic carrier accepted")
+                finally:
+                    item.source.write_bytes(original)
 
     def test_changed_identity_during_build_is_rejected_on_context_exit(self):
         self.build()

@@ -29,19 +29,51 @@ def normalize_word(word):
     return "".join(output)
 
 
+
+
 def word_script(word):
-    scripts = set()
+    # Keep historical model labels (including OTHER), while validating marks
+    # against their actual Unicode-name family rather than that broad label.
+    legacy_known = {"LATIN", "CYRILLIC", "GREEK", "ARABIC", "HEBREW", "DEVANAGARI", "BENGALI",
+                    "GEORGIAN", "ARMENIAN", "THAI", "HIRAGANA", "KATAKANA", "HANGUL", "CJK"}
+    explicit_families = legacy_known | {"GUJARATI", "GURMUKHI", "TAMIL", "TELUGU", "KANNADA",
+        "MALAYALAM", "SINHALA", "MEETEI", "ORIYA", "LAO", "MYANMAR", "TIBETAN", "THAANA",
+        "ETHIOPIC", "OL"}
+    base_families, mark_families, legacy_scripts = set(), set(), set()
     for char in word:
-        if not char.isalpha():
-            continue
         name = unicodedata.name(char, "")
         family = name.partition(" ")[0]
-        if family in {"LATIN", "CYRILLIC", "GREEK", "ARABIC", "HEBREW", "DEVANAGARI", "BENGALI",
-                      "GEORGIAN", "ARMENIAN", "THAI", "HIRAGANA", "KATAKANA", "HANGUL", "CJK"}:
-            scripts.add(family)
+        if char.isalpha():
+            base_families.add(family)
+            legacy_scripts.add(family if family in legacy_known else "OTHER")
+        elif unicodedata.category(char).startswith("M"):
+            if family == "COMBINING":
+                # Generic accents inherit the base; explicitly named script
+                # marks must still match it, including an OTHER-labelled base.
+                mark_families.update(script for script in explicit_families if script in name.split())
+            else:
+                mark_families.add(family)
+    if (len(legacy_scripts) != 1 or len(base_families) != 1
+            or not mark_families <= base_families):
+        return None
+    return next(iter(legacy_scripts))
+
+
+def is_valid_word(word):
+    """Accept native combining marks without allowing leading/detached marks."""
+    if not isinstance(word, str) or not 1 <= len(word) <= 48:
+        return False
+    after_letter = False
+    for char in word:
+        if char.isalpha():
+            after_letter = True
+        elif unicodedata.category(char).startswith("M") and after_letter:
+            continue
+        elif char in "'-" and after_letter:
+            after_letter = False
         else:
-            scripts.add("OTHER")
-    return next(iter(scripts)) if len(scripts) == 1 else None
+            return False
+    return after_letter and word_script(word) is not None
 
 
 def feature_indexes(word, dimensions):
@@ -69,6 +101,11 @@ class WordClassifier:
             self.weights.byteswap()
         if len(self.weights) != self.dimensions * len(self.codes):
             raise ValueError("Word classifier weight count does not match its labels")
+        self.native_combining_marks = document.get("native_combining_marks") is True
+        ambiguous = document.get("known_ambiguous_spellings", [])
+        if not isinstance(ambiguous, list) or any(not isinstance(word, str) for word in ambiguous):
+            raise ValueError("Invalid word classifier ambiguity guard")
+        self.ambiguous_words = frozenset(ambiguous)
         self.default_weights = tuple(document["default_weights"])
         if len(self.default_weights) != len(self.codes):
             raise ValueError("Word classifier defaults do not match its labels")
@@ -102,7 +139,10 @@ class WordClassifier:
 
     def predict(self, word, enabled_languages=None):
         word = normalize_word(word)
-        if len(word) < 4 or len(word) > 48 or not all(char.isalpha() or char in "'-" for char in word):
+        if (len(word) < 4 or not is_valid_word(word)
+                or (not getattr(self, "native_combining_marks", False)
+                    and any(unicodedata.category(char).startswith("M") for char in word))
+                or word in getattr(self, "ambiguous_words", ())):
             return None, 0.
         code, confidence, support = self.rank(word)
         # Rank against every eligible model language BEFORE the enabled filter.

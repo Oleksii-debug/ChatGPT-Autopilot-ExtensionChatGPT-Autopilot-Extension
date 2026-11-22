@@ -1,0 +1,29 @@
+{
+  "format": "dordiai-exact-afri-six-layer-reports",
+  "run": 45017187461,
+  "source_commit": "fd4c68c255e045c41ee5f63073174a8e566f621c",
+  "product_integrated": false,
+  "physical_audio_verified": false,
+  "files": [
+    {
+      "path": "evidence/afri_six_layer_45017187461_import-preflight.json.gz",
+      "sha256": "dfca615c099439f74e5dcd2f576e8ae1e12078c6f493fa1a6274789b38753d68"
+    },
+    {
+      "path": "evidence/afri_six_layer_45017187461_acquisition.json.gz",
+      "sha256": "80959a594253c553d98f9530b6a66bcd15ebec00874e751755a07137472b5ff4"
+    },
+    {
+      "path": "evidence/afri_six_layer_45017187461_export.json.gz",
+      "sha256": "fefa83bd392ee11b3684634cc28622635438f4d68546de45109746be71b70312"
+    },
+    {
+      "path": "evidence/afri_six_layer_45017187461_parity.json.gz",
+      "sha256": "3bc3ddb1c78c6c99bdfd062798b57eea50da228564729178832f53fa190025cf"
+    },
+    {
+      "path": "evidence/afri_six_layer_45017187461_native.json.gz",
+      "sha256": "5f597189674580116e76dca04b71d80da71ad96bfb0bee3562eb13101e91bf44"
+    }
+  ]
+}

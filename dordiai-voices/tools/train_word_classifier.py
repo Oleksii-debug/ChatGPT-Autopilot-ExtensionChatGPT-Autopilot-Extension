@@ -134,6 +134,55 @@ def gather(runtime, baseline=BASELINE, training_data=None):
     return {word: labels for word, labels in corpus.items() if labels}, sources, cyrillic_lexicon
 
 
+def additional_word_corpus(path, runtime):
+    """Read a checksummed prepared corpus and retain global publisher holdouts."""
+    path = Path(path)
+    receipt_path = Path(str(path) + ".receipt.json")
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if sha256(path.read_bytes()).hexdigest() != receipt.get("corpus_sha256"):
+        raise ValueError("Prepared native-word corpus checksum mismatch")
+    corpus, overrides = {}, {}
+    with gzip.open(path, "rt", encoding="utf-8") as stream:
+        header = json.loads(stream.readline(8 * 1024 * 1024))
+        if header.get("format") != "dordiai-word-lid-extra-v1" or header.get("sources") != receipt.get("sources"):
+            raise ValueError("Prepared native-word corpus provenance mismatch")
+        source_lock = json.loads((ROOT / "tools/data/word_lid_sources_v2.json").read_text(encoding="utf-8"))
+        locked_hash = sha256(json.dumps(source_lock, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        if header.get("source_lock_sha256") != locked_hash:
+            raise ValueError("Prepared native-word source lock differs from the reviewed source lock")
+        locked_sources = {row["id"]: row for row in source_lock["sources"]}
+        if not isinstance(header.get("sources"), list) or not header["sources"]:
+            raise ValueError("Prepared native-word corpus has no pinned source receipts")
+        for source in header["sources"]:
+            locked = locked_sources.get(source.get("id")) if isinstance(source, dict) else None
+            if (locked is None or any(source.get(key) != locked.get(key) for key in
+                    ("language", "source_language", "url", "revision", "license", "license_url", "attribution"))
+                    or locked.get("sha256") is not None and source.get("sha256") != locked["sha256"]
+                    or locked.get("bytes") is not None and source.get("bytes") != locked["bytes"]):
+                raise ValueError("Prepared native-word receipt differs from its pinned primary source")
+        allowed = {canonical(row["id"]) for row in json.loads((ROOT / "selected_languages.json").read_text(encoding="utf-8"))["languages"]}
+        previous = None
+        for line in stream:
+            if len(line) > 1024 * 1024:
+                raise ValueError("Prepared native-word row is too large")
+            row = json.loads(line)
+            word, labels, role = row.get("word"), row.get("labels"), row.get("publisher_role")
+            if (not isinstance(word, str) or runtime.normalize_word(word) != word
+                    or not runtime.is_valid_word(word) or previous is not None and word <= previous
+                    or not isinstance(labels, list) or not labels
+                    or any(not isinstance(code, str) or code not in allowed for code in labels)
+                    or len(set(labels)) != len(labels)
+                    or role not in ("train", "validation", "test")):
+                raise ValueError("Invalid prepared native-word spelling, labels or publisher split")
+            corpus[word] = set(labels)
+            if role != "train":
+                overrides[word] = role
+            previous = word
+    if len(corpus) != header.get("normalised_words"):
+        raise ValueError("Prepared native-word corpus count differs from provenance")
+    return corpus, overrides, header
+
+
 def metrics(classifier, rows, threshold=None, temperature=None):
     accepted = correct = top_correct = 0
     by_language = defaultdict(lambda: {"words": 0, "accepted": 0, "correct": 0})
@@ -162,14 +211,30 @@ def metrics(classifier, rows, threshold=None, temperature=None):
 def train(args):
     runtime = load_runtime()
     corpus, sources, cyrillic_lexicon = gather(runtime, args.baseline, args.training_data)
+    extra_header, publisher_overrides = None, {}
+    if getattr(args, "additional_corpus", None) is not None:
+        extra, publisher_overrides, extra_header = additional_word_corpus(args.additional_corpus, runtime)
+        for word, labels in extra.items():
+            if len(word) >= 4:
+                corpus.setdefault(word, set()).update(labels)
+        sources.extend(extra_header["sources"])
+    def assignment(word):
+        return publisher_overrides.get(word) or split_word(word)
     support = Counter(code for labels in corpus.values() for code in labels)
-    codes = sorted(code for code, count in support.items() if count >= args.minimum_words)
+    actual_script_support = Counter((code, runtime.word_script(word))
+        for word, labels in corpus.items() if assignment(word) == "train" for code in labels) if extra_header is not None else Counter()
+    eligible_training_codes = {code for (code, script), count in actual_script_support.items()
+                               if script is not None and count >= args.minimum_words}
+    codes = sorted(code for code, count in support.items() if count >= args.minimum_words
+                   and (extra_header is None or code in eligible_training_codes))
+    training_ambiguities = sorted(word for word, labels in corpus.items()
+        if len(labels) > 1 and assignment(word) == "train") if extra_header is not None else []
     allowed = set(codes)
     corpus = {word: labels & allowed for word, labels in corpus.items() if labels & allowed}
     # Cap training contribution per label without touching held-out assignments.
     label_words = defaultdict(list)
     for word, labels in corpus.items():
-        if split_word(word) == "train":
+        if assignment(word) == "train":
             for code in labels:
                 label_words[code].append(word)
     selected_pairs = set()
@@ -180,8 +245,9 @@ def train(args):
     scripts = {code: set() for code in codes}
     train_words = set()
     train_labels = Counter()
+    trained_script_support = Counter()
     for word, labels in sorted(corpus.items()):
-        if split_word(word) != "train":
+        if assignment(word) != "train":
             continue
         features = runtime.feature_indexes(word, args.dimensions)
         for code in labels:
@@ -191,6 +257,10 @@ def train(args):
             scripts[code].add(runtime.word_script(word))
             train_words.add(word)
             train_labels[code] += 1
+            trained_script_support[code, runtime.word_script(word)] += 1
+    if extra_header is not None:
+        scripts = {code: {script for script in scripts[code]
+                    if trained_script_support[code, script] >= args.minimum_words} for code in codes}
     weights = array("h")
     defaults = []
     scale = 256
@@ -207,9 +277,12 @@ def train(args):
                 "dimensions": args.dimensions, "quantization": scale, "ngrams": [2, 3, 4],
                 "temperature": 1., "minimum_confidence": .99,
                 "default_weights": defaults, "weights": base64.b64encode(weights.tobytes()).decode("ascii")}
+    if extra_header is not None:
+        document["native_combining_marks"] = True
+        document["known_ambiguous_spellings"] = training_ambiguities
     classifier = runtime.WordClassifier(document)
-    validation = [(word, labels) for word, labels in sorted(corpus.items()) if split_word(word) == "validation"]
-    testing = [(word, labels) for word, labels in sorted(corpus.items()) if split_word(word) == "test"]
+    validation = [(word, labels) for word, labels in sorted(corpus.items()) if assignment(word) == "validation"]
+    testing = [(word, labels) for word, labels in sorted(corpus.items()) if assignment(word) == "test"]
     # Temperature is selected ONLY on validation. The final test is evaluated
     # once after the confidence policy is fixed.
     rankings = [(classifier.scores(word), labels) for word, labels in validation]
@@ -258,7 +331,7 @@ def train(args):
     args.lexicon_output.write_bytes(lexicon_packed)
     # Split membership digests permit auditing without publishing a duplicate
     # corpus. All words are assigned globally after NFC/case/stress normalisation.
-    partition_words = {name: sorted(word for word in corpus if split_word(word) == name)
+    partition_words = {name: sorted(word for word in corpus if assignment(word) == name)
                        for name in ("train", "validation", "test")}
     assert not (set(partition_words["train"]) & set(partition_words["validation"]) or
                 set(partition_words["train"]) & set(partition_words["test"]) or
@@ -286,6 +359,18 @@ def train(args):
               "abstention": "Fewer than 4 characters, mixed/unknown script, low selected confidence, <25% seen grams, disabled predicted language",
               "test_failure_examples": [{"word": word, "labels": sorted(labels), "predicted": code, "score": confidence}
                                         for word, labels, code, confidence, _ in predictions if code not in labels][:30]}
+    if extra_header is not None:
+        report["split_policy"] = "Publisher test > publisher validation > global SHA256 80/10/10; applies to ALL baseline/new labels of the normalised spelling"
+        report["additional_corpus"] = {"source_lock_sha256": extra_header["source_lock_sha256"],
+            "publisher_holdout_spellings": len(publisher_overrides),
+            "known_training_homographs_abstained": len(document["known_ambiguous_spellings"]),
+            "languages_rejected_for_insufficient_training_spellings": sorted(set(support) - set(codes)),
+            "available_training_spellings_per_language_script": {code: {script: count for (label, script), count in actual_script_support.items() if label == code} for code in sorted(support)},
+            "selected_training_words_per_language_script": {code: {script: count for (label, script), count in trained_script_support.items() if label == code} for code in codes},
+            "per_language_holdout_acceptance_requires_review": True,
+            "integrated_router_holdout_verified": False,
+            "exact_lexicon_not_used_in_classifier_evaluation": True}
+        report["character_features"] += "; native combining marks retained; training-only known homographs explicitly abstain"
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf8")
     print(json.dumps({"languages": len(codes), "model_bytes": len(packed), "trained_words": len(train_words),
@@ -297,6 +382,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, default=BASELINE)
     parser.add_argument("--training-data", type=Path, default=ROOT / "training-data/word-lid")
+    parser.add_argument("--additional-corpus", type=Path, help="Pinned-source prepared corpus; publisher holdouts override baseline/train spellings globally")
     parser.add_argument("--output", type=Path, default=RUNTIME / "models/WordLanguage/word-lid.json.gz")
     parser.add_argument("--lexicon-output", type=Path, default=RUNTIME / "models/WordLanguage/cyrillic-lexicon.json.gz")
     parser.add_argument("--report", type=Path, default=ROOT / "evidence/word_classifier_evaluation.json")

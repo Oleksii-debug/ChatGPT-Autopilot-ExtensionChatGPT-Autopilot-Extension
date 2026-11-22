@@ -1,0 +1,132 @@
+name: Dordiai isolated-word source preflight and candidate training
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pinned-word-sources:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-lid-preflight]') || contains(github.event.head_commit.message, '[word-lid-train]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WORD_LID_CACHE: ${{ github.workspace }}/word-lid-source-cache
+      WORD_LID_REPORTS: ${{ github.workspace }}/dordiai-voices/word-lid-sources-results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create owned source-only output directories
+        run: mkdir -p "$WORD_LID_CACHE" "$WORD_LID_REPORTS"
+      - name: Test source parsing Unicode marks and global publisher holdouts
+        run: |
+          python -m unittest discover -s dordiai-voices/tests -p test_word_lid_sources.py -v 2>&1 | tee "$WORD_LID_REPORTS/unit-tests.log"
+          python -m unittest discover -s dordiai-voices/tests -p test_word_classifier.py -v 2>&1 | tee "$WORD_LID_REPORTS/baseline-tests.log"
+      - name: Small pinned Bodo and Dogri native-word preflight
+        run: |
+          python dordiai-voices/tools/prepare_word_lid_sources.py \
+            --cache "$WORD_LID_CACHE" --output "$WORD_LID_REPORTS/preflight" \
+            --languages brx doi 2>&1 | tee "$WORD_LID_REPORTS/preflight.log"
+      - name: Acquire all reviewed sources only on the separate training flag
+        if: contains(github.event.head_commit.message, '[word-lid-train]')
+        run: |
+          python dordiai-voices/tools/prepare_word_lid_sources.py \
+            --cache "$WORD_LID_CACHE" --output "$WORD_LID_REPORTS/full" \
+            2>&1 | tee "$WORD_LID_REPORTS/full-preparation.log"
+      - name: Train to explicit candidate paths without installing a model
+        if: contains(github.event.head_commit.message, '[word-lid-train]')
+        run: |
+          python dordiai-voices/tools/train_word_classifier.py \
+            --additional-corpus "$WORD_LID_REPORTS/full/extra-corpus.jsonl.gz" \
+            --output "$WORD_LID_REPORTS/full/word-lid.candidate.json.gz" \
+            --lexicon-output "$WORD_LID_REPORTS/full/cyrillic-lexicon.candidate.json.gz" \
+            --report "$WORD_LID_REPORTS/full/evaluation.json" \
+            2>&1 | tee "$WORD_LID_REPORTS/candidate-training.log"
+      - name: Preserve actual pins licenses schemas and global holdout receipts
+        if: always()
+        shell: python
+        run: |
+          from collections import Counter
+          import hashlib,json,os,pathlib,sys,zipfile
+          root=pathlib.Path("dordiai-voices").resolve()
+          sys.path.insert(0,str(root/"tools"))
+          import prepare_word_lid_sources as source_tool
+          import train_word_classifier as trainer
+          reports=pathlib.Path(os.environ["WORD_LID_REPORTS"])
+          reports.mkdir(parents=True,exist_ok=True)
+          cache=pathlib.Path(os.environ["WORD_LID_CACHE"])
+          manifest=json.loads((root/"tools/data/word_lid_sources_v2.json").read_text(encoding="utf-8"))
+          inspection={"scope":"actual pinned source acquisition/schema/split audit; no model installation or language-quality acceptance",
+                      "trained_model_installed":False,"classifier_language_coverage_verified":False,
+                      "sources":[],"prepared_corpora":{}}
+          for row in manifest["sources"]:
+              path=cache/(row["id"]+".source")
+              if not path.is_file():
+                  continue
+              record=source_tool.verify_source(path,row)
+              if row["kind"]=="aksharantar-jsonl-zip":
+                  with zipfile.ZipFile(path) as archive:
+                      record["members"]=[{"name":item.filename,"bytes":item.file_size} for item in archive.infolist()]
+                      schemas=[]
+                      for item in archive.infolist():
+                          if item.is_dir() or not item.filename.endswith((".json",".jsonl")):
+                              continue
+                          with archive.open(item) as stream:
+                              line=stream.readline(source_tool.MAX_LINE+1)
+                          try:
+                              document=json.loads(line.decode("utf-8"))
+                              schemas.append({"member":item.filename,"keys":sorted(document) if isinstance(document,dict) else None,
+                                              "identifier_prefix":str(document.get("unique_identifier",""))[:12] if isinstance(document,dict) else None,
+                                              "source_tag":document.get("source") if isinstance(document,dict) else None})
+                          except (ValueError,UnicodeError) as error:
+                              schemas.append({"member":item.filename,"schema_error":type(error).__name__})
+                      record["observed_schemas"]=schemas
+              inspection["sources"].append(record)
+          runtime=trainer.load_runtime()
+          baseline=None
+          for phase in ("preflight","full"):
+              path=reports/phase/"extra-corpus.jsonl.gz"
+              if not path.is_file():
+                  continue
+              corpus,overrides,header=trainer.additional_word_corpus(path,runtime)
+              if baseline is None:
+                  baseline=trainer.gather(runtime)[0]
+              combined={word:set(labels) for word,labels in baseline.items()}
+              for word,labels in corpus.items():
+                  if len(word)>=4:
+                      combined.setdefault(word,set()).update(labels)
+              partitions={name:set() for name in ("train","validation","test")}
+              for word in combined:
+                  partitions[overrides.get(word) or trainer.split_word(word)].add(word)
+              overlaps={first+"_"+second:len(partitions[first]&partitions[second])
+                        for first,second in (("train","validation"),("train","test"),("validation","test"))}
+              if any(overlaps.values()):
+                  raise AssertionError("Prepared global publisher holdouts overlap")
+              counts=Counter(code for labels in corpus.values() for code in labels)
+              result={"normalised_extra_spellings":len(corpus),"extra_labels_present":dict(sorted(counts.items())),
+                      "extra_ambiguous_spellings":sum(len(labels)>1 for labels in corpus.values()),
+                      "publisher_holdout_spellings":len(overrides),
+                      "baseline_hash_training_spellings_reassigned":sum(word in baseline and trainer.split_word(word)=="train" for word in overrides),
+                      "combined_split_spellings":{key:len(value) for key,value in partitions.items()},
+                      "combined_spelling_overlap":overlaps,"corpus_sha256":hashlib.sha256(path.read_bytes()).hexdigest(),
+                      "source_lock_sha256":header["source_lock_sha256"],"model_quality_verified":False}
+              inspection["prepared_corpora"][phase]=result
+          output=reports/"source-inspection.json"
+          output.write_text(json.dumps(inspection,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print("WORD_LID_SOURCE_INSPECTION "+json.dumps(inspection,ensure_ascii=True),flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-word-lid-sources-${{ github.run_id }}
+          path: ${{ env.WORD_LID_REPORTS }}
+          if-no-files-found: warn
+          retention-days: 7
