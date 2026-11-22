@@ -621,6 +621,34 @@
       "product_ready": false,
       "evidence": "evidence/source12_phrase_transport_45042554326.json",
       "scope": "Repeated known phrase only; no unprepared continuous-read/cancel/audible quality acceptance."
+    },
+    "additional_source12_keyboard": {
+      "format": "dordiai-source12-remaining-typing-evidence",
+      "format_version": 1,
+      "run_id": 45043812521,
+      "commit": "2b7179440966aab12fe049b4e2c32a348cebba32",
+      "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+      "functional": {
+        "characters_only_keys_passed": 9,
+        "both_native_word_echoes_absent": true,
+        "navigation_seed_keys_passed": 2,
+        "actual_navigation_keys_passed": 2,
+        "russian_keyboard_did_not_leak_into_ukrainian_navigation": true,
+        "forced_uk_russian_key_passed": true,
+        "disabled_ru_russian_key_passed": true,
+        "all_configs_layouts_speech_modes_restored": true,
+        "both_driver_preference_restorations_passed": true,
+        "unexpected_failed_checks": 0
+      },
+      "scope": {
+        "recording_sink_test_double": true,
+        "physical_audio_verified": false,
+        "wave_player_verified": false,
+        "acoustic_latency_verified": false,
+        "pronunciation_verified": false,
+        "product_ready": false
+      },
+      "evidence": "evidence/source12_additional_typing_result.json"
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",

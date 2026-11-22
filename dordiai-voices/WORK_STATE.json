@@ -37,7 +37,8 @@
     "Real unchanged WavePlayer on owned virtual render endpoint passed core10 control without recording sink; capture denied and physical audio remain unverified.",
     "Immutable source12 passes all five actual NVDA modes: unchanged100 words/102 pieces route with zero mismatches; seven plain/metadata/compound cases, nine actual typed cases and two genuine resource faults pass.",
     "Exact source12 core and receipt durably stored in separate unpublished backup; both full readback hashes verified.",
-    "Actual immutable12 unchanged WavePlayer complete53041-frame phrase captured from owned NVDA process; full-window NCC0.9999301895 independently reproduced. Own processes/device cleanup verified."
+    "Actual immutable12 unchanged WavePlayer complete53041-frame phrase captured from owned NVDA process; full-window NCC0.9999301895 independently reproduced. Own processes/device cleanup verified.",
+    "All five keyboard scenarios on exact immutable12 pass actual NVDA; configuration/layout/speech and forced/disabled preferences restored."
   ],
   "open_requirements": [
     "8 selected entries have no integrated resources; Tamazight remains partial. Combined older optionals plus actual11 Afri six resources cover127 entries,126 complete; this is resource presence, not native pronunciation.",
@@ -46,8 +47,7 @@
     "Native-listener pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source.",
     "All135 language word identification and homograph abstention need broader quality evaluation; current installed classifier has45 trained labels.",
     "Exact final release reconstruction must retain newly generated bank bytes and matching source/package evidence.",
-    "Pre-existing personalLanguage normalization semantics need separate reviewed correction after main12 actual acceptance.",
-    "Matching immutable12 extended keyboard characters-only/navigation/forced-uk/disabled-ru scenarios remain pending; standard9cases pass. Prior10 scenarios remain historical."
+    "Pre-existing personalLanguage normalization semantics need separate reviewed correction after main12 actual acceptance."
   ],
   "environment": {
     "windows_verification_route": "GitHub Actions isolated Windows runners",
@@ -488,7 +488,8 @@
       }
     },
     "extended_keyboard_scenarios": {
-      "immutable_core_version": "0.13.1-dev.10",
+      "immutable_core_version": "0.13.1-dev.12",
+      "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
       "passed": [
         "standard",
         "characters-only",
@@ -496,18 +497,12 @@
         "forced-uk",
         "disabled-ru"
       ],
-      "passed_artifacts": {
-        "standard": 14755960226,
-        "characters_only": 14755767125
-      },
       "pending": [],
-      "retry_source": "e86dc354a171ca123668b1a07d26273acb938289",
-      "scope": "Actual real-key NVDA with explicit recording sink; no device-acoustic acceptance.",
-      "latest_successful_retry_run": 45027257765,
-      "exact_evidence_preservation_pending": false,
-      "evidence": "evidence/core10_keyboard_scenarios.json",
-      "actual_rows": 24,
-      "configuration_and_layout_restored": true
+      "latest_successful_retry_run": 45043812521,
+      "standard_run": 45041853551,
+      "configuration_and_layout_restored": true,
+      "evidence": "evidence/source12_additional_typing_result.json",
+      "scope": "Actual real-key NVDA with explicit recording sink; no device-acoustic or135language acceptance."
     },
     "word_classifier_v4": {
       "run": 45024624278,
@@ -787,17 +782,14 @@
       "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
     },
     "current_working_source_suite": {
-      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
-      "linux": {
-        "run": 45029834067,
-        "tests": 1058,
-        "skipped": 39
-      },
-      "windows": {
-        "run": 45029834209,
-        "tests": 1058,
-        "skipped": 36
-      }
+      "source_commit": "c9e727a9d684a4af2bd56b76ae6ab9bfb0b47b2d",
+      "run": 45043651462,
+      "job": 137273361162,
+      "status": "passed_actual_linux_fullsuite",
+      "note": "Exact currenttool/research source, not immutable12 binary rebuild; primaryPDF-specific cases skip here and were executed separately.",
+      "total": 1423,
+      "passed": 1369,
+      "skipped": 54
     },
     "afri_native_causal_stream": {
       "run": 45029366603,
@@ -1289,6 +1281,15 @@
         }
       ],
       "evidence": "evidence/source12_phrase_transport_45042554326.json"
+    },
+    "character_names_selected135_audit": {
+      "evidence": "evidence/ordinary_names_selected135_after12.json",
+      "selected": 135,
+      "source_complete_tables": 14,
+      "any_explicit_tables": 19,
+      "missing_identified_explicit_tables": 116,
+      "missing_table_but_existing_engine_route_candidates": 67,
+      "scope": "Static explicit table audit; missing table is not equivalent to unsupported native spelling. Full135 typing/pronunciation unverified."
     }
   },
   "pending_decisions": [],

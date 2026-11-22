@@ -1,0 +1,83 @@
+{
+  "format": "dordiai-isolated-voice-removal-windows-candidate",
+  "format_version": 1,
+  "production_modified": false,
+  "refs_modified": false,
+  "root_launch_marker": "[voice-removal-candidate]",
+  "production_candidate_packet": "081ed48fd2723d6e9105a7eeb8b074515af93478",
+  "test_only_revision": "Windows actual locked-mmap case added; three production candidate files unchanged",
+  "files": [
+    {
+      "path": ".github/workflows/dordiai-voice-removal-candidate.yml",
+      "bytes": 1632,
+      "sha256": "dc5089e3938b324909563fcdc252fdf4519fda8aa19543ed487bb284c1d2c2ea",
+      "git_sha": "db094e4a563c73b735264b5a0ec1b56339258b2a"
+    },
+    {
+      "path": "dordiai-voices/docs/voice-package-lifecycle-acceptance.md",
+      "bytes": 3825,
+      "sha256": "b91bc1b02c225132e3116ee6ada0cf9f70d27a06c2c84233f6bc39d8c8e3bcda",
+      "git_sha": "b9d15c411ee81aacce5e98b938751ac8f2b290f7"
+    },
+    {
+      "path": "dordiai-voices/experiments/voice-removal-ownership/candidate.json",
+      "bytes": 1132,
+      "sha256": "e965a36970551b52b2bad53e257d9e25e91f7fc002352b63cd24a57edd6fae0b",
+      "git_sha": "3c1cae19ec023996e029a88f6006edf81bf5e2ed"
+    },
+    {
+      "path": "dordiai-voices/experiments/voice-removal-ownership/preferences.py",
+      "bytes": 54325,
+      "sha256": "8ca42af7cbaeb7f842fa6ad8858c18e2d0b4f7c7aa17eed6bd9b10f2086fe050",
+      "git_sha": "adbb32c6c6858bc7aee4cad5c116bd456cc8173f"
+    },
+    {
+      "path": "dordiai-voices/experiments/voice-removal-ownership/test_voice_package_retention.py",
+      "bytes": 18174,
+      "sha256": "b7e916b4ced1514ec00f7f8b5b276833c864e75047443c50ad37c3339b499045",
+      "git_sha": "c234162e5789e2e3c1e401ce19f64974dad9cd92"
+    },
+    {
+      "path": "dordiai-voices/experiments/voice-removal-ownership/upgrade_packages.py",
+      "bytes": 15557,
+      "sha256": "20a6463d12eb85f5859fd3522a998bd62208c948e426fddc9d1b15e4aa5acf7a",
+      "git_sha": "ffb73001ca1036dec1ec4ae66f257398b87308e2"
+    },
+    {
+      "path": "dordiai-voices/experiments/voice-removal-ownership/voice_packages.py",
+      "bytes": 24462,
+      "sha256": "7aa7eb85b44a5d296d294804ba166c33789f5740dd1b8a9fce82a15ba18c1302",
+      "git_sha": "4ffcba11049f707090f6749598dc3996158ebcf6"
+    },
+    {
+      "path": "dordiai-voices/tests/test_voice_removal_candidate_gate.py",
+      "bytes": 5660,
+      "sha256": "c0f7e84cfca38107f6e8e07763f9e399bdb22a9fb6ccdf820b1a810e02cda6a3",
+      "git_sha": "85802307a0714c607fea2f7dbb86c3c7675db28b"
+    },
+    {
+      "path": "dordiai-voices/tools/research/voice_removal_candidate_gate.py",
+      "bytes": 8011,
+      "sha256": "37bf6bfc509a1f51b24e9c90df1fa4315b85754c0ad0ead238244be2a153edef",
+      "git_sha": "22469b96923c53928bb3301a28aacb9d7c6bc5e3"
+    }
+  ],
+  "checks": {
+    "guard_tests": 9,
+    "local_end_to_end": {
+      "success": true,
+      "windows": false,
+      "focused_total": 21,
+      "focused_pass": 20,
+      "focused_skip": 1,
+      "full_total": 1270,
+      "full_pass": 1217,
+      "full_skip": 53,
+      "checkout_production_unchanged": true
+    },
+    "windows_actual_run": false,
+    "actual_nvda_gui": false,
+    "product_ready": false
+  },
+  "workflow": "Stages exact reviewed files under experiments only. Verifies source12 production baseline Git hashes and exact four-file candidate manifest. Copies project and workflows to fresh external temporary tree, overlays there, runs focused21 and full matching source suite. Requires actual Windows and mandatory mapped-file test success, rejects skipped required cases, independently checks checkout production bytes unchanged, uploads only bounded logs/receipts, no source/models."
+}

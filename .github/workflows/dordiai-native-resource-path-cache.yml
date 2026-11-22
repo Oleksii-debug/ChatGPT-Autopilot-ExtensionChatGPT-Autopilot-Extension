@@ -1,0 +1,66 @@
+name: Unpublished Resource pure Path spelling profile
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  path-spelling-profile:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[resource-path-profile]')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Preserve exact reviewed source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Verify live filesystem calls and unchanged resource lifecycle
+        run: python -m unittest discover -s dordiai-voices/tests -p test_native_resource_path_cache.py -v
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-compact-native-word-membership
+          run-id: 45027190211
+          github-token: ${{ github.token }}
+          path: dordiai-voices/native-membership-build
+      - name: Matched unchanged versus spelling-cache Resource with same V2 leaf
+        run: >-
+          python dordiai-voices/tools/probe_native_resource_path_cache.py
+          --dataset-dir dordiai-voices/native-membership-build
+          --output dordiai-voices/native-resource-path-profile/matched-profile.json
+      - name: Preserve exact report and full function profile
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path('dordiai-voices/native-resource-path-profile/matched-profile.json')
+          if not path.is_file():
+              print('No matched profile report produced',flush=True)
+              raise SystemExit(0)
+          raw=path.read_bytes()
+          if len(raw)>2*1024*1024:raise ValueError('Unexpected report size')
+          doc={'format':'dordiai-exact-native-resource-path-profile-json','format_version':1,
+              'run_id':os.environ['GITHUB_RUN_ID'],'commit':os.environ['GITHUB_SHA'],
+              'file':{'name':path.name,'sha256':hashlib.sha256(raw).hexdigest(),
+                      'size_bytes':len(raw),'source_base64':base64.b64encode(raw).decode('ascii')}}
+          encoded=json.dumps(doc,sort_keys=True,separators=(',',':')).encode()
+          payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode('ascii')
+          print('DORDIAI_RESOURCE_PATH_PROFILE_JSON_SHA256 '+hashlib.sha256(encoded).hexdigest(),flush=True)
+          for index in range(0,len(payload),24000):
+              print('DORDIAI_RESOURCE_PATH_PROFILE_GZIP_B64_%03d '%(index//24000)+payload[index:index+24000],flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: unpublished-resource-path-profile-${{ matrix.os }}
+          path: dordiai-voices/native-resource-path-profile/*.json
+          if-no-files-found: warn
+          retention-days: 30

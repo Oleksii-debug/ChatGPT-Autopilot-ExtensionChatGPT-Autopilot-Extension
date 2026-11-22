@@ -1,0 +1,30 @@
+{
+  "format": "dordiai-voice-removal-ownership-overlay",
+  "format_version": 1,
+  "files": [
+    {
+      "source": "voice_packages.py",
+      "target": "source/0.12.2/kx47Runtime/voice_packages.py",
+      "sha256": "7aa7eb85b44a5d296d294804ba166c33789f5740dd1b8a9fce82a15ba18c1302",
+      "git_sha": "4ffcba11049f707090f6749598dc3996158ebcf6"
+    },
+    {
+      "source": "preferences.py",
+      "target": "source/0.12.2/kx47Runtime/preferences.py",
+      "sha256": "8ca42af7cbaeb7f842fa6ad8858c18e2d0b4f7c7aa17eed6bd9b10f2086fe050",
+      "git_sha": "adbb32c6c6858bc7aee4cad5c116bd456cc8173f"
+    },
+    {
+      "source": "upgrade_packages.py",
+      "target": "source/0.12.2/kx47Runtime/upgrade_packages.py",
+      "sha256": "20a6463d12eb85f5859fd3522a998bd62208c948e426fddc9d1b15e4aa5acf7a",
+      "git_sha": "ffb73001ca1036dec1ec4ae66f257398b87308e2"
+    },
+    {
+      "source": "test_voice_package_retention.py",
+      "target": "tests/test_voice_package_retention.py",
+      "sha256": "b7e916b4ced1514ec00f7f8b5b276833c864e75047443c50ad37c3339b499045",
+      "git_sha": "c234162e5789e2e3c1e401ce19f64974dad9cd92"
+    }
+  ]
+}

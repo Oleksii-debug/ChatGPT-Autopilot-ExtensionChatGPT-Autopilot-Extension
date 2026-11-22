@@ -1,0 +1,92 @@
+{
+  "format": "dordiai-voice-removal-ownership-candidate",
+  "format_version": 1,
+  "base_source_snapshot": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+  "frozen_actual_source12_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+  "production12_modified": false,
+  "refs_modified": false,
+  "acceptance": "unreviewed candidate, not a new binary",
+  "bug": {
+    "trigger": "Voice-package removal deactivates index then shutil.rmtree raises, including partial Windows file deletion.",
+    "before": "Files remain, admin list becomes empty; no accessible retry removal or version selection.",
+    "reproduced": {
+      "files_remain": true,
+      "active": {},
+      "admin_list": [],
+      "retained_versions": [
+        "1.0.0"
+      ]
+    }
+  },
+  "design": [
+    "Before deleting any registered voice assets, atomically move ID/version from active to inactive ownership. Speech discovery continues to read active only.",
+    "Retain inactive ownership across deletion exceptions, abrupt process exit, keep_files=True and final index-write failures; retry cleanup is idempotent even with no files left.",
+    "Only registered IDs can be deleted. Administrative listing includes registered inactive rows without directory enumeration. Explicit Ukrainian inactive label; removal and existing verified version activation remain accessible. The installed-version chooser includes the sole retained version for an inactive entry; active entries still exclude their current version.",
+    "Index writer emits format2 only while nonempty inactive ownership exists. New reader accepts legacy format1 without inactive and format2 with an inactive map, validates IDs/versions/exclusions and rejects overlap/unsupported/malformed versions. Old v1 readers reject format2 rather than silently corrupting ownership.",
+    "Successful verified install/activation clears inactive ownership. Successful full cleanup normalizes back to active-only format1.",
+    "Core migration preserves inactive ownership, rejects active/inactive/version collisions, never alters old data. Partly damaged retained data blocks upgrade until explicit cleanup, preserving its administrative retry entry."
+  ],
+  "files": [
+    {
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/voice_packages.py",
+      "bytes": 24462,
+      "sha256": "7aa7eb85b44a5d296d294804ba166c33789f5740dd1b8a9fce82a15ba18c1302",
+      "git_sha": "4ffcba11049f707090f6749598dc3996158ebcf6",
+      "base_sha": "5be4b4dcac5bf3aa27baf657bace97e0e50b47a6",
+      "source12_same_base": true
+    },
+    {
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/preferences.py",
+      "bytes": 54325,
+      "sha256": "8ca42af7cbaeb7f842fa6ad8858c18e2d0b4f7c7aa17eed6bd9b10f2086fe050",
+      "git_sha": "adbb32c6c6858bc7aee4cad5c116bd456cc8173f",
+      "base_sha": "dc8aab9ba81a6a53d3e0bc9a7eb0edf7c46532d6",
+      "source12_same_base": true
+    },
+    {
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/upgrade_packages.py",
+      "bytes": 15557,
+      "sha256": "20a6463d12eb85f5859fd3522a998bd62208c948e426fddc9d1b15e4aa5acf7a",
+      "git_sha": "ffb73001ca1036dec1ec4ae66f257398b87308e2",
+      "base_sha": "db005fec90dce8a3cf26f5b6febdc7b565a6ad46",
+      "source12_same_base": true
+    },
+    {
+      "path": "dordiai-voices/tests/test_voice_package_retention.py",
+      "bytes": 17382,
+      "sha256": "e371eebf8df43747d17d8a7eb8aea067b8e193adfccb7456a3fa678dc694847a",
+      "git_sha": "2714fe92796c561b815c4e0be6029e6d13be6d33"
+    }
+  ],
+  "validation": {
+    "new_tests": 20,
+    "complete_isolated_snapshot_suite": {
+      "total": 1260,
+      "passed": 1208,
+      "skipped": 52,
+      "failed": 0,
+      "seconds": 6.771,
+      "base": "09f4 source snapshot + exactly candidate files; relevant three production files byte-equal accepted source12 base"
+    },
+    "new_proofs": [
+      "first ownership commit failure leaves prior active data unchanged",
+      "locked and partial deletion preserve inactive listing and retry",
+      "abrupt os._exit(23) releases OS lock, ownership survives and retry succeeds",
+      "post-delete index commit failure remains recoverable without files",
+      "keep-files, verified reactivation/reinstall, damaged activation rejected",
+      "strict legacy/v2/invalid schema and excluded/symlink guard",
+      "actual dialog list labels and remove dispatch (GUI stubs)",
+      "actual dialog inactive label, enabled remove dispatch and sole retained version activation chooser/dispatch (GUI stubs)"
+    ],
+    "actual_windows_candidate_run": false,
+    "actual_nvda_candidate_run": false,
+    "physical_audio_acceptance": false
+  },
+  "remaining_acceptance": [
+    "Parent source/code review and production13 integration decision",
+    "Run matching full Windows suite, including actual locked-file Windows deletion semantics",
+    "Actual NVDA install/import/rollback/remove/retry and upgrade interface acceptance; mocked GUI tests do not establish this"
+  ],
+  "revision": 2,
+  "supersedes": "90e03647ea2455c5b0c87384b1c1ebc539e5967c"
+}

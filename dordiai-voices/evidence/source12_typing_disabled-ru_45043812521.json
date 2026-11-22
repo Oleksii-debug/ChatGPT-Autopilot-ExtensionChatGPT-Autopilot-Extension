@@ -1,0 +1,2671 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "status": "partial",
+  "run_id": "ed1ab1d057634dc9bf5bc990bcea2184",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "nvda_version_expected": "2026.3.1",
+  "checks": [
+    {
+      "name": "physical_audio_output",
+      "status": "blocked",
+      "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+    },
+    {
+      "name": "select_dordiai",
+      "status": "passed",
+      "driver_name": "kx47Preview"
+    },
+    {
+      "name": "native_membership_singleton",
+      "status": "passed"
+    },
+    {
+      "name": "native_membership_active_owned_lease",
+      "status": "passed",
+      "active_leases": 1
+    },
+    {
+      "name": "native_membership_actual_installed_long_namespace",
+      "status": "passed",
+      "dataset_path": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tsqopp0v\\config-native-host\\addons\\kx47Voices\\kx47Runtime\\models\\WordLanguage\\native-word-membership.bin",
+      "path_characters": 270,
+      "external_candidate_used": false
+    },
+    {
+      "name": "native_membership_trusted_dataset",
+      "status": "passed",
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 0,
+        "cache_bytes_charged": 0,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 0,
+        "word_cache_bytes_charged": 0,
+        "word_cache_entry_limit": 1024,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 0,
+        "word_cache_misses": 0,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      }
+    },
+    {
+      "name": "native_membership_unknown_finite_membership",
+      "status": "passed",
+      "scope": "Finite dictionary abstention only; downstream legacy routing remains separate"
+    },
+    {
+      "name": "native_membership_source_membership_and_wrappers",
+      "status": "passed",
+      "case_count": 96
+    },
+    {
+      "name": "native_membership_readonly_probe_completed",
+      "status": "passed",
+      "resource_or_driver_closed_by_probe": false
+    },
+    {
+      "name": "host_sonic_import_and_dll",
+      "status": "passed",
+      "module": "synthDrivers._sonic"
+    },
+    {
+      "name": "allowed_voice_catalog",
+      "status": "passed",
+      "count": 45,
+      "voices": [
+        "adam",
+        "agnieszka",
+        "alex",
+        "alice_day1",
+        "astra_day2",
+        "bella",
+        "brian",
+        "brian_studio",
+        "brianna",
+        "callum_day1",
+        "charlie_day1",
+        "chris",
+        "claude_day2",
+        "daniel",
+        "daniel_day1",
+        "david",
+        "elis",
+        "gemini_day2",
+        "george",
+        "george_unpacked",
+        "gpt_day2",
+        "grok_day2",
+        "harry",
+        "hazel",
+        "keeper",
+        "laura_day1",
+        "laura_unpacked",
+        "lian",
+        "liza",
+        "liza_talk",
+        "mark",
+        "mykola",
+        "oksana",
+        "oleksii",
+        "oleksii_day1",
+        "oleksii_day2",
+        "oleksii_unpacked",
+        "olena",
+        "sara",
+        "sara_archive",
+        "studio_day1",
+        "veren",
+        "viktoriia",
+        "will",
+        "yevhen"
+      ],
+      "excluded_present": []
+    },
+    {
+      "name": "fresh_default_languages",
+      "status": "passed",
+      "enabled": [
+        "en",
+        "ru",
+        "uk"
+      ]
+    },
+    {
+      "name": "settings_dialog",
+      "status": "passed",
+      "title": "dordiai-voices — налаштування",
+      "visible": true,
+      "pages": [
+        "Мовлення",
+        "Голоси",
+        "Мови",
+        "Пакети"
+      ],
+      "labels": [
+        "dordiai-voices — налаштування",
+        "panel",
+        "Основний голос",
+        "Визначення мови",
+        "Швидкість, відсотків",
+        "Множник швидкості",
+        "Гучність, відсотків",
+        "Висота, відсотків",
+        "Тембр, відсотків",
+        "Мова чисел",
+        "Мова кириличних літер",
+        "panel",
+        "Доступні голоси",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "panel",
+        "Мови для перемикання",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "Основна мова",
+        "Мова для призначення голосу",
+        "Голос для цієї мови",
+        "Показано встановлені мови. Галочка вмикає мову, але не видаляє її файли. Нові мови\nпотрібно вмикати окремо. Текст вимкненою мовою читається основною мовою.\nВиберіть мову й сумісний голос. У примусовому режимі весь текст читається основною\nмовою.",
+        "panel",
+        "Установлені додаткові пакети",
+        "Установити пакет із ZIP-файла…",
+        "Видалити вибраний пакет…",
+        "Вибрати попередню версію голосу…",
+        "Основний комплект не видаляється тут. Під час роботи з пакетом навігацію озвучує\nвбудований eSpeak. Потім dordiai-voices автоматично перезавантажиться, і можна буде\nввімкнути нові мови на вкладці «Мови».",
+        "OK",
+        "Cancel",
+        "&Apply"
+      ],
+      "checked_languages": [
+        "en",
+        "ru",
+        "uk"
+      ],
+      "voice_rows": 45,
+      "missing_controls": []
+    },
+    {
+      "name": "settings_hotkey_binding",
+      "status": "passed",
+      "scripts": [
+        "script_preferences"
+      ]
+    },
+    {
+      "name": "keyboard_tab",
+      "status": "passed",
+      "events_emitted": true,
+      "changed_focus": true,
+      "focused_type": "WxCtrlWithEnableEvnt",
+      "reason": null
+    },
+    {
+      "name": "keyboard_checkbox_space",
+      "status": "passed",
+      "changed": true,
+      "reason": null
+    },
+    {
+      "name": "actual_typing_owned_focus",
+      "status": "passed",
+      "hwnd_verified": true,
+      "protected": false
+    },
+    {
+      "name": "actual_typing_utterance_observation",
+      "status": "passed",
+      "scope": "existing index feed submission boundaries, never physical playback",
+      "errors": []
+    },
+    {
+      "name": "actual_typing_keyboard_pipeline",
+      "status": "passed",
+      "cases": 1,
+      "scope": "Injected real keyboard/NVDA/model/PCM functional check, not physical keyboard/acoustic latency"
+    },
+    {
+      "name": "actual_typing_language_routes",
+      "status": "passed",
+      "mismatches": []
+    },
+    {
+      "name": "actual_typing_preferences_restored",
+      "status": "passed",
+      "receipt": {
+        "restored": true,
+        "configuration_scope": "effective isolated AggregatedSection values; owned process discarded afterward"
+      }
+    },
+    {
+      "name": "actual_typing_cleanup",
+      "status": "passed",
+      "observations": {
+        "attempted": true,
+        "errors": [],
+        "keyboard_config_restored": true,
+        "keyboard_layout_restored": true,
+        "speech_mode_restored": true
+      }
+    }
+  ],
+  "limitations": [
+    "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+    "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+    "One keyboard smoke check is not a complete accessibility assessment.",
+    "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "nvda_version_actual": "2026.3.1",
+  "native_membership": {
+    "scope": "Actual installed manager and both candidate wrappers; not pronunciation or intended-language proof",
+    "source_cases": [
+      {
+        "word": "ольсену",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "галапагосе",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "витівкових",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "доктрину",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "мегакрутими",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "утеплювавсь",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "рушникосушки",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "яснесенькою",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "вигибатимеш",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "курятинами",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "висловлень",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "малопривабливій",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "детектуй",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "погамував",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зализуватимусь",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "проголених",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "попідливано",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "найпискливіш",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "розплішіться",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "оберстдорфові",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "без'ядерності",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "озимій",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "променітимем",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "дідуню",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "плагіоклазі",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "непальцем",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "бережечками",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "драйвували",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "кріогідратів",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "діагенезом",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "одкочено",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "незім'яте",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "присмирённая",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "списались",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "аминбаевны",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "прорубишься",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "ковыляниями",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "припоминаньи",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "оплёвывающуюся",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "ильменским",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "донецки",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "пожалевши",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "простерёгшего",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "воспринимала",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зарумянивших",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "лилиянн",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "переволочило",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "картофелесортировальных",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "низлагаемы",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "питиримах",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "безмельницыны",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "иносказательно",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "петрунелями",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "антитеатру",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "синевато-сером",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "посахаренную",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "истолковываемое",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "тяготимому",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "отсасываемых",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "саживаешь",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "поточенной",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зашлифовывала",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "кудесниками",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "взаимопроникающего",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "небесно-голубому",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "нордах",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "затекли",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "спохватитесь",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "кольчуги",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "скверна",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "шапочками",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "питого",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зашушукайтесь",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "камуфляже",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "уколупнули",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "полонянка",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "тумаком",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "контрпропагандою",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "маликам",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "червоточиною",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "тугрику",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "дискомфортах",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "конденсорами",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "секуляризуй",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "поморочило",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "блефуй",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "скрипни",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "плющена",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "термосифонною",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "обагритесь",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "лонам",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "черпав",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "неоген",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "перешитому",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "фталазолом",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "латникам",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      }
+    ],
+    "archive_modified": false,
+    "dataset_modified": false,
+    "production_word_route_verified": false,
+    "physical_audio_verified": false,
+    "lookup_timings": {
+      "reader_100": {
+        "count": 100,
+        "median_ms": 0.02855,
+        "p95_ms": 0.0364,
+        "max_ms": 0.0585,
+        "total_ms": 3.1032,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      },
+      "manager_100": {
+        "count": 100,
+        "median_ms": 0.54745,
+        "p95_ms": 0.5995,
+        "max_ms": 0.659,
+        "total_ms": 55.9212,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      },
+      "reader_1000": {
+        "count": 1000,
+        "median_ms": 0.0282,
+        "p95_ms": 0.0333,
+        "max_ms": 0.0604,
+        "total_ms": 29.7132,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      },
+      "manager_1000": {
+        "count": 1000,
+        "median_ms": 0.58675,
+        "p95_ms": 0.9525,
+        "max_ms": 1.7008,
+        "total_ms": 675.4952,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      }
+    },
+    "statistics_after": {
+      "closed": false,
+      "codes": [
+        "uk",
+        "ru"
+      ],
+      "word_count": 6642550,
+      "blocks": 25948,
+      "cached_blocks": 32,
+      "cache_bytes_charged": 1818761,
+      "cache_byte_limit": 4194304,
+      "cache_block_limit": 32,
+      "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+      "max_raw_block_bytes": 65536,
+      "max_block_words": 256,
+      "membership_mask_bytes": 1,
+      "language_table_limit": 1024,
+      "cached_words": 96,
+      "word_cache_bytes_charged": 55854,
+      "word_cache_entry_limit": 1024,
+      "word_cache_byte_limit": 524288,
+      "word_cache_hits": 2488,
+      "word_cache_misses": 96,
+      "word_cache_evictions": 0,
+      "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+    }
+  },
+  "actual_typing": {
+    "scope": "real SendInput to owned wx.TextCtrl through unchanged NVDA typing handlers",
+    "input_injection": "scan-code SendInput, not WM_CHAR or direct speech calls",
+    "speech_mode": "talk",
+    "speak_typed_characters": 1,
+    "speak_typed_words": 1,
+    "no_manual_language_commands": true,
+    "physical_audio_verified": false,
+    "recording_pcm_sink_test_double": true,
+    "cases": [
+      {
+        "language": "ru",
+        "klid": "00000419",
+        "actual_hkl": "0x4190419",
+        "hkl_language_id": 1049,
+        "glyph": "а",
+        "vk": 70,
+        "scan": 33,
+        "shift": false,
+        "expected_control_value": "а",
+        "raw_keys": [
+          {
+            "vk": 70,
+            "pressed": true,
+            "injected": true,
+            "scan": 33,
+            "extended": false,
+            "time_ns": 193225881600
+          },
+          {
+            "vk": 70,
+            "pressed": false,
+            "injected": true,
+            "scan": 33,
+            "extended": false,
+            "time_ns": 193226497800
+          }
+        ],
+        "typed_events": [
+          {
+            "glyph": "а",
+            "time_ns": 193242158000
+          }
+        ],
+        "normal_typed_speech": [
+          [
+            {
+              "command": "LanguageOriginCommand"
+            },
+            {
+              "command": "LanguageOriginCommand"
+            },
+            {
+              "command": "CharacterModeCommand",
+              "state": true
+            },
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "а"
+            },
+            {
+              "command": "EndUtteranceCommand"
+            },
+            {
+              "command": "CharacterModeCommand",
+              "state": false
+            }
+          ]
+        ],
+        "driver_sequences": [
+          [
+            {
+              "command": "LanguageOriginCommand"
+            },
+            {
+              "command": "LanguageOriginCommand"
+            },
+            {
+              "command": "CharacterModeCommand",
+              "state": true
+            },
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "а"
+            },
+            {
+              "command": "IndexCommand",
+              "index": 6
+            }
+          ],
+          [
+            {
+              "command": "LanguageOriginCommand"
+            },
+            {
+              "command": "CharacterModeCommand",
+              "state": true
+            },
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "command": "CharacterModeCommand",
+              "state": false
+            },
+            {
+              "command": "IndexCommand",
+              "index": 7
+            }
+          ]
+        ],
+        "routes": [
+          {
+            "language": "uk",
+            "profile": "adam",
+            "character": true,
+            "text": "а"
+          }
+        ],
+        "stage": "typing-ru-0",
+        "send_started_ns": 193225696500,
+        "inserted_key_events": 2,
+        "expected_language": "uk",
+        "queued_utterances": [
+          {
+            "queued_ns": 193243064800,
+            "priority": 0,
+            "sequence": [
+              {
+                "command": "LanguageOriginCommand"
+              },
+              {
+                "command": "LanguageOriginCommand"
+              },
+              {
+                "command": "CharacterModeCommand",
+                "state": true
+              },
+              {
+                "command": "LangChangeCommand",
+                "lang": "uk"
+              },
+              {
+                "text": "а"
+              },
+              {
+                "command": "EndUtteranceCommand"
+              },
+              {
+                "command": "CharacterModeCommand",
+                "state": false
+              }
+            ]
+          }
+        ],
+        "driver_request_ns": 193243163800,
+        "driver_utterances": [
+          {
+            "ordinal": 0,
+            "notified_ns": 193243165600,
+            "sequence": [
+              {
+                "command": "LanguageOriginCommand"
+              },
+              {
+                "command": "LanguageOriginCommand"
+              },
+              {
+                "command": "CharacterModeCommand",
+                "state": true
+              },
+              {
+                "command": "LangChangeCommand",
+                "lang": "uk"
+              },
+              {
+                "text": "а"
+              },
+              {
+                "command": "IndexCommand",
+                "index": 6
+              }
+            ],
+            "indices": [
+              6
+            ],
+            "remaining_index_submissions": 0,
+            "planned_parts": [
+              {
+                "language": "uk",
+                "profile": "adam",
+                "character": true,
+                "text": "а",
+                "planned_ns": 193245397600
+              }
+            ],
+            "pcm_bytes": 8882,
+            "nonzero_chunks": 19,
+            "boundary_scope": "existing driver IndexCommand onDone feed SUBMISSION, not played-audio completion",
+            "first_pcm_submission_ns": 193247188100,
+            "last_pcm_submission_ns": 193248254900,
+            "driver_to_first_pcm_ms": 4.0225,
+            "submission_closed_ns": 193248282500
+          },
+          {
+            "ordinal": 1,
+            "notified_ns": 193257349300,
+            "sequence": [
+              {
+                "command": "LanguageOriginCommand"
+              },
+              {
+                "command": "CharacterModeCommand",
+                "state": true
+              },
+              {
+                "command": "LangChangeCommand",
+                "lang": "uk"
+              },
+              {
+                "command": "CharacterModeCommand",
+                "state": false
+              },
+              {
+                "command": "IndexCommand",
+                "index": 7
+              }
+            ],
+            "indices": [
+              7
+            ],
+            "remaining_index_submissions": 0,
+            "planned_parts": [],
+            "pcm_bytes": 2,
+            "nonzero_chunks": 0,
+            "boundary_scope": "existing driver IndexCommand onDone feed SUBMISSION, not played-audio completion",
+            "submission_closed_ns": 193257997000
+          }
+        ],
+        "first_typing_pcm_ns": 193247192800,
+        "actual_control_value": "а",
+        "pcm_metrics": {
+          "pcm_bytes": 8880,
+          "nonzero_bytes": 8039,
+          "play_calls": 19,
+          "first_nonzero_feed_ns": 193247194000,
+          "first_play_return_ns": 193247248700
+        },
+        "driver_error": null,
+        "effective_languages": [
+          "uk"
+        ],
+        "emitted_languages": [
+          "uk",
+          "uk"
+        ],
+        "status": "passed",
+        "symbol_label_matches": true,
+        "letter_name_matches": true,
+        "word_echo_matches": true,
+        "routing_status": "passed",
+        "first_pcm_ms": 21.4963
+      }
+    ],
+    "scenario": "disabled-ru",
+    "observer_scope": "passive uncalibrated queued/driver/planner/index-feed timestamps; no physical acoustic claim",
+    "preference_application": {
+      "api": "actual PreferencesMixin._dordiai_apply (same settings-dialog API)",
+      "mode": "auto",
+      "enabled_languages": [
+        "en",
+        "uk"
+      ],
+      "default_language": "uk",
+      "expected_route": "uk"
+    },
+    "preference_restoration": {
+      "restored": true,
+      "configuration_scope": "effective isolated AggregatedSection values; owned process discarded afterward"
+    },
+    "cleanup": {
+      "attempted": true,
+      "errors": [],
+      "keyboard_config_restored": true,
+      "keyboard_layout_restored": true,
+      "speech_mode_restored": true
+    }
+  },
+  "pcm_metrics": {
+    "typing-layout-ru": {
+      "pcm_bytes": 77478,
+      "nonzero_bytes": 71699,
+      "play_calls": 164,
+      "first_nonzero_feed_ns": 192929694900,
+      "first_play_return_ns": 192929753400
+    },
+    "typing-ru-0": {
+      "pcm_bytes": 8880,
+      "nonzero_bytes": 8039,
+      "play_calls": 19,
+      "first_nonzero_feed_ns": 193247194000,
+      "first_play_return_ns": 193247248700
+    }
+  },
+  "finished_at_ns": 1795364857434883900
+}

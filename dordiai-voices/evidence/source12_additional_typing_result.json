@@ -1,0 +1,69 @@
+{
+  "format": "dordiai-source12-remaining-typing-evidence",
+  "format_version": 1,
+  "run_id": 45043812521,
+  "commit": "2b7179440966aab12fe049b4e2c32a348cebba32",
+  "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+  "functional": {
+    "characters_only_keys_passed": 9,
+    "both_native_word_echoes_absent": true,
+    "navigation_seed_keys_passed": 2,
+    "actual_navigation_keys_passed": 2,
+    "russian_keyboard_did_not_leak_into_ukrainian_navigation": true,
+    "forced_uk_russian_key_passed": true,
+    "disabled_ru_russian_key_passed": true,
+    "all_configs_layouts_speech_modes_restored": true,
+    "both_driver_preference_restorations_passed": true,
+    "unexpected_failed_checks": 0
+  },
+  "scope": {
+    "recording_sink_test_double": true,
+    "physical_audio_verified": false,
+    "wave_player_verified": false,
+    "acoustic_latency_verified": false,
+    "pronunciation_verified": false,
+    "product_ready": false
+  },
+  "evidence": [
+    {
+      "scenario": "characters-only",
+      "job_id": 137273863214,
+      "raw_report_git_blob": "6d0b5b525a5534861c45b2c38090414c7f56e275",
+      "complete_bundle_gzip_git_blob": "a2eb504cd1360727679f54377093c8d2d4d09981",
+      "bundle_gzip_sha256": "950f8261d377ab6f196acf9022da25dd0147889124690ebf0fe722b3943d66bc",
+      "bundle_json_sha256": "04db7dd7e13f31d0d66dcf177935682abcd4350e6030ef8b935135d0354843a4",
+      "artifact_id": 14762897322,
+      "artifact_zip_sha256": "f89f7e3cedb65b6a2a83fb55d0b7586cbf14235ba529e87e409b80c0de674df7"
+    },
+    {
+      "scenario": "navigation",
+      "job_id": 137273863178,
+      "raw_report_git_blob": "a4a83d0eab7a4f95221ae57e8a8d5e04c3c37233",
+      "complete_bundle_gzip_git_blob": "529029cd44361131d4347c4e556e94f401a6e23a",
+      "bundle_gzip_sha256": "9a639142ea1de623e2bc8a88f64f32852589c5c660643bf45de2324ae86ce8bd",
+      "bundle_json_sha256": "dac3e003f0e74938199b89b9394cba635d34146919affd93be14a8e9f1306c46",
+      "artifact_id": 14762287725,
+      "artifact_zip_sha256": "7c2d471350a12b5c05c6d120d5f0fc8352efc61ecb25406840e004e78ee34f7b"
+    },
+    {
+      "scenario": "forced-uk",
+      "job_id": 137273862853,
+      "raw_report_git_blob": "f25e1bb91b2d5b4a66b397a7ce8241b451dac21b",
+      "complete_bundle_gzip_git_blob": "39bf1d0127073e2b83e85bb328614868e185b952",
+      "bundle_gzip_sha256": "76a841319a4c020e70b7e737f9be3c2d6c8dea1e4c7dece2d422d08ce09a0f7d",
+      "bundle_json_sha256": "448802e67ca5dd915cfbca585300b2d56a60019b844a122f1b4407651088a738",
+      "artifact_id": 14762608192,
+      "artifact_zip_sha256": "aa8d0c5bb16443987f699f89135c5df682d80e45607f25dec088726bfba331d4"
+    },
+    {
+      "scenario": "disabled-ru",
+      "job_id": 137273863262,
+      "raw_report_git_blob": "b2d9b8ab82409554921ecb32b127868ce862415a",
+      "complete_bundle_gzip_git_blob": "f2509efbe269c3aa9191a8aa7077109b2d876a03",
+      "bundle_gzip_sha256": "7a77b5e9bf0f8a2fc66e09e3a1d883c6512a836833f9049c2f191e2512d826b9",
+      "bundle_json_sha256": "c241f133b53f792e7cc990be8cb343a27f173e4e25fdb2bcecd83c3abe043001",
+      "artifact_id": 14762856395,
+      "artifact_zip_sha256": "d2cef31401ae122b911c8ec4608037c2f6e01548b34abee1f0b7184365fd7051"
+    }
+  ]
+}

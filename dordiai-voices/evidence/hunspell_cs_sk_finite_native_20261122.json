@@ -1,0 +1,135 @@
+{
+  "format": "dordiai-finite-cs-sk-native-dictionary-stem-experiment",
+  "format_version": 1,
+  "source": "https://github.com/LibreOffice/dictionaries/tree/c0865a85eb67dc377f2cf8e8fe2c4fa9e53f0dcb",
+  "source_revision": "c0865a85eb67dc377f2cf8e8fe2c4fa9e53f0dcb",
+  "input_files": {
+    "cs_CZ/cs_CZ.aff": {
+      "bytes": 111575,
+      "sha256": "7ecb20620ecd46ebd9c36f3f33e69dd4eda385cba5b2bb4e6bc396d910e297f7",
+      "git_blob": "9ebd2c44607cb515a1f69d96c3215cd27ccb523c"
+    },
+    "cs_CZ/cs_CZ.dic": {
+      "bytes": 3656362,
+      "sha256": "d8e8c88c006fdae72dac8c85df11b0c99a773e05a4ab0fcbe92244876668ca74",
+      "git_blob": "eef8d834994a592926e0e2aed005f38beaed7deb"
+    },
+    "cs_CZ/README_en.txt": {
+      "bytes": 13105,
+      "sha256": "0fe6d017aa91ffb58146d19160f8207900cc0c49d5fffef0b1a7d3a364cb29bd",
+      "git_blob": "7d4266ad66f7a45846845baf1a8abb8926612985"
+    },
+    "sk_SK/sk_SK.aff": {
+      "bytes": 225271,
+      "sha256": "af67bbe8ea9dea74968ec01acd266b3f74177ca087ee6eb7898c576e0aef7a3d",
+      "git_blob": "a1a9eaab1e519059c4c4667486805bbbf2d6144b"
+    },
+    "sk_SK/sk_SK.dic": {
+      "bytes": 3362212,
+      "sha256": "3e3dbd5c6af8431a3a47652c69692f3f86d0cd82deb4418e49a057a33ef56063",
+      "git_blob": "7ce548b22afc2644a1e5f16b830e71ac147070b6"
+    },
+    "sk_SK/README_en.txt": {
+      "bytes": 2027,
+      "sha256": "a36af75654ae6e65614f7821b2c401ea1f3b4adfdcba9b59efcb1a06c96df14d",
+      "git_blob": "a3edf6a5dc5094eba7d591308577ac8e6ed7949a"
+    },
+    "sk_SK/LICENSE.txt": {
+      "bytes": 67574,
+      "sha256": "dc06f891b13dcb6fe1ede36c0c9020f0e57e6777aca951ecaceefa95a19d7cfc",
+      "git_blob": "28a351fb4ca7606471af428c257b0786bcd608d9"
+    }
+  },
+  "source_licences": {
+    "cs": "GNU GPL, version unspecified in original spellchecker notice",
+    "sk": "Publisher alternatives: GPL-2.0 OR LGPL-2.1 OR MPL-1.1"
+  },
+  "executed_tool": {
+    "bytes": 9470,
+    "sha256": "f291eb1f9e1beab6f87e341d66a30df707e542c661c8bd0dfa84758e6a3c7d85"
+  },
+  "library": {
+    "path": "/usr/lib/x86_64-linux-gnu/libhunspell-1.7.so.0.0.1",
+    "bytes": 800320,
+    "sha256": "7dc4e1d423b3e2c976359ae84a9bd8f6e2c19816322ceeddace6313244c50958"
+  },
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "reader_format": {
+    "bytes": 18985,
+    "sha256": "3e4f5c015a85a0da204690052108386a82c4090403b9b0fb898b7ced2b9ebdb2"
+  },
+  "source_counts": {
+    "cs_CZ": {
+      "declared_entries": 261167,
+      "canonical_entry_candidates": 261011
+    },
+    "sk_SK": {
+      "declared_entries": 160357,
+      "canonical_entry_candidates": 160357
+    }
+  },
+  "candidate_union": 391414,
+  "counts": {
+    "cs": 165210,
+    "sk": 152225,
+    "shared": 31422,
+    "rejected_by_both": 105401
+  },
+  "examples": {
+    "žena": [
+      "cs",
+      "sk"
+    ],
+    "škola": [
+      "cs",
+      "sk"
+    ],
+    "český": [
+      "cs",
+      "sk"
+    ],
+    "slovenský": [
+      "cs",
+      "sk"
+    ],
+    "kůň": [
+      "cs"
+    ],
+    "kôň": [
+      "sk"
+    ],
+    "řeka": [
+      "cs"
+    ],
+    "rieka": [
+      "sk"
+    ],
+    "příliš": [
+      "cs"
+    ],
+    "príliš": [
+      "sk"
+    ],
+    "najkrajší": [
+      "sk"
+    ],
+    "nejkrásnější": [
+      "cs"
+    ],
+    "qzxqzxqzx": []
+  },
+  "seconds": 5.048650124999767,
+  "output": {
+    "bytes": 1068252,
+    "sha256": "90f0f0ead992abdf64a86f4f3b2ed25bf670009ab3ce8dd86154f954d9b4a1e3"
+  },
+  "both_native_dictionaries_check_every_candidate": true,
+  "native_handles_closed": true,
+  "all_inflections_enumerated": false,
+  "other_language_absence_inferred": false,
+  "production_changed": false,
+  "pronunciation_verified": false,
+  "nvda_verified": false,
+  "product_ready": false,
+  "scope": "Finite original dictionary-root candidates and native spell memberships, not author intent or language correctness for unseen words"
+}
