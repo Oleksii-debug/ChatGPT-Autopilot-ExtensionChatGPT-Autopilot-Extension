@@ -4,6 +4,7 @@ on:
     branches: [dordiai-voices/audit-20261122]
 permissions:
   contents: read
+  actions: read
 jobs:
   recover:
     if: contains(github.event.head_commit.message, '[recover-source13-parts]')
@@ -13,11 +14,17 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Read private owned development backup and verify complete SHA256
+      - name: Acquire immutable source13 Actions backup
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-source13-development-core-45049806570
+          run-id: 45049806570
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/source13-original
+      - name: Split verified immutable backup without changing bytes
         env:
-          GH_TOKEN: ${{ github.token }}
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 dordiai-voices/tools/recover_core13_transport.py --output "${{ runner.temp }}/source13-parts"
+        run: python3 dordiai-voices/tools/recover_core13_transport.py --addon "${{ runner.temp }}/source13-original/dordiai-voices-0.13.1-dev.13.nvda-addon" --output "${{ runner.temp }}/source13-parts"
       - name: Retain bounded verified part 001
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
