@@ -130,5 +130,38 @@ class RangeReaderTests(unittest.TestCase):
         self.assertEqual(len(result["omitted"]), 1)
 
 
+    def test_owned_banks_summary_whitelist_is_exact_and_does_not_adopt_pcm(self):
+        for name in ("overlay-input.json", "prepared-coverage-summary.json", "input-cleanup.json"):
+            self.assertTrue(reader_tool.selected_member(Path("banks") / name))
+        for name in ("banks/unknown.json", "banks/nested/prepared-coverage-summary.json",
+                     "models/banks/prepared-coverage-summary.json", "banks/payload.pcm",
+                     "banks/worker.py", "banks/prepared-coverage-all45.json"):
+            with self.subTest(name=name):
+                self.assertFalse(reader_tool.selected_member(Path(name)))
+
+    def test_engine_mms_characters_and_bank_original_reports_recover_without_weights(self):
+        paths = ["banks/overlay-input.json", "banks/prepared-coverage-summary.json",
+                 "engine/report.json", "extra-engines/report.json", "characters/report.json",
+                 "mms-ha/report.json", "mms-ha-shared/report.json",
+                 "nvda/run/nvda-probe.json", "nt/windows-nvda-probe.json", "nr/windows-nvda-probe.json"]
+        data = io.BytesIO()
+        raw = b'{"status":"passed","measured_ms":1.234}'
+        with zipfile.ZipFile(data, "w", compression=zipfile.ZIP_STORED) as archive:
+            archive.writestr("models/large.onnx", bytes(1024*1024))
+            archive.writestr("banks/payload.pcm", bytes(1024*1024))
+            for path in paths:
+                archive.writestr(path, raw)
+        ranges = InMemoryRanges(data.getvalue())
+        with reader_tool.HTTPRangeReader(BLOB, open_url=ranges) as remote, tempfile.TemporaryDirectory() as folder:
+            with redirect_stdout(io.StringIO()):
+                result = reader_tool.recover(remote, Path(folder))
+            self.assertEqual({row["path"] for row in result["files"]}, set(paths))
+            self.assertLess(remote.bytes_read, 30000)
+            for path in paths:
+                self.assertEqual((Path(folder) / path).read_bytes(), raw)
+            self.assertFalse((Path(folder) / "models").exists())
+            self.assertFalse((Path(folder) / "banks/payload.pcm").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

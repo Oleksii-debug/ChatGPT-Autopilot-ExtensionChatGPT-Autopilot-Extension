@@ -1,0 +1,87 @@
+{
+  "format": "dordiai-native-morphology-sources",
+  "format_version": 1,
+  "scope": "Primary full-form lexical membership; finite source evidence, not infallible author-intent language identification",
+  "normalization": "nfc-casefold-cyrillic-acute-apostrophes-v1",
+  "sources": {
+    "uk": {
+      "publisher": "Andriy Rysin, Vasyl Starko and BrUK / VESUM",
+      "version": "6.8.6",
+      "commit": "fbf4caee38bc5995bb599731942ebeac8d2cd78f",
+      "url": "https://github.com/brown-uk/dict_uk/releases/download/v6.8.6/dict_corp_vis.txt.bz2",
+      "size_bytes": 18195377,
+      "sha256": "e33803783ac138e6f3af2cf0e9428ba146c0ecfda7f5c41fe83ae00c7af24be9",
+      "license": "CC-BY-NC-SA-4.0",
+      "license_url": "https://github.com/brown-uk/dict_uk/blob/fbf4caee38bc5995bb599731942ebeac8d2cd78f/README.md",
+      "format": "vesum-indented-full-forms",
+      "policy": "Exclude analyses marked bad/err, including inherited lemma flags. Retain genuine standard/alternative/slang/vulgar Ukrainian forms; retain all cross-language memberships.",
+      "annotation_reference": "https://github.com/brown-uk/dict_uk/blob/fbf4caee38bc5995bb599731942ebeac8d2cd78f/doc/nonstandard_items.md"
+    },
+    "ru": {
+      "publisher": "OpenCorpora; compiled distribution no-plagiarism/pymorphy3-dicts",
+      "version": "2.4.417150.4580142",
+      "source_revision": 417150,
+      "url": "https://files.pythonhosted.org/packages/b0/67/469e9e52d046863f5959928794d3067d455a77f580bf4a662630a43eb426/pymorphy3_dicts_ru-2.4.417150.4580142-py2.py3-none-any.whl",
+      "size_bytes": 8442043,
+      "sha256": "718bac64c73c10c16073a199402657283d9b64c04188b694f6d3e9b0d85440f4",
+      "license": "CC-BY-SA-3.0",
+      "code_license": "MIT",
+      "license_url": "https://pypi.org/project/pymorphy3-dicts-ru/2.4.417150.4580142/",
+      "format": "pymorphy-WordsDawg->HH",
+      "policy": "Enumerate stored exact RecordDAWG keys/records only; no suffix/prefix/unknown-word guessing and no automatic yo-to-e substitution."
+    }
+  },
+  "build_reader": {
+    "publisher": "Mikhail Korobov / pytries DAWG-Python",
+    "repository": "pytries/DAWG-Python",
+    "commit": "e56241ec919b78735ff79014bf18d7fd1f8e08b9",
+    "license": "MIT",
+    "scope": "Isolated build-time pure Python source reader only; never ship or import a cp314 native DLL in the NVDA host.",
+    "files": {
+      "dawg_python/__init__.py": {
+        "size_bytes": 208,
+        "git_blob_sha1": "ac524910facfa47a3c451666cf55f9dfdb90230d"
+      },
+      "dawg_python/compat.py": {
+        "size_bytes": 124,
+        "git_blob_sha1": "879bcd62f88ff847e19af8feec9897aa415df7fc"
+      },
+      "dawg_python/dawgs.py": {
+        "size_bytes": 14704,
+        "git_blob_sha1": "ae0f5b5d3ab209767260dbccd63e6992a02ffe04"
+      },
+      "dawg_python/units.py": {
+        "size_bytes": 771,
+        "git_blob_sha1": "c98c96769b2ab97d8910268dc86cf0b5f0132c6d"
+      },
+      "dawg_python/wrapper.py": {
+        "size_bytes": 4819,
+        "git_blob_sha1": "15dbac2f92289f312b9d72e2e146c3243262b28e"
+      },
+      "LICENSE": {
+        "size_bytes": 1060,
+        "git_blob_sha1": "d71198e08d8c4ea630c6270fa8d1262667636cfe"
+      }
+    }
+  },
+  "followup_sources": {
+    "cs": {
+      "publisher": "UniMorph conversion of UFAL MorfFlex-CZ2.0",
+      "repository": "unimorph/ces",
+      "commit": "f0d4a4dfaec45b1f4a0ba0a1db1298f3d64af503",
+      "path": "ces.xz",
+      "license": "CC-BY-NC-SA-4.0",
+      "note": "Git path is LFS pointer (134B), not actual morphology. Must acquire exact LFS oid/size and verify expanded data before counts. Plain ces file is Wiktionary, not MorfFlex."
+    },
+    "sk": {
+      "publisher": "UniMorph conversion of UFAL MorfFlex-SK170914",
+      "repository": "unimorph/slk",
+      "commit": "5b6989c0699329be64f6dc1cb1bd269b78ea19fc",
+      "path": "slk.xz",
+      "git_blob_sha1": "0e9cd6736d056a919cd8843cba064be6c55ab1d3",
+      "size_bytes": 78759772,
+      "license": "CC-BY-NC-SA-4.0",
+      "note": "Primary README notes missing reflexive markers, removed proper names and some archaic/nonstandard forms. Not acquired yet."
+    }
+  }
+}

@@ -186,10 +186,15 @@ def safe_member(info):
     return path
 
 
+BANK_REPORT_NAMES = frozenset(("overlay-input.json", "prepared-coverage-summary.json", "input-cleanup.json"))
+
+
 def selected_member(path):
     if any(part.casefold() in EXCLUDED_COMPONENTS for part in path.parts):
         return False
     if path.name in REPORT_NAMES or path.name in LOG_NAMES:
+        return True
+    if len(path.parts) == 2 and path.parts[0] == "banks" and path.name in BANK_REPORT_NAMES:
         return True
     return path.name in {"report.json", "worker-stderr.log", "native-carrier-stderr.log"} and path.parts[0] in {"engine", "extra-engines", "characters", "mms-ha", "mms-ha-shared"}
 

@@ -1,0 +1,137 @@
+name: Dordiai version10 existing evidence reader
+
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-banks10-evidence.yml"
+      - "dordiai-voices/tools/read_action_artifact.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-banks10-evidence-reader
+  cancel-in-progress: false
+
+jobs:
+  read-existing-small-evidence:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[banks10-evidence]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    env:
+      DORDIAI_SOURCE_RUN: "45021069771"
+      DORDIAI_SOURCE_COMMIT: "2bdababb86378f3cc6e58b934265175da589d703"
+      DORDIAI_SOURCE_ARTIFACT: "14754117799"
+      DORDIAI_SOURCE_WRAPPER_SHA256: "7b9774ef5d01c967e4220aae921376ec1ea5db3d1baced0e382cfaeefee1ce82"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify bounded report selection and range safety regressions
+        run: python -m unittest discover -s dordiai-voices/tests -p test_read_action_artifact.py -v
+      - name: Verify the pinned existing Windows evidence artifact identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json,os,re,sys,urllib.request
+          sys.path.insert(0,"dordiai-voices/tools")
+          from read_action_artifact import NoRedirect
+          artifact=int(os.environ["DORDIAI_SOURCE_ARTIFACT"])
+          expected=os.environ["DORDIAI_SOURCE_WRAPPER_SHA256"]
+          if artifact<=0 or not re.fullmatch("[0-9a-f]{64}",expected):
+              raise RuntimeError("Pin the actual completed Windows evidence artifact before triggering")
+          repo="Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension"
+          req=urllib.request.Request("https://api.github.com/repos/"+repo+"/actions/artifacts/"+str(artifact),
+              headers={"Authorization":"Bearer "+os.environ["GITHUB_TOKEN"],"Accept":"application/vnd.github+json",
+                       "X-GitHub-Api-Version":"2022-11-28","User-Agent":"dordiai-owned-evidence-reader"})
+          with urllib.request.build_opener(NoRedirect()).open(req,timeout=30) as response:
+              document=json.load(response)
+          if (document.get("name")!="dordiai-voices-banks10-windows-evidence"
+                  or document.get("expired") is not False or document.get("digest")!="sha256:"+expected
+                  or document.get("workflow_run",{}).get("id")!=int(os.environ["DORDIAI_SOURCE_RUN"])
+                  or document.get("workflow_run",{}).get("head_sha")!=os.environ["DORDIAI_SOURCE_COMMIT"]):
+              raise RuntimeError("Existing Windows evidence artifact identity mismatch")
+          print(json.dumps({"verified_existing_artifact":artifact,"source_run":int(os.environ["DORDIAI_SOURCE_RUN"]),
+                            "wrapper_sha256":expected,"size_bytes":document["size_in_bytes"]}),flush=True)
+      - name: Recover only bounded existing reports and logs, never the core or PCM
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python dordiai-voices/tools/read_action_artifact.py
+          --repo Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+          --artifact-id "$DORDIAI_SOURCE_ARTIFACT"
+          --output dordiai-voices/recovered-banks10-evidence
+      - name: Print exact measured summaries and encode original JSON bytes
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/recovered-banks10-evidence")
+          def summary(document):
+              wanted=("status","scope","addon_sha256","recording_pcm_sink_test_double","physical_audio_verified",
+                      "product_ready","initial_smoke_predevice_latency","required_resource_recovery",
+                      "required_resource_cleanup","required_resource_quarantine","aggregate",
+                      "profiles","requests_per_profile","requests","prepared_candidates","live_worker_candidates",
+                      "exact180_output_payloads_verified","old_indices_pcm_prefixes_preserved_by_builder")
+              result={key:document[key] for key in wanted if key in document}
+              api=document.get("api_latency")
+              if isinstance(api,dict):
+                  result["api_latency"]={key:value for key,value in api.items() if key!="samples"}
+                  samples=api.get("samples",{})
+                  result["api_sample_counts"]={key:len(samples.get(key,[])) for key in
+                      ("alphabet_first_pass_ms","warm_letters_ms","warm_switch_requests_ms","cancel_api_ms")}
+                  result["api_errors"]=samples.get("errors")
+                  result["api_timeouts"]=samples.get("timeouts")
+              for field in ("checks","tests","cases"):
+                  rows=document.get(field)
+                  if isinstance(rows,list):
+                      result[field+"_count"]=len(rows)
+                      result[field+"_nonpassing"]=[row for row in rows if row.get("status") not in ("passed","success","passed-structure-only")]
+              typed=document.get("actual_typing")
+              if isinstance(typed,dict):
+                  result["actual_typing"]=typed
+              if isinstance(document.get("probe"),dict):
+                  result["probe"]=summary(document["probe"])
+              return result
+          files={}
+          for path in sorted(root.rglob("*.json")):
+              raw=path.read_bytes()
+              relative=path.relative_to(root).as_posix()
+              document=json.loads(raw)
+              print("BANKS10_REPORT "+json.dumps({"path":relative,"sha256":hashlib.sha256(raw).hexdigest(),
+                    "size_bytes":len(raw),"summary":summary(document)},ensure_ascii=True),flush=True)
+              files[relative]={"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),
+                               "source_base64":base64.b64encode(raw).decode("ascii"),
+                               "kind":"reader-generated" if relative=="recovery.json" else "original-Windows-report"}
+          if not files:
+              raise RuntimeError("No existing JSON evidence recovered")
+          bundle={"format":"dordiai-exact-windows-json-evidence","format_version":1,
+                  "run_id":int(os.environ["DORDIAI_SOURCE_RUN"]),"artifact_id":int(os.environ["DORDIAI_SOURCE_ARTIFACT"]),
+                  "source_commit":os.environ["DORDIAI_SOURCE_COMMIT"],"product_ready":False,
+                  "scope":"Original existing engineering report bytes; this reader does not rerun or certify Windows/audio",
+                  "files":files}
+          compressed=gzip.compress(json.dumps(bundle,sort_keys=True,separators=(",",":")).encode("utf-8"),mtime=0)
+          if len(compressed)>2*1024*1024:
+              raise RuntimeError("Bounded original-JSON gzip exceeds2MiB; full recovered reports remain in artifact")
+          target=root/"exact-dev10-json-evidence.json.gz"
+          target.write_bytes(compressed)
+          encoded=base64.b64encode(compressed).decode("ascii")
+          parts=[encoded[index:index+60000] for index in range(0,len(encoded),60000)]
+          print("DORDIAI_BANKS10_EVIDENCE_META "+json.dumps({"sha256":hashlib.sha256(compressed).hexdigest(),
+                "size_bytes":len(compressed),"files":len(files),"chunks":len(parts)}),flush=True)
+          for index,part in enumerate(parts,1):
+              print("DORDIAI_BANKS10_EVIDENCE_B64_%03d_OF_%03d %s"%(index,len(parts),part),flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-voices-recovered-banks10-diagnostics
+          path: dordiai-voices/recovered-banks10-evidence
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 0

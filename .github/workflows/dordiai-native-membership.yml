@@ -1,0 +1,63 @@
+name: Acquire primary native morphological word forms
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acquire:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-membership]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source parsers and immutable payload guards
+        run: |
+          python -m py_compile dordiai-voices/tools/acquire_morphological_words.py
+          python -m unittest discover -s dordiai-voices/tests -p "test_morphology_sources.py" -v
+      - name: Acquire actual expanded VESUM and exact OpenCorpora forms
+        run: python dordiai-voices/tools/acquire_morphological_words.py --output dordiai-voices/native-membership-acquisition
+      - name: Print bounded actual counts and preserve exact JSON evidence
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/native-membership-acquisition")
+          report=root/"acquisition-report.json"
+          if not report.is_file():
+              print("No actual acquisition report was produced; source membership is UNVERIFIED.",flush=True)
+              raise SystemExit(0)
+          raw=report.read_bytes()
+          document=json.loads(raw)
+          print("NATIVE_MEMBERSHIP_ACQUISITION "+json.dumps(document,ensure_ascii=True),flush=True)
+          bundle={"format":"dordiai-exact-native-membership-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "scope":"Actual finite native lexicon acquisition, not synthesis or pronunciation acceptance",
+              "files":{"acquisition-report.json":{"sha256":hashlib.sha256(raw).hexdigest(),
+                  "size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}}}
+          encoded=json.dumps(bundle,sort_keys=True,separators=(",",":")).encode()
+          payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode("ascii")
+          if len(payload)>256*1024:raise ValueError("Exact acquisition receipt exceeds quota")
+          chunks=[payload[i:i+24000] for i in range(0,len(payload),24000)]
+          print("DORDIAI_NATIVE_MEMBERSHIP_META "+json.dumps({"chunks":len(chunks),"json_sha256":hashlib.sha256(encoded).hexdigest(),"json_size_bytes":len(encoded)}),flush=True)
+          for i,part in enumerate(chunks):
+              print("DORDIAI_NATIVE_MEMBERSHIP_GZIP_B64_%03d "%i+part,flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-primary-native-word-membership
+          path: |
+            dordiai-voices/native-membership-acquisition/acquisition-report.json
+            dordiai-voices/native-membership-acquisition/SOURCE-NOTICES.json
+            dordiai-voices/native-membership-acquisition/RU-PUBLISHER-METADATA.txt
+            dordiai-voices/native-membership-acquisition/uk-native-words.txt.gz
+            dordiai-voices/native-membership-acquisition/ru-native-words.txt.gz
+            dordiai-voices/native-membership-acquisition/build-reader/LICENSE
+          if-no-files-found: warn
+          retention-days: 30
