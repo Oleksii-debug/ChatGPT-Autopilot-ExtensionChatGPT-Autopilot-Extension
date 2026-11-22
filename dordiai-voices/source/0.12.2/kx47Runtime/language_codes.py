@@ -1,11 +1,14 @@
 """Known language-tag aliases shared by UI, routing and installed-resource checks.
 
-ISO aliases follow the Library of Congress ISO 639-2/639-1 table (2026-01-15):
+ISO aliases follow the Library of Congress ISO 639-2/639-1 table (retrieved 2026-11-22):
 https://www.loc.gov/standards/iso639-2/php/code_list.php
 Only identifiers are normalized; this module never declares a model installed.
 The existing project choices no→Bokmål and zh→Mandarin are retained. Explicit
 Nynorsk, Cantonese, Western Armenian and North/South Ndebele remain distinct.
 """
+
+import json
+from pathlib import Path
 
 ALIASES = {
     "no": "nb", "iw": "he", "in": "id", "zh": "cmn", "zh-cmn": "cmn",
@@ -24,6 +27,14 @@ ALIASES = {
     "zul": "zu", "wol": "wo", "ton": "to", "hmo": "ho", "ssw": "ss",
     "ven": "ve", "aar": "aa",
 }
+
+# Exact ISO 639-2 (terminological/bibliographic) to 639-1 equivalents.
+# Prepared from the official LoC table by tools/prepare_language_codes.py.
+# Resolve existing project defaults only after the exact identifier mapping;
+# this keeps, for example, explicit Cantonese and Nynorsk distinct.
+_ISO_EQUIVALENTS = json.loads(Path(__file__).with_name("language_iso_aliases.json").read_text(encoding="utf-8"))
+ALIASES.update({alias: ALIASES.get(primary, primary)
+                for alias, primary in _ISO_EQUIVALENTS.items() if alias not in ALIASES})
 
 
 def canonical_language(value, default=""):

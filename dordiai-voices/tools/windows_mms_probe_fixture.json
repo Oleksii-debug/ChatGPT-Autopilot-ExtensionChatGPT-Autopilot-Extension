@@ -1,0 +1,64 @@
+{
+  "format": "dordiai-windows-mms-probe-fixture-v1",
+  "language": "ha",
+  "scope": "Frozen metadata and actual same-checkpoint source identity prepared on Linux; Windows probe separately tests the actual model and voice conversion.",
+  "preparation_tool": "tools/prepare_mms_models.py",
+  "reproduction": "Acquire pinned model/tokens/publisher sample from tools/mms_model_sources.json and the pinned FP32 encoder from tools/prepare_reference_encoder.py, then run offline verification for ha.",
+  "sample_text": "Wannan gwajin murya ne.",
+  "sample_text_review": "Engineering smoke text; native-speaker pronunciation acceptance is not claimed.",
+  "config": {
+    "format": "dordiai-mms-onnx-v1",
+    "backend": "mms-onnx",
+    "code": "ha",
+    "iso_code": "hau",
+    "name_uk": "Хауса",
+    "standard": "hau",
+    "sample_rate": 16000,
+    "add_blank": true,
+    "blank_id": 0,
+    "frontend": "characters",
+    "is_uroman": false,
+    "lowercase": true,
+    "navigation": {},
+    "navigation_verified": false,
+    "license": "CC-BY-NC-4.0",
+    "provenance": {
+      "repo_id": "willwade/mms-tts-multilingual-models-onnx",
+      "revision": "4f49fc254f11ddb0e35fbf25b6e48b04463a6779",
+      "source_project": "facebook/mms-tts",
+      "model_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/model.onnx",
+      "model_sha256": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32",
+      "tokens_sha256": "78b39313ddfc60be59cc12a957f11bf0f5dd4d1cdd3d5c16fe0bf3fae165d0c9"
+    },
+    "native_pronunciation_verified": false,
+    "windows_nvda_verified": false,
+    "source_identity": {
+      "basis": "publisher-sample-from-same-pinned-checkpoint",
+      "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/hau/sample.wav",
+      "reference_wav_sha256": "a164ed01dc2548802fdd466600c05d98afbcdbceaa6d27850a10924700c9b0e6",
+      "reference_sample_rate": 16000,
+      "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+      "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+      "source_shape": [
+        1,
+        256,
+        1
+      ],
+      "source_norm": 11.689874649047852,
+      "source_dtype": "float32",
+      "unit_normalized": false,
+      "generated_calibration_noise_scale": 0.0,
+      "generated_calibration_noise_scale_w": 0.0
+    },
+    "technical_onnx_inference_verified": true
+  },
+  "source_npy": {
+    "encoding": "base64",
+    "bytes": 1152,
+    "sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+    "data": "k05VTVBZAQB2AHsnZGVzY3InOiAnPGY0JywgJ2ZvcnRyYW5fb3JkZXInOiBGYWxzZSwgJ3NoYXBlJzogKDEsIDI1NiwgMSksIH0gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAotg7K+LMISPcBqlj4Jexm/e+FHPz5G5z7H4Zc+ZBLqPsWF7L4BVDg+Bhdvv/SJaT9odWO9ddsMP3ES8T5rJhK/UJVqvqQ9sT/IP7e+W0ZUv7bkST5cvIW/OB4vvrM7Ez/i6oC/YmiVvYYsjb+pDrs/QI+tvj4Vcz/kSiG/AlD3PdIL2T74M7S+gNPRuluXLb90hQK/BPeCP7MTWz8CxJa/2b9GvQ4ot762TYK+wAa5Pmhg+747/oQ/tBubv/xoTD7eSj6+lA+VP0CTND0gPYY80CM2Pghwkr/NtRK/wjpbv2nVbj9Tp2E+ZapEvzuxvD6gb6A+smUPvzLCgr8noWo+qNq4PavfZr1ISW0/aJjxPfBK6jvjzy2/VP0jwHTxA79YjfS+TJDHvjyoIL98G8Y+qhfwvgzbML24Gtg+DFkrPpkN7L629Z0/NjJRvm5koz4kP+29+k04Pizmob6rRYS/4wGtvt2twb5s/nk+l0mTPVLi3772mwk+KCHWvX5Ylz4csci+Ql3TPvWPQD/OAKS/2pzaPc74GL/7XS8/TA0eP970i76/FiY/htcDP9ao07/64cS+5p+wPpRS/r82QKM+g0xiP+L/t759m8E90MicvwolgLzdDbI+o1s+PzCY0r+FnUQ+2lIHPx2vuj0luzW/dW6YP7XJd8Dsjmg+7BoPP4voqb06r4M/LDkBwD0eBb54lVG/fKawP4CKFz4U5Lk+khF4viq+Zr7gOQm/FFWyP1Rooj/vbzi++NQxv8CdAj8kFI2/05AUv5Ijnr2i3989RNumPvAYF7/GbDe/8FZTP3oqHL2ITiq/i1XHPxSaJD4siHk9OP1WPayBET7paVq/X3eav6Ihmz041mO/UleaPvNWxT6RS7Y+Gjl/PUpXRD4mVk+/lHLCvUdm6z4zePq+YK5PvsQAML6bChC+nj2dv4EBpb52TU0/UnwcvzAF+jwYY2Y/3Qo7P6oCrr5Swrq+aQuDP2hImz5Il7W9NiTPvuCePz490H+/Hz/VPvaDmz7AUGa75A7YPvVgsr4aF1HAhqHlPGNuvz6yQPW9CuPIvXNV8Dwj0XO/8w1RvzJYC7+Ojp8+PIJfvzV7/b7T842+hiFfvnetFD7qXL695qAqv2UeXT4NcSQ/UwCGPk3Wgb71+Hg+/o+MPoAE/D4UEzK/U2sZP+L6SD96GYw/XBt2v/drML5K44y9vnghvbeaDT7BlJA+bPHOPVRuAz8eGA8/wuelPm6gRL9TGag/BCz7PawBcT3LJX+/l9U/v9Rn+72CiRM+LfiHPfn+Wr5skh6/LGdDvzYcOL+7u1C/jDglP25P8T6ygBi+valfvxM8iT4Qjg+/HvAMP6SgEz/D4F0/"
+  },
+  "notice": "MMS native-language VITS model, original project Meta/Facebook MMS.\nModel weights: Creative Commons Attribution NonCommercial 4.0 (CC BY-NC 4.0).\nhttps://creativecommons.org/licenses/by-nc/4.0/\nONNX conversion: Will Wade; https://github.com/willwade/mms-tts-multilingual-models-onnx\nPinned repository: willwade/mms-tts-multilingual-models-onnx @ 4f49fc254f11ddb0e35fbf25b6e48b04463a6779\nOriginal checkpoint: https://huggingface.co/facebook/mms-tts-hau\nSource identity measured from this carrier using OpenVoice V2 FP32 reference encoder (MIT).\nThis preparation verifies finite PCM and source identity shape; native pronunciation,\nnavigation names and Windows/NVDA acceptance are not claimed.\n",
+  "windows_nvda_verified": false,
+  "native_pronunciation_verified": false
+}

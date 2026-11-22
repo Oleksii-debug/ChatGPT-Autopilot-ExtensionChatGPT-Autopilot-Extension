@@ -1,5 +1,6 @@
 """Explicit equivalent tags must agree between settings and resource lookup."""
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -33,9 +34,30 @@ class LanguageCodeTests(unittest.TestCase):
         self.assertEqual("nn", codes.canonical_language("nno-NO"))
 
     def test_different_standards_and_catalogue_groups_are_not_aliases(self):
-        for tag in ("tgl", "fil", "tl", "dgo", "doi", "ayr", "kab", "zgh", "tamazight"):
+        for tag in ("fil", "tl", "dgo", "doi", "ayr", "kab", "zgh", "tamazight"):
             self.assertEqual(tag, codes.canonical_language(tag))
+        self.assertEqual("tl", codes.canonical_language("tgl"))
+        self.assertNotEqual("fil", codes.canonical_language("tgl"))
         self.assertNotEqual(codes.canonical_language("nbl"), codes.canonical_language("nde"))
+
+    def test_all_official_equivalents_reproduce_and_share_the_same_primary(self):
+        path = RUNTIME.parents[2] / "tools/prepare_language_codes.py"
+        spec = importlib.util.spec_from_file_location("prepare_iso_equivalents", path)
+        generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generator)
+        exact = generator.prepare()
+        self.assertEqual(exact, json.loads((RUNTIME / "language_iso_aliases.json").read_text(encoding="utf8")))
+        self.assertEqual(len(exact), 203)
+        for tag, primary in exact.items():
+            with self.subTest(tag=tag):
+                self.assertEqual(codes.canonical_language(tag), codes.canonical_language(primary))
+
+    def test_common_marked_languages_are_not_misrouted_as_unknown(self):
+        for tag, primary in (("bos", "bs"), ("hin", "hi"), ("ben", "bn"),
+                              ("jpn", "ja"), ("ara", "ar"), ("tur", "tr"),
+                              ("zho", "cmn"), ("nor", "nb")):
+            with self.subTest(tag=tag):
+                self.assertEqual(primary, preferences.language_key(tag))
 
     def test_missing_tags_keep_the_callers_own_default_policy(self):
         self.assertEqual("", catalog.canonical_code(None))

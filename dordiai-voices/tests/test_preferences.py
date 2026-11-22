@@ -6,7 +6,7 @@ import sys
 import types
 import unittest
 from collections import OrderedDict
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 RUNTIME = Path(__file__).resolve().parents[1] / "source" / "0.12.2" / "kx47Runtime"
 spec = importlib.util.spec_from_file_location("tested_preferences", RUNTIME / "preferences.py")
@@ -221,6 +221,57 @@ class PreferencesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             prefs.validate_preference_selection(VOICES, {"uk"}, "uk", "alice", VOICES, LANGUAGES,
                                                 voice_map={"uk": "clara"}, compatible=compatible)
+
+    def test_settings_choices_use_actual_nvda_voiceinfo_display_name_api(self):
+        """Exercise makeSettings with faithful parameter objects, not a GUI acceptance test."""
+        class VoiceInfo:
+            # NVDA VoiceInfo/StringParameterInfo exposes displayName, not name.
+            __slots__ = ("id", "displayName", "language", "variant")
+
+            def __init__(self, identifier, display_name, language=None, variant=None):
+                self.id, self.displayName = identifier, display_name
+                self.language, self.variant = language, variant
+
+        driver = Driver()
+        driver.description = "Dordiai test"
+        for key in ("rate", "rateMultiplier", "volume", "pitch", "timbre"):
+            setattr(driver, key, 2 if key == "rateMultiplier" else 50)
+        choices = OrderedDict(auto=VoiceInfo("auto", "Автоматично"), uk=VoiceInfo("uk", "Українська", "uk"))
+        self.assertFalse(hasattr(choices["uk"], "name"))
+        for key, attribute in (("numberLanguage", "availableNumberlanguages"),
+                               ("spellingLanguage", "availableSpellinglanguages"),
+                               ("readingStyle", "availableReadingstyles")):
+            setattr(driver, attribute, choices)
+            setattr(driver, key, "uk")
+        wx = MagicMock()
+        helper = MagicMock()
+        gui = types.ModuleType("gui")
+        gui.guiHelper = types.SimpleNamespace(BoxSizerHelper=lambda *args, **kwargs: helper)
+        settings = types.ModuleType("gui.settingsDialogs")
+        settings.SettingsDialog = type("SettingsDialog", (), {})
+        built = []
+
+        def popup(dialog_type):
+            dialog = dialog_type.__new__(dialog_type)
+            dialog.voice_labels = VOICES
+            dialog.language_labels = LANGUAGES
+            dialog.original = driver._dordiai_selection
+            dialog._checklist = MagicMock()
+            dialog._update_choices = MagicMock()
+            dialog._make_packages = MagicMock()
+            dialog.Bind = MagicMock()
+            dialog.makeSettings(MagicMock())
+            built.append(dialog)
+
+        gui.mainFrame = types.SimpleNamespace(popupSettingsDialog=popup)
+        with patch.dict(sys.modules, {"wx": wx, "gui": gui, "gui.settingsDialogs": settings,
+                                     "synthDriverHandler": types.SimpleNamespace(getSynth=lambda: driver)}):
+            prefs.open_dialog(driver)
+        self.assertEqual(len(built), 1)
+        self.assertEqual(set(built[0].choices), {"numberLanguage", "spellingLanguage", "readingStyle"})
+        selected = [call.kwargs["choices"] for call in helper.addLabeledControl.call_args_list
+                    if call.args[0] in {"Мова чисел", "Мова кириличних літер", "Режим читання"}]
+        self.assertEqual(selected, [["Автоматично", "Українська"]] * 3)
 
 
 if __name__ == "__main__":

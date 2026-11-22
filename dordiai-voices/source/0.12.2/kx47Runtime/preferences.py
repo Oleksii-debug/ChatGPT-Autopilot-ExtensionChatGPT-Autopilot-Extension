@@ -369,7 +369,7 @@ def open_dialog(synth):
                 values = getattr(synth, property_name, None)
                 if values:
                     codes = list(values)
-                    control = speech_helper.addLabeledControl(label, wx.Choice, choices=[v.name for v in values.values()])
+                    control = speech_helper.addLabeledControl(label, wx.Choice, choices=[v.displayName for v in values.values()])
                     value = getattr(synth, key)
                     control.SetSelection(codes.index(value) if value in codes else 0)
                     self.choices[key] = (control, codes)

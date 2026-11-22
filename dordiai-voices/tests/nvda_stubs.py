@@ -29,8 +29,8 @@ class Setting:
 
 
 class VoiceInfo:
-    def __init__(self, id, name, language=None):
-        self.id, self.name, self.language = id, name, language
+    def __init__(self, id, displayName, language=None):
+        self.id, self.displayName, self.language = id, displayName, language
 
 
 def command(name, field):

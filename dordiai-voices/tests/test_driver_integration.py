@@ -70,6 +70,19 @@ class DriverPlanningTests(unittest.TestCase):
             with self.subTest(tag=tag):
                 self.assertEqual(d.language_code(tag, "uk", "en-US"), expected)
 
+    def test_explicit_noncore_iso_tags_survive_the_complete_planner(self):
+        d = self.module
+        for tag, code, text in (("hin", "hi", "नमस्ते"),
+                                ("bos", "bs", "zdravo"),
+                                ("jpn", "ja", "こんにちは")):
+            with self.subTest(tag=tag):
+                obj = self.synth(("uk", "en", "ru", code))
+                parts = self.planned(obj, [d.LangChangeCommand(tag), text])
+                self.assertEqual(len(parts), 1)
+                self.assertEqual(parts[0][1]["language"], code)
+                self.assertEqual(parts[0][1]["text"], text)
+                self.assertTrue(parts[0][1]["wideLocale"])
+
     def test_shared_lone_letter_uses_current_language(self):
         d = self.module
         values = self.planned(self.synth(), [d.LangChangeCommand("ru"), "б"])
