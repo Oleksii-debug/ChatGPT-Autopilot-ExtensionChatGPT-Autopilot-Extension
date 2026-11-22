@@ -1,0 +1,1039 @@
+{
+  "format": "dordiai-native-word-unicode-fast-v2-actual-dual-os-review",
+  "format_version": 1,
+  "run_id": 45042554484,
+  "head_sha": "0c48e3f1d71f885450aa48f2e5a9b978c4d8e4e6",
+  "baseline_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+  "candidate_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+  "tests_per_os": 57,
+  "status": "passed",
+  "production_changed": false,
+  "nvda_verified": false,
+  "pronunciation_verified": false,
+  "physical_audio_verified": false,
+  "scope": "Actual Windows/Linux CPython 3.13 reader equivalence and matched first97 fresh-process plus hot controls; not frozen NVDA Resource or speech latency acceptance.",
+  "proofs": [
+    {
+      "os": "Linux",
+      "kind": "AUDIT",
+      "path": "evidence/native_word_unicode_fast_v2_linux_audit_45042554484.json.gz",
+      "size_bytes": 1648,
+      "sha256": "3d4c32f284fb472196f2d3caf74c4985248477ce6686d134c562293123ed409d",
+      "envelope_sha256": "2844e7d174068ca0ef5fc24113fe77aaf7f5bf5459a47478e2a85631e22b3ebf",
+      "file_name": "unicode-audit.json",
+      "file_size_bytes": 1767,
+      "file_sha256": "06f6c0af99fd5536dcac6cc52f3389d737ac03761570db4ed343d2ba4c6997c1",
+      "git_blob": "d8405f4ab7dd51b38309741c309d0b0e50ad2cdb"
+    },
+    {
+      "os": "Linux",
+      "kind": "BENCH",
+      "path": "evidence/native_word_unicode_fast_v2_linux_bench_45042554484.json.gz",
+      "size_bytes": 6728,
+      "sha256": "c08296677ff9c3d5568564a8fdcaca96194b699d0ef62711a5bd88f4fe85d9ab",
+      "envelope_sha256": "f66e67ccaee45a0ed6ae1c01c04341fb93b09448c1af71b9ee72061098cf8b4b",
+      "file_name": "matched-first-use.json",
+      "file_size_bytes": 29369,
+      "file_sha256": "e8d6ba052557e90b4462f63146af63740936a81b1b9a58e281079e4ae1a38cb0",
+      "git_blob": "91939fd2c1104c7e3138dde8eed7090cb6e88355"
+    },
+    {
+      "os": "Windows",
+      "kind": "AUDIT",
+      "path": "evidence/native_word_unicode_fast_v2_windows_audit_45042554484.json.gz",
+      "size_bytes": 1664,
+      "sha256": "a2266f513445df22eb1d86edcefa254dcf4df92d28622fe2fd46f0a6f0cd9cf2",
+      "envelope_sha256": "a6eefcb66d636b297f8bd1b44ad0e06bccc26a3438c8e8bd4a15ed3c39ee7df6",
+      "file_name": "unicode-audit.json",
+      "file_size_bytes": 1833,
+      "file_sha256": "a9dfe6889f4aa921f6e30021a62eca0b424a2ba7fa5fa1b5c91a3ca585d523de",
+      "git_blob": "107d30963d023527b44e5fe426fde3c0f399f6ba"
+    },
+    {
+      "os": "Windows",
+      "kind": "BENCH",
+      "path": "evidence/native_word_unicode_fast_v2_windows_bench_45042554484.json.gz",
+      "size_bytes": 6563,
+      "sha256": "679f63bf0ab7937bf74b9a18e9defb9371e7c3418ae51ad15669fc16ceef23e8",
+      "envelope_sha256": "12fe3e468702babb488e4fbe0ca42c92ec7801e3c72df0096addd4022738f344",
+      "file_name": "matched-first-use.json",
+      "file_size_bytes": 29625,
+      "file_sha256": "7b69421210eedaf1133c442827718b720181b0dc41d29e90178b22acaab83503",
+      "git_blob": "60ec4509fd1c1c9072cdb69ae4f2efa5d3c43edd"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14762585213,
+      "name": "unpublished-unicode-first-use-ubuntu-latest",
+      "size_in_bytes": 4037,
+      "digest": "sha256:2a543dc3691a80a91de16b93890ee5537bcb5023e922f73957df3871727a01f3"
+    },
+    {
+      "id": 14762181552,
+      "name": "unpublished-unicode-first-use-windows-latest",
+      "size_in_bytes": 3993,
+      "digest": "sha256:27748775d9ee47a51710fb67a9d0c096617d757bb82e4b74149ff2b5fb18af54"
+    }
+  ],
+  "os_results": [
+    {
+      "name": "linux",
+      "audit": {
+        "format": "dordiai-exhaustive-unicode-word-fastpath-audit",
+        "format_version": 1,
+        "status": "passed-full-unicode-and-deterministic-string-equivalence",
+        "baseline_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+        "candidate_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+        "python": "3.13.18 (main, Oct 26 2026, 14:19:33) [GCC 15.2.0]",
+        "unicode_database_version": "15.1.0",
+        "all_other_module_ast_identical": true,
+        "reader_class_and_all_block_validations_unchanged": true,
+        "nvda_verified": false,
+        "production_integrated": false,
+        "pronunciation_verified": false,
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "scope": "Finite exhaustive codepoint/context and deterministic string comparison; not a proof over infinitely many strings, native pronunciation or speed",
+        "exhaustive": {
+          "codepoints": 1114112,
+          "contexts_each": 6,
+          "string_comparisons": 6684672,
+          "full_unicode_range": true,
+          "ordered_result_sha256": "2af0a6cade716ecd8ff45a5f950e862ce63728d453ae95c4aa3263b51f9aea51"
+        },
+        "random_and_special": {
+          "random_strings": 50000,
+          "seed": 218419617,
+          "max_string_length": 140,
+          "special_strings": 23,
+          "custom_str_subclasses": 4,
+          "ordinary_text_after_mutating_subclass_preserved": true,
+          "ordered_result_sha256": "78ff8e680b2ac7198c966fc36c0323873838cafbfbfe6d900864a4f5573f31aa"
+        },
+        "actual_source_semantic_scan": {
+          "validated_blocks": 25948,
+          "validated_words": 6642550,
+          "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+          "seconds": 14.404608380000013,
+          "reader_closed": true,
+          "scope": "Full unchanged semantic reader validation; not inference or cold-start latency"
+        },
+        "seconds": 47.643639656999994
+      },
+      "rows": [
+        {
+          "round": 1,
+          "variant": "original",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.965154,
+            "p95_ms": 1.150776,
+            "p99_ms": 1.907935,
+            "minimum_ms": 0.828147,
+            "maximum_ms": 1.907935,
+            "total_ms": 95.347845
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.010956,
+            "p95_ms": 0.015053,
+            "p99_ms": 0.028523,
+            "minimum_ms": 0.010005,
+            "maximum_ms": 0.36896,
+            "total_ms": 12.801485
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 1,
+          "variant": "candidate-cache0",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.592359,
+            "p95_ms": 0.853926,
+            "p99_ms": 0.98846,
+            "minimum_ms": 0.499157,
+            "maximum_ms": 0.98846,
+            "total_ms": 60.217197
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.58314,
+            "p95_ms": 0.837701,
+            "p99_ms": 1.301946,
+            "minimum_ms": 0.011117,
+            "maximum_ms": 3.069828,
+            "total_ms": 619.058448
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1819403,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 0,
+            "word_cache_bytes_charged": 0,
+            "word_cache_entry_limit": 0,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 0,
+            "word_cache_misses": 1197,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 1,
+          "variant": "candidate-default",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.569965,
+            "p95_ms": 0.718771,
+            "p99_ms": 1.108182,
+            "minimum_ms": 0.488962,
+            "maximum_ms": 1.108182,
+            "total_ms": 57.387172
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.009454,
+            "p95_ms": 0.010666,
+            "p99_ms": 0.015934,
+            "minimum_ms": 0.008933,
+            "maximum_ms": 0.897051,
+            "total_ms": 10.92628
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 2,
+          "variant": "candidate-default",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.574382,
+            "p95_ms": 1.042792,
+            "p99_ms": 1.922978,
+            "minimum_ms": 0.495793,
+            "maximum_ms": 1.922978,
+            "total_ms": 61.202892
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.009465,
+            "p95_ms": 0.011257,
+            "p99_ms": 0.020441,
+            "minimum_ms": 0.008863,
+            "maximum_ms": 0.051909,
+            "total_ms": 10.255712
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 2,
+          "variant": "candidate-cache0",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.572378,
+            "p95_ms": 0.83006,
+            "p99_ms": 1.651206,
+            "minimum_ms": 0.500971,
+            "maximum_ms": 1.651206,
+            "total_ms": 59.134022
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.5833555,
+            "p95_ms": 0.844531,
+            "p99_ms": 1.379042,
+            "minimum_ms": 0.011367,
+            "maximum_ms": 2.640847,
+            "total_ms": 621.047171
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1819403,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 0,
+            "word_cache_bytes_charged": 0,
+            "word_cache_entry_limit": 0,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 0,
+            "word_cache_misses": 1197,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 2,
+          "variant": "original",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.962481,
+            "p95_ms": 1.467707,
+            "p99_ms": 1.836137,
+            "minimum_ms": 0.812433,
+            "maximum_ms": 1.836137,
+            "total_ms": 97.35399
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.011117,
+            "p95_ms": 0.012389,
+            "p99_ms": 0.023326,
+            "minimum_ms": 0.010206,
+            "maximum_ms": 0.11814,
+            "total_ms": 11.84228
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 3,
+          "variant": "original",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.956582,
+            "p95_ms": 1.428819,
+            "p99_ms": 2.798496,
+            "minimum_ms": 0.816659,
+            "maximum_ms": 2.798496,
+            "total_ms": 97.680184
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.010906,
+            "p95_ms": 0.012719,
+            "p99_ms": 0.023525,
+            "minimum_ms": 0.009935,
+            "maximum_ms": 0.381799,
+            "total_ms": 11.912947
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 3,
+          "variant": "candidate-cache0",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.572879,
+            "p95_ms": 0.839214,
+            "p99_ms": 1.717817,
+            "minimum_ms": 0.478005,
+            "maximum_ms": 1.717817,
+            "total_ms": 61.015528
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.570551,
+            "p95_ms": 0.757309,
+            "p99_ms": 1.054049,
+            "minimum_ms": 0.011437,
+            "maximum_ms": 3.152704,
+            "total_ms": 600.108142
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1819403,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 0,
+            "word_cache_bytes_charged": 0,
+            "word_cache_entry_limit": 0,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 0,
+            "word_cache_misses": 1197,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 3,
+          "variant": "candidate-default",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 0.584938,
+            "p95_ms": 0.745372,
+            "p99_ms": 1.155544,
+            "minimum_ms": 0.499938,
+            "maximum_ms": 1.155544,
+            "total_ms": 58.953889
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.009474,
+            "p95_ms": 0.011267,
+            "p99_ms": 0.020712,
+            "minimum_ms": 0.008884,
+            "maximum_ms": 0.043036,
+            "total_ms": 10.221261
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "windows",
+      "audit": {
+        "format": "dordiai-exhaustive-unicode-word-fastpath-audit",
+        "format_version": 1,
+        "status": "passed-full-unicode-and-deterministic-string-equivalence",
+        "baseline_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+        "candidate_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+        "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+        "unicode_database_version": "15.1.0",
+        "all_other_module_ast_identical": true,
+        "reader_class_and_all_block_validations_unchanged": true,
+        "nvda_verified": false,
+        "production_integrated": false,
+        "pronunciation_verified": false,
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "scope": "Finite exhaustive codepoint/context and deterministic string comparison; not a proof over infinitely many strings, native pronunciation or speed",
+        "exhaustive": {
+          "codepoints": 1114112,
+          "contexts_each": 6,
+          "string_comparisons": 6684672,
+          "full_unicode_range": true,
+          "ordered_result_sha256": "2af0a6cade716ecd8ff45a5f950e862ce63728d453ae95c4aa3263b51f9aea51"
+        },
+        "random_and_special": {
+          "random_strings": 50000,
+          "seed": 218419617,
+          "max_string_length": 140,
+          "special_strings": 23,
+          "custom_str_subclasses": 4,
+          "ordinary_text_after_mutating_subclass_preserved": true,
+          "ordered_result_sha256": "78ff8e680b2ac7198c966fc36c0323873838cafbfbfe6d900864a4f5573f31aa"
+        },
+        "actual_source_semantic_scan": {
+          "validated_blocks": 25948,
+          "validated_words": 6642550,
+          "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+          "seconds": 25.297289500000005,
+          "reader_closed": true,
+          "scope": "Full unchanged semantic reader validation; not inference or cold-start latency"
+        },
+        "seconds": 92.1484058
+      },
+      "rows": [
+        {
+          "round": 1,
+          "variant": "original",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.8041,
+            "p95_ms": 2.815,
+            "p99_ms": 3.1261,
+            "minimum_ms": 1.5928,
+            "maximum_ms": 3.1261,
+            "total_ms": 182.7571
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.0406,
+            "p95_ms": 0.054,
+            "p99_ms": 0.0882,
+            "minimum_ms": 0.0376,
+            "maximum_ms": 0.1497,
+            "total_ms": 43.984
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 1,
+          "variant": "candidate-cache0",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.0558,
+            "p95_ms": 1.2363,
+            "p99_ms": 1.6929,
+            "minimum_ms": 0.9,
+            "maximum_ms": 1.6929,
+            "total_ms": 103.5477
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 1.0138500000000001,
+            "p95_ms": 1.1907,
+            "p99_ms": 1.3011,
+            "minimum_ms": 0.0449,
+            "maximum_ms": 1.5034,
+            "total_ms": 1026.3833
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1819403,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 0,
+            "word_cache_bytes_charged": 0,
+            "word_cache_entry_limit": 0,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 0,
+            "word_cache_misses": 1197,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 1,
+          "variant": "candidate-default",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.032,
+            "p95_ms": 1.2575,
+            "p99_ms": 1.4172,
+            "minimum_ms": 0.9007,
+            "maximum_ms": 1.4172,
+            "total_ms": 101.7353
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.0359,
+            "p95_ms": 0.0445,
+            "p99_ms": 0.0858,
+            "minimum_ms": 0.0339,
+            "maximum_ms": 0.0975,
+            "total_ms": 38.6402
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 2,
+          "variant": "candidate-default",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.028,
+            "p95_ms": 1.8306,
+            "p99_ms": 2.2977,
+            "minimum_ms": 0.8946,
+            "maximum_ms": 2.2977,
+            "total_ms": 106.5696
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.036,
+            "p95_ms": 0.0484,
+            "p99_ms": 0.0807,
+            "minimum_ms": 0.0342,
+            "maximum_ms": 0.1206,
+            "total_ms": 39.1684
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 2,
+          "variant": "candidate-cache0",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.026,
+            "p95_ms": 1.1916,
+            "p99_ms": 1.3405,
+            "minimum_ms": 0.8876,
+            "maximum_ms": 1.3405,
+            "total_ms": 100.4519
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 1.01915,
+            "p95_ms": 1.1749,
+            "p99_ms": 1.2706,
+            "minimum_ms": 0.044,
+            "maximum_ms": 1.4307,
+            "total_ms": 1028.43
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1819403,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 0,
+            "word_cache_bytes_charged": 0,
+            "word_cache_entry_limit": 0,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 0,
+            "word_cache_misses": 1197,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 2,
+          "variant": "original",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.765,
+            "p95_ms": 1.9948,
+            "p99_ms": 2.2633,
+            "minimum_ms": 1.5489,
+            "maximum_ms": 2.2633,
+            "total_ms": 172.398
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.0407,
+            "p95_ms": 0.0512,
+            "p99_ms": 0.0928,
+            "minimum_ms": 0.0377,
+            "maximum_ms": 0.104,
+            "total_ms": 43.6139
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 3,
+          "variant": "original",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.7468,
+            "p95_ms": 2.0336,
+            "p99_ms": 2.2775,
+            "minimum_ms": 1.4893,
+            "maximum_ms": 2.2775,
+            "total_ms": 172.0513
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.0409,
+            "p95_ms": 0.0662,
+            "p99_ms": 0.0796,
+            "minimum_ms": 0.0379,
+            "maximum_ms": 0.0949,
+            "total_ms": 44.2843
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 3,
+          "variant": "candidate-cache0",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.0254,
+            "p95_ms": 1.193,
+            "p99_ms": 1.3818,
+            "minimum_ms": 0.8876,
+            "maximum_ms": 1.3818,
+            "total_ms": 100.2798
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 1.0061,
+            "p95_ms": 1.1784,
+            "p99_ms": 1.2873,
+            "minimum_ms": 0.0437,
+            "maximum_ms": 1.6203,
+            "total_ms": 1018.0187
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1819403,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 0,
+            "word_cache_bytes_charged": 0,
+            "word_cache_entry_limit": 0,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 0,
+            "word_cache_misses": 1197,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        },
+        {
+          "round": 3,
+          "variant": "candidate-default",
+          "first_pass": {
+            "count": 97,
+            "median_ms": 1.0287,
+            "p95_ms": 1.2095,
+            "p99_ms": 1.3248,
+            "minimum_ms": 0.8983,
+            "maximum_ms": 1.3248,
+            "total_ms": 101.9519
+          },
+          "repeated": {
+            "count": 1000,
+            "median_ms": 0.03535,
+            "p95_ms": 0.0464,
+            "p99_ms": 0.0771,
+            "minimum_ms": 0.0336,
+            "maximum_ms": 0.105,
+            "total_ms": 38.2543
+          },
+          "statistics": {
+            "closed": false,
+            "codes": [
+              "uk",
+              "ru"
+            ],
+            "word_count": 6642550,
+            "blocks": 25948,
+            "cached_blocks": 32,
+            "cache_bytes_charged": 1816629,
+            "cache_byte_limit": 4194304,
+            "cache_block_limit": 32,
+            "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+            "max_raw_block_bytes": 65536,
+            "max_block_words": 256,
+            "membership_mask_bytes": 1,
+            "language_table_limit": 1024,
+            "cached_words": 97,
+            "word_cache_bytes_charged": 56607,
+            "word_cache_entry_limit": 1024,
+            "word_cache_byte_limit": 524288,
+            "word_cache_hits": 1100,
+            "word_cache_misses": 97,
+            "word_cache_evictions": 0,
+            "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+          }
+        }
+      ]
+    }
+  ]
+}

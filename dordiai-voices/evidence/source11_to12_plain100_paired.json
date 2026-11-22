@@ -1,0 +1,33 @@
+{
+  "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+  "new_delivered_locales": [
+    "uk"
+  ],
+  "new_delivered_origin_flags": [
+    false
+  ],
+  "new_mismatch_lexical_pieces": 0,
+  "new_original_locales": [
+    null
+  ],
+  "new_report_git_blob": "9728989e3a2b45c38bfebd4d7299e0096eaca8a1",
+  "old_delivered_locales": [
+    "uk"
+  ],
+  "old_mismatch_lexical_pieces": 71,
+  "old_original_locales": [
+    null
+  ],
+  "old_report_git_blob": "334317a44a252b888440a798bd7809b3aad5f3e5",
+  "scope": "Paired exact actual source11/source12 plain100 evidence; no phonology/physical claim",
+  "unchanged_fields": {
+    "case": true,
+    "configured_mode": true,
+    "default_language": true,
+    "enabled_languages": true,
+    "input_text": true,
+    "metadata_case": true,
+    "source_words": true,
+    "textinfo_text": true
+  }
+}

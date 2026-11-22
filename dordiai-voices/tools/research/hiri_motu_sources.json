@@ -1,0 +1,328 @@
+{
+  "data_notice": "Independently curated linguistic facts and brief forms, attributed to the primary sources; conservatively preserve CC-BY-SA-4.0 notice. No book pages or recordings are redistributed.",
+  "format": "dordiai-hiri-motu-primary-phonology-facts",
+  "format_version": 1,
+  "iso639_3": "hmo",
+  "language": "ho",
+  "language_inventory_increment": 0,
+  "lateral_exceptions": [
+    "lau",
+    "lao",
+    "dala"
+  ],
+  "lexical_segment_overrides": {
+    "lao": {
+      "phone_symbols": [
+        "l",
+        "a",
+        "u"
+      ],
+      "source": "D24-1974:printed1",
+      "spelling": "lao"
+    }
+  },
+  "limits": [
+    "No acoustic carrier, source embedding, selected-profile projection, Windows/NVDA or native-listener acceptance in this frontend-only work.",
+    "No ordinary alphabet names, symbol names, numeric grammar or abbreviation expansion established.",
+    "Acute/offglide/dot/hyphen syntax is explicit research annotation, not silently asserted to be ordinary Hiri Motu spelling.",
+    "Uncurated vowel grouping, morpheme boundaries and written-l realization remain unresolved and cannot be rendered.",
+    "Lexical stress facts do not by themselves establish all adjacent-vowel syllabifications."
+  ],
+  "morpheme_boundaries": {
+    "haorea": {
+      "phone_offsets": [
+        2
+      ],
+      "source": "C40-1977:printed770"
+    }
+  },
+  "native_pronunciation_verified": false,
+  "not_alias_of": "meu",
+  "ordinary_letter_names_ready": false,
+  "product_integrated": false,
+  "reference_pronunciation": "Bounded research reading of the 1974 course with selected Central-type segment distinctions; this is not a claim of a universal Hiri Motu standard or of all dialects.",
+  "rules": [
+    {
+      "fact": "Plain voiceless p/t/k retain an explicit unaspirated requirement.",
+      "id": "HO-UNASP",
+      "sources": [
+        "D24-1974:printed2",
+        "C40-1977:printed769"
+      ]
+    },
+    {
+      "fact": "Written gw is represented as one labialised voiced velar stop gʷ; do not silently substitute ordinary g or a neighbouring-language kw.",
+      "id": "HO-GW",
+      "sources": [
+        "C40-1977:printed769"
+      ]
+    },
+    {
+      "fact": "Lexical stress is not generally predictable. Use exact curated forms or caller-supplied acute marks; do not apply a universal penultimate default.",
+      "id": "HO-STRESS",
+      "sources": [
+        "C40-1977:printed771"
+      ]
+    },
+    {
+      "fact": "The source explicitly contrasts táu with one syllable and niú with two. These lexical grouping facts do not license a universal vowel-grouping rule.",
+      "id": "HO-TAU-NIU",
+      "sources": [
+        "C40-1977:printed771"
+      ]
+    },
+    {
+      "fact": "Preserve vowel sequences across actual morpheme boundaries. The source identifies ha-orea; no blanket ae→ai, ao→au or oe→oi replacement is permitted.",
+      "id": "HO-MORPHEME",
+      "sources": [
+        "C40-1977:printed770"
+      ]
+    },
+    {
+      "fact": "Exact námo/namóna/namódia and néga/negána/negádia stress forms are independent entries; no guessed general suffix rule.",
+      "id": "HO-SUFFIX",
+      "sources": [
+        "C40-1977:printed771"
+      ]
+    },
+    {
+      "fact": "The course says written lao and lau sound the same; retain this exact lexical segment correspondence without converting arbitrary ao sequences.",
+      "id": "HO-LAO",
+      "sources": [
+        "D24-1974:printed1",
+        "C40-1977:printed770"
+      ]
+    },
+    {
+      "fact": "Selected course realization uses written v as voiced bilabial friction β and r as a single flap ɾ. Genuine w and other dialect variants remain documented, not automatically mixed.",
+      "id": "HO-COURSE-SEGMENTS",
+      "sources": [
+        "D24-1974:printed2"
+      ]
+    },
+    {
+      "fact": "The course singles out lau and dala with actual l; arbitrary written l cannot be assigned a flap or lateral with certainty.",
+      "id": "HO-L-EXCEPTIONS",
+      "sources": [
+        "D24-1974:printed2:footnote1"
+      ]
+    },
+    {
+      "fact": "Keep h in the selected conservative realization; the source also reports real intervocalic deletion, which is not automatically imposed.",
+      "id": "HO-H",
+      "sources": [
+        "D24-1974:printed2"
+      ]
+    },
+    {
+      "fact": "Do not import Motu plural stress shifts: Hiri Motu hahíne and kekéni retain the same stress across number.",
+      "id": "HO-NUMBER-STRESS",
+      "sources": [
+        "C40-1977:printed772"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "authors": [
+        "T. E. Dutton",
+        "C. L. Voorhoeve"
+      ],
+      "doi": "10.15144/PL-D24",
+      "id": "D24-1974",
+      "licence": "Online edition PDF footer CC-BY-SA-4.0 (2015); landing metadata BY4 discrepancy retained, conservative SA4 for copied material.",
+      "pdf_pages": 278,
+      "sha256": "b97373c996d6a09ddcd24ce0b1ff2f1c94c51945e24d653604e74c5aa8e0917c",
+      "size_bytes": 17914983,
+      "title": "Beginning Hiri Motu",
+      "url": "https://openresearch-repository.anu.edu.au/bitstreams/94168cbc-c9e2-4fd0-8541-c764c9385444/download",
+      "visually_checked_pages": [
+        {
+          "pdf_page": 19,
+          "printed_page": "1"
+        },
+        {
+          "pdf_page": 20,
+          "printed_page": "2"
+        }
+      ],
+      "whole_raw_bytes_actually_verified": true,
+      "year": 1974
+    },
+    {
+      "authors": [
+        "T. E. Dutton",
+        "H. A. Brown"
+      ],
+      "doi": "10.15144/PL-C40.759",
+      "hash_provenance": "First actual primary download in this investigation; now reproducibility pin, not falsely described as an earlier independent pin.",
+      "id": "C40-1977",
+      "licence": "CC-BY-SA-4.0 per ANU metadata and online edition.",
+      "metadata_url": "https://openresearch-repository.anu.edu.au/items/1bfa5b8f-a948-4150-83e3-f421c1265981",
+      "pdf_pages": 36,
+      "sha256": "f58e42ef22591a9b425900e5c0ad2f11fa3292b0bbb875f97ecba90361055926",
+      "size_bytes": 3894304,
+      "title": "[Hiri Motu] The Language Itself",
+      "url": "https://openresearch-repository.anu.edu.au/server/api/core/bitstreams/a57be48e-d4d4-4a22-b807-2dca7ed226ca/content",
+      "visually_checked_pages": [
+        {
+          "pdf_page": 11,
+          "printed_page": "769"
+        },
+        {
+          "pdf_page": 12,
+          "printed_page": "770"
+        },
+        {
+          "pdf_page": 13,
+          "printed_page": "771"
+        },
+        {
+          "pdf_page": 14,
+          "printed_page": "772"
+        }
+      ],
+      "whole_raw_bytes_actually_verified": true,
+      "year": 1977,
+      "year_correction": "ANU repository dates publication1977; do not label this chapter1975."
+    }
+  ],
+  "stress_lexicon": [
+    {
+      "form": "táu",
+      "source": "C40-1977:printed771",
+      "syllable_groups": "tau-single"
+    },
+    {
+      "form": "niú",
+      "source": "C40-1977:printed771",
+      "syllable_groups": "niu-hiatus"
+    },
+    {
+      "form": "gíni",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "áne",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "idáu",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "dogái",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "metáu",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "heáu",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "heái",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "bogakúnu",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "dábarere",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "magánibada",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "dúrua",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "taunimánima",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "hadikáia",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "námo",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "namóna",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "namódia",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "néga",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "negána",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "negádia",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "héreva",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "herevána",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "herevádia",
+      "source": "C40-1977:printed771",
+      "syllable_groups": null
+    },
+    {
+      "form": "hahíne",
+      "source": "C40-1977:printed772",
+      "syllable_groups": null
+    },
+    {
+      "form": "kekéni",
+      "source": "C40-1977:printed772",
+      "syllable_groups": null
+    }
+  ],
+  "unadopted_examples": [
+    {
+      "form": "kubórukubóru",
+      "reason": "Two source-marked accents in a reduplicated form require an explicit compound/prosodic-domain analysis; do not coerce into a single-stress word."
+    }
+  ]
+}

@@ -1,0 +1,5213 @@
+{
+  "acoustic_pronunciation_verified": false,
+  "all_native_name_requests_rejected": true,
+  "curated_stress_form_count": 26,
+  "explicit_annotation_cases": [
+    {
+      "origin": "explicit-research-annotation, not an independently recorded native lexical pronunciation",
+      "plan": {
+        "carrier": "not-established",
+        "events": [
+          {
+            "acoustic_pronunciation_verified": false,
+            "explicit_syllable_boundaries": [
+              6
+            ],
+            "ipa_hypothesis": "naˈmodi.a",
+            "iso639_3": "hmo",
+            "language": "ho",
+            "morpheme_boundaries": [],
+            "not_alias_of": "meu",
+            "nuclei": [
+              [
+                1
+              ],
+              [
+                3
+              ],
+              [
+                5
+              ],
+              [
+                6
+              ]
+            ],
+            "ordinary_letter_names": false,
+            "phones": [
+              {
+                "aspirated": false,
+                "grapheme": "n",
+                "kind": "nasal",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "dental-alveolar",
+                "symbol": "n",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "m",
+                "kind": "nasal",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "bilabial",
+                "symbol": "m",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "o",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "o",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "d",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "dental-alveolar",
+                "symbol": "d",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "i",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "i",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              }
+            ],
+            "primary_stress_phone": 3,
+            "primary_stress_syllable": 1,
+            "source_ids": [
+              "D24-1974:printed2",
+              "C40-1977:printed769-771",
+              "C40-1977:printed771"
+            ],
+            "spelling": "namodia",
+            "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+            "strictly_renderable": true,
+            "text": "namódi.a",
+            "unresolved": [],
+            "warnings": [
+              "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+            ]
+          }
+        ],
+        "format": "dordiai-hiri-motu-semantic-phone-plan",
+        "format_version": 1,
+        "iso639_3": "hmo",
+        "language": "ho",
+        "language_inventory_increment": 0,
+        "native_pronunciation_verified": false,
+        "not_alias_of": "meu",
+        "ordinary_letter_names": false,
+        "product_integrated": false,
+        "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+      },
+      "text": "namódi.a"
+    },
+    {
+      "origin": "explicit-research-annotation, not an independently recorded native lexical pronunciation",
+      "plan": {
+        "carrier": "not-established",
+        "events": [
+          {
+            "acoustic_pronunciation_verified": false,
+            "explicit_syllable_boundaries": [
+              3,
+              5
+            ],
+            "ipa_hypothesis": "ˈha.oɾe.a",
+            "iso639_3": "hmo",
+            "language": "ho",
+            "morpheme_boundaries": [
+              2
+            ],
+            "not_alias_of": "meu",
+            "nuclei": [
+              [
+                1
+              ],
+              [
+                2
+              ],
+              [
+                4
+              ],
+              [
+                5
+              ]
+            ],
+            "ordinary_letter_names": false,
+            "phones": [
+              {
+                "aspirated": false,
+                "grapheme": "h",
+                "kind": "fricative",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "glottal",
+                "symbol": "h",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "o",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "o",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "r",
+                "kind": "flap",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "dental-alveolar",
+                "symbol": "ɾ",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "e",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "e",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              }
+            ],
+            "primary_stress_phone": 1,
+            "primary_stress_syllable": 0,
+            "source_ids": [
+              "D24-1974:printed2",
+              "C40-1977:printed769-771",
+              "C40-1977:printed770"
+            ],
+            "spelling": "haorea",
+            "stress_evidence": "explicit-caller-stress-unverified-word",
+            "strictly_renderable": true,
+            "text": "há-o.re.a",
+            "unresolved": [],
+            "warnings": [
+              "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect.",
+              "Caller supplied stress; lexical language membership has not been established."
+            ]
+          }
+        ],
+        "format": "dordiai-hiri-motu-semantic-phone-plan",
+        "format_version": 1,
+        "iso639_3": "hmo",
+        "language": "ho",
+        "language_inventory_increment": 0,
+        "native_pronunciation_verified": false,
+        "not_alias_of": "meu",
+        "ordinary_letter_names": false,
+        "product_integrated": false,
+        "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+      },
+      "text": "há-o.re.a"
+    },
+    {
+      "origin": "explicit-research-annotation, not an independently recorded native lexical pronunciation",
+      "plan": {
+        "carrier": "not-established",
+        "events": [
+          {
+            "acoustic_pronunciation_verified": false,
+            "explicit_syllable_boundaries": [],
+            "ipa_hypothesis": "ˈgʷa",
+            "iso639_3": "hmo",
+            "language": "ho",
+            "morpheme_boundaries": [],
+            "not_alias_of": "meu",
+            "nuclei": [
+              [
+                1
+              ]
+            ],
+            "ordinary_letter_names": false,
+            "phones": [
+              {
+                "aspirated": false,
+                "grapheme": "gw",
+                "kind": "stop",
+                "labialised": true,
+                "nonsyllabic": false,
+                "place": "velar",
+                "symbol": "gʷ",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              }
+            ],
+            "primary_stress_phone": 1,
+            "primary_stress_syllable": 0,
+            "source_ids": [
+              "D24-1974:printed2",
+              "C40-1977:printed769-771"
+            ],
+            "spelling": "gwa",
+            "stress_evidence": "explicit-caller-stress-unverified-word",
+            "strictly_renderable": true,
+            "text": "gwá",
+            "unresolved": [],
+            "warnings": [
+              "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect.",
+              "Caller supplied stress; lexical language membership has not been established."
+            ]
+          }
+        ],
+        "format": "dordiai-hiri-motu-semantic-phone-plan",
+        "format_version": 1,
+        "iso639_3": "hmo",
+        "language": "ho",
+        "language_inventory_increment": 0,
+        "native_pronunciation_verified": false,
+        "not_alias_of": "meu",
+        "ordinary_letter_names": false,
+        "product_integrated": false,
+        "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+      },
+      "text": "gwá"
+    },
+    {
+      "origin": "explicit-research-annotation, not an independently recorded native lexical pronunciation",
+      "plan": {
+        "carrier": "not-established",
+        "events": [
+          {
+            "acoustic_pronunciation_verified": false,
+            "explicit_syllable_boundaries": [],
+            "ipa_hypothesis": "ˈpata",
+            "iso639_3": "hmo",
+            "language": "ho",
+            "morpheme_boundaries": [],
+            "not_alias_of": "meu",
+            "nuclei": [
+              [
+                1
+              ],
+              [
+                3
+              ]
+            ],
+            "ordinary_letter_names": false,
+            "phones": [
+              {
+                "aspirated": false,
+                "grapheme": "p",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "bilabial",
+                "symbol": "p",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "t",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "dental-alveolar",
+                "symbol": "t",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              }
+            ],
+            "primary_stress_phone": 1,
+            "primary_stress_syllable": 0,
+            "source_ids": [
+              "D24-1974:printed2",
+              "C40-1977:printed769-771"
+            ],
+            "spelling": "pata",
+            "stress_evidence": "explicit-caller-stress-unverified-word",
+            "strictly_renderable": true,
+            "text": "páta",
+            "unresolved": [],
+            "warnings": [
+              "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect.",
+              "Caller supplied stress; lexical language membership has not been established."
+            ]
+          }
+        ],
+        "format": "dordiai-hiri-motu-semantic-phone-plan",
+        "format_version": 1,
+        "iso639_3": "hmo",
+        "language": "ho",
+        "language_inventory_increment": 0,
+        "native_pronunciation_verified": false,
+        "not_alias_of": "meu",
+        "ordinary_letter_names": false,
+        "product_integrated": false,
+        "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+      },
+      "text": "páta"
+    },
+    {
+      "origin": "explicit-research-annotation, not an independently recorded native lexical pronunciation",
+      "plan": {
+        "carrier": "not-established",
+        "events": [
+          {
+            "acoustic_pronunciation_verified": false,
+            "explicit_syllable_boundaries": [],
+            "ipa_hypothesis": "ˈtaka",
+            "iso639_3": "hmo",
+            "language": "ho",
+            "morpheme_boundaries": [],
+            "not_alias_of": "meu",
+            "nuclei": [
+              [
+                1
+              ],
+              [
+                3
+              ]
+            ],
+            "ordinary_letter_names": false,
+            "phones": [
+              {
+                "aspirated": false,
+                "grapheme": "t",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "dental-alveolar",
+                "symbol": "t",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "k",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "velar",
+                "symbol": "k",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              }
+            ],
+            "primary_stress_phone": 1,
+            "primary_stress_syllable": 0,
+            "source_ids": [
+              "D24-1974:printed2",
+              "C40-1977:printed769-771"
+            ],
+            "spelling": "taka",
+            "stress_evidence": "explicit-caller-stress-unverified-word",
+            "strictly_renderable": true,
+            "text": "táka",
+            "unresolved": [],
+            "warnings": [
+              "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect.",
+              "Caller supplied stress; lexical language membership has not been established."
+            ]
+          }
+        ],
+        "format": "dordiai-hiri-motu-semantic-phone-plan",
+        "format_version": 1,
+        "iso639_3": "hmo",
+        "language": "ho",
+        "language_inventory_increment": 0,
+        "native_pronunciation_verified": false,
+        "not_alias_of": "meu",
+        "ordinary_letter_names": false,
+        "product_integrated": false,
+        "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+      },
+      "text": "táka"
+    },
+    {
+      "origin": "explicit-research-annotation, not an independently recorded native lexical pronunciation",
+      "plan": {
+        "carrier": "not-established",
+        "events": [
+          {
+            "acoustic_pronunciation_verified": false,
+            "explicit_syllable_boundaries": [],
+            "ipa_hypothesis": "ˈkapa",
+            "iso639_3": "hmo",
+            "language": "ho",
+            "morpheme_boundaries": [],
+            "not_alias_of": "meu",
+            "nuclei": [
+              [
+                1
+              ],
+              [
+                3
+              ]
+            ],
+            "ordinary_letter_names": false,
+            "phones": [
+              {
+                "aspirated": false,
+                "grapheme": "k",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "velar",
+                "symbol": "k",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              },
+              {
+                "aspirated": false,
+                "grapheme": "p",
+                "kind": "stop",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "bilabial",
+                "symbol": "p",
+                "voiced": false
+              },
+              {
+                "aspirated": false,
+                "grapheme": "a",
+                "kind": "vowel",
+                "labialised": false,
+                "nonsyllabic": false,
+                "place": "native-five-vowel",
+                "symbol": "a",
+                "voiced": true
+              }
+            ],
+            "primary_stress_phone": 1,
+            "primary_stress_syllable": 0,
+            "source_ids": [
+              "D24-1974:printed2",
+              "C40-1977:printed769-771"
+            ],
+            "spelling": "kapa",
+            "stress_evidence": "explicit-caller-stress-unverified-word",
+            "strictly_renderable": true,
+            "text": "kápa",
+            "unresolved": [],
+            "warnings": [
+              "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect.",
+              "Caller supplied stress; lexical language membership has not been established."
+            ]
+          }
+        ],
+        "format": "dordiai-hiri-motu-semantic-phone-plan",
+        "format_version": 1,
+        "iso639_3": "hmo",
+        "language": "ho",
+        "language_inventory_increment": 0,
+        "native_pronunciation_verified": false,
+        "not_alias_of": "meu",
+        "ordinary_letter_names": false,
+        "product_integrated": false,
+        "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+      },
+      "text": "kápa"
+    }
+  ],
+  "format": "dordiai-hiri-motu-primary-frontend-proof",
+  "format_version": 1,
+  "frontend_file": {
+    "sha256": "69ff6e58f86163e6747f5be5d414df31aa83086502bc91eb79f8d118d649aa19",
+    "size_bytes": 13381
+  },
+  "future_native_acoustic_probe": {
+    "carrier_boundary": "Own versioned Hiri Motu phoneme/config frontend on disclosed shared acoustic primitives; no Motu/meu alias and no neighbouring-language text/dictionary/phoneme-table fallback.",
+    "future_evidence_required": [
+      "Original unchanged private Windows runtime, exact own native voice/phoneme table and dependency file SHA identities.",
+      "Actual carrier output with all declared phone/nucleus/stress contrasts, finite/nonzero PCM and uncached deterministic repeats.",
+      "Actual generated same-carrier calibration through original FP32 reference encoder; never copy a source vector from Motu or another language.",
+      "Exact allowed selected-profile asset resolver/hash and actual original conversion call source/target identity checks.",
+      "Measured cold/warm first PCM, stop/cancel, native word-language switching, RAM and package replacement lifecycle.",
+      "Primary listening reference/native-speaker phonetic evaluation; output differences or nonzero WAV alone do not certify native correctness.",
+      "Ordinary source-backed alphabet/digit/punctuation names, then actual private NVDA keyboard/navigation/reading proof."
+    ],
+    "future_mechanical_cases": [
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈtau̯",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1,
+                  2
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "t",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "t",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "u",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": true,
+                  "place": "native-five-vowel",
+                  "symbol": "u",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 1,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "tau",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "tau",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "tau"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "niˈu",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  2
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "i",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "i",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "u",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "u",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 2,
+              "primary_stress_syllable": 1,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "niu",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "niu",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "niu"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈgini",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "g",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "g",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "i",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "i",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "i",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "i",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 1,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "gini",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "gini",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "gini"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈane",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  0
+                ],
+                [
+                  2
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 0,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "ane",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "ane",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "ane"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "bogaˈkunu",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ],
+                [
+                  7
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "b",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "b",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "o",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "o",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "g",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "g",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "k",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "k",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "u",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "u",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "u",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "u",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 5,
+              "primary_stress_syllable": 2,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "bogakunu",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "bogakunu",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "bogakunu"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈdabaɾeɾe",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ],
+                [
+                  7
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "d",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "d",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "b",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "b",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "r",
+                  "kind": "flap",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "ɾ",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "r",
+                  "kind": "flap",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "ɾ",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 1,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "dabarere",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "dabarere",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "dabarere"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "maˈganibada",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ],
+                [
+                  7
+                ],
+                [
+                  9
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "m",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "m",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "g",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "g",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "i",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "i",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "b",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "b",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "d",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "d",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 3,
+              "primary_stress_syllable": 1,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "maganibada",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "maganibada",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "maganibada"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈnamo",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "m",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "m",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "o",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "o",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 1,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "namo",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "namo",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "namo"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "naˈmona",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "m",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "m",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "o",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "o",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 3,
+              "primary_stress_syllable": 1,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "namona",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "namona",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "namona"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈnega",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "g",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "g",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 1,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "nega",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "nega",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "nega"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "neˈgana",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "g",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "g",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 3,
+              "primary_stress_syllable": 1,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "negana",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "negana",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "negana"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "ˈheɾeβa",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "h",
+                  "kind": "fricative",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "glottal",
+                  "symbol": "h",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "r",
+                  "kind": "flap",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "ɾ",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "v",
+                  "kind": "fricative",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "β",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 1,
+              "primary_stress_syllable": 0,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "hereva",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "hereva",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "hereva"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "heɾeˈβana",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ],
+                [
+                  7
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "h",
+                  "kind": "fricative",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "glottal",
+                  "symbol": "h",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "r",
+                  "kind": "flap",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "ɾ",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "v",
+                  "kind": "fricative",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "bilabial",
+                  "symbol": "β",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 5,
+              "primary_stress_syllable": 2,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed771"
+              ],
+              "spelling": "herevana",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "herevana",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "herevana"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "haˈhine",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "h",
+                  "kind": "fricative",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "glottal",
+                  "symbol": "h",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "a",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "a",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "h",
+                  "kind": "fricative",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "glottal",
+                  "symbol": "h",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "i",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "i",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 3,
+              "primary_stress_syllable": 1,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed772"
+              ],
+              "spelling": "hahine",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "hahine",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "hahine"
+      },
+      {
+        "semantic_plan": {
+          "carrier": "not-established",
+          "events": [
+            {
+              "acoustic_pronunciation_verified": false,
+              "explicit_syllable_boundaries": [],
+              "ipa_hypothesis": "keˈkeni",
+              "iso639_3": "hmo",
+              "language": "ho",
+              "morpheme_boundaries": [],
+              "not_alias_of": "meu",
+              "nuclei": [
+                [
+                  1
+                ],
+                [
+                  3
+                ],
+                [
+                  5
+                ]
+              ],
+              "ordinary_letter_names": false,
+              "phones": [
+                {
+                  "aspirated": false,
+                  "grapheme": "k",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "k",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "k",
+                  "kind": "stop",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "velar",
+                  "symbol": "k",
+                  "voiced": false
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "e",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "e",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "n",
+                  "kind": "nasal",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "dental-alveolar",
+                  "symbol": "n",
+                  "voiced": true
+                },
+                {
+                  "aspirated": false,
+                  "grapheme": "i",
+                  "kind": "vowel",
+                  "labialised": false,
+                  "nonsyllabic": false,
+                  "place": "native-five-vowel",
+                  "symbol": "i",
+                  "voiced": true
+                }
+              ],
+              "primary_stress_phone": 3,
+              "primary_stress_syllable": 1,
+              "source_ids": [
+                "D24-1974:printed2",
+                "C40-1977:printed769-771",
+                "C40-1977:printed772"
+              ],
+              "spelling": "kekeni",
+              "stress_evidence": "curated-primary-lexical-stress",
+              "strictly_renderable": true,
+              "text": "kekeni",
+              "unresolved": [],
+              "warnings": [
+                "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+              ]
+            }
+          ],
+          "format": "dordiai-hiri-motu-semantic-phone-plan",
+          "format_version": 1,
+          "iso639_3": "hmo",
+          "language": "ho",
+          "language_inventory_increment": 0,
+          "native_pronunciation_verified": false,
+          "not_alias_of": "meu",
+          "ordinary_letter_names": false,
+          "product_integrated": false,
+          "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30"
+        },
+        "text": "kekeni"
+      }
+    ],
+    "required_exact_features": [
+      "gʷ one voiced labialised velar phone distinct from g and kw",
+      "p/t/k explicitly unaspirated",
+      "β voiced bilabial friction, selected course variant",
+      "ɾ one flap and source-licensed l exceptions",
+      "five native vowels without invented contrastive length",
+      "tau one nucleus/offglide versus niu two nuclei",
+      "explicit native lexical stress and exact morphological forms"
+    ],
+    "status": "not-executed; carrier and ordinary names remain unestablished",
+    "stop_conditions": [
+      "Any missing exact primitive, stress or nucleus/domain feature; do not approximate or substitute a neighbouring language.",
+      "Unresolved frontend result must stop before synthesis; no English/native-language guessing backoff.",
+      "A changed source, phoneme-map/config, selected voice or managed resource epoch invalidates calibration and cached audio."
+    ]
+  },
+  "iso639_3": "hmo",
+  "language": "ho",
+  "language_inventory_increment": 0,
+  "no_foreign_acoustic_engine_invoked": true,
+  "not_alias_of": "meu",
+  "nvda_verified": false,
+  "ordinary_letter_names_ready": false,
+  "product_integrated": false,
+  "required_semantic_phone_inventory": {
+    "a": {
+      "aspirated": false,
+      "kind": "vowel",
+      "labialised": false,
+      "place": "native-five-vowel",
+      "symbol": "a",
+      "voiced": true
+    },
+    "b": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": false,
+      "place": "bilabial",
+      "symbol": "b",
+      "voiced": true
+    },
+    "d": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": false,
+      "place": "dental-alveolar",
+      "symbol": "d",
+      "voiced": true
+    },
+    "e": {
+      "aspirated": false,
+      "kind": "vowel",
+      "labialised": false,
+      "place": "native-five-vowel",
+      "symbol": "e",
+      "voiced": true
+    },
+    "g": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": false,
+      "place": "velar",
+      "symbol": "g",
+      "voiced": true
+    },
+    "gʷ": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": true,
+      "place": "velar",
+      "symbol": "gʷ",
+      "voiced": true
+    },
+    "h": {
+      "aspirated": false,
+      "kind": "fricative",
+      "labialised": false,
+      "place": "glottal",
+      "symbol": "h",
+      "voiced": false
+    },
+    "i": {
+      "aspirated": false,
+      "kind": "vowel",
+      "labialised": false,
+      "place": "native-five-vowel",
+      "symbol": "i",
+      "voiced": true
+    },
+    "k": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": false,
+      "place": "velar",
+      "symbol": "k",
+      "voiced": false
+    },
+    "m": {
+      "aspirated": false,
+      "kind": "nasal",
+      "labialised": false,
+      "place": "bilabial",
+      "symbol": "m",
+      "voiced": true
+    },
+    "n": {
+      "aspirated": false,
+      "kind": "nasal",
+      "labialised": false,
+      "place": "dental-alveolar",
+      "symbol": "n",
+      "voiced": true
+    },
+    "o": {
+      "aspirated": false,
+      "kind": "vowel",
+      "labialised": false,
+      "place": "native-five-vowel",
+      "symbol": "o",
+      "voiced": true
+    },
+    "p": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": false,
+      "place": "bilabial",
+      "symbol": "p",
+      "voiced": false
+    },
+    "t": {
+      "aspirated": false,
+      "kind": "stop",
+      "labialised": false,
+      "place": "dental-alveolar",
+      "symbol": "t",
+      "voiced": false
+    },
+    "u": {
+      "aspirated": false,
+      "kind": "vowel",
+      "labialised": false,
+      "place": "native-five-vowel",
+      "symbol": "u",
+      "voiced": true
+    },
+    "ɾ": {
+      "aspirated": false,
+      "kind": "flap",
+      "labialised": false,
+      "place": "dental-alveolar",
+      "symbol": "ɾ",
+      "voiced": true
+    },
+    "β": {
+      "aspirated": false,
+      "kind": "fricative",
+      "labialised": false,
+      "place": "bilabial",
+      "symbol": "β",
+      "voiced": true
+    }
+  },
+  "selected_profile_projection_verified": false,
+  "source_embedding_prepared": false,
+  "source_facts_sha256": "55231b82c64850daac6921666386c37b3c43151b7082219d21587d83809a2f30",
+  "source_lexical_analyses": [
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈtau̯",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1,
+          2
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "t",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "t",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": true,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "táu",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "tau",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "táu",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "niˈu",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 2,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "niú",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "niu",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "niú",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈgini",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "gíni",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "gini",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "gíni",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈane",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          0
+        ],
+        [
+          2
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 0,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "áne",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "ane",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "áne",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "iˈda.u",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          0
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 2,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "idáu",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "idau",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "idáu",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "doˈga.i",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "o",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "o",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "dogái",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "dogai",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "dogái",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "meˈta.u",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "t",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "t",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "metáu",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "metau",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "metáu",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "heˈa.u",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 2,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "heáu",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "heau",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "heáu",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "heˈa.i",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 2,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "heái",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "heai",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "heái",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "bogaˈkunu",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          7
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "b",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "b",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "o",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "o",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "k",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "k",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 5,
+      "primary_stress_syllable": 2,
+      "source": "C40-1977:printed771",
+      "source_form": "bogakúnu",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "bogakunu",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "bogakúnu",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈdabaɾeɾe",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          7
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "b",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "b",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "r",
+          "kind": "flap",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "ɾ",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "r",
+          "kind": "flap",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "ɾ",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "dábarere",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "dabarere",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "dábarere",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "maˈganibada",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          7
+        ],
+        [
+          9
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "b",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "b",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "magánibada",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "maganibada",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "magánibada",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈduɾu.a",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "r",
+          "kind": "flap",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "ɾ",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "dúrua",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "durua",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "dúrua",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ta.uniˈmanima",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          6
+        ],
+        [
+          8
+        ],
+        [
+          10
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "t",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "t",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "u",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "u",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 6,
+      "primary_stress_syllable": 3,
+      "source": "C40-1977:printed771",
+      "source_form": "taunimánima",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "taunimanima",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "taunimánima",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "hadiˈka.i.a",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          6
+        ],
+        [
+          7
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "k",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "k",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 5,
+      "primary_stress_syllable": 2,
+      "source": "C40-1977:printed771",
+      "source_form": "hadikáia",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "hadikaia",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "hadikáia",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈnamo",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "o",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "o",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "námo",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "namo",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "námo",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "naˈmona",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "o",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "o",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "namóna",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "namona",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "namóna",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "naˈmodi.a",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          6
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "m",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "m",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "o",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "o",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "namódia",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "namodia",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "namódia",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈnega",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "néga",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "nega",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "néga",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "neˈgana",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "negána",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "negana",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "negána",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "neˈgadi.a",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          6
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "g",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "g",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed771",
+      "source_form": "negádia",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "negadia",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "negádia",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "ˈheɾeβa",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "r",
+          "kind": "flap",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "ɾ",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "v",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "β",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 1,
+      "primary_stress_syllable": 0,
+      "source": "C40-1977:printed771",
+      "source_form": "héreva",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "hereva",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "héreva",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "heɾeˈβana",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          7
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "r",
+          "kind": "flap",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "ɾ",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "v",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "β",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 5,
+      "primary_stress_syllable": 2,
+      "source": "C40-1977:printed771",
+      "source_form": "herevána",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "herevana",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "herevána",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "heɾeˈβadi.a",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ],
+        [
+          7
+        ],
+        [
+          8
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "r",
+          "kind": "flap",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "ɾ",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "v",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "bilabial",
+          "symbol": "β",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "d",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "d",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 5,
+      "primary_stress_syllable": 2,
+      "source": "C40-1977:printed771",
+      "source_form": "herevádia",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed771"
+      ],
+      "spelling": "herevadia",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": false,
+      "text": "herevádia",
+      "unresolved": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "haˈhine",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "a",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "a",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "h",
+          "kind": "fricative",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "glottal",
+          "symbol": "h",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed772",
+      "source_form": "hahíne",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed772"
+      ],
+      "spelling": "hahine",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "hahíne",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    },
+    {
+      "acoustic_pronunciation_verified": false,
+      "explicit_syllable_boundaries": [],
+      "ipa_hypothesis": "keˈkeni",
+      "iso639_3": "hmo",
+      "language": "ho",
+      "morpheme_boundaries": [],
+      "not_alias_of": "meu",
+      "nuclei": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          5
+        ]
+      ],
+      "ordinary_letter_names": false,
+      "phones": [
+        {
+          "aspirated": false,
+          "grapheme": "k",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "k",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "k",
+          "kind": "stop",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "velar",
+          "symbol": "k",
+          "voiced": false
+        },
+        {
+          "aspirated": false,
+          "grapheme": "e",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "e",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "n",
+          "kind": "nasal",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "dental-alveolar",
+          "symbol": "n",
+          "voiced": true
+        },
+        {
+          "aspirated": false,
+          "grapheme": "i",
+          "kind": "vowel",
+          "labialised": false,
+          "nonsyllabic": false,
+          "place": "native-five-vowel",
+          "symbol": "i",
+          "voiced": true
+        }
+      ],
+      "primary_stress_phone": 3,
+      "primary_stress_syllable": 1,
+      "source": "C40-1977:printed772",
+      "source_form": "kekéni",
+      "source_ids": [
+        "D24-1974:printed2",
+        "C40-1977:printed769-771",
+        "C40-1977:printed772"
+      ],
+      "spelling": "kekeni",
+      "stress_evidence": "explicit-caller-stress-confirmed-by-primary",
+      "strictly_renderable": true,
+      "text": "kekéni",
+      "unresolved": [],
+      "warnings": [
+        "Native-listener and acoustic validation pending; selected 1974-course realization is not every dialect."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "doi": "10.15144/PL-D24",
+      "id": "D24-1974",
+      "licence": "Online edition PDF footer CC-BY-SA-4.0 (2015); landing metadata BY4 discrepancy retained, conservative SA4 for copied material.",
+      "sha256": "b97373c996d6a09ddcd24ce0b1ff2f1c94c51945e24d653604e74c5aa8e0917c",
+      "size_bytes": 17914983,
+      "verified_whole_primary_bytes": true,
+      "year": 1974
+    },
+    {
+      "doi": "10.15144/PL-C40.759",
+      "id": "C40-1977",
+      "licence": "CC-BY-SA-4.0 per ANU metadata and online edition.",
+      "sha256": "f58e42ef22591a9b425900e5c0ad2f11fa3292b0bbb875f97ecba90361055926",
+      "size_bytes": 3894304,
+      "verified_whole_primary_bytes": true,
+      "year": 1977
+    }
+  ],
+  "status": "source-verified-semantic-frontend-only-not-acoustic-support",
+  "strict_rejections": [
+    {
+      "message": "Native phonology is unresolved; no foreign/default backoff",
+      "reasons": [
+        "lexical-stress-unresolved"
+      ],
+      "rejected": true,
+      "text": "pataka"
+    },
+    {
+      "message": "Native phonology is unresolved; no foreign/default backoff",
+      "reasons": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "rejected": true,
+      "text": "káu"
+    },
+    {
+      "message": "Native phonology is unresolved; no foreign/default backoff",
+      "reasons": [
+        "adjacent-vowel-grouping-unresolved"
+      ],
+      "rejected": true,
+      "text": "háorea"
+    },
+    {
+      "message": "Native phonology is unresolved; no foreign/default backoff",
+      "reasons": [
+        "written-l-realization-unverified"
+      ],
+      "rejected": true,
+      "text": "láma"
+    },
+    {
+      "message": "Native phonology is unresolved; no foreign/default backoff",
+      "reasons": [
+        "loanword-phonology-unverified"
+      ],
+      "rejected": true,
+      "text": "fóto"
+    },
+    {
+      "message": "No native words or unsupported trailing symbol/number",
+      "reasons": [],
+      "rejected": true,
+      "text": "namo 123"
+    },
+    {
+      "message": "Unsupported or duplicate vowel annotation; no invented length/tone rule",
+      "reasons": [],
+      "rejected": true,
+      "text": "ā"
+    },
+    {
+      "message": "Multiple accents require unestablished compound stress domains",
+      "reasons": [],
+      "rejected": true,
+      "text": "kubórukubóru"
+    }
+  ],
+  "strict_semantic_primary_golden_count": 15,
+  "strict_semantic_primary_goldens": [
+    "tau",
+    "niu",
+    "gini",
+    "ane",
+    "bogakunu",
+    "dabarere",
+    "maganibada",
+    "namo",
+    "namona",
+    "nega",
+    "negana",
+    "hereva",
+    "herevana",
+    "hahine",
+    "kekeni"
+  ],
+  "windows_verified": false
+}

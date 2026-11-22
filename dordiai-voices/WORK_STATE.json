@@ -34,7 +34,9 @@
     "Immutable core11 built and 225 packaged Afri/profile requests passed; all180 banks and1596 private runtime files byte-identical.",
     "Actual source11 NVDA normal176/300 and9 real key cases functionally pass; genuine missing model and corrupted dictionary recover with exact restoration.",
     "Actual installed source11 dictionary manager at266-character plain data path passes97 source/control cases; all memberships match source.",
-    "Real unchanged WavePlayer on owned virtual render endpoint passed core10 control without recording sink; capture denied and physical audio remain unverified."
+    "Real unchanged WavePlayer on owned virtual render endpoint passed core10 control without recording sink; capture denied and physical audio remain unverified.",
+    "Immutable source12 passes all five actual NVDA modes: unchanged100 words/102 pieces route with zero mismatches; seven plain/metadata/compound cases, nine actual typed cases and two genuine resource faults pass.",
+    "Exact source12 core and receipt durably stored in separate unpublished backup; both full readback hashes verified."
   ],
   "open_requirements": [
     "8 selected entries have no integrated resources; Tamazight remains partial. Combined older optionals plus actual11 Afri six resources cover127 entries,126 complete; this is resource presence, not native pronunciation.",
@@ -43,10 +45,8 @@
     "Native-listener pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source.",
     "All135 language word identification and homograph abstention need broader quality evaluation; current installed classifier has45 trained labels.",
     "Exact final release reconstruction must retain newly generated bank bytes and matching source/package evidence.",
-    "Repeat extended keyboard policy/navigation checks and dictionary reads on matching final source11 archive; immutable core10's five scenarios passed.",
-    "Real source11 unmarked plain-file mixed-word routing and authored TextInfo metadata verification in run45034220666; no default-locale pinning may suppress auto mode.",
-    "Confirmed source11 original LangChange(None)→NVDA normalizedUK loses provenance and pins100 unmarked words; fix in12 with documented speech hook and preserve real author/typing/forced/enabled priority.",
-    "Pre-existing personalLanguage normalization semantics need separate reviewed correction after main12 actual acceptance."
+    "Pre-existing personalLanguage normalization semantics need separate reviewed correction after main12 actual acceptance.",
+    "Matching immutable12 extended keyboard characters-only/navigation/forced-uk/disabled-ru scenarios remain pending; standard9cases pass. Prior10 scenarios remain historical."
   ],
   "environment": {
     "windows_verification_route": "GitHub Actions isolated Windows runners",
@@ -57,49 +57,48 @@
   },
   "verification": {
     "current_frozen_core": {
-      "version": "0.13.1-dev.11",
-      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
-      "run": 45029834209,
-      "job": 137230752726,
-      "archive_bytes": 1992938157,
-      "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
-      "installed_bytes": 2408429678,
-      "files": 10257,
-      "core_artifact": 14757229220,
-      "evidence_artifact": 14757224120,
-      "windows_tests": 1058,
-      "windows_skipped": 36,
-      "old_bank_files_byte_identical": 180,
-      "old_private_python_files_byte_identical": 1596,
-      "actual_packaged_native_profile_requests": 225,
-      "default_three_engine_regression_passed": true,
-      "same_worker_source_removal_restoration_passed": true,
-      "eight_excluded_voices_rejected": true,
-      "worker_clean_exit": true,
-      "nvda_verified": "limited_functional_with_explicit_recording_sink; plain_file_word_routing_pending",
+      "version": "0.13.1-dev.12",
+      "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+      "run": 45040668513,
+      "job": 137264162762,
+      "archive_name": "dordiai-voices-0.13.1-dev.12.nvda-addon",
+      "archive_bytes": 1992944744,
+      "archive_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+      "core_artifact": 14761553443,
+      "evidence_artifact": 14761533502,
+      "windows_tests_total": 1330,
+      "windows_passed": 1280,
+      "windows_skipped": 50,
+      "worker_native_profile_requests": 225,
+      "default3_passed": true,
+      "banks_byte_identical": 180,
+      "private_files_byte_identical": 1596,
+      "other_models_identity_files_byte_identical": 8508,
+      "reviewed_character_data_exceptions": 2,
+      "voice_ids_unchanged": 45,
+      "native_dictionary_descriptor_notice_unchanged": true,
+      "actual_nvda_pipeline_verified": true,
       "typing_verified": true,
       "physical_audio_verified": false,
       "native_pronunciation_verified": false,
       "product_ready": false,
-      "evidence": "evidence/source11_worker_45029834209.json",
-      "windows_tests_total": 1058,
-      "windows_passed": 1022,
-      "nvda_functional_checks_verified": true,
-      "nvda_functional_run": 45033534150,
+      "evidence": "evidence/source12_worker_45040668513.json",
+      "nvda_functional_run": 45041853551,
+      "nvda_evidence": "evidence/source12_nvda_five_mode_result.json",
+      "plain100_lexical_pieces": 102,
+      "plain100_route_mismatches": 0,
       "actual_typing_cases": 9,
+      "typing_scenario": "standard",
       "required_resource_recovery_verified": true,
-      "native_dictionary_recovery_verified": true,
-      "installed_dictionary_manager_verified": true,
-      "nvda_evidence": "evidence/source11_nvda_45033534150.json"
+      "native_dictionary_recovery_verified": true
     },
     "main_build_suite": {
       "status": "matching-source Windows suite passed",
-      "windows_tests": 1058,
-      "windows_tests_total": 1058,
-      "windows_passed": 1022,
-      "windows_skipped": 36,
-      "run": 45029834209,
-      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+      "windows_tests_total": 1330,
+      "windows_passed": 1280,
+      "windows_skipped": 50,
+      "run": 45040668513,
+      "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
       "linux_tests_tracked_separately": true
     },
     "latest_typing_and_recovery_windows_suite": {
@@ -178,7 +177,7 @@
     "windows_audio_verified": false,
     "latency_targets_verified": false,
     "nvda_accessibility_verified": "Limited actual settings/hotkey/Tab/Space smoke only",
-    "final_source_snapshot": "Immutable core10 source is Git commit2bdababb86378f3cc6e58b934265175da589d703; old source_snapshot_0.13.1-dev.6.json.gz is historical only.",
+    "final_source_snapshot": "Immutable core12 binary source be7f4e2468dc18bd155d2c205f89bf61c8e235a2; later tool/evidence commits do not alter this archive.",
     "drive_independent_core_resume_evidence": "evidence/recovered_core4_to_dev5_rebuild.json",
     "mms_all29_parity": {
       "run": 45009987791,
@@ -342,6 +341,21 @@
         "draft": true,
         "published": false,
         "evidence": "evidence/dordiai-afri-six-dev11-backup-receipt.json"
+      },
+      "core12": {
+        "run": 45042554359,
+        "release_id": 454572810,
+        "asset_id": 779635004,
+        "receipt_asset_id": 779639712,
+        "bytes": 1992944744,
+        "sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+        "readback_sha256_verified": true,
+        "receipt_readback_sha256_verified": true,
+        "draft": true,
+        "published": false,
+        "binary_source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+        "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+        "evidence": "evidence/dordiai-core-dev12-backup-receipt.json"
       }
     },
     "word_candidate_review": {
@@ -436,7 +450,8 @@
         "windows_p99_lookup_ms": 2.7906,
         "windows_working_set_increase_bytes": 10158080,
         "linux_p95_lookup_ms": 2.066,
-        "nvda_verified": "installed manager and exact memberships; routing in real plain-file read pending"
+        "nvda_verified": "installed manager and exact memberships; routing in real plain-file read pending",
+        "production_plain_file_routing_verified": true
       },
       "full_source_equality": {
         "run": 45029256575,
@@ -749,12 +764,20 @@
       "reviewed_character_data_exceptions": 2,
       "voice_ids_unchanged": 45,
       "native_dictionary_descriptor_notice_unchanged": true,
-      "actual_nvda_pipeline_verified": false,
-      "typing_verified": false,
+      "actual_nvda_pipeline_verified": true,
+      "typing_verified": true,
       "physical_audio_verified": false,
       "native_pronunciation_verified": false,
       "product_ready": false,
-      "evidence": "evidence/source12_worker_45040668513.json"
+      "evidence": "evidence/source12_worker_45040668513.json",
+      "nvda_functional_run": 45041853551,
+      "nvda_evidence": "evidence/source12_nvda_five_mode_result.json",
+      "plain100_lexical_pieces": 102,
+      "plain100_route_mismatches": 0,
+      "actual_typing_cases": 9,
+      "typing_scenario": "standard",
+      "required_resource_recovery_verified": true,
+      "native_dictionary_recovery_verified": true
     },
     "current_working_source_suite": {
       "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
@@ -894,7 +917,8 @@
       "forced_uk_and_disabled_ru_plain_controls_passed": true,
       "authored_rich_metadata_cases_blocked": "Probe isolated detectFormatAfterCursor was false; genuine nativefontLCIDs alternate but TextInfo only initially exposesru_RU. Tool-only setting/restore correction prepared.",
       "cleanup_restored": true,
-      "evidence": "evidence/source11_plain_text_provenance_failure.md"
+      "evidence": "evidence/source11_plain_text_provenance_failure.md",
+      "status": "historical_source11_defect_fixed_and_paired_actual_source12_verified"
     },
     "source12_candidate": {
       "status": "actual_windows_build_worker_passed_matching_nvda_pending",
@@ -953,15 +977,192 @@
       "first_use_unique_speedup_claimed": false,
       "typing_audio_acceptance": false,
       "evidence": "evidence/native_word_cache_nvda_45039894049.json"
+    },
+    "current_frozen_core_historical11": {
+      "version": "0.13.1-dev.11",
+      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+      "run": 45029834209,
+      "job": 137230752726,
+      "archive_bytes": 1992938157,
+      "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+      "installed_bytes": 2408429678,
+      "files": 10257,
+      "core_artifact": 14757229220,
+      "evidence_artifact": 14757224120,
+      "windows_tests": 1058,
+      "windows_skipped": 36,
+      "old_bank_files_byte_identical": 180,
+      "old_private_python_files_byte_identical": 1596,
+      "actual_packaged_native_profile_requests": 225,
+      "default_three_engine_regression_passed": true,
+      "same_worker_source_removal_restoration_passed": true,
+      "eight_excluded_voices_rejected": true,
+      "worker_clean_exit": true,
+      "nvda_verified": "limited_functional_with_explicit_recording_sink; plain_file_word_routing_pending",
+      "typing_verified": true,
+      "physical_audio_verified": false,
+      "native_pronunciation_verified": false,
+      "product_ready": false,
+      "evidence": "evidence/source11_worker_45029834209.json",
+      "windows_tests_total": 1058,
+      "windows_passed": 1022,
+      "nvda_functional_checks_verified": true,
+      "nvda_functional_run": 45033534150,
+      "actual_typing_cases": 9,
+      "required_resource_recovery_verified": true,
+      "native_dictionary_recovery_verified": true,
+      "installed_dictionary_manager_verified": true,
+      "nvda_evidence": "evidence/source11_nvda_45033534150.json"
+    },
+    "source12_actual_nvda": {
+      "format": "dordiai-source12-actual-nvda-five-mode-evidence",
+      "format_version": 1,
+      "run_id": 45041853551,
+      "commit": "553d1a164e431458e7e394510530bdcf2329eade",
+      "core": {
+        "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+        "build_run_id": 45040668513,
+        "bytes": 1992944744,
+        "sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573"
+      },
+      "nvda": {
+        "version": "2026.3.1",
+        "official_installer_sha256": "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052"
+      },
+      "functional": {
+        "matrix_jobs_passed": 5,
+        "failed_checks": 0,
+        "plain_cases_passed": 7,
+        "original100_source_words_preserved": true,
+        "original100_lexical_pieces": 102,
+        "original100_routing_mismatches": 0,
+        "original100_delivered_origin_explicit": false,
+        "original100_profile": "adam",
+        "original100_high_level_locales": [
+          null
+        ],
+        "original100_delivered_locales": [
+          "uk"
+        ],
+        "genuine_rich_metadata_preserved": true,
+        "forced_disabled_policy_preserved": true,
+        "compound_memberships_verified": true,
+        "typing_cases_passed": 9,
+        "typed_word_ru_preserved": true,
+        "plain_private_config_restored": true,
+        "typing_config_layout_speech_mode_restored": true,
+        "ru_missing_genuine_fallback": true,
+        "ru_model_sha_identically_restored": true,
+        "descriptor_genuine_integrity_fallback": true,
+        "descriptor_reader_and_resource_closed": true,
+        "descriptor_sha_identically_restored": true,
+        "normal_glyph_samples": 176,
+        "normal_languages": [
+          "uk",
+          "en",
+          "ru"
+        ],
+        "warm_letters": 100,
+        "switch_requests": 100,
+        "cancel_api": 100,
+        "normal_timeouts": 0,
+        "normal_errors": 0
+      },
+      "scope": {
+        "recording_pcm_sink_test_double": true,
+        "physical_audio_verified": false,
+        "wave_player_verified": false,
+        "acoustic_latency_verified": false,
+        "pronunciation_verified": false,
+        "all45_voice_acoustics_verified": false,
+        "all135_language_coverage_verified": false,
+        "product_ready": false,
+        "uninterrupted_real_playback_verified": false,
+        "private_nvda_unsupported_language_reporting": "OFF during plain routing probe; exact original 'speech' restored",
+        "source100_routing_basis": "Finite exact native dictionary membership; shared spellings follow current-language policy, not author-intent inference"
+      },
+      "predevice_metrics": {
+        "plain100_first_pcm_ms": 252.8204,
+        "plain100_wall_seconds": 39.7140413,
+        "plain100_captured_pcm_seconds": 59.24525,
+        "warm_letter_p95_ms": 1.6685,
+        "warm_switch_p95_ms": 1.9159,
+        "cancel_api_p95_ms": 0.0071,
+        "typing_first_pcm_range_ms": [
+          15.4797,
+          152.1119
+        ],
+        "ru_missing_notice_nonzero_bytes": 762201,
+        "ru_missing_recovery_ms": 5156.459,
+        "descriptor_notice_nonzero_bytes": 199940,
+        "descriptor_recovery_ms": 133.0261
+      },
+      "evidence": [
+        {
+          "mode": "plain-text",
+          "job_id": 137267827083,
+          "exact_nvda_report_git_blob": "9728989e3a2b45c38bfebd4d7299e0096eaca8a1",
+          "complete_bundle_gzip_git_blob": "c5815af1e3cf6ed90f5fff846b37a5ce38c9dac4",
+          "bundle_gzip_sha256": "2244d5e0e2332efaacc9f7f809ff4c8f87553dde02d85313758a5365a48c1456",
+          "bundle_json_sha256": "aec63e6beaece35750aa69013affa99465bcab1acbc387b12278c5c0cb2793a5",
+          "artifact_zip_sha256": "84a23ea3b3bf0afee9c1dd9f91d48a49f4c2cac8f2392a60b5fbd33e47c0a929",
+          "artifact_id": 14762126636,
+          "artifact_bytes": 1496749
+        },
+        {
+          "mode": "typing",
+          "job_id": 137267827297,
+          "exact_nvda_report_git_blob": "8418bd31818a80b298422ca3a269e39dbfd67c1f",
+          "complete_bundle_gzip_git_blob": "5a94221049e49093770be09add00bab22b313d31",
+          "bundle_gzip_sha256": "6009e59265d060431ad4a6c26df800df8a247d4451e68e8f1e7ceaec7718ddf7",
+          "bundle_json_sha256": "fe1b7ac0da477a10e31d3dd9b816f341660dfd37dc07037ab211a80beaded3f1",
+          "artifact_zip_sha256": "3415a0ae27fd2059d4f3dde913748e9b615147ce2b50942d54b1ecb8c9dbe141",
+          "artifact_id": 14762116606,
+          "artifact_bytes": 388626
+        },
+        {
+          "mode": "normal",
+          "job_id": 137267827308,
+          "exact_nvda_report_git_blob": "5eaa7103efd04b17832a8c30279098a4d316c3c9",
+          "complete_bundle_gzip_git_blob": "0ddbb22a4bc82091811b57935a383a7d96f2f0df",
+          "bundle_gzip_sha256": "daa55ce2a626ac2f0cc5726e4e99a2d96cc1d3ec58f176dadf500cff6723720e",
+          "bundle_json_sha256": "40175072bae36cd51323eb3f5858e53945f462878b506cb71dff791b05b9989b",
+          "artifact_zip_sha256": "4dd1f2032edb8aab104a0b26dc0e340951ad5c334d7ed1178918f220aebeed53",
+          "artifact_id": 14761298821,
+          "artifact_bytes": 491339
+        },
+        {
+          "mode": "ru-missing",
+          "job_id": 137267827292,
+          "exact_nvda_report_git_blob": "6a8588afc776b2bb5f6cc977a7a9dd94859bef58",
+          "complete_bundle_gzip_git_blob": "4faa1f35f3feb54ae60a5fa3e5ab5c799608196d",
+          "bundle_gzip_sha256": "85c44d84726be26bdb14c727e90c48a2e518ad7542066f607198325e09423b39",
+          "bundle_json_sha256": "39a2ef45fb6193d22c0ff710f06c54a8d4a73ef1492c7ba2797fad9549eb5c4e",
+          "artifact_zip_sha256": "8678a513114bffe1b4767731d4329de988d5ba83fc923bf84d494907397e0ec5",
+          "artifact_id": 14761838689,
+          "artifact_bytes": 30555
+        },
+        {
+          "mode": "descriptor-corruption",
+          "job_id": 137267827364,
+          "exact_nvda_report_git_blob": "1074a969b0975bdf8a0d96cfa3c3d027378d9df8",
+          "complete_bundle_gzip_git_blob": "1dd3549218d436d82c98bf2436436cc17f44bd6a",
+          "bundle_gzip_sha256": "316e971dd33692960bedec47a70b71edee700b79102d692fe2a72d00f7cd0c32",
+          "bundle_json_sha256": "a02e4cc8c4ef4cd80110bc04448a259afe5f5fb70c199b184183c0575358838c",
+          "artifact_zip_sha256": "b3e5acd885d30ec6dd516c9cb8124be4190bea60ea27cb14b10d91a6c0dfa12c",
+          "artifact_id": 14761963213,
+          "artifact_bytes": 28389
+        }
+      ]
     }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
   "next_work": [
-    "Run pinned actual12 NVDA five modes with original100 unmarkedwords/real authoredmetadata/typing/forced/disabled/compound and genuine faults. Preserve12 immutable; fixes need13.",
-    "Calibrate own exact render-loopback PCM without microphone/privacy/default changes, then measure matching-core real output.",
-    "Complete genuine missing-language frontends/resources and ordinary character names; retain truthful missing/partial counts.",
-    "Measure downstream voice conversion/streaming and full typing, optimize only with unchanged quality and bounded lifecycle evidence."
+    "Verify remaining actual12 keyboard scenarios and personalLanguage enabled/installed priority semantics.",
+    "Match real12 WavePlayer phrase capture and preserve original exact evidence.",
+    "Advance unprepared-read performance with guarded equivalence tests; keep experimental changes out of frozen12.",
+    "Complete missing genuine resources, ordinary-character coverage and broad quality tests without language aliases or readiness inflation."
   ],
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
@@ -1109,5 +1310,5 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Immutable12 built atbe7f4e2468dc18bd155d2c205f89bf61c8e235a2; Windows1330total/1280pass/50skip and225packaged requests passed. Matching5modeactualNVDA12 pending; productionchanges next require13."
+  "working_source_target_version": "Immutable12 sourcebe7f4e: actual Windows1330/1280pass/50skip, worker225, all5actualNVDAmodes pass; future production changes require13."
 }

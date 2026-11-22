@@ -1,0 +1,141 @@
+{
+  "format": "dordiai-source12-actual-nvda-five-mode-evidence",
+  "format_version": 1,
+  "run_id": 45041853551,
+  "commit": "553d1a164e431458e7e394510530bdcf2329eade",
+  "core": {
+    "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+    "build_run_id": 45040668513,
+    "bytes": 1992944744,
+    "sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573"
+  },
+  "nvda": {
+    "version": "2026.3.1",
+    "official_installer_sha256": "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052"
+  },
+  "functional": {
+    "matrix_jobs_passed": 5,
+    "failed_checks": 0,
+    "plain_cases_passed": 7,
+    "original100_source_words_preserved": true,
+    "original100_lexical_pieces": 102,
+    "original100_routing_mismatches": 0,
+    "original100_delivered_origin_explicit": false,
+    "original100_profile": "adam",
+    "original100_high_level_locales": [
+      null
+    ],
+    "original100_delivered_locales": [
+      "uk"
+    ],
+    "genuine_rich_metadata_preserved": true,
+    "forced_disabled_policy_preserved": true,
+    "compound_memberships_verified": true,
+    "typing_cases_passed": 9,
+    "typed_word_ru_preserved": true,
+    "plain_private_config_restored": true,
+    "typing_config_layout_speech_mode_restored": true,
+    "ru_missing_genuine_fallback": true,
+    "ru_model_sha_identically_restored": true,
+    "descriptor_genuine_integrity_fallback": true,
+    "descriptor_reader_and_resource_closed": true,
+    "descriptor_sha_identically_restored": true,
+    "normal_glyph_samples": 176,
+    "normal_languages": [
+      "uk",
+      "en",
+      "ru"
+    ],
+    "warm_letters": 100,
+    "switch_requests": 100,
+    "cancel_api": 100,
+    "normal_timeouts": 0,
+    "normal_errors": 0
+  },
+  "scope": {
+    "recording_pcm_sink_test_double": true,
+    "physical_audio_verified": false,
+    "wave_player_verified": false,
+    "acoustic_latency_verified": false,
+    "pronunciation_verified": false,
+    "all45_voice_acoustics_verified": false,
+    "all135_language_coverage_verified": false,
+    "product_ready": false,
+    "uninterrupted_real_playback_verified": false,
+    "private_nvda_unsupported_language_reporting": "OFF during plain routing probe; exact original 'speech' restored",
+    "source100_routing_basis": "Finite exact native dictionary membership; shared spellings follow current-language policy, not author-intent inference"
+  },
+  "predevice_metrics": {
+    "plain100_first_pcm_ms": 252.8204,
+    "plain100_wall_seconds": 39.7140413,
+    "plain100_captured_pcm_seconds": 59.24525,
+    "warm_letter_p95_ms": 1.6685,
+    "warm_switch_p95_ms": 1.9159,
+    "cancel_api_p95_ms": 0.0071,
+    "typing_first_pcm_range_ms": [
+      15.4797,
+      152.1119
+    ],
+    "ru_missing_notice_nonzero_bytes": 762201,
+    "ru_missing_recovery_ms": 5156.459,
+    "descriptor_notice_nonzero_bytes": 199940,
+    "descriptor_recovery_ms": 133.0261
+  },
+  "evidence": [
+    {
+      "mode": "plain-text",
+      "job_id": 137267827083,
+      "exact_nvda_report_git_blob": "9728989e3a2b45c38bfebd4d7299e0096eaca8a1",
+      "complete_bundle_gzip_git_blob": "c5815af1e3cf6ed90f5fff846b37a5ce38c9dac4",
+      "bundle_gzip_sha256": "2244d5e0e2332efaacc9f7f809ff4c8f87553dde02d85313758a5365a48c1456",
+      "bundle_json_sha256": "aec63e6beaece35750aa69013affa99465bcab1acbc387b12278c5c0cb2793a5",
+      "artifact_zip_sha256": "84a23ea3b3bf0afee9c1dd9f91d48a49f4c2cac8f2392a60b5fbd33e47c0a929",
+      "artifact_id": 14762126636,
+      "artifact_bytes": 1496749
+    },
+    {
+      "mode": "typing",
+      "job_id": 137267827297,
+      "exact_nvda_report_git_blob": "8418bd31818a80b298422ca3a269e39dbfd67c1f",
+      "complete_bundle_gzip_git_blob": "5a94221049e49093770be09add00bab22b313d31",
+      "bundle_gzip_sha256": "6009e59265d060431ad4a6c26df800df8a247d4451e68e8f1e7ceaec7718ddf7",
+      "bundle_json_sha256": "fe1b7ac0da477a10e31d3dd9b816f341660dfd37dc07037ab211a80beaded3f1",
+      "artifact_zip_sha256": "3415a0ae27fd2059d4f3dde913748e9b615147ce2b50942d54b1ecb8c9dbe141",
+      "artifact_id": 14762116606,
+      "artifact_bytes": 388626
+    },
+    {
+      "mode": "normal",
+      "job_id": 137267827308,
+      "exact_nvda_report_git_blob": "5eaa7103efd04b17832a8c30279098a4d316c3c9",
+      "complete_bundle_gzip_git_blob": "0ddbb22a4bc82091811b57935a383a7d96f2f0df",
+      "bundle_gzip_sha256": "daa55ce2a626ac2f0cc5726e4e99a2d96cc1d3ec58f176dadf500cff6723720e",
+      "bundle_json_sha256": "40175072bae36cd51323eb3f5858e53945f462878b506cb71dff791b05b9989b",
+      "artifact_zip_sha256": "4dd1f2032edb8aab104a0b26dc0e340951ad5c334d7ed1178918f220aebeed53",
+      "artifact_id": 14761298821,
+      "artifact_bytes": 491339
+    },
+    {
+      "mode": "ru-missing",
+      "job_id": 137267827292,
+      "exact_nvda_report_git_blob": "6a8588afc776b2bb5f6cc977a7a9dd94859bef58",
+      "complete_bundle_gzip_git_blob": "4faa1f35f3feb54ae60a5fa3e5ab5c799608196d",
+      "bundle_gzip_sha256": "85c44d84726be26bdb14c727e90c48a2e518ad7542066f607198325e09423b39",
+      "bundle_json_sha256": "39a2ef45fb6193d22c0ff710f06c54a8d4a73ef1492c7ba2797fad9549eb5c4e",
+      "artifact_zip_sha256": "8678a513114bffe1b4767731d4329de988d5ba83fc923bf84d494907397e0ec5",
+      "artifact_id": 14761838689,
+      "artifact_bytes": 30555
+    },
+    {
+      "mode": "descriptor-corruption",
+      "job_id": 137267827364,
+      "exact_nvda_report_git_blob": "1074a969b0975bdf8a0d96cfa3c3d027378d9df8",
+      "complete_bundle_gzip_git_blob": "1dd3549218d436d82c98bf2436436cc17f44bd6a",
+      "bundle_gzip_sha256": "316e971dd33692960bedec47a70b71edee700b79102d692fe2a72d00f7cd0c32",
+      "bundle_json_sha256": "a02e4cc8c4ef4cd80110bc04448a259afe5f5fb70c199b184183c0575358838c",
+      "artifact_zip_sha256": "b3e5acd885d30ec6dd516c9cb8124be4190bea60ea27cb14b10d91a6c0dfa12c",
+      "artifact_id": 14761963213,
+      "artifact_bytes": 28389
+    }
+  ]
+}

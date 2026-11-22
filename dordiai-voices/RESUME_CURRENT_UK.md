@@ -1,33 +1,34 @@
 # Продовження dordiai-voices
 
-Користувач доручив працювати автономно до погодженої кінцевої цілі, без додаткових запитів. Працювати лише в dordiai-voices та його спеціальних workflow, гілка dordiai-voices/audit-20261122. Корінь координує Git-коміти; субагенти не пересувають гілку. Не змінювати сторонній Autopilot, старий поширений0.12.1 або виключені вісім профілів.
+Працювати автономно до FINAL_PRODUCT_SPEC_UK.md, без додаткових запитів. Лише dordiai-voices і його спеціальні workflow; гілка dordiai-voices/audit-20261122. Корінь комітить і пересуває ref. Поширений0.12.1, unified0.3.10 та Autopilot не змінювати. Вісім виключених ідентичностей залишаються заблокованими.
 
-## Незмінна поточна збірка
+## Незмінний поточний12
 
-11: source84ca83e36e729fece88fc56af078a0de826d9db3, run45029834209, artifact14757229220. Архів1 992 938 157байтів/SHA256223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb.1058 тестів загалом:1022 passed,36 skipped.225 реальних упакованих запитів/45 профілів/5 нових мовних умов, незмінні180 банки й1596 private-runtime файлів. Не накладати повторно старий overlay банків на11.
+Source be7f4e2468dc18bd155d2c205f89bf61c8e235a2; build45040668513; coreartifact14761553443; evidence14761533502. Архів1 992 944 744байти/SHA256908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573. Windows1330total/1280pass/50skip;225actualworker/default3/excluded8/removalrestorepass. Усі180 банки/1596private/8508інші файли побайтово збережені; лише AY/FIL reviewedCharacterNamesJSON дозволені винятки.
 
-Draft core11: release454496891/coreasset779291724/receipt779295872; усі повні readback SHA перевірено. Draft AfriSix:454498261/шість ZIP і receipt779299684; усі сім readback перевірено. Точні receipts у evidence/. Нічого не публікувати як повністю готове за самою наявністю архіву.
+DRAFT454572810, coreasset779635004, receipt779639712, обидва повні readbackSHA перевірені. Receipt evidence/dordiai-core-dev12-backup-receipt.json. Коміт зберігання096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4 не є binarysource. Старі11DRAFT454496891 і AfriSix454498261 не змінювати. Не перегенеровувати3330готових кліпів/180банків.
 
-## Нові фактичні результати
+## Реальний12 NVDA
 
-NVDA11 run45033534150: усі чотири фактичні звіти partial з нульовою кількістю failedchecks. Normal176glyph+100letter+100switch+100cancel, typing9keys, genuineRuAccentmissing і nativeDescriptorcorruption проходять функціонально. Normal GitHub job failure — тільки allowlistheadlessblockedchecks; не приховувати цього й не робити висновок з одного зеленого/червоного значка. Деталі evidence/source11_nvda_45033534150.json та чотири точні gzip.
+Run45041853551 на toolhead553d1a164e431458e7e394510530bdcf2329eade; усі5 jobs SUCCESS. Індекс evidence/source12_nvda_five_mode_result.json +5originalJSON/5completegzip. Той самий100word/102pieces текст, джерельні очікування й TextInfo:71wrong→0. Парний evidence/source11_to12_plain100_paired.json. Виправлення381ad8/a2759e provenance hook підтверджене через справжню чергу; originalNone досі нормалізується наUK, але originFalse тепер не пригнічує auto. Авторські мітки/forced/disabled/knowncompound збережено; усі7casespass.
 
-Встановлений DMLX18,66MB:6 642 550 слів,97 source/controlcases, actual266plain/270namespacepath; reader і manager через усі обгортки однакові. Manager1000 median1,46–2,52мс/P952,24–3,03мс; суміш96 слів перевищує32blockLRU, тому це не повністю гарячий кеш. Словник звірено повністю з обома вихідними потоками;196509sharedforms неоднозначні. Genuinecorrupt558Bdescriptor→registeredresourceerror→real eSpeak notice→закритий mapping/worker, exactrestore після зупинки процесів.
+Standardtyping9genuinecasespass, у тому числі RUабы/spacewordecho. Обидва справжні resourcefaults відновлюються черезeSpeak; конфігурація/розкладки/ресурси відновлені точно. Normal176glyph+100letters+100switch+100cancel,0errors/timeouts. WarmP95letter1,6685ms/switch1,9159ms/cancelAPI0,0071ms. ЛишеUK/EN/RU, RecordingPCMSink, не фізичний звук і не21мова. Plain100firstPCM252,8204ms/39,714swall/59,245sPCM; не доказ безперервного playback.
 
-Реальний plain-file/TextInfo100words + forced/disabled + authoredRichEditmetadata: run45034220666, immutable11, helperd576d2959f6ed0a25548b1e1b16b5c2733f9fa68.17 локальних тестів і композиція plugin пройдено. Фактично45034918498 це ПІДТВЕРДЖЕНО: originalNone→synthUK, усі100 слів/102 частини збережені,71 частина/69 слів помилковоUK. Усі30RU-exclusive occurrences такожUK. Окремі forcedUK і disabledRU plain controls passed. Точний доказ — evidence/source11_plain_text_provenance_failure.md. Для авторських richmetadata ввімкнути справжній detectFormatAfterCursor лише в ізольованому тесті та точно відновити; попередні3 metadata cases були BLOCKED, не passed. Не виправляти тест під помилковий продукт; справжні авторські мітки повинні лишатися пріоритетними. Виробниче виправлення — тільки12.
+Додаткові actual12keyboard characters-only/navigation/forced-uk/disabled-ru ще перевіряються. personalLanguage getter ІСНУЄ як _get_availablePersonallanguages: не записувати помилку відсутнього getter. Реальна окрема проблема — literalNone замінюється після NVDA-нормалізації; також перевірити enabled/installed вибір. Майбутні виробничі виправлення тільки13.
 
-Справжній WavePlayer пройдено на контрольному10, run45032356299, безRecordingPCMSink, P95preparedglyph3,385мс. Мікрофонна captureInitializeE_ACCESSDENIED, MMEopen1. Не змінювати privacy/defaultdevice/cert/security. Наступний boundedknown-marker render-loopback тільки власного нового signedvendorendpoint без2GBcoredownload. Калібрування не є фізичним чи акустичним прийманням.
+## Звук і експерименти
 
-MNI repair45033534125:24shapeexpressions corrected,405 learnedpayloads unchanged, fixed original/repairbitexact, dynamiclengths/bothspeakers працюють. Утім fixedfloat/PCM критерії не пройдено, до6LSB, word~0,53–0,71с. backend_accepted=false; не інтегрувати й не послаблювати критерії. Native8cases original/compact bitexact і safeweights-only архів збережено.
+OwnPIDprocessloopback marker45036525050 пройдено, NCC0,99662; це калібрування, не мовлення.
+Matching12actualNVDAcapture45042554326 завершився SUCCESS: справжній WavePlayer, повна53041-frame фраза/239520captureframes,NCC0,9999301895. Точний proof agentnative_capture ще передає кореню; зберегти й незалежно перевірити перед внесенням machineacceptance. Offset2225 — індекс PCM, не затримка. Physical/nativepronunciation/productready FALSE.
 
-## Відкриті цілі
+RecentwordLRU1738de7 уже входить у12; frozenResource45039894049 довів membership/lifecycle та wrapper~2,2x, не33x. FutureUnicodeV2 7fadc20d6bd735db2b7cc08f0b694422ed27ea2e НЕ інтегрований:45042554484actualWin/Linux57tests,6684672Unicodecomparisons+50kstrings+all6642550wordsPASS. Winfirst97~102–107ms vs1738~172–183ms. СтарийV1be53 відхилено через mutatingstr-subclass map-poison;V2 це виправляє. Наступний isolatedfrozenResource1738vsV2 запускається [word-unicode-nvda] без2GBархіву.
 
-135selected/45profiles; ресурси127=126complete+1partial,8missing з урахуванням старих optionalpacks і нових шести Afri. Не називати це127 прийнятими носіями мовами. Нові SS/VE дають+2; заміни ZU/WO/NSO не дають+3. ZGH залишається partial до справжнього окремого доказу; HiriMotu не підміняти Motu.
+AY/FIL32/28 ordinarynames primarypins+actualnative/projectionpass і включені12; маленькі originalWAVZIPи вevidence/audio. ZGH45040668464 дійсно синтезує власнуZGHумову originalOmni і профільViktoriia, але слово25,844s/RTF22,28, тому неpromote. Tongan40actualphonemic/projectioncasespass зявнимeSpeakcarrier, неnativeNN;неpromote. HiriMotu34actualtests,26stressforms/15semanticgoldens,primaryANU1974+1977pins;безwaveform/ordinarynames/countpromotion.
 
-Відкриті: усі необхідні звичайні назви символів, швидке непідготовлене змішане читання й друкування на всьому обсязі, реальна вимова/носії, physicaloutput, коректні нові missinglanguagefrontends, голосові стилі лише там, де фактично підтримані. Tonganstrictfrontend досліджується; macronlongvowel і writtenVV — різні ядра, не зливати. Фабрика оригінальних голосів — суміжне дослідження, не обіцяти сотню готових нових голосів.
+## Незавершений обсяг
 
-## Середовище й перевірки
+135selected/45profiles;127resourcepresent=126complete+1partial,8missing. Жодної заміни спорідненою мовою заради цифри. Класифікатор45labels збережений,64/70кандидати відхилено заprecision/regression. Потрібні всі належні символи/друкування, швидке непідготовлене читання без пауз/старого звуку, nativequality і physicaloutput. ПовільніOmni/відсутніресурси — реальні відкриті вимоги; не послаблювати пороги й не видавати неперевірені можливості заготові.
 
-Локальний executor доступний з explicitworkdir та /bin/bash. Перевірений tracked snapshot888members знаходиться у /workspace/scratch/eb1194a9e557/repo-source, source8b1fed1251277b328268979360cfa32aa1df244c; це не Gitcheckout і не останній HEAD. Не перезаписувати його змінами інших власників без координації. Python3.12.14/NumPy наявні; Torch/ONNX не припускати. Реальні Windows/NVDA/моделі запускати через власні GitHubActions.
+## Середовище
 
-Artifact connector повертає короткочасний storage downloadURL; тримати його в пам’яті, не друкувати, завантажувати локально з перевіркою розміру/SHA та безпечним розпакуванням. Git-джерело проєкту вже збережене зовні; не дублювати великі моделі чи весь репозиторій у другому сховищі. Машинна істина — WORK_STATE.json/evidence/product_acceptance.json, product_ready=false до виконання всіх вимог.
+Local executor працює з /bin/bash, loginfalse та явним існуючим workdir. Відновлений snapshot09f4ec8453344b500dd15ecf7bd279339910c5fe у /workspace/scratch/eb1194a9e557/repo-source,961members; це неGitcheckout і неlatestHEAD. Source12reviewoverlay у source12-root-review. Реальні Windows/моделі — власніGitHubActions. Artifact connector короткочасний storageURL тримати в пам’яті, не друкувати; перевірятиSHA/size/safeextract. Репозиторій уже зовні збережений; великі моделі не дублювати. product_ready=false до виконання всього контракту.
