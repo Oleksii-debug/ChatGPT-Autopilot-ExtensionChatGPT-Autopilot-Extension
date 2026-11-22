@@ -33,13 +33,38 @@
       "files": [
         {
           "path": "pytorch_model.bin",
-          "approx_bytes": 2610000000,
+          "bytes": 2609273198,
           "sha256": "0b25598a4e2f9b63273744e5863cb06733dada7cb445b531bc625d6e2a581bf6"
         },
         {
           "path": "audiovae.pth",
-          "approx_bytes": 301000000,
+          "bytes": 301494192,
           "sha256": "5b93f34c771281679b0ff93be3d1c1681eb1f301c3892e701db8f10a725b20a9"
+        },
+        {
+          "path": "config.json",
+          "bytes": 2602,
+          "sha256": "3e4c4501e1b712e18f302b69944c6b82cf374098ad0e1a991506e55416dbc947"
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 3676778,
+          "sha256": "63443666e076f48a575030d4861e5bdbf64b71632b48e75d4e867c46dd980aa5"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 4952,
+          "sha256": "466575c55f0cf49530666c2e46ed14f26237dbd227ba7f4bb3bbec93df90edfc"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "bytes": 1632,
+          "sha256": "068594063e37662c02b21acf42ebb334ef6a74fb810e68a2368f88f08351de76"
+        },
+        {
+          "path": "README.md",
+          "bytes": 2620,
+          "sha256": "32a87bf9d4e2671b68149424318eb719f875f01526b1599d9aaddb141acfdb09"
         }
       ],
       "license": "Apache-2.0 according to publisher; original training-data/source terms separate",
@@ -59,7 +84,7 @@
       },
       "compatibility_cautions": [
         "Expected ~2.91GB downloaded weights plus CPU runtime; not for minimal initial core",
-        "CPU memory/speed and current-runtime compatibility need actual Actions execution",
+        "Actual Linux CPU inference is slower than real time (RTF4.23–4.73), peak RSS6444580KiB; Windows/current-runtime/selected-voice compatibility remain unverified",
         "Successful finite native-text PCM would still not verify native pronunciation, characters, typing or selected-voice projection",
         "Different AfriSpeech/vox-cpm-africa repository uses IPA and private filesystem paths; it is not silently substituted for this released orthographic checkpoint"
       ],
@@ -75,9 +100,49 @@
         "artifact_id": 14749562121,
         "artifact_bytes": 231858,
         "artifact_zip_sha256": "5625e5dd217615af9b0d785eee696da52979248382305f206cb46f164a985b2a",
-        "exact_report_metrics_retrieval": "pending artifact JSON reader; do not invent",
+        "exact_report_metrics_retrieval": "Verified artifact read in run45010650904/job137172018773; original gzip retained in dedicated evidence",
         "native_listener_verified": false,
-        "product_integrated": false
+        "product_integrated": false,
+        "actual_metrics": {
+          "model_load_seconds": 2.9573716350000154,
+          "peak_rss_kib": 6444580,
+          "parameter_count": 727642498,
+          "sample_rate": 16000,
+          "asset_bytes": 2914455974,
+          "cases": [
+            {
+              "id": "Afar_aar_00000002",
+              "wav": "afar-00.wav",
+              "seconds": 1.44,
+              "inference_seconds": 6.811267784000023,
+              "real_time_factor": 4.730047072222239,
+              "sha256": "45f615b0e2bcca385ce3544a45cf991e263d5508c2035337dca98859869e50af"
+            },
+            {
+              "id": "Afar_aar_00000010",
+              "wav": "afar-01.wav",
+              "seconds": 3.52,
+              "inference_seconds": 14.899374877000014,
+              "real_time_factor": 4.232776953693186,
+              "sha256": "d87f1d6802e715c4248748134ab73736f74962aeab57550b4ec9f80e2ccd9b4f"
+            },
+            {
+              "id": "Afar_aar_00000009",
+              "wav": "afar-02.wav",
+              "seconds": 2.96,
+              "inference_seconds": 13.454109794000033,
+              "real_time_factor": 4.545307362837849,
+              "sha256": "22c689246710bfcb571f09dc408f9097e1ea3d0f7db7bae94a91fae8184fbe7f"
+            }
+          ],
+          "blocked_network_attempts": [
+            {
+              "event": "socket.bind"
+            }
+          ]
+        },
+        "reader_run_id": 45010650904,
+        "ready_for_nvda": false
       },
       "prototype_report_reader_git_blob": "b14e622c901bc26ee44f3e00985e6a84650aa0c9"
     },

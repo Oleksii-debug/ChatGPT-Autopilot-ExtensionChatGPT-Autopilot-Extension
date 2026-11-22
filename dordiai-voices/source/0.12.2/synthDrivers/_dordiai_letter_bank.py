@@ -3,6 +3,7 @@ from functools import lru_cache
 from hashlib import sha256
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 from unicodedata import normalize
@@ -23,12 +24,32 @@ def bank_key(language, name):
 
 
 @lru_cache(maxsize=1)
+def _host_paths():
+    name = "_dordiai_main_host_paths"
+    module = sys.modules.get(name)
+    if module is None:
+        location = Path(__file__).absolute().parent.parent / "kx47Runtime" / "host_paths.py"
+        spelling = str(location)
+        if os.name == "nt" and not spelling.startswith(("\\\\?\\", "\\\\.\\")):
+            spelling = "\\\\?\\UNC\\" + spelling[2:] if spelling.startswith("\\\\") else "\\\\?\\" + spelling
+        spec = importlib.util.spec_from_file_location(name, spelling)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        try:
+            spec.loader.exec_module(module)
+        except Exception:
+            sys.modules.pop(name, None)
+            raise
+    return module
+
+
+@lru_cache(maxsize=1)
 def _voice_assets():
     # NVDA imports synthDrivers without the worker's runtime on sys.path.
     name = "_dordiai_prepared_bank_assets"
     module = sys.modules.get(name)
     if module is None:
-        path = Path(__file__).resolve().parent.parent / "kx47Runtime" / "voice_assets.py"
+        path = _host_paths().filesystem_path(Path(__file__).absolute().parent.parent / "kx47Runtime" / "voice_assets.py")
         spec = importlib.util.spec_from_file_location(name, path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
@@ -50,7 +71,7 @@ def _signature(path):
 
 class NativeLetterBank:
     def __init__(self, references, folder="native_letters"):
-        self.references = Path(references) if references else None
+        self.references = _host_paths().filesystem_path(references) if references else None
         self.folder_name = folder
         self.folder = self.references / folder if self.references else None
 

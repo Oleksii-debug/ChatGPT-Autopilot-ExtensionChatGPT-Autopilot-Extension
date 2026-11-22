@@ -21,7 +21,9 @@
     "Drive-independent core4 + source5 exact ZIP reproduction verified",
     "Actual Windows dev8 core3 and all21 sampled extended engines pass, including legacy nb/cmn native data paths",
     "Actual Windows default-on shared MMS native and converted Hausa passes alongside original sessions",
-    "Actual NVDA dev8 phrase/character PCM,176 first-use glyph requests,300 cached API samples and genuine built-in eSpeak recovery after notification-boundary import fault complete"
+    "Actual NVDA dev8 phrase/character PCM,176 first-use glyph requests,300 cached API samples and genuine built-in eSpeak recovery after notification-boundary import fault complete",
+    "Actual NVDA native missing RuAccent model error switches to real eSpeak with nonzero resource notice PCM, old thread stops, configured synth preserved and exact asset restored",
+    "New lossless all29 audit actually completed on Linux ORT1.27: native and converted outputs bit-identical with one shared raw graph and all input hashes unchanged"
   ],
   "open_requirements": [
     "10 selected entries have no integrated resources; one selected group is explicitly partial",
@@ -29,8 +31,8 @@
     "Five primary Omni language paths remain too slow for interactive NVDA; Bodo/Kashmiri alternatives are experimental and not pronunciation/NVDA accepted",
     "Native-speaker pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source",
     "First-use character latency remains too high:176 requests p95 242.0168ms, p99 572.6739ms, maximum1066.98ms before physical output",
-    "Real keyboard echo still needs owned-edit-control scan-code testing; direct CharacterMode requests are not typing evidence",
-    "Actual required-resource worker failure must be exercised end to end; injected ImportError recovery has passed"
+    "Fix actual Russian-layout shared-letter typing locale; all6 real-key pipeline cases work but RU а incorrectly routes Ukrainian",
+    "Validate namespace-safe host roots in a newly frozen build, repeating first-use176 glyphs; core8 actual host cannot see existing prepared WAVs at266characters"
   ],
   "environment": {
     "os": "Linux",
@@ -251,11 +253,59 @@
       "timeouts": []
     },
     "actual_keyboard_echo_verified": false,
-    "dev8_required_resource_end_to_end_verified": false
+    "dev8_required_resource_end_to_end_verified": true,
+    "all29_actual_parity": {
+      "run": 45009987791,
+      "source_commit": "b8efd1baed341a112eb633197f6b9f93ac11bf48",
+      "evidence": "evidence/mms_all29_runtime_parity_45009987791.json.gz",
+      "sha256": "f7d03b25f53060e13b6e64c2e50133f62448acc2d5cd27e3cc4f415e0d72a8a5",
+      "measured_languages": 29,
+      "native_bitwise_equal": true,
+      "projected_bitwise_equal": true,
+      "shared_raw_graphs": 1,
+      "fingerprinted_inputs_unchanged": true,
+      "scope": "New actual zero-noise native-grapheme numerical reproduction, not recovered earlier lost data; not pronunciation or device acceptance."
+    },
+    "actual_typing": {
+      "run": 45010564271,
+      "cases": 6,
+      "keyboard_pipeline_passed": true,
+      "language_routes_accepted": false,
+      "proven_defect": "Russian-layout shared а emits and routes Ukrainian; unique ы switches by script heuristic. English a/b route en-us correctly although NVDA emits uk; test's en-vs-en-us comparison requires canonical alias fix.",
+      "physical_audio_verified": false,
+      "cleanup_restored": true,
+      "evidence": "evidence/windows_core8_typing_45010564271.json.gz",
+      "sha256": "9461912cc9ca68caae241d8bc68a6c377b78ef8d2f4acfb3c93430f528001bf9"
+    },
+    "host_path_diagnosis": {
+      "run": 45010564271,
+      "known_nav_plain_path_chars": 266,
+      "plain_exists": false,
+      "plain_winerror": 3,
+      "namespace_exists": true,
+      "namespace_file_bytes": 9644,
+      "quarantine_plain_chars": 310,
+      "quarantine_namespace_readable": true,
+      "production_fix_status": "working-source candidate under Linux/Windows regressions; not yet built or measured",
+      "evidence": "evidence/windows_core8_required_resource_45010564271.json.gz",
+      "sha256": "b475cfa9f54a81c184b644a285b5b1220dcd2e14ba2410f534efe85862fb3885"
+    },
+    "required_resource_recovery": {
+      "run": 45010564271,
+      "status": "functional-pass-recording-output-only",
+      "reason": "required-resource-unavailable",
+      "actual_worker_type": "ModelDownloadError",
+      "direct_cause": "FileNotFoundError",
+      "notice_pcm_bytes": 443112,
+      "notice_nonzero_bytes": 385370,
+      "configured_synth_preserved": true,
+      "old_thread_stopped": true,
+      "asset_restored_sha_identical": true
+    }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Prove actual NVDA typing locale and missing-resource worker recovery; optimize first-use character preparation using measured evidence; retain open135-language/native-pronunciation/physical gates. Automatic decisions authorized; no permission questions.",
+  "next_work": "Finish scoped actual-typing locale correction; freeze new version with namespace-safe host filesystem roots; repeat same actual Windows glyph/typing/recovery and engine tests. Integrate genuine remaining language resources only after compatible runtime proof; Afar prototype remains unintegrated and too slow.",
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
     "omni_fixed_reference_sets": 10,
@@ -286,5 +336,6 @@
     "scope": "Exact original reports stored as byte-preserving Base64 records inside gzip; headless recording-output functional checks only. Not physical output, pronunciation or full product acceptance.",
     "core_version": "0.13.1-dev.8",
     "core_archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6"
-  }
+  },
+  "working_source_target_version": "0.13.1-dev.9"
 }

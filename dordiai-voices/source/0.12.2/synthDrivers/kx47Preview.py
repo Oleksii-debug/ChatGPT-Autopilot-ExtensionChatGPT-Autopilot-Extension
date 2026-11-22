@@ -27,7 +27,17 @@ from synthDriverHandler import SynthDriver as BaseDriver, VoiceInfo, synthDoneSp
 
 
 SAMPLE_RATE = 24000
-RUNTIME = Path(__file__).resolve().parent.parent / "kx47Runtime"
+# Bootstrap the known absolute runtime directory before loading any helper.
+# NVDA's host executable may lack the private interpreter's long-path manifest.
+RUNTIME = Path(__file__).absolute().parent.parent / "kx47Runtime"
+if sys.platform == "win32":
+    import ntpath as _runtime_ntpath
+    _runtime_spelling = _runtime_ntpath.normpath(str(RUNTIME))
+    if not _runtime_spelling.startswith(("\\\\?\\", "\\\\.\\")):
+        _runtime_spelling = ("\\\\?\\UNC\\" + _runtime_spelling[2:] if _runtime_spelling.startswith("\\\\")
+                             else "\\\\?\\" + _runtime_spelling)
+    RUNTIME = Path(_runtime_spelling)
+RUNTIME = RUNTIME.resolve()
 
 
 def _runtime_module(name):
@@ -45,6 +55,8 @@ def _runtime_module(name):
     return sys.modules[key]
 
 
+_host_paths = _runtime_module("host_paths")
+RUNTIME = _host_paths.filesystem_path(RUNTIME)
 _voice_policy = _runtime_module("voice_policy")
 _error_diagnostics = _runtime_module("error_diagnostics")
 _pref_spec = importlib.util.spec_from_file_location("_dordiai_main_preferences", RUNTIME / "preferences.py")
@@ -473,7 +485,7 @@ def _package_file_signature(path):
 
 
 def _resource_epoch(references):
-    voice_index=Path(references)/"packages/voice-packages.json" if references is not None else None
+    voice_index=_host_paths.filesystem_path(references)/"packages/voice-packages.json" if references is not None else None
     return (_package_file_signature(voice_index) if voice_index is not None else None,
             _package_file_signature(RUNTIME/"installed_resource_packs.json"))
 
@@ -498,7 +510,7 @@ class SpeechWorker:
         self._io = RLock()
         self._ready_modes = set()
         self._navigation = OrderedDict()
-        self._references = Path(reference_config[1]) if reference_config else None
+        self._references = _host_paths.filesystem_path(reference_config[1]) if reference_config else None
         self._resource_epoch=_resource_epoch(self._references)
         from synthDrivers._dordiai_letter_bank import NativeLetterBank
         self._letterBank = NativeLetterBank(self._references)
@@ -1063,8 +1075,11 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             info = json.loads((RUNTIME / "local-runtime.json").read_text(encoding="utf-8-sig"))
             python = Path(info["python"])
             models = Path(info["models"])
-            if python.is_absolute() and models.is_absolute() and python.is_file() and models.is_dir():
-                return python, models, info
+            if python.is_absolute() and models.is_absolute():
+                python = _host_paths.filesystem_path(python)
+                models = _host_paths.filesystem_path(models)
+                if python.is_file() and models.is_dir():
+                    return python, models, info
         except (OSError, ValueError, KeyError, TypeError):
             pass
         return None
@@ -1099,6 +1114,9 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         reference_config = None
         if "referenceModel" in info and "referenceSamples" in info:
             model, samples = Path(info["referenceModel"]), Path(info["referenceSamples"])
+            if model.is_absolute() and samples.is_absolute():
+                model = _host_paths.filesystem_path(model)
+                samples = _host_paths.filesystem_path(samples)
             if model.is_absolute() and samples.is_absolute() and model.is_dir() and samples.is_dir():
                 reference_config = model, samples, info.get("referenceEngine", "omnivoice")
                 self._voiceReferences = samples

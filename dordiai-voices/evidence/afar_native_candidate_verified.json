@@ -1,0 +1,261 @@
+{
+  "format": "dordiai-isolated-native-candidate-proof-v1",
+  "generated_at": "2026-11-22",
+  "selected_code": "aa",
+  "product_registered": false,
+  "source": {
+    "probe_commit": "b8efd1baed341a112eb633197f6b9f93ac11bf48",
+    "probe_run_id": 45009987751,
+    "probe_job_id": 137169971173,
+    "reader_commit": "0a36d492536f6de58791cb6df9efc1ebed73c29c",
+    "reader_run_id": 45010650904,
+    "reader_job_id": 137172018773,
+    "artifact_id": 14749562121,
+    "artifact_name": "dordiai-afar-candidate-45009987751",
+    "artifact_zip_bytes": 231858,
+    "artifact_zip_sha256": "5625e5dd217615af9b0d785eee696da52979248382305f206cb46f164a985b2a"
+  },
+  "original_report_encoding": {
+    "encoding": "gzip-base64",
+    "gzip_mtime": 0,
+    "gzip_sha256": "44ece79d74e7d94be0af3ffa230bc1fab74e2c8f4e31d95d24f4bd39f6bf2d0c",
+    "data": "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"
+  },
+  "reader_verified_report": {
+    "status": "real-native-text-pcm-candidate-unintegrated",
+    "language": "aa",
+    "repository": "michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+    "model_revision": "e3d25f78d2613dc0e659f12711f4cac1bf1b81a1",
+    "runtime_repository": "OpenBMB/VoxCPM",
+    "runtime_revision": "300e4260b509066151d623dc9c0aa922cf82232b",
+    "conditioning": {
+      "requested_language": "aa / aar (Afar)",
+      "training_subset": "Afar_aar",
+      "selection": "Native Afar orthography, as documented by the fine-tune publisher",
+      "explicit_language_token": null,
+      "language_argument_exposed_by_runtime": false,
+      "g2p_used": false,
+      "related_language_substitution": false,
+      "reference_voice_or_prompt_audio_used": false,
+      "note": "This released multilingual model infers language from text. No invented language tag or neighbouring-language phonemizer is added. Native pronunciation remains unverified."
+    },
+    "text_source": "https://huggingface.co/datasets/AfriSpeech/youversion-african-speech",
+    "source_text_revision": null,
+    "source_text_revision_limitation": "Publisher dataset examples observed 2026-11-22; row identifiers retained. No dataset revision hash is invented.",
+    "registered_in_product": false,
+    "native_listener_verified": false,
+    "native_pronunciation_verified": false,
+    "nvda_or_windows_verified": false,
+    "typing_or_character_names_verified": false,
+    "selected_voice_projection_verified": false,
+    "cases": [
+      {
+        "id": "Afar_aar_00000002",
+        "text": "KANQAAN MARAT ABEN QEEBI.",
+        "token_ids": [
+          1681,
+          2541,
+          41289,
+          2541,
+          1445,
+          2324,
+          2214,
+          16748,
+          2343,
+          3052,
+          9364,
+          10800,
+          72
+        ],
+        "seconds": 1.44,
+        "samples": 23040,
+        "inference_seconds": 6.811267784000023,
+        "real_time_factor": 4.730047072222239,
+        "peak": 0.8069245219230652,
+        "rms": 0.2243366688489914,
+        "wav_sha256": "45f615b0e2bcca385ce3544a45cf991e263d5508c2035337dca98859869e50af",
+        "wav_file": "afar-00.wav",
+        "finite_nonzero": true,
+        "may_have_reached_generation_cap": false,
+        "artifact_wav_hash_and_header_verified": true
+      },
+      {
+        "id": "Afar_aar_00000010",
+        "text": "Adoonibedek wokkel geeniih qeebi kaat aben.",
+        "token_ids": [
+          3227,
+          5826,
+          1599,
+          1367,
+          2469,
+          1366,
+          1607,
+          30935,
+          5202,
+          1356,
+          5581,
+          59331,
+          4639,
+          2199,
+          7481,
+          40463,
+          1353,
+          1628,
+          1356,
+          72
+        ],
+        "seconds": 3.52,
+        "samples": 56320,
+        "inference_seconds": 14.899374877000014,
+        "real_time_factor": 4.232776953693186,
+        "peak": 0.8620739579200745,
+        "rms": 0.1887856423854828,
+        "wav_sha256": "d87f1d6802e715c4248748134ab73736f74962aeab57550b4ec9f80e2ccd9b4f",
+        "wav_file": "afar-01.wav",
+        "finite_nonzero": true,
+        "may_have_reached_generation_cap": false,
+        "artifact_wav_hash_and_header_verified": true
+      },
+      {
+        "id": "Afar_aar_00000009",
+        "text": "Bedek deqsita aracal tabna alfih numuk yeysen.",
+        "token_ids": [
+          16023,
+          2469,
+          1564,
+          28109,
+          8757,
+          1722,
+          1405,
+          1364,
+          11391,
+          3003,
+          1474,
+          59337,
+          14500,
+          1915,
+          3776,
+          50400,
+          1729,
+          1356,
+          72
+        ],
+        "seconds": 2.96,
+        "samples": 47360,
+        "inference_seconds": 13.454109794000033,
+        "real_time_factor": 4.545307362837849,
+        "peak": 0.873436689376831,
+        "rms": 0.16544561088085175,
+        "wav_sha256": "22c689246710bfcb571f09dc408f9097e1ea3d0f7db7bae94a91fae8184fbe7f",
+        "wav_file": "afar-02.wav",
+        "finite_nonzero": true,
+        "may_have_reached_generation_cap": false,
+        "artifact_wav_hash_and_header_verified": true
+      }
+    ],
+    "assets": {
+      "repository": "michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+      "revision": "e3d25f78d2613dc0e659f12711f4cac1bf1b81a1",
+      "candidate_license": "Apache-2.0 declared by publisher; original dataset/source terms remain separate",
+      "weights_downloaded": true,
+      "inference_executed": false,
+      "files": {
+        "pytorch_model.bin": {
+          "sha256": "0b25598a4e2f9b63273744e5863cb06733dada7cb445b531bc625d6e2a581bf6",
+          "bytes": 2609273198,
+          "expected_sha256": "0b25598a4e2f9b63273744e5863cb06733dada7cb445b531bc625d6e2a581bf6",
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/pytorch_model.bin",
+          "pin": "exact immutable model revision"
+        },
+        "audiovae.pth": {
+          "sha256": "5b93f34c771281679b0ff93be3d1c1681eb1f301c3892e701db8f10a725b20a9",
+          "bytes": 301494192,
+          "expected_sha256": "5b93f34c771281679b0ff93be3d1c1681eb1f301c3892e701db8f10a725b20a9",
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/audiovae.pth",
+          "pin": "exact immutable model revision"
+        },
+        "config.json": {
+          "sha256": "3e4c4501e1b712e18f302b69944c6b82cf374098ad0e1a991506e55416dbc947",
+          "bytes": 2602,
+          "expected_sha256": null,
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/config.json",
+          "pin": "exact immutable model revision"
+        },
+        "tokenizer.json": {
+          "sha256": "63443666e076f48a575030d4861e5bdbf64b71632b48e75d4e867c46dd980aa5",
+          "bytes": 3676778,
+          "expected_sha256": null,
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/tokenizer.json",
+          "pin": "exact immutable model revision"
+        },
+        "tokenizer_config.json": {
+          "sha256": "466575c55f0cf49530666c2e46ed14f26237dbd227ba7f4bb3bbec93df90edfc",
+          "bytes": 4952,
+          "expected_sha256": null,
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/tokenizer_config.json",
+          "pin": "exact immutable model revision"
+        },
+        "special_tokens_map.json": {
+          "sha256": "068594063e37662c02b21acf42ebb334ef6a74fb810e68a2368f88f08351de76",
+          "bytes": 1632,
+          "expected_sha256": null,
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/special_tokens_map.json",
+          "pin": "exact immutable model revision"
+        },
+        "README.md": {
+          "sha256": "32a87bf9d4e2671b68149424318eb719f875f01526b1599d9aaddb141acfdb09",
+          "bytes": 2620,
+          "expected_sha256": null,
+          "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606/resolve/e3d25f78d2613dc0e659f12711f4cac1bf1b81a1/README.md",
+          "pin": "exact immutable model revision"
+        }
+      }
+    },
+    "offline_socket_guard_enabled": true,
+    "audited_runtime_git_blobs_verified": {
+      "src/voxcpm/model/voxcpm.py": "20fc15b6df0955b018c8329f84f0ceecec37da71",
+      "src/voxcpm/model/utils.py": "f6d7463ca19ab6cc0ddcbd44563603aa8029b6a7",
+      "src/voxcpm/modules/audiovae/audio_vae.py": "38899180cfa8b2ffbcfc3aadc439310790efb03b"
+    },
+    "blocked_network_attempts": [
+      {
+        "event": "socket.bind"
+      }
+    ],
+    "original_config_dtype": "bfloat16",
+    "original_config_max_length": 4096,
+    "runtime_overrides": {
+      "device": "cpu",
+      "dtype": "float32",
+      "cache_horizon": 256,
+      "checkpoint_files_rewritten": false
+    },
+    "state_keys_missing": [],
+    "state_keys_unexpected": [],
+    "model_load_seconds": 2.9573716350000154,
+    "parameter_count": 727642498,
+    "sample_rate": 16000,
+    "torch_version": "2.6.0+cpu",
+    "runtime_file": "/home/runner/work/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/.afar-runtime/src/voxcpm/model/voxcpm.py",
+    "runtime_source_git_blob": {
+      "src/voxcpm/model/voxcpm.py": "20fc15b6df0955b018c8329f84f0ceecec37da71",
+      "src/voxcpm/model/utils.py": "f6d7463ca19ab6cc0ddcbd44563603aa8029b6a7",
+      "src/voxcpm/modules/audiovae/audio_vae.py": "38899180cfa8b2ffbcfc3aadc439310790efb03b"
+    },
+    "peak_rss_kib": 6444580,
+    "native_text_pcm_executed": true
+  },
+  "interpretation": {
+    "proven": "Pinned actual pretrained state dictionary loads strictly and produces three finite nonzero 16kHz native-orthographic Afar-text waveforms offline on CPU.",
+    "not_proven": [
+      "Native pronunciation or intelligibility",
+      "Correct isolated letters/numbers",
+      "Selected-voice projection/calibration",
+      "Windows/NVDA driver compatibility",
+      "Typing or rapid language-switch latency",
+      "Compact deployable ONNX runtime"
+    ],
+    "network_guard": "One socket.bind attempt was recorded and blocked; successful external network access is not claimed.",
+    "acquisition_phase_boolean_note": "assets.inference_executed=false belongs to the acquisition receipt, before inference; top-level native_text_pcm_executed=true and three verified WAVs record subsequent actual inference."
+  }
+}

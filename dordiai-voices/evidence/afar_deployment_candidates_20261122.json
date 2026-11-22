@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-22",
+  "selected_language": "aa",
+  "status": "read-only-export-path-research-not-executed",
+  "candidate_checkpoint_revision": "e3d25f78d2613dc0e659f12711f4cac1bf1b81a1",
+  "preferred_future_investigation": {
+    "repository": "bluryar/VoxCPM.cpp",
+    "revision": "e5b89534e379c79b923c9969b79c3858d140bedb",
+    "license": "Apache-2.0",
+    "files": {
+      "README.md": "429b23dfa015198a72ed863f8ff1b35919c8c38a",
+      "LICENSE": "4615177327fddc5a9ae3fd4a1c461173dea1952f",
+      "scripts/convert_voxcpm_to_gguf.py": "dd4cb66c907c2a7a918dbcf0e10b9c39679dabda",
+      "scripts/export_quantized_weights.sh": "ba91c6f592463bf36cdd9d8310aaa59ff26f0128"
+    },
+    "compatibility_observed": "Converter accepts local config.json, tokenizer.json, pytorch_model.bin or model.safetensors, and audiovae.pth; checkpoint loading uses weights_only=True. This matches published Afar file layout, not proven runtime parity.",
+    "primary_url": "https://github.com/bluryar/VoxCPM.cpp/tree/e5b89534e379c79b923c9969b79c3858d140bedb",
+    "publisher_base_model_benchmark": {
+      "not_our_Afar_measurement": true,
+      "architecture": "voxcpm-0.5b",
+      "cpu": "Intel Core i5-12600K",
+      "f32_size_label_MB": 2779,
+      "q4_k_size_label_MB": 477,
+      "q4_k_rtf_model_only": 1.826,
+      "q4_k_rtf_without_encode": 2.219,
+      "q4_k_rtf_full_pipeline": 3.609
+    },
+    "cautions": [
+      "Numbers above are publisher measurements on base weights, not our Afar fine-tune",
+      "No Afar GGUF conversion, quantization, native intelligibility or selected-voice projection executed",
+      "Quantization changes weights; quality is not guaranteed unchanged",
+      "Even publisher CPU full-pipeline RTF>1 does not meet typing or rapid language switching"
+    ]
+  },
+  "older_onnx_candidate": {
+    "repository": "bluryar/VoxCPM-ONNX",
+    "revision": "6434322aac97da5c292199607313d56ba65f5a60",
+    "readme_blob": "26cf5e6c1f86a5ec24f398bc0261372bb813a14d",
+    "export_script_blob": "385e2b2d55174894b90876584b31c9e4c462a1a2",
+    "infer_blob": "6a2154f599b8414ea65a786c1d38ddb61c4b431a",
+    "publisher_status": "ARCHIVED",
+    "cautions": [
+      "README explicitly says prefill/decode export duplicates model weights",
+      "README research-only/commercial-authorization wording; no LICENSE file verified",
+      "Targets VoxCPM0.5B; pure NumPy/ORT inference exists, but no Afar-specific export/parity tested"
+    ]
+  },
+  "alternate_dakeqq": {
+    "repository": "DakeQQ/Text-to-Speech-TTS-ONNX",
+    "revision": "ae69a6c1cc9e43c855d7d906c80770581f49ee3c",
+    "actual_voxcpm_subdirectories": [
+      "v1.5",
+      "v2"
+    ],
+    "limitation": "No plain v1/VoxCPM0.5B target in current tree; do not assume v1.5 or v2 weights/runtime interchangeability."
+  }
+}

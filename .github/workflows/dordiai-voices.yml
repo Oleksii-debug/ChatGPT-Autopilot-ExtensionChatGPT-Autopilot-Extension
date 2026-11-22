@@ -14,6 +14,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  path-regressions:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[host-path-tests]')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Preserve exact source bytes
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r dordiai-voices/tests/requirements.txt
+      - name: Run real Windows long-path identity and complete regression suite
+        run: python -m unittest discover -s dordiai-voices/tests -v
   resource-diagnostics:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[diagnose-resources]')
     runs-on: windows-latest

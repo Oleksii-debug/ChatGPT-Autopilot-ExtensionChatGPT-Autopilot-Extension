@@ -113,7 +113,7 @@
       "confirmed_import_module": null,
       "worker_bootstrap_reset_observed": true,
       "dll_search_reset_resolved_import_error": false,
-      "reason": "Zero Windows audio endpoints; genuine keyboard echo and native pronunciation remain unverified. API and PCM tests cannot establish audible output.",
+      "reason": "Physical audio absent. Actual6-key echo pipeline works but Russian shared а is misrouted; first-use glyph latency also unaccepted. Working-source path fix not yet built.",
       "builtin_windows_fallback_selected": true,
       "fallback_notice_requested": true,
       "fallback_audibility_verified": false,
@@ -123,7 +123,13 @@
       "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
       "report_member": "nvda/windows-nvda-probe.json",
       "actual_keyboard_echo_verified": false,
-      "import_notification_recovery_notice_pcm_verified": true
+      "import_notification_recovery_notice_pcm_verified": true,
+      "actual_keyboard_pipeline_cases": 6,
+      "actual_keyboard_pipeline_verified": true,
+      "actual_keyboard_language_routes_accepted": false,
+      "required_resource_failure_recovery_verified": true,
+      "required_resource_recovery_evidence": "evidence/windows_core8_required_resource_45010564271.json.gz",
+      "actual_keyboard_evidence": "evidence/windows_core8_typing_45010564271.json.gz"
     },
     "native_pronunciation": {
       "status": "not_accepted",
@@ -166,6 +172,19 @@
       "acoustic_latency_verified": false,
       "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
       "report_member": "audio/audio-endpoint.json"
+    },
+    "mms_shared_graph_numerical_parity": {
+      "status": "all29_bit_exact_passed",
+      "run": 45009987791,
+      "source_commit": "b8efd1baed341a112eb633197f6b9f93ac11bf48",
+      "evidence": "evidence/mms_all29_runtime_parity_45009987791.json.gz",
+      "sha256": "f7d03b25f53060e13b6e64c2e50133f62448acc2d5cd27e3cc4f415e0d72a8a5",
+      "measured_languages": 29,
+      "native_bitwise_equal": true,
+      "projected_bitwise_equal": true,
+      "shared_raw_graphs": 1,
+      "fingerprinted_inputs_unchanged": true,
+      "scope": "New actual zero-noise native-grapheme numerical reproduction, not recovered earlier lost data; not pronunciation or device acceptance."
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -202,5 +221,19 @@
     "new_word_latency_verified": false,
     "source_snapshot_note": "Exact source8 and recipe in Git; separate compressed source snapshot remains dev6."
   },
-  "current_environment_blocker": "Local exec-server unavailable; frozen source6 and binary source snapshot6 already committed. GitHub Windows verification continues."
+  "current_environment_blocker": "Local exec-server unavailable; frozen source6 and binary source snapshot6 already committed. GitHub Windows verification continues.",
+  "working_source_target_version": "0.13.1-dev.9",
+  "host_namespace_failure": {
+    "run": 45010564271,
+    "known_nav_plain_path_chars": 266,
+    "plain_exists": false,
+    "plain_winerror": 3,
+    "namespace_exists": true,
+    "namespace_file_bytes": 9644,
+    "quarantine_plain_chars": 310,
+    "quarantine_namespace_readable": true,
+    "production_fix_status": "working-source candidate under Linux/Windows regressions; not yet built or measured",
+    "evidence": "evidence/windows_core8_required_resource_45010564271.json.gz",
+    "sha256": "b475cfa9f54a81c184b644a285b5b1220dcd2e14ba2410f534efe85862fb3885"
+  }
 }
