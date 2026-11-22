@@ -1,0 +1,35 @@
+{
+  "format": "dordiai-owned-transport-cleanup",
+  "kept_archive": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\packages\\0.13.1-dev.13\\dordiai-voices-0.13.1-dev.13.nvda-addon",
+  "kept_archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "removed_only_created_download_containers": true,
+  "original_voice_archives_touched": false,
+  "removed": [
+    {
+      "path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\downloads\\core13-parts\\dordiai-core13-part-001.zip",
+      "bytes": 450000158,
+      "sha256": "064536f6c5350b5622fd1aad8657e6d7b73baf5492d6e8808eeb6262b756199d"
+    },
+    {
+      "path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\downloads\\core13-parts\\dordiai-core13-part-002.zip",
+      "bytes": 450000158,
+      "sha256": "6eff7f2363e1c5cf85cbdf7290bc921b0b975e333ce7498780532d0c2e88d4bf"
+    },
+    {
+      "path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\downloads\\core13-parts\\dordiai-core13-part-003.zip",
+      "bytes": 450000158,
+      "sha256": "6c336c8ede750a8882126b9e2a108a4889e3f3f457e0500eed13940b54bf882b"
+    },
+    {
+      "path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\downloads\\core13-parts\\dordiai-core13-part-004.zip",
+      "bytes": 450000158,
+      "sha256": "dee5d1150a0ace8be67e931150387b14e9b94dc28ece500934fba93f6b892fee"
+    },
+    {
+      "path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\downloads\\core13-parts\\dordiai-core13-part-005.zip",
+      "bytes": 192990472,
+      "sha256": "693b29ef213831b623c6f5c70e3753890f8742e94f218ab6011bbfe00ddb04e5"
+    }
+  ],
+  "reclaimed_bytes": 1992991104.0
+}

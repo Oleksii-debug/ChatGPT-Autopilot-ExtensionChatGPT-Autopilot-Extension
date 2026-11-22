@@ -5,9 +5,12 @@ import ctypes
 from hashlib import sha256
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import textwrap
+import sys
+import subprocess
 from types import SimpleNamespace
 from contextlib import contextmanager
 import unittest
@@ -33,7 +36,10 @@ def receipt(phase):
         for kind,code,before,after in [('language','ru',True,False),('language','uk',True,False),
                                      ('voice','voice1',True,False),('voice','voice1',False,True)]:
             events.append(dict(name='checkbox',kind=kind,code=code,before=before,after=after))
-    else:events += [{'name':'actual_process_restart_loaded_settings'},{'name':'NVDA_tools_menu_opened_settings'}]
+    else:events += [{'name':'actual_process_restart_loaded_settings'},{'name':'NVDA_tools_menu_opened_settings'},
+                   {'name':'native_menu_target','menu_item_id':71,'observer':'wx-taskbar-popup-owner'},
+                   {'name':'native_menu_highlight','menu_item_id':71},
+                   {'name':'native_menu_selection_verified','menu_item_id':71,'observed_menu_item_id':71}]
     for label in ['NVDA+control+shift+f10','NVDA+control+c']+(['NVDA+n','Activate dordiai Tools item'] if phase=='resume' else []):
         events.append(dict(name='send_input',label=label,events_expected=4,events_sent=4))
     row={'phase':phase,'status':'passed-functional-only','events':events,'raw_keys':[{'vk':9}],
@@ -140,6 +146,17 @@ class ReceiptTests(unittest.TestCase):
         r=receipt('resume');r['probe']['keyboard_settings']['saved_settings']['languages']=['en']
         with self.assertRaises(ValueError):m.validate_phase(r,'resume',{'archive_sha256':'a'*64})
 
+    def test_spoken_menu_label_or_wrong_native_highlight_cannot_prove_selection(self):
+        for change in ('no_highlight','wrong_highlight','wrong_selection','late_highlight','wrong_owner'):
+            r=receipt('resume');events=r['probe']['keyboard_settings']['events']
+            highlight=next(x for x in events if x['name']=='native_menu_highlight')
+            if change=='no_highlight':events.remove(highlight)
+            elif change=='wrong_highlight':highlight['menu_item_id']=999
+            elif change=='wrong_selection':next(x for x in events if x['name']=='native_menu_selection_verified')['observed_menu_item_id']=999
+            elif change=='late_highlight':events.remove(highlight);events.append(highlight)
+            else:next(x for x in events if x['name']=='native_menu_target')['observer']='unowned-menu'
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                m.validate_phase(r,'resume',{'archive_sha256':'a'*64})
     def test_unsupported_claims_and_excluded_voices_rejected(self):
         r=receipt('edit');r['probe']['keyboard_settings']['named_profile_switching_verified']=True
         with self.assertRaises(ValueError):m.validate_phase(r,'edit',{'archive_sha256':'a'*64})
@@ -221,13 +238,32 @@ class InputBufferTests(unittest.TestCase):
         ns.update(_KS={},_ks_record=lambda *a,**kw:events.append((a,kw)))
         # An active probe always has a nonempty ownership/result object.
         ns['_KS']['result']={}
-        event=SimpleNamespace(GetId=lambda:71,Skip=lambda:skipped.append(True))
+        event=SimpleNamespace(GetId=lambda:-1,GetMenuId=lambda:71,Skip=lambda:skipped.append(True))
         ns['_ks_menu_highlight'](event)
         self.assertEqual(ns['_KS']['menu_last_highlight'],71)
         self.assertEqual(len(events),1);self.assertEqual(skipped,[True])
         ns['_KS']['cleaned']=True
         ns['_ks_menu_highlight'](event)
         self.assertEqual(len(events),1);self.assertEqual(skipped,[True,True])
+
+    def test_menu_highlights_are_bound_to_actual_taskbar_popup_owner(self):
+        ns=self.namespace();bindings=[];events=[]
+        target=SimpleNamespace(GetId=lambda:71,GetItemLabel=lambda:'dordiai preferences',IsSeparator=lambda:False,IsEnabled=lambda:True)
+        tools=SimpleNamespace(GetMenuItems=lambda:[target])
+        root_item=SimpleNamespace(GetSubMenu=lambda:tools,GetItemLabel=lambda:'&Tools',IsSeparator=lambda:False,IsEnabled=lambda:True)
+        tray=SimpleNamespace(menu=SimpleNamespace(GetMenuItems=lambda:[root_item]),toolsMenu=tools,
+                             Bind=lambda kind,fn:bindings.append((kind,fn)))
+        owner=type('GlobalPlugin',(),{'__module__':'globalPlugins.dordiaiMainPreferences'})();owner._item=target
+        wx=SimpleNamespace(EVT_MENU_HIGHLIGHT_ALL=object())
+        ns.update(_KS={'result':{},'nvda_key':(45,True)},wx=wx,
+                  _ks_record=lambda name,**kw:events.append(dict(name=name,**kw)),_ks_send=lambda *a:None)
+        with patch.dict(sys.modules,{'gui':SimpleNamespace(mainFrame=SimpleNamespace(sysTrayIcon=tray)),
+                                    'globalPluginHandler':SimpleNamespace(runningPlugins=[owner])}):
+            ns['_ks_menu']()
+        self.assertEqual(ns['_KS']['menu_observers'],[tray])
+        self.assertEqual(bindings,[(wx.EVT_MENU_HIGHLIGHT_ALL,ns['_ks_menu_highlight'])])
+        self.assertEqual(events[0]['menu_item_id'],71)
+        self.assertEqual(events[0]['observer'],'wx-taskbar-popup-owner')
 
     def test_balanced_buffer_and_partial_send_modifier_release(self):
         for partial in [False,True]:
@@ -269,30 +305,129 @@ class RuntimeIntegrityTests(unittest.TestCase):
 
 
 class OwnedLifecycleTests(unittest.TestCase):
+    @staticmethod
+    def fake_job():
+        job=SimpleNamespace(handle=1,assign_and_resume=lambda p:None)
+        def finish(**kwargs):
+            job.handle=None
+            return {'active_before_cleanup':0,'active_after_cleanup':0,
+                    'forced_tree_termination':False,'all_owned_workers_reaped':True}
+        job.finish=finish
+        return job
+
+    def test_failed_resume_receipt_survives_secondary_fatal_exit(self):
+        primary={'name':'keyboard_settings_exception','status':'failed','error':'native menu selection timeout'}
+        value={'checks':[primary,{'name':'keyboard_settings_cleanup','status':'passed'}],
+               'keyboard_startup_synth':{'saved_synth_automatic_startup_verified':True}}
+        for code in (3221226525,-1073740771):
+            process=SimpleNamespace(pid=7264,poll=lambda code=code:code)
+            report={'phases':{}}
+            second=m._record_resume_receipt(report,{'archive_sha256':'a'*64},value,process,1234)
+            self.assertIs(report['phases']['resume'],second)
+            self.assertIs(second['probe'],value)
+            self.assertEqual(report['primary_phase_error']['check'],primary)
+            m._record_resume_exit(report,process)
+            self.assertEqual(report['resume_process_exit']['returncode'],code)
+            self.assertEqual(report['resume_process_exit']['windows_status_hex'],'0xC000041D')
+            self.assertFalse(report['resume_process_exit']['normal_shutdown_verified'])
+            self.assertEqual(report['actual_second_process_pid'],7264)
+
+    def test_successful_resume_receipt_never_invents_primary_failure(self):
+        report={'phases':{}};process=SimpleNamespace(pid=8,poll=lambda:0)
+        m._record_resume_receipt(report,{'archive_sha256':'a'*64},{'checks':[{'status':'passed'}]},process,9)
+        m._record_resume_exit(report,process)
+        self.assertNotIn('primary_phase_error',report)
+        self.assertTrue(report['resume_process_exit']['normal_shutdown_verified'])
+
     def test_only_exact_popen_objects_are_stopped_and_explicitly_waited(self):
         events=[]
         class Child:
             def __init__(self,pid):self.pid=pid;self.code=None
             def poll(self):return self.code
             def wait(self,timeout):events.append(('wait',self.pid,timeout));self.code=0;return 0
-        module=SimpleNamespace(Popen=lambda command:Child(len(events)+10),STDOUT=-2)
-        observed=m.OwnedProcesses(module)
+        flags=[]
+        def popen(command,**kwargs):flags.append(kwargs['creationflags']);return Child(len(flags)+10)
+        module=SimpleNamespace(Popen=popen,STDOUT=-2)
+        observed=m.OwnedProcesses(module,job_factory=self.fake_job)
         a=observed.Popen(['/own/nvda.exe']);b=observed.Popen(['/own/nvda.exe'])
         report={};stopped=[]
         observed.reap(SimpleNamespace(stop_owned=lambda p:stopped.append(p)),report)
-        self.assertEqual(stopped,[a,b]);self.assertEqual(len(events),2)
+        self.assertEqual(stopped,[]);self.assertEqual(len(events),2)
+        self.assertEqual(flags,[4,4])
         self.assertEqual(observed.STDOUT,-2)
         self.assertTrue(report['owned_process_cleanup']['all_reaped_before_device_cleanup'])
         self.assertEqual(report['owned_process_cleanup']['actual_nvda_process_count'],2)
+        self.assertTrue(report['owned_process_cleanup']['all_owned_nvda_descendants_reaped'])
 
     def test_forced_stop_failure_never_claims_success_even_if_process_exits(self):
         process=SimpleNamespace(pid=19,poll=lambda:0,wait=lambda **kw:0)
-        observed=m.OwnedProcesses(SimpleNamespace(Popen=lambda command:process));observed.Popen(['nvda.exe'])
+        observed=m.OwnedProcesses(SimpleNamespace(Popen=lambda command:process));observed.Popen(['installer.exe'])
         def fail(p):raise OSError('synthetic stop failure')
         report={}
         with self.assertRaises(RuntimeError):observed.reap(SimpleNamespace(stop_owned=fail),report)
         self.assertFalse(report['owned_process_cleanup']['all_reaped_before_device_cleanup'])
         self.assertIn('OSError',report['owned_process_cleanup']['errors'][0])
+
+    def test_forced_job_cleanup_remains_failed_even_when_entire_tree_is_reaped(self):
+        job=self.fake_job()
+        original=job.finish
+        def finish(**kwargs):return dict(original(**kwargs),forced_tree_termination=True)
+        job.finish=finish
+        child=SimpleNamespace(pid=91,poll=lambda:1,wait=lambda **kw:1)
+        observed=m.OwnedProcesses(SimpleNamespace(Popen=lambda *a,**kw:child),job_factory=lambda:job)
+        observed.Popen(['nvda.exe']);report={}
+        with self.assertRaises(RuntimeError):observed.reap(SimpleNamespace(stop_owned=lambda p:None),report)
+        self.assertTrue(report['owned_process_cleanup']['all_owned_nvda_descendants_reaped'])
+        self.assertFalse(report['owned_process_cleanup']['all_reaped_before_device_cleanup'])
+        self.assertTrue(report['owned_process_cleanup']['owned_nvda_jobs'][0]['forced_tree_termination'])
+
+    def test_job_assignment_failure_reaps_suspended_held_child_and_closes_job(self):
+        calls=[];job=self.fake_job()
+        def reject(process):calls.append('assign');raise OSError('assignment failed')
+        job.assign_and_resume=reject;original=job.finish
+        def finish(**kw):calls.append('close');return original(**kw)
+        job.finish=finish
+        child=SimpleNamespace(pid=12,kill=lambda:calls.append('kill'),wait=lambda **kw:calls.append('wait'),poll=lambda:1)
+        observed=m.OwnedProcesses(SimpleNamespace(Popen=lambda *a,**kw:child),job_factory=lambda:job)
+        with self.assertRaises(OSError):observed.Popen(['nvda.exe'])
+        self.assertEqual(calls,['assign','kill','wait','close']);self.assertIsNone(job.handle)
+
+    def test_failed_popen_and_job_query_always_close_owned_job(self):
+        job=self.fake_job()
+        def fail(*a,**kw):raise OSError('Popen failed')
+        observed=m.OwnedProcesses(SimpleNamespace(Popen=fail),job_factory=lambda:job)
+        with self.assertRaises(OSError):observed.Popen(['nvda.exe'])
+        self.assertIsNone(job.handle)
+        for failure in ('query','terminate'):
+            job=m.OwnedNvdaJob.__new__(m.OwnedNvdaJob);job.handle=77;closed=[]
+            job.kernel=SimpleNamespace(CloseHandle=lambda h:closed.append(h) or True,
+                                       TerminateJobObject=lambda *a:False)
+            job.ct=SimpleNamespace(WinError=lambda code:OSError('native failure'),get_last_error=lambda:5)
+            def query_error():raise OSError('accounting failed')
+            job.active=query_error if failure=='query' else lambda:1
+            with self.subTest(failure=failure),self.assertRaises(OSError):job.finish(grace_seconds=0)
+            self.assertEqual(closed,[77]);self.assertIsNone(job.handle)
+
+    @unittest.skipUnless(os.name=='nt','Actual bounded Windows owned process-family test')
+    def test_actual_windows_child_and_grandchild_job_normal_and_forced_cleanup(self):
+        for orphan in (False,True):
+            job=m.OwnedNvdaJob();process=None
+            child_code='import time;time.sleep('+('5' if orphan else '.6')+')'
+            code='import subprocess,sys,time;p=subprocess.Popen([sys.executable,"-I","-B","-c",'+repr(child_code)+']);'+('time.sleep(.3)' if orphan else 'p.wait(timeout=4)')
+            try:
+                process=subprocess.Popen([sys.executable,'-I','-B','-c',code],creationflags=4)
+                job.assign_and_resume(process)
+                deadline=m.time.monotonic()+4
+                while job.active()<2 and process.poll() is None and m.time.monotonic()<deadline:m.time.sleep(.01)
+                self.assertEqual(job.active(),2,'Actual own child and grandchild must both be in the job')
+                process.wait(timeout=5)
+                result=job.finish(grace_seconds=0 if orphan else 2)
+                self.assertEqual(result['active_after_cleanup'],0)
+                self.assertEqual(result['forced_tree_termination'],orphan)
+                if orphan:self.assertGreaterEqual(result['active_before_cleanup'],1)
+            finally:
+                if job.handle is not None:job.finish(grace_seconds=0)
+                if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
 
     def description(self):
         return SimpleNamespace(pid=9,returncode=0,stderr='',stdout=json.dumps({

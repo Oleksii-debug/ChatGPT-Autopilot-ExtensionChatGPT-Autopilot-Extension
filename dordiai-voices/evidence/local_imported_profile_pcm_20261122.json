@@ -1,0 +1,1267 @@
+{
+  "format": "dordiai-imported-profile-pcm-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T19:47:13.073298+00:00",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "status": "passed",
+  "addon": "D:\\DordiaiTestTemp\\core13-audit-20261122",
+  "release_version": "0.13.1-dev.13",
+  "technical_copy_not_new_person": true,
+  "immutable_release_inventory_sha256": "839f781a417d30da0af4cfa15aefefd8d3dc26629dd00c04c6ff0277a479b035",
+  "original_files_before": {
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\character_names.py": "0c20fcfc088cf11b11b3cf1db2ed238237408205843e72ca45627b1ded5d85d9",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\clean_voice_audio.py": "57ae7714ccf63442edd6fcfecc1ce6229754bf4436ca3db8d0b387e23d5e936e",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\converted_voices.py": "32de0cf843b32a30b3fb45bb519a810af5500f8b09deb4ba3ac17b7919346bd7",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\download_models.py": "c726b2fe2708da1c8c263ffec0ec8b1c986654cbde62593cafba435c2c635453",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\english_phonetics.py": "3a93bbadec3eca4f271014b2fa4542f241965ae137e410b5dab3ec3bba323471",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\error_diagnostics.py": "b3363bd82c4252a2e6f9555128dbf7d5caf7cd35436a0a41ea79aac9c0595bff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\experiment_letters.py": "652e525cc4cf221e950ac351a929f5754e884365cb1d18eda0fe5e52e646aeff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\host_paths.py": "c66f4aba1db4072cfd9123cb5675b161b580c48e40bc5e62cb26d68c1fd7e6f0",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\kx47.py": "41e2b8476df17117745729630c2f2bf0e16c0fb576c26cb576835fbbda13e028",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_catalog.py": "e4b8bdf5a785210f79d31c72596fc297325e47132149302c669bab11e756846c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_codes.py": "c622589170fa0964b889531673e55c00e2ee530892c680cd37b21c5b0587a365",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_origin.py": "0faff0d29d68ce28373a6ca431792ae846cdcf4c5ca26c1e81798a2ece5912b5",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_routing.py": "17e102d1b0a2dc49cfdc7f5b998f99637643abd682e1680f7c704f2f7721f851",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\latin_languages.py": "7e440d6fda9f1f690380a1294bca678f80b1883844b5689b6a299c152da14b6a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\latin_phonetics.py": "f25357473a4b10d93cae1efe61628e3eb44338737196a6c685b583063ab08f56",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\legacy_data_path.py": "7b634658c5cc3eb6ac4bfca65afd870dbe59fcc36bbec9c24ef213a55c4cb050",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\mms_family_sessions.py": "0f84f29c526d30d0affd8ddf5434abafa12e91863ac63b766ecce1115d8c4e95",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_locale.py": "ebc426b44e00685340d0bc730fd2f85227a9bc7f7807c45880f89a7712987bbe",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_lookahead.py": "5475d58fe296824d84db41c921ed3abddcf246cc61d6ec80c25595ec74231530",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_membership_runtime.py": "6641a19317d28330ba87078b92d5b8d70b239fef290f9c2dbba70363fef347cd",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_multilingual.py": "b49980cac86304285bd44b548c9f3e653b21ff66ca3b5df21e1386aaae25e47c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_word_membership.py": "13ba429470ab0f795d1485bdddcd9edf31026d71b3e2747b1a6b9ac0dcae2ccc",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\navigation_cache.py": "25d078060158484e4cea9513f75ab712f8e4b1dde34cd21a22986d2dcd273e65",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\nvda_worker.py": "8fb4303098489bc8ad255696895a05f3daf731e60c4dbb8b271c16fdc31d121a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\omnivoice_duration.py": "3a0b468e89eb2a109a270fe4386ce1afe57305c08375a524a1af08399dfaf772",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\package_manager.py": "bf8d7b4c53d0749f8e59411b8dfcf819ed1b3c987b78620e407e6662dc6a6641",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_catalog.py": "d9eb0e1ba731f938cd0f2d1e651e54de7bbef36ee27d3a05f73bd18f96c3730d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_language.py": "2f9a72f2f91592c731c8fb6edca6d1b2a7cf75519c097fd50622a5a4bfdfe190",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_orthography.py": "018a2da967633129174887e9816bd375acc5c52cb6fdc91f17b052548935405a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_voice.py": "93e47f1d93a401637529c9e79e333993d963526a1eea2d256c04b69467de6f34",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\piper_family_sessions.py": "7a320440a7720fc4e6e5cb4095b7a20b1d0143773fde066b8e0a870c7297ad1c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\pocket_english.py": "870aa2e2e6e36a2692844638f255dd2316e96a6f806534ea15d160c9ac51609a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\preferences.py": "8ca42af7cbaeb7f842fa6ad8858c18e2d0b4f7c7aa17eed6bd9b10f2086fe050",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\reference_prosody.py": "83b5b10ed5c473dcf3de609526df76bf97bcb9cf7d9c9eec9db266810754fa69",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\reference_voices.py": "07ee879c3a67c4b17968c7d0895be7cabe1f034313d5ff9878e7fc97d81d0e9c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\rhvoice_carrier.py": "b589018a35539ba75f216a69b74008090dfef69e68fd5befa4b376b8434fc900",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\russian_phonetics.py": "02b0300583799367b8b464adf3de2b28fab88ff26b0ce369aaeeb61cd9a58ce3",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\santali_phonemizer.py": "1424f604dccc88b96fcc8b65df6b733741fc7485c3482728b9e246be2c94a733",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\session_control.py": "f9a7a121465ec19a1ec6f4847cbff1bbb0e88860ecd590cc1ad16004152086bf",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\speech_tempo.py": "100218779ee930079c9742169caa90a58b6150e99920025385a1545a7fa66a9d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\speech_text.py": "3334924e97059a9dbd43a42252ecd91044b7cca466d626a77c82d5d68c107df6",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\spelling_audio.py": "6a8579f2d3f3f569e10452e7e4c3b06aed02c865fb88606b0b771306895dae05",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\streaming_resample.py": "8c4953670bc0d15598c6b878aa5942324c824c5606f8fd8739daea1102e08760",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\typing_locale.py": "508e2de4e80210bb70dcdfb8b3cf9f0ca9af5add4aa40fd8411002c282aca3c0",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\ukrainian_stress.py": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\ukrainian_voices.py": "ace27177938aef3e9a5b5fc958a412b64f4c8b1e9548c0cc9c25285a5a3d696b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\upgrade_packages.py": "20a6463d12eb85f5859fd3522a998bd62208c948e426fddc9d1b15e4aa5acf7a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_assets.py": "27e8da00fbe4bc55314ff93e8362a9add21be0701d506f46fe2340e15ec6d153",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_catalog.py": "a87bd24451fa43f66a93b25f584e773fc7d6fa373a74fb46387251a792bced62",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_controls.py": "d464e5a2a03a0b60911033277d38f00d9f256792219444d44a6ca1e1b4898eff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_delivery.py": "2d5a1877622f6d7e95babc12685f88f69999263fa0a6fd32748f2093cda2ea93",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_packages.py": "9af25b73977fd91b8147fcb9abf90d6897122d77458e57131e2c1ece95794a20",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_policy.py": "a4440452751b66ed7500b23031fc4590c57dc74e76bcc95fc452d4a79382887f",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_afri_frontend.py": "7d12d940290380e997dd0f61f553bd08ece7b20d788af9eef4c0453cf54556d8",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_afri_six.py": "62faef83dd6428d3a9b30c098dc67a37ff1cb0e909253adfb901c3109ee9593a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_breton.py": "6699f2aea9f0139669a77d751aff5441f07a90279f5cf8b554c595323b82294b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_carrier.py": "d070848cb5684cd1f151fa45ae93035f3fb9dd8533821b7326d38cfe96ae4bc4",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_common.py": "55eea8508b15e4c3c8a6845f02617a66a00fd71b89ec26001df7312b81700e2a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_common_carrier.py": "59ed90e97016feb090bfed0f80d5720187a24c687fafe5dc54a4fdd56840b558",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_common_helpers.py": "41e69f2bfd2de02bb15915f141459bc47e61b06ddd690bec10849a0f8a80e7b7",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_coqui_onnx.py": "c261e6a8640952989e43326f4323f5018b8cdbaa373389510da82ae313184d9d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_extra.py": "ec71557f3e0b7315c9b84b62537ef4e71a23460a4dc06b1d2b388aaab0286e00",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_extra_models.py": "e0b72f7d0236551852d89d5eebb7e8e85630ac5e36e8e2666e636475891f33df",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_hebrew.py": "2a346efe61bc4c2861ab9221ea830d89dd9904c8d6226cfc9b86a3ef19bdcad5",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_hebrew_niqqud.py": "df4705b1da04d76bfc7e3e2a8472b4603ab4ecd6c6bd51b658556a487ee85d27",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_japanese.py": "b75d54d901ea9da1a3683bce14252ef0f03dccffeeb52154f78a31027f9f7795",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_languages.py": "67e45b0993655dbd5d84ae1ce6dd5817debd5f3ecf4e51b3772f6ecb09be7b0b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_loading.py": "0c0c1855ddc88e25e9adbcd8ea54629af713c5e34dc2186383becd2d3d2972ae",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_matcha.py": "24428af9431f4b0f6d2ea38e0ac6993b5a75f22cf9571746a7e7abe9fd7c1ee7",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_matcha_frontend.py": "665b4f2f12dd7488138918b8ffdee9c03eb0d682aab61486f7020ecd0051dddc",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_mms.py": "ca65e236c392cb46d8683098f83b1a6a401a5ad84abb3ec4de2cd125ce46a874",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_nordic.py": "19ca7c92b4112bd82a98ea07a6c3bc62ae07fc240b3f3787ffc101d4bc62ebd9",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_numbers.py": "1e195fa81d578369682e861855f8654f713c20515af89602031c273cca244fdf",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_omnivoice_onnx.py": "5cc2ec060f82f1d31ff32b357706fcea8c9365450330f3d18ae97a093d5576ff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_phonetics.py": "6c496542013385b93873451e68c9e966726d0c593071bfc8ebdcbee944366f0c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_profiles.py": "13c979be734ccee298864b26db7c08d158cbd320d06e401692b2aebea9eef18a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_rasa.py": "d3358559ef8aeb23d4862306349884ff3d01c5b43b9df17f571882bdb4aa7d01",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_simba.py": "00dc995afe223d7f2c073b5f6c26e4869899bda963518ff948d97dac4596d648",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_voice.py": "22fd778cb2e479e3d9280696ab9c3c11c1afbcad877140a4e0ce9c069d5055e5",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_warmup.py": "35db19883df0241ccb231f39b19604571350c48a5a68c9ff9f5c866301b692ab",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\windows_runtime.py": "71457f59258d2e21686eadb13d276dba6b7946249df3cc4a824b5de5afbffe4a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\word_classifier.py": "53de0f1111c10ed3db4c020fe6500d58307ab28e697818cb5679eba113dda785",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx": "b5065620cbb288acc28b46c50b60904a6737d2583797cab815ae410bab72a481",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\dordiai_kernels.dll": "052dfc28517a410bbe3a92a2332068279a82ab6606c984d42392b5749338c975",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx": "625ef992925aa37a9c4c2c08be0497b2c69e68a1f92c6062f2deb8ea098858da",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\holos_onnx.json": "a9480fa95168180683d5502694227ffa6518743f3ef2352ae02aac46bb6c407d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\offline-optimized": "a24cd15828bf3057edac6c5afc17dd012d033beff02788003c8fd67a9d03c22f",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx": "46a2aa55bc5a2d0f071bf9a5060b4edf8a20ad7bfb9c270ef53c129681454dda",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\source.onnx": "60210f55b177b7165de9c17764cd53881e27245b4610ca56561d5e59a12b855b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\voices.npz": "5124ef2311e03c89228cc62ffdf8cefd88f8c07f0d8161063a03538af8f1b436",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\python\\python.exe": "3adbbf2af609e206e3ca18cd55fc7c4b52f5c8bb8218dd99fd5a9e50d7a193cd",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\voices\\holos\\sara_archive.npy": "0c757641b723083c051414181c591ab8d368889454f76eefde7f76f80267fc5f",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\voices\\holos\\bella.npy": "026208d2151d6a971f642023d66f87d46e287d0c653ff2100f6a5c41679d7daf"
+  },
+  "original_files_after": {
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\character_names.py": "0c20fcfc088cf11b11b3cf1db2ed238237408205843e72ca45627b1ded5d85d9",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\clean_voice_audio.py": "57ae7714ccf63442edd6fcfecc1ce6229754bf4436ca3db8d0b387e23d5e936e",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\converted_voices.py": "32de0cf843b32a30b3fb45bb519a810af5500f8b09deb4ba3ac17b7919346bd7",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\download_models.py": "c726b2fe2708da1c8c263ffec0ec8b1c986654cbde62593cafba435c2c635453",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\english_phonetics.py": "3a93bbadec3eca4f271014b2fa4542f241965ae137e410b5dab3ec3bba323471",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\error_diagnostics.py": "b3363bd82c4252a2e6f9555128dbf7d5caf7cd35436a0a41ea79aac9c0595bff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\experiment_letters.py": "652e525cc4cf221e950ac351a929f5754e884365cb1d18eda0fe5e52e646aeff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\host_paths.py": "c66f4aba1db4072cfd9123cb5675b161b580c48e40bc5e62cb26d68c1fd7e6f0",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\kx47.py": "41e2b8476df17117745729630c2f2bf0e16c0fb576c26cb576835fbbda13e028",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_catalog.py": "e4b8bdf5a785210f79d31c72596fc297325e47132149302c669bab11e756846c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_codes.py": "c622589170fa0964b889531673e55c00e2ee530892c680cd37b21c5b0587a365",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_origin.py": "0faff0d29d68ce28373a6ca431792ae846cdcf4c5ca26c1e81798a2ece5912b5",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\language_routing.py": "17e102d1b0a2dc49cfdc7f5b998f99637643abd682e1680f7c704f2f7721f851",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\latin_languages.py": "7e440d6fda9f1f690380a1294bca678f80b1883844b5689b6a299c152da14b6a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\latin_phonetics.py": "f25357473a4b10d93cae1efe61628e3eb44338737196a6c685b583063ab08f56",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\legacy_data_path.py": "7b634658c5cc3eb6ac4bfca65afd870dbe59fcc36bbec9c24ef213a55c4cb050",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\mms_family_sessions.py": "0f84f29c526d30d0affd8ddf5434abafa12e91863ac63b766ecce1115d8c4e95",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_locale.py": "ebc426b44e00685340d0bc730fd2f85227a9bc7f7807c45880f89a7712987bbe",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_lookahead.py": "5475d58fe296824d84db41c921ed3abddcf246cc61d6ec80c25595ec74231530",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_membership_runtime.py": "6641a19317d28330ba87078b92d5b8d70b239fef290f9c2dbba70363fef347cd",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_multilingual.py": "b49980cac86304285bd44b548c9f3e653b21ff66ca3b5df21e1386aaae25e47c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\native_word_membership.py": "13ba429470ab0f795d1485bdddcd9edf31026d71b3e2747b1a6b9ac0dcae2ccc",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\navigation_cache.py": "25d078060158484e4cea9513f75ab712f8e4b1dde34cd21a22986d2dcd273e65",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\nvda_worker.py": "8fb4303098489bc8ad255696895a05f3daf731e60c4dbb8b271c16fdc31d121a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\omnivoice_duration.py": "3a0b468e89eb2a109a270fe4386ce1afe57305c08375a524a1af08399dfaf772",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\package_manager.py": "bf8d7b4c53d0749f8e59411b8dfcf819ed1b3c987b78620e407e6662dc6a6641",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_catalog.py": "d9eb0e1ba731f938cd0f2d1e651e54de7bbef36ee27d3a05f73bd18f96c3730d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_language.py": "2f9a72f2f91592c731c8fb6edca6d1b2a7cf75519c097fd50622a5a4bfdfe190",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_orthography.py": "018a2da967633129174887e9816bd375acc5c52cb6fdc91f17b052548935405a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\personal_voice.py": "93e47f1d93a401637529c9e79e333993d963526a1eea2d256c04b69467de6f34",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\piper_family_sessions.py": "7a320440a7720fc4e6e5cb4095b7a20b1d0143773fde066b8e0a870c7297ad1c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\pocket_english.py": "870aa2e2e6e36a2692844638f255dd2316e96a6f806534ea15d160c9ac51609a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\preferences.py": "8ca42af7cbaeb7f842fa6ad8858c18e2d0b4f7c7aa17eed6bd9b10f2086fe050",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\reference_prosody.py": "83b5b10ed5c473dcf3de609526df76bf97bcb9cf7d9c9eec9db266810754fa69",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\reference_voices.py": "07ee879c3a67c4b17968c7d0895be7cabe1f034313d5ff9878e7fc97d81d0e9c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\rhvoice_carrier.py": "b589018a35539ba75f216a69b74008090dfef69e68fd5befa4b376b8434fc900",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\russian_phonetics.py": "02b0300583799367b8b464adf3de2b28fab88ff26b0ce369aaeeb61cd9a58ce3",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\santali_phonemizer.py": "1424f604dccc88b96fcc8b65df6b733741fc7485c3482728b9e246be2c94a733",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\session_control.py": "f9a7a121465ec19a1ec6f4847cbff1bbb0e88860ecd590cc1ad16004152086bf",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\speech_tempo.py": "100218779ee930079c9742169caa90a58b6150e99920025385a1545a7fa66a9d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\speech_text.py": "3334924e97059a9dbd43a42252ecd91044b7cca466d626a77c82d5d68c107df6",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\spelling_audio.py": "6a8579f2d3f3f569e10452e7e4c3b06aed02c865fb88606b0b771306895dae05",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\streaming_resample.py": "8c4953670bc0d15598c6b878aa5942324c824c5606f8fd8739daea1102e08760",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\typing_locale.py": "508e2de4e80210bb70dcdfb8b3cf9f0ca9af5add4aa40fd8411002c282aca3c0",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\ukrainian_stress.py": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\ukrainian_voices.py": "ace27177938aef3e9a5b5fc958a412b64f4c8b1e9548c0cc9c25285a5a3d696b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\upgrade_packages.py": "20a6463d12eb85f5859fd3522a998bd62208c948e426fddc9d1b15e4aa5acf7a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_assets.py": "27e8da00fbe4bc55314ff93e8362a9add21be0701d506f46fe2340e15ec6d153",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_catalog.py": "a87bd24451fa43f66a93b25f584e773fc7d6fa373a74fb46387251a792bced62",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_controls.py": "d464e5a2a03a0b60911033277d38f00d9f256792219444d44a6ca1e1b4898eff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_delivery.py": "2d5a1877622f6d7e95babc12685f88f69999263fa0a6fd32748f2093cda2ea93",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_packages.py": "9af25b73977fd91b8147fcb9abf90d6897122d77458e57131e2c1ece95794a20",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\voice_policy.py": "a4440452751b66ed7500b23031fc4590c57dc74e76bcc95fc452d4a79382887f",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_afri_frontend.py": "7d12d940290380e997dd0f61f553bd08ece7b20d788af9eef4c0453cf54556d8",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_afri_six.py": "62faef83dd6428d3a9b30c098dc67a37ff1cb0e909253adfb901c3109ee9593a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_breton.py": "6699f2aea9f0139669a77d751aff5441f07a90279f5cf8b554c595323b82294b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_carrier.py": "d070848cb5684cd1f151fa45ae93035f3fb9dd8533821b7326d38cfe96ae4bc4",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_common.py": "55eea8508b15e4c3c8a6845f02617a66a00fd71b89ec26001df7312b81700e2a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_common_carrier.py": "59ed90e97016feb090bfed0f80d5720187a24c687fafe5dc54a4fdd56840b558",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_common_helpers.py": "41e69f2bfd2de02bb15915f141459bc47e61b06ddd690bec10849a0f8a80e7b7",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_coqui_onnx.py": "c261e6a8640952989e43326f4323f5018b8cdbaa373389510da82ae313184d9d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_extra.py": "ec71557f3e0b7315c9b84b62537ef4e71a23460a4dc06b1d2b388aaab0286e00",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_extra_models.py": "e0b72f7d0236551852d89d5eebb7e8e85630ac5e36e8e2666e636475891f33df",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_hebrew.py": "2a346efe61bc4c2861ab9221ea830d89dd9904c8d6226cfc9b86a3ef19bdcad5",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_hebrew_niqqud.py": "df4705b1da04d76bfc7e3e2a8472b4603ab4ecd6c6bd51b658556a487ee85d27",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_japanese.py": "b75d54d901ea9da1a3683bce14252ef0f03dccffeeb52154f78a31027f9f7795",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_languages.py": "67e45b0993655dbd5d84ae1ce6dd5817debd5f3ecf4e51b3772f6ecb09be7b0b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_loading.py": "0c0c1855ddc88e25e9adbcd8ea54629af713c5e34dc2186383becd2d3d2972ae",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_matcha.py": "24428af9431f4b0f6d2ea38e0ac6993b5a75f22cf9571746a7e7abe9fd7c1ee7",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_matcha_frontend.py": "665b4f2f12dd7488138918b8ffdee9c03eb0d682aab61486f7020ecd0051dddc",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_mms.py": "ca65e236c392cb46d8683098f83b1a6a401a5ad84abb3ec4de2cd125ce46a874",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_nordic.py": "19ca7c92b4112bd82a98ea07a6c3bc62ae07fc240b3f3787ffc101d4bc62ebd9",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_numbers.py": "1e195fa81d578369682e861855f8654f713c20515af89602031c273cca244fdf",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_omnivoice_onnx.py": "5cc2ec060f82f1d31ff32b357706fcea8c9365450330f3d18ae97a093d5576ff",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_phonetics.py": "6c496542013385b93873451e68c9e966726d0c593071bfc8ebdcbee944366f0c",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_profiles.py": "13c979be734ccee298864b26db7c08d158cbd320d06e401692b2aebea9eef18a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_rasa.py": "d3358559ef8aeb23d4862306349884ff3d01c5b43b9df17f571882bdb4aa7d01",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_simba.py": "00dc995afe223d7f2c073b5f6c26e4869899bda963518ff948d97dac4596d648",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_voice.py": "22fd778cb2e479e3d9280696ab9c3c11c1afbcad877140a4e0ce9c069d5055e5",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\wide_warmup.py": "35db19883df0241ccb231f39b19604571350c48a5a68c9ff9f5c866301b692ab",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\windows_runtime.py": "71457f59258d2e21686eadb13d276dba6b7946249df3cc4a824b5de5afbffe4a",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\word_classifier.py": "53de0f1111c10ed3db4c020fe6500d58307ab28e697818cb5679eba113dda785",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx": "b5065620cbb288acc28b46c50b60904a6737d2583797cab815ae410bab72a481",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\dordiai_kernels.dll": "052dfc28517a410bbe3a92a2332068279a82ab6606c984d42392b5749338c975",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx": "625ef992925aa37a9c4c2c08be0497b2c69e68a1f92c6062f2deb8ea098858da",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\holos_onnx.json": "a9480fa95168180683d5502694227ffa6518743f3ef2352ae02aac46bb6c407d",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\offline-optimized": "a24cd15828bf3057edac6c5afc17dd012d033beff02788003c8fd67a9d03c22f",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx": "46a2aa55bc5a2d0f071bf9a5060b4edf8a20ad7bfb9c270ef53c129681454dda",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\source.onnx": "60210f55b177b7165de9c17764cd53881e27245b4610ca56561d5e59a12b855b",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\voices.npz": "5124ef2311e03c89228cc62ffdf8cefd88f8c07f0d8161063a03538af8f1b436",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\python\\python.exe": "3adbbf2af609e206e3ca18cd55fc7c4b52f5c8bb8218dd99fd5a9e50d7a193cd",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\voices\\holos\\sara_archive.npy": "0c757641b723083c051414181c591ab8d368889454f76eefde7f76f80267fc5f",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\voices\\holos\\bella.npy": "026208d2151d6a971f642023d66f87d46e287d0c653ff2100f6a5c41679d7daf"
+  },
+  "original_tracked_files_unchanged": true,
+  "worker_python_sha256": "3adbbf2af609e206e3ca18cd55fc7c4b52f5c8bb8218dd99fd5a9e50d7a193cd",
+  "observer_sha256": "4548a4f7c2faba3a50b185f3348efbeead09a826dfeef5beaf3bb7281cd8e774",
+  "versions": {
+    "1.0.0": {
+      "source_profile": "sara_archive",
+      "file_sha256": "0c757641b723083c051414181c591ab8d368889454f76eefde7f76f80267fc5f",
+      "array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+      "package_sha256": "de836bad9c5cd79c622bf7136fa1e99a585420461def1de2ed7a6aa35921114f",
+      "shape": [
+        1,
+        256
+      ],
+      "dtype": "float32"
+    },
+    "2.0.0": {
+      "source_profile": "bella",
+      "file_sha256": "026208d2151d6a971f642023d66f87d46e287d0c653ff2100f6a5c41679d7daf",
+      "array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+      "package_sha256": "cd7a43cd90e7db7066093286d84c092aedf6c914aa76f6163fb55c27b6ee254e",
+      "shape": [
+        1,
+        256
+      ],
+      "dtype": "float32"
+    }
+  },
+  "cases": [
+    {
+      "case": "builtin-control",
+      "profile": "sara_archive",
+      "version": null,
+      "request_text": "Збережений профіль читає нове речення. Перевірка українського голосу.",
+      "metrics": {
+        "first_pcm_ms": 2366.1596000019927,
+        "completed_ms": 3847.384399996372,
+        "real_time_factor": 0.8065795387833066,
+        "audio": {
+          "frames": 114480,
+          "duration_seconds": 4.77,
+          "peak": 0.410736083984375,
+          "rms": 0.0915904461434425,
+          "nonzero_samples": 112571
+        },
+        "chunks": [
+          {
+            "time_ms": 2366.1596000019927,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 2591.0748000023887,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 2848.651599997538,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 2979.6993999916594,
+            "bytes": 26400
+          },
+          {
+            "time_ms": 3244.61579999479,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 3486.155799997505,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 3724.1762000048766,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 3820.4566999920644,
+            "bytes": 4800
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "sara_archive"
+          }
+        ]
+      },
+      "pcm_sha256": "57b3aa1e2c488765fe0288cb09dc431e14c4198fe2957ef526f18af5350b1a4e",
+      "wav": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\builtin-control.wav",
+      "wav_sha256": "11081d8e96d763bba618e9e7ff44debbf86ad940cc4f71b8e9d485b832308bb6",
+      "shutdown": {
+        "exit_code": 0,
+        "forced_termination": false
+      },
+      "trace": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\builtin-control.trace.jsonl",
+      "trace_sha256": "1cbff854a645fa5a71319b3703e13dca550662e8a9d1b9ce0f92c6ccd08e813c",
+      "observed": [
+        {
+          "kind": "navigation_bank_lookup",
+          "hit": false
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        }
+      ],
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual_graph_identity_proved": true,
+      "no_navigation_bank_hit": true
+    },
+    {
+      "case": "imported-v1",
+      "profile": "probe_imported_profile",
+      "version": "1.0.0",
+      "request_text": "Збережений профіль читає нове речення. Перевірка українського голосу.",
+      "metrics": {
+        "first_pcm_ms": 2654.5228000031784,
+        "completed_ms": 4319.150900002569,
+        "real_time_factor": 0.9054823689732849,
+        "audio": {
+          "frames": 114480,
+          "duration_seconds": 4.77,
+          "peak": 0.410736083984375,
+          "rms": 0.0915904461434425,
+          "nonzero_samples": 112571
+        },
+        "chunks": [
+          {
+            "time_ms": 2654.5228000031784,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 2918.009600005462,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 3224.0920000040205,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 3404.6963000000687,
+            "bytes": 26400
+          },
+          {
+            "time_ms": 3697.5792000012007,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 3939.949300009175,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 4179.713200006518,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 4288.160099997185,
+            "bytes": 4800
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "probe_imported_profile"
+          }
+        ]
+      },
+      "pcm_sha256": "57b3aa1e2c488765fe0288cb09dc431e14c4198fe2957ef526f18af5350b1a4e",
+      "wav": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\imported-v1.wav",
+      "wav_sha256": "11081d8e96d763bba618e9e7ff44debbf86ad940cc4f71b8e9d485b832308bb6",
+      "shutdown": {
+        "exit_code": 0,
+        "forced_termination": false
+      },
+      "trace": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\imported-v1.trace.jsonl",
+      "trace_sha256": "316a3c6cba38c602e40d5829a65cfd132a98f3d18f5cd08157c375d23aaba547",
+      "observed": [
+        {
+          "kind": "navigation_bank_lookup",
+          "hit": false
+        },
+        {
+          "kind": "verified_asset",
+          "profile": "probe_imported_profile",
+          "role": "holos_profile",
+          "path": "\\\\?\\D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\references\\packages\\probe_imported_profile\\1.0.0\\holos.npy",
+          "file_sha256": "0c757641b723083c051414181c591ab8d368889454f76eefde7f76f80267fc5f",
+          "size_bytes": 1152
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        }
+      ],
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual_graph_identity_proved": true,
+      "no_navigation_bank_hit": true,
+      "managed_asset_exact": true
+    },
+    {
+      "case": "imported-v2-changed-input",
+      "profile": "probe_imported_profile",
+      "version": "2.0.0",
+      "request_text": "Збережений профіль читає нове речення. Перевірка українського голосу.",
+      "metrics": {
+        "first_pcm_ms": 2201.711700006854,
+        "completed_ms": 3658.933300001081,
+        "real_time_factor": 0.7670719706501219,
+        "audio": {
+          "frames": 114480,
+          "duration_seconds": 4.77,
+          "peak": 0.3349609375,
+          "rms": 0.062388273638148854,
+          "nonzero_samples": 111927
+        },
+        "chunks": [
+          {
+            "time_ms": 2201.711700006854,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 2404.6994999953313,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 2677.2870999993756,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 2816.008399997372,
+            "bytes": 26400
+          },
+          {
+            "time_ms": 3077.4964000011096,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 3316.9252000079723,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 3543.5152999998536,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 3634.3908999988344,
+            "bytes": 4800
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "probe_imported_profile"
+          }
+        ]
+      },
+      "pcm_sha256": "e11380ebfd92cd72a1a7c314a4d30688035544880e4c39c33e9cdc3d6b8da3ad",
+      "wav": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\imported-v2-changed-input.wav",
+      "wav_sha256": "fc278d5c6bbcb3a456146db3895705472adc6858a48e4542201140e7c3f46f7e",
+      "shutdown": {
+        "exit_code": 0,
+        "forced_termination": false
+      },
+      "trace": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\imported-v2-changed-input.trace.jsonl",
+      "trace_sha256": "2607b3c4518b39129bc1b6bf9b1c197bddbabad013e8520530394b47b5e7b054",
+      "observed": [
+        {
+          "kind": "navigation_bank_lookup",
+          "hit": false
+        },
+        {
+          "kind": "verified_asset",
+          "profile": "probe_imported_profile",
+          "role": "holos_profile",
+          "path": "\\\\?\\D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\references\\packages\\probe_imported_profile\\2.0.0\\holos.npy",
+          "file_sha256": "026208d2151d6a971f642023d66f87d46e287d0c653ff2100f6a5c41679d7daf",
+          "size_bytes": 1152
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "693498cfb7431bef25c7a6d43f9e2a7b3e0a3e326e3684d57afa66a5e918ba86",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        }
+      ],
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual_graph_identity_proved": true,
+      "no_navigation_bank_hit": true,
+      "managed_asset_exact": true
+    },
+    {
+      "case": "rollback-v1",
+      "profile": "probe_imported_profile",
+      "version": "1.0.0",
+      "request_text": "Збережений профіль читає нове речення. Перевірка українського голосу.",
+      "metrics": {
+        "first_pcm_ms": 2206.514599994989,
+        "completed_ms": 3862.394999989192,
+        "real_time_factor": 0.8097264150920739,
+        "audio": {
+          "frames": 114480,
+          "duration_seconds": 4.77,
+          "peak": 0.410736083984375,
+          "rms": 0.0915904461434425,
+          "nonzero_samples": 112571
+        },
+        "chunks": [
+          {
+            "time_ms": 2206.514599994989,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 2474.3083999928785,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 2781.2754999904428,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 2948.242200000095,
+            "bytes": 26400
+          },
+          {
+            "time_ms": 3234.8905999970157,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 3489.6114000002854,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 3732.449099989026,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 3832.188699991093,
+            "bytes": 4800
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "probe_imported_profile"
+          }
+        ]
+      },
+      "pcm_sha256": "57b3aa1e2c488765fe0288cb09dc431e14c4198fe2957ef526f18af5350b1a4e",
+      "wav": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\rollback-v1.wav",
+      "wav_sha256": "11081d8e96d763bba618e9e7ff44debbf86ad940cc4f71b8e9d485b832308bb6",
+      "shutdown": {
+        "exit_code": 0,
+        "forced_termination": false
+      },
+      "trace": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\rollback-v1.trace.jsonl",
+      "trace_sha256": "316a3c6cba38c602e40d5829a65cfd132a98f3d18f5cd08157c375d23aaba547",
+      "observed": [
+        {
+          "kind": "navigation_bank_lookup",
+          "hit": false
+        },
+        {
+          "kind": "verified_asset",
+          "profile": "probe_imported_profile",
+          "role": "holos_profile",
+          "path": "\\\\?\\D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\references\\packages\\probe_imported_profile\\1.0.0\\holos.npy",
+          "file_sha256": "0c757641b723083c051414181c591ab8d368889454f76eefde7f76f80267fc5f",
+          "size_bytes": 1152
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\encoder.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "acoustic_tokens",
+            "prosodic_tokens",
+            "durations"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\prosody.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "f0",
+            "energy"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        },
+        {
+          "kind": "successful_onnx_run",
+          "model": "\\\\?\\D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos\\decoder_window.onnx",
+          "voice_array_sha256": "aa693e20e8f600d17369d707ef9c00a28190511203f39d6e133c23366ba10b85",
+          "shape": [
+            1,
+            256
+          ],
+          "dtype": "float32",
+          "outputs": [
+            "audio"
+          ]
+        }
+      ],
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual_graph_identity_proved": true,
+      "no_navigation_bank_hit": true,
+      "managed_asset_exact": true
+    },
+    {
+      "case": "missing-managed-asset",
+      "profile": "probe_imported_profile",
+      "version": null,
+      "request_text": "Збережений профіль читає нове речення. Перевірка українського голосу.",
+      "expected_failure": true,
+      "error": "Speech engine error: PackageError",
+      "shutdown": {
+        "exit_code": 0,
+        "forced_termination": false
+      },
+      "trace": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\missing-managed-asset.trace.jsonl",
+      "trace_sha256": null,
+      "observed": [],
+      "stderr_sha256": "5c8853acb4109b984d6d70e1d17ffd7e49de343c482cec220c91fb7262d057e3"
+    }
+  ],
+  "same_array_builtin_imported_rollback_pcm_identical": true,
+  "changed_imported_target_changes_pcm": true,
+  "scope": "Windows packaged Holos uk managed asset to actual successful ONNX inputs and 24kHz PCM",
+  "not_proved": [
+    "NVDA/UI integration",
+    "physical audio onset/cancellation",
+    "native pronunciation or perceived identity",
+    "English/Russian and other engines/adapters",
+    "product acceptance"
+  ],
+  "product_ready": false,
+  "full_local_report": {
+    "path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\imported-profile-pcm-20261122-final\\report.json",
+    "bytes": 65955,
+    "sha256": "8996a5e6d7f658538046a474f30ae5fcdafe675f879be56c5037746b60e7a397"
+  },
+  "reproduction": {
+    "command": "python -B tools/windows_imported_profile_pcm_probe.py --addon D:\\DordiaiTestTemp\\core13-audit-20261122 --output windows-evidence\\FRESH-imported-profile-pcm --timeout 180",
+    "host_python": "Python 3.13.9; numpy 2.3.5",
+    "temp_tmp": "D:\\DordiaiTestTemp",
+    "contract_tests": 8,
+    "test_command": "python -B -m unittest discover -s tests -p test_windows_imported_profile_pcm_probe.py -v"
+  },
+  "probe_sources": {
+    "tools\\windows_imported_profile_pcm_probe.py": "5496e9727c845409bbce40f34c9a837287f208e1811e65f931ecc18c488b9ca5",
+    "tests\\test_windows_imported_profile_pcm_probe.py": "757ea3b3c04dc4eec18c26c4e904d7cc3ad318f30881e9ab602b0a75efee4fc8",
+    "tools\\windows_engine_probe.py": "8c914845e00470fb8fca8348d0031c381630b1a1f5e9044ca47ec7baee4cb526"
+  },
+  "scope_notes_uk": [
+    "Справжній Windows worker: exact copied NPY imported/activated через незмінені API voice_packages/voice_assets; encoder, prosody й audio decoder реально завершили ONNX run із SHA того самого масиву.",
+    "Технічний тестовий ID probe_imported_profile не є новим людським голосом. Два пакети використовують дозволені наявні sara_archive і bella, без навчання чи нових дозволів на поширення.",
+    "Для кожного випадку створено новий worker. Rollback підтверджений після запуску нового процесу; гаряче оновлення кешу вже запущеного worker тут не перевірялось.",
+    "Ізольовані references містять Holos NPY та дві калібровки; звукових банків, native profiles, navigation audio та delivery_profiles тут немає. Це контроль акустичного профілю, не копія всього кінцевого NVDA-конвеєра.",
+    "Перший PCM отримано у свіжих процесах приблизно через 2.20–2.65 секунди; це холодний старт плюс forwarding-only trace, не цільова підготовлена затримка і не реально чутний старт.",
+    "Базовий PCM, imported v1 та rollback побітово однакові. При зміні лише imported Holos identity на bella PCM змінюється, точний масив підтверджений у графі; missing managed asset дає PackageError до графів та PCM.",
+    "Жодної інстальованої NVDA/userconfig не змінено. Original Python-джерела runtime, Holos model files, executable та обидва профілі перевірено проти pinned release inventory до тесту й на незмінність після.",
+    "Не перевірено слухову ідентичність, точність фонем, англійську/інші адаптери, live NVDA echo/settings, фізичний аудіовихід, warm latency чи готовність продукту."
+  ]
+}

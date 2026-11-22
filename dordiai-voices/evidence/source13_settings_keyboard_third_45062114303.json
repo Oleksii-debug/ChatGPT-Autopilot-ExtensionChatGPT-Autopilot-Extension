@@ -1,0 +1,180 @@
+{
+  "format": "dordiai-source13-settings-keyboard-third-failure-diagnosis",
+  "format_version": 1,
+  "checked_date": "2026-11-22",
+  "status": "failed-real-ci-harness-menu-observer-defect-with-secondary-fatal-exit",
+  "product_ready": false,
+  "runtime_changed": false,
+  "user_nvda_or_drivers_touched": false,
+  "ci": {
+    "run_id": 45062114303,
+    "job_id": 137330128243,
+    "commit": "6ad43f38600ab4f2e12d1a11de3e560ab9d200ea",
+    "url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/45062114303",
+    "conclusion": "failure",
+    "artifact_id": 14770041373,
+    "artifact_bytes": 31795,
+    "artifact_sha256": "8fbfbc25cfe119ffa5f13635dc88da24bcfe6e0b3d6a29227c1c545d5e5bad60",
+    "embedded_json_sha256": "79b54b94e5eb34b0c5cb680f6129725fe703bff31ae4c7ff9da943d7b5a3fea8",
+    "embedded_gzip_sha256": "816eebc30a6cb64dfef734146adc246c97e6bcb57ac3306f9e4cf5650c691820",
+    "original_preflight_tests_passed": 37,
+    "host": "Windows Server 2025 build26100, official portable NVDA2026.3.1, Python3.13.17, wxPython4.2.4/wxWidgets3.2.8"
+  },
+  "identity": {
+    "source13_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+    "core_archive_bytes": 1992990314,
+    "core_archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "installed_runtime_files_verified_after_edit": 10220,
+    "installed_runtime_bytes_verified_after_edit": 2408393531,
+    "all_match_immutable_core_manifest_after_edit": true,
+    "verification_after_resume_and_restore_completed": false,
+    "original_keyboard_saved_ini_sha256": "52adf5797ede8ee372735de51d3f869567032f596e445d7194c3e40e1a007b25"
+  },
+  "observations": {
+    "edit": {
+      "host_run_id": "d6d7c880866a4b0cb0cc326056a5d3d0",
+      "pid": 7980,
+      "returncode": 0,
+      "host_status": "passed",
+      "settings_status": "passed-functional-only",
+      "actual_keyboard_save_verified": true,
+      "saved_settings": {
+        "languages": ["en"],
+        "default_language": "en",
+        "mode": "auto",
+        "voice": "adam",
+        "voice_map": {"en": "viktoriia"},
+        "allowed_voice_count": 45
+      },
+      "observers_unregistered": true
+    },
+    "resume": {
+      "host_run_id": "534b6d23e0d140c0be28370331826c73",
+      "pid": 7264,
+      "returncode": 3221226525,
+      "windows_status_hex": "0xC000041D",
+      "windows_status_name": "STATUS_FATAL_USER_CALLBACK_EXCEPTION",
+      "normal_shutdown_verified": false,
+      "host_status": "failed",
+      "saved_synth_automatic_startup_verified": true,
+      "same_startup_instance_at_begin": true,
+      "actual_module": "synthDrivers.kx47Preview",
+      "genuine_wave_player": true,
+      "exact_owned_output_endpoint": "{0.0.0.00000000}.{d9c9b7df-1502-4fe0-ac65-ec46e93b4a01}",
+      "saved_settings_match_edit": true,
+      "primary_failed_check": "keyboard_settings_exception",
+      "primary_error": "TimeoutError('Native keyboard menu selection did not reach the exact preferences item')",
+      "cleanup_check": "passed",
+      "observers_unregistered": true,
+      "public_post_configSave_count": 0,
+      "menu_open_restore_save_completed": false,
+      "observed_raw_key_count": 28,
+      "native_menu_highlight_event_count": 0,
+      "delivered_key_actions": [
+        "NVDA+n:4/4 balanced native events",
+        "Tools mnemonic T:2/2 balanced native events",
+        "Home then ten Down:22/22 balanced native events"
+      ],
+      "last_actual_nvda_speech_text": ["dordiai-voices — голоси, мови й мовлення...  ", "d"],
+      "interpretation": "The requested menu label was announced after real navigation, but no exact native menu ID was observed. Speech feedback alone does not close the menu-selection gate."
+    },
+    "cleanup": {
+      "tracked_processes": [
+        {"pid": 5148, "executable": "nvda_2026.3.1.exe", "returncode": 0, "reaped": true},
+        {"pid": 7980, "executable": "nvda.exe", "returncode": 0, "reaped": true},
+        {"pid": 7264, "executable": "nvda.exe", "returncode": 3221226525, "reaped": true}
+      ],
+      "tracked_popen_objects_reaped_before_device_removal": true,
+      "exact_owned_endpoint_absence_verified": true,
+      "actions_cleanup_observed_orphan_nvda_pid": 8352,
+      "all_nvda_descendants_reaped_before_device_removal_proved": false,
+      "interpretation": "The harness only claimed tracked Popen cleanup. Actions later killed an orphan nvda process. Do not turn that claim into complete descendant cleanup or a successful shutdown."
+    }
+  },
+  "diagnosis": {
+    "primary_classification": "Harness observation/routing defect, not evidence that the product menu is absent",
+    "cause": "The supplement bound EVT_MENU_HIGHLIGHT_ALL only to tray.menu and tray.toolsMenu. NVDA SysTrayIcon invokes its own PopupMenu. On wxMSW that method pushes the TaskBarIcon onto the hidden popup-owner window's event chain. The observer therefore omitted the actual popup owner; the run recorded zero highlight events even as NVDA announced the expected label.",
+    "primary_sources": [
+      {
+        "url": "https://raw.githubusercontent.com/nvaccess/nvda/release-2026.3.1/source/gui/__init__.py",
+        "observation": "SysTrayIcon(wx.adv.TaskBarIcon).onActivate calls self.PopupMenu(self.menu)."
+      },
+      {
+        "url": "https://raw.githubusercontent.com/wxWidgets/wxWidgets/v3.2.8/src/msw/taskbar.cpp",
+        "observation": "Exact wxWidgets version from the actual NVDA log: wxTaskBarIcon::PopupMenu calls m_win->PushEventHandler(this), then m_win->PopupMenu(menu), then pops that handler."
+      },
+      {
+        "url": "https://docs.wxpython.org/wx.MenuEvent.html",
+        "observation": "Native menu events route through menu-associated/owning event handlers; GetMenuId returns the menu-specific identifier."
+      }
+    ],
+    "secondary_controller_defect": "The outer controller waited for process exit and raised on nonzero returncode before assigning phases.resume. That concealed the already written primary menu-timeout receipt from the aggregate report.",
+    "fatal_exit_classification": "Real fatal NVDA process result, not a benign or accepted shutdown code. The available log was overwritten by a subsequent startup; no preserved crash stack/dump proves the exact origin of the callback exception. It must remain an unresolved separate failure until a real rerun demonstrates normal exit and cleanup.",
+    "not_established": [
+      "The synth or saved-profile startup is broken: this run actually observed them functioning",
+      "The product menu cannot open: Enter was never sent because the observer timed out",
+      "The fatal exit was caused by source13 acoustic runtime or fixed by changing the observer",
+      "The orphan process is harmless or all descendants were reaped before endpoint cleanup",
+      "Full keyboard, acoustic, latency or product acceptance"
+    ]
+  },
+  "minimal_harness_fix": {
+    "files": ["tools/windows_nvda_settings_keyboard_probe.py", "tests/test_windows_nvda_settings_keyboard_probe.py"],
+    "helper_git_blob": "3c8b166be4d93c1c7afe86480703b19ffbc75534",
+    "changes": [
+      "Observe highlights on the actual TaskBarIcon popup owner and use GetMenuId; propagate events normally",
+      "Keep the exact preferences owner/item lookup and native Home/Down/Enter navigation",
+      "Record the actual target ID and require a matching observed native highlight before Enter; the receipt validator also requires that ordered proof",
+      "Preserve phases.resume, the first failed check and all failed checks immediately after its receipt, before wait/exit exceptions",
+      "Record resumed PID, decimal/hex returncode, reaping and normal-shutdown result separately",
+      "Snapshot nvda-at-receipt.log before a subsequent automatic restart can overwrite the log"
+    ],
+    "unchanged_gates": [
+      "Nonzero/fatal process exit remains a failure",
+      "Exact source13 archive/runtime identity",
+      "Actual saved-synth startup before reselection",
+      "Genuine WavePlayer and exact endpoint",
+      "Actual keyboard menu activation, edit/reopen/save and restart",
+      "No direct programmatic dialog opening or control mutation",
+      "No acoustic readiness implied"
+    ],
+    "regression_result": {"tests": 41, "passed": 41, "failed": 0, "helper_compile": "passed"},
+    "new_real_ci_after_fix_performed_by_this_subagent": false,
+    "actual_native_highlight_and_fatal_exit_after_fix": "UNVERIFIED; root owns the subsequent CI run"
+  },
+  "ownership_hardening_after_diagnosis": {
+    "helper_git_blob": "bc75b678149fc158bf5ed53b7044dcd33aa02e9b",
+    "implementation": "Local narrow OwnedNvdaJob with KILL_ON_JOB_CLOSE and no breakaway. Each exact nvda.exe Popen starts CREATE_SUSPENDED, is assigned using its already-held process handle, then resumes using that same handle. Descendants inherit the job before they can be spawned; no PID rediscovery or broad process kill.",
+    "cleanup": "Held job accounting must reach zero active processes before endpoint removal. A bounded grace allows ordinary worker teardown; TerminateJobObject is the final cleanup path and remains an explicit failed normal-shutdown gate, even after zero active is verified. Error paths close the held job; failed assignment also reaps the exact still-suspended child handle.",
+    "dependencies_added": [],
+    "actual_windows_proof_file": "owned-job-actual.json",
+    "actual_windows_proof_sha256": "e9fa065816de12f594dd490b25f1f720851a4d51fd2415190ca8b57ce38b2f43",
+    "actual_windows_cases": [
+      {"parent_pid": 17644, "grandchild_pid": 20148, "active_family": 2, "parent_returncode": 0, "active_after_cleanup": 0, "forced": false, "normal_shutdown_gate_passes": true},
+      {"parent_pid": 5728, "grandchild_pid": 25120, "active_family": 2, "parent_returncode": 0, "active_before_cleanup": 1, "active_after_cleanup": 0, "forced": true, "normal_shutdown_gate_passes": false}
+    ],
+    "new_tests": [
+      "Actual bounded Windows child and grandchild, normal versus surviving-descendant cleanup",
+      "Forced tree cleanup cannot imply normal shutdown",
+      "Assignment failure reaps suspended held child and closes job",
+      "Popen, accounting and termination failures close the owned job in finally"
+    ],
+    "final_regression_result": {"tests": 45, "passed": 45, "failed": 0, "helper_compile": "passed", "workflow_exact_pin_checked": true},
+    "original_failed_ci_cleanup_claim_preserved": true,
+    "actual_nvda_after_hardening": "UNVERIFIED pending root CI; the local proof used only newly created finite Python families, no NVDA or audio"
+  },
+  "evidence_local_directory": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Тимчасові файли\\settings-45062114303",
+  "saved_files": [
+    {"path": "artifact-14770041373.zip", "bytes": 31795, "sha256": "8fbfbc25cfe119ffa5f13635dc88da24bcfe6e0b3d6a29227c1c545d5e5bad60"},
+    {"path": "job-137330128243.log", "sha256": "baf23f0a974769ab631a32789e5b35819d93802b6d77694345773b11e0f1d68c", "representation": "Decoded connector text, UTF-8/LF normalization; original binary log ZIP not claimed"},
+    {"path": "artifact/edit-controller.json", "bytes": 85955, "sha256": "9da051749bc78e75ff08910c16c8537d5d1370cb24d4e0fdbd3faebf6a41ae30"},
+    {"path": "artifact/edit-host.json", "bytes": 75743, "sha256": "1c7b37f11ec48a9d7471ec8ee57c47ff834ddd5742db3f33e125d64691d2de20"},
+    {"path": "artifact/edit-nvda.log", "bytes": 58039, "sha256": "1dbabb483ab533c146df32a1c95510d64998c17ba802193d9ac5ac539c207b32"},
+    {"path": "artifact/keyboard-settings-supplement.json", "bytes": 105759, "sha256": "a991a56b00499296f440790880291bc072196be9a2e297792b3bef7c01bb151b"},
+    {"path": "artifact/resume-host.json", "bytes": 23784, "sha256": "52aeed274ee48b708882ffb6bb3d3f85a1a8ebf5aa4e142f0955edef88edc84d"},
+    {"path": "artifact/resume-nvda.log", "bytes": 9756, "sha256": "6a45bdfa15a0ca44f9f9b39f57d4dc1e2bf4fa771ab8a8006756738396a139be"},
+    {"path": "helper-regression.log", "description": "Actual local initial 41-test regression after root refreshed the menu-fix helper pin"},
+    {"path": "helper-regression-final.log", "description": "Actual final local 45-test regression including held Windows child/grandchild jobs and final exact workflow pin"},
+    {"path": "owned-job-actual.json", "sha256": "e9fa065816de12f594dd490b25f1f720851a4d51fd2415190ca8b57ce38b2f43", "description": "Separate measured Windows normal and surviving-grandchild job accounting receipts"}
+  ]
+}

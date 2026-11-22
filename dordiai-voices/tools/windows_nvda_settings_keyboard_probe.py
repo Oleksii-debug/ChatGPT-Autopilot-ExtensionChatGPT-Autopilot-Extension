@@ -362,8 +362,10 @@ def _ks_menu_access_key(label):
 
 def _ks_menu_highlight(event):
     if _KS and not _KS.get("cleaned"):
-        _KS["menu_last_highlight"]=event.GetId()
-        _ks_record("native_menu_highlight",menu_item_id=event.GetId())
+        # MenuEvent has a menu-specific ID; never infer selection from speech.
+        ident=event.GetMenuId()
+        _KS["menu_last_highlight"]=ident
+        _ks_record("native_menu_highlight",menu_item_id=ident)
     event.Skip()
 
 def _ks_menu():
@@ -375,14 +377,22 @@ def _ks_menu():
     items=[x for x in tray.toolsMenu.GetMenuItems() if not x.IsSeparator() and x.IsEnabled()]
     target_index=_ks_preferences_item_index(items,globalPluginHandler.runningPlugins)
     target_id=items[target_index].GetId()
-    _KS["menu_observers"]=[tray.menu,tray.toolsMenu]
+    # wxMSW TaskBarIcon.PopupMenu pushes the TaskBarIcon onto its hidden
+    # popup-owner window's event chain. Menu-only bindings missed every actual
+    # highlight in run45062114303 despite NVDA announcing the correct item.
+    _KS["menu_observers"]=[tray]
     for menu in _KS["menu_observers"]:
         menu.Bind(wx.EVT_MENU_HIGHLIGHT_ALL,_ks_menu_highlight)
+    _ks_record("native_menu_target",menu_item_id=target_id,target_index=target_index,
+               item_label=items[target_index].GetItemLabel(),observer="wx-taskbar-popup-owner")
     def root_open():
         _ks_key(tools_key,tools_open,"Navigate NVDA Tools submenu")
     def tools_open():
         _KS["menu_last_highlight"]=None
         def selected():
+            _ks_require(_KS.get("menu_last_highlight")==target_id,"Exact native menu highlight changed before Enter")
+            _ks_record("native_menu_selection_verified",menu_item_id=target_id,
+                       observed_menu_item_id=_KS["menu_last_highlight"])
             _ks_key(0x0d,lambda:_ks_wait(lambda:find_dialog() is not None,
                 lambda:_ks_restore(find_dialog()),"Real NVDA menu did not open settings"),"Activate dordiai Tools item")
         _ks_send([[(0x24,True)]]+[[(0x28,True)]]*target_index,"Select dordiai Tools item",
@@ -523,6 +533,19 @@ def validate_phase(controller,phase,pin):
         raise ValueError('Actual settings/save keyboard chords missing')
     if phase=='resume' and not {'NVDA+n','Activate dordiai Tools item'}<=labels:
         raise ValueError('Actual NVDA menu keyboard path missing')
+    if phase=='resume':
+        events=row.get('events',[])
+        targets=[(i,r) for i,r in enumerate(events) if r.get('name')=='native_menu_target']
+        selected=[(i,r) for i,r in enumerate(events) if r.get('name')=='native_menu_selection_verified']
+        if len(targets)!=1 or len(selected)!=1:raise ValueError('Exact native menu target/selection proof missing')
+        ti,target=targets[0];si,selection=selected[0];ident=target.get('menu_item_id')
+        if (type(ident) is not int or ident<0 or target.get('observer')!='wx-taskbar-popup-owner'
+            or selection.get('menu_item_id')!=ident or selection.get('observed_menu_item_id')!=ident
+            or not any(ti<i<si and r.get('name')=='native_menu_highlight' and r.get('menu_item_id')==ident
+                       for i,r in enumerate(events))):
+            raise ValueError('Actual native menu highlight does not match the exact preferences item')
+        activations=[i for i,r in enumerate(events) if r.get('name')=='send_input' and r.get('label')=='Activate dordiai Tools item']
+        if len(activations)!=1 or not si<activations[0]:raise ValueError('Menu Enter did not follow actual exact highlight')
     checks=list(controller.get('checks',[]))+list(probe.get('checks',[]))
     startup=probe.get('keyboard_startup_synth',{})
     if phase=='resume':
@@ -593,20 +616,104 @@ def verify_installed_runtime(addon,installed):
             'scope':'Read-only installed runtime/model/private-Python bytes; no checkbox deletion or modification'}
 
 
+class OwnedNvdaJob:
+    """Held-handle Windows job; suspended startup closes the child-spawn race."""
+    def __init__(self):
+        import ctypes as ct
+        from ctypes import wintypes as wt
+        self.ct=ct;self.kernel=ct.WinDLL('kernel32',use_last_error=True)
+        self.nt=ct.WinDLL('ntdll');self.handle=None
+        class Limits(ct.Structure):
+            _fields_=[('process_time',ct.c_longlong),('job_time',ct.c_longlong),('flags',wt.DWORD),
+                      ('min_set',ct.c_size_t),('max_set',ct.c_size_t),('active_limit',wt.DWORD),
+                      ('affinity',ct.c_size_t),('priority',wt.DWORD),('scheduling',wt.DWORD)]
+        class Extended(ct.Structure):
+            _fields_=[('basic',Limits),('io',ct.c_ulonglong*6),('process_memory',ct.c_size_t),
+                      ('job_memory',ct.c_size_t),('peak_process',ct.c_size_t),('peak_job',ct.c_size_t)]
+        class Accounting(ct.Structure):
+            _fields_=[('times',ct.c_longlong*4),('faults',wt.DWORD),('total',wt.DWORD),
+                      ('active',wt.DWORD),('terminated',wt.DWORD)]
+        self.Accounting=Accounting
+        for name,args in [('CreateJobObjectW',[ct.c_void_p,wt.LPCWSTR]),
+                          ('SetInformationJobObject',[wt.HANDLE,ct.c_int,ct.c_void_p,wt.DWORD]),
+                          ('AssignProcessToJobObject',[wt.HANDLE,wt.HANDLE]),
+                          ('QueryInformationJobObject',[wt.HANDLE,ct.c_int,ct.c_void_p,wt.DWORD,ct.c_void_p]),
+                          ('TerminateJobObject',[wt.HANDLE,wt.UINT]),('CloseHandle',[wt.HANDLE])]:
+            f=getattr(self.kernel,name);f.argtypes=args;f.restype=wt.HANDLE if name=='CreateJobObjectW' else wt.BOOL
+        self.nt.NtResumeProcess.argtypes=[wt.HANDLE];self.nt.NtResumeProcess.restype=ct.c_long
+        self.handle=self.kernel.CreateJobObjectW(None,None)
+        if not self.handle:raise ct.WinError(ct.get_last_error())
+        limits=Extended();limits.basic.flags=0x2000  # KILL_ON_JOB_CLOSE, no breakaway.
+        if not self.kernel.SetInformationJobObject(self.handle,9,ct.byref(limits),ct.sizeof(limits)):
+            error=ct.WinError(ct.get_last_error());self.kernel.CloseHandle(self.handle);self.handle=None;raise error
+
+    def assign_and_resume(self,process):
+        if not self.kernel.AssignProcessToJobObject(self.handle,int(process._handle)):
+            raise self.ct.WinError(self.ct.get_last_error())
+        status=self.nt.NtResumeProcess(int(process._handle))
+        if status<0:raise OSError('NtResumeProcess failed: 0x%08X'%(status&0xffffffff))
+
+    def active(self):
+        record=self.Accounting()
+        if not self.kernel.QueryInformationJobObject(self.handle,1,self.ct.byref(record),self.ct.sizeof(record),None):
+            raise self.ct.WinError(self.ct.get_last_error())
+        return int(record.active)
+
+    def finish(self,grace_seconds=2):
+        if self.handle is None:raise RuntimeError('Owned NVDA job already closed')
+        try:
+            before=self.active();deadline=time.monotonic()+grace_seconds
+            while self.active() and time.monotonic()<deadline:time.sleep(.02)
+            forced=self.active()!=0
+            if forced and not self.kernel.TerminateJobObject(self.handle,1):
+                raise self.ct.WinError(self.ct.get_last_error())
+            deadline=time.monotonic()+10
+            while self.active():
+                if time.monotonic()>=deadline:raise RuntimeError('Owned NVDA descendants did not finish')
+                time.sleep(.02)
+            return {'active_before_cleanup':before,'active_after_cleanup':0,
+                    'forced_tree_termination':forced,'all_owned_workers_reaped':True}
+        finally:
+            handle=self.handle;self.handle=None
+            if not self.kernel.CloseHandle(handle):raise self.ct.WinError(self.ct.get_last_error())
+
+
 class OwnedProcesses:
-    """Observe only this controller's exact Popen objects; never rediscover PIDs."""
-    def __init__(self,module):
-        self.module=module;self.children=[]
+    """Own exact Popen handles plus inherited NVDA jobs; never scan/reopen PIDs."""
+    def __init__(self,module,job_factory=OwnedNvdaJob):
+        self.module=module;self.children=[];self.jobs=[];self.job_factory=job_factory
     def __getattr__(self,name):return getattr(self.module,name)
     def Popen(self,command,*args,**kwargs):
-        process=self.module.Popen(command,*args,**kwargs)
-        self.children.append((process,Path(command[0]).name.lower()))
+        name=Path(command[0]).name.lower()
+        job=self.job_factory() if name=='nvda.exe' else None
+        if job:kwargs['creationflags']=kwargs.get('creationflags',0)|0x4  # CREATE_SUSPENDED.
+        try:process=self.module.Popen(command,*args,**kwargs)
+        except BaseException:
+            if job:job.finish(grace_seconds=0)
+            raise
+        self.children.append((process,name))
+        if job:
+            self.jobs.append((process,job))
+            try:job.assign_and_resume(process)
+            except BaseException:
+                # Assignment may have failed before job ownership. This held
+                # Popen handle is still ours; never leave its suspended thread.
+                try:process.kill();process.wait(timeout=20)
+                finally:
+                    if job.handle is not None:job.finish(grace_seconds=0)
+                raise
         return process
     def reap(self,base,report):
-        errors=[]
+        errors=[];jobs=[]
+        job_by_process={id(p):j for p,j in self.jobs}
         for process,_ in self.children:
             try:
-                base.stop_owned(process)
+                job=job_by_process.get(id(process))
+                if job:
+                    if job.handle is None:raise RuntimeError('Owned NVDA startup failed before normal job cleanup')
+                    row=dict(pid=process.pid,**job.finish());jobs.append(row)
+                    if row['forced_tree_termination']:errors.append('Forced owned NVDA job termination: '+str(process.pid))
+                else:base.stop_owned(process)
                 process.wait(timeout=20)
                 if process.poll() is None:raise RuntimeError('Exact owned child was not reaped')
             except Exception as error:errors.append(type(error).__name__+': '+str(error))
@@ -614,6 +721,7 @@ class OwnedProcesses:
               for p,name in self.children]
         report['owned_process_cleanup']={'children':rows,'errors':errors,
             'all_reaped_before_device_cleanup':bool(rows) and not errors and all(x['reaped'] for x in rows),
+            'owned_nvda_jobs':jobs,'all_owned_nvda_descendants_reaped':len(jobs)==len(self.jobs) and all(x['active_after_cleanup']==0 for x in jobs),
             'actual_nvda_process_count':sum(x['executable']=='nvda.exe' for x in rows)}
         if errors or any(not x['reaped'] for x in rows):
             raise RuntimeError('Exact owned process cleanup failed: '+str(errors))
@@ -685,6 +793,25 @@ def owned_virtual_render(args,report):
             raise RuntimeError('Exact owned device absence was not verified')
 
 
+def _record_resume_receipt(report,pin,value,process,started):
+    """Publish the original receipt before a secondary process/exit exception."""
+    second={'addon_sha256':pin['archive_sha256'],'checks':[],'probe':value}
+    report['phases']['resume']=second
+    report.update(actual_second_process_pid=process.pid,actual_second_process_started_at_ns=started)
+    failures=[r for r in value.get('checks',[]) if r.get('status')=='failed']
+    if failures:
+        report['primary_phase_error']=dict(phase='resume',check=failures[0],
+                                          all_failed_checks=failures)
+    return second
+
+
+def _record_resume_exit(report,process):
+    code=process.poll()
+    report['resume_process_exit']={'pid':process.pid,'returncode':code,
+        'windows_status_hex':None if code is None else '0x%08X'%(code&0xffffffff),
+        'reaped':code is not None,'normal_shutdown_verified':code==0}
+
+
 def _run_phases(args,pin,output,base,pristine,report,lease):
     original_subprocess=base.subprocess
     observed=OwnedProcesses(subprocess)
@@ -734,12 +861,21 @@ def _run_phases(args,pin,output,base,pristine,report,lease):
                 if process.poll() is not None:raise RuntimeError('Owned restarted NVDA exited before its receipt')
                 time.sleep(.25)
             else:raise TimeoutError('Owned restart settings proof timed out')
+            second=_record_resume_receipt(report,pin,value,process,started)
+            # An unsafe automatic restart can overwrite NVDA's --log-file.
+            # Keep the original observation at receipt time before waiting.
+            log=resumed/'nvda.log'
+            if log.is_file():
+                if log.stat().st_size>8*1024*1024:raise ValueError('Owned restart log exceeded diagnostic bound')
+                (resumed/'nvda-at-receipt.log').write_bytes(log.read_bytes())
             try:process.wait(timeout=20)
-            except subprocess.TimeoutExpired:base.stop_owned(process);raise RuntimeError('Owned restarted NVDA did not shut down normally')
+            except subprocess.TimeoutExpired:
+                base.stop_owned(process)
+                _record_resume_exit(report,process)
+                raise RuntimeError('Owned restarted NVDA did not shut down normally')
+            _record_resume_exit(report,process)
             if process.returncode!=0:raise RuntimeError('Owned restarted NVDA shutdown returned a failure')
         process=None
-        second={'addon_sha256':pin['archive_sha256'],'checks':[],'probe':value}
-        report['phases']['resume']=second
         validate_phase(second,'resume',pin)
         if _sha_file(executable)!=executable_hash:raise ValueError('Owned official NVDA executable changed')
         if _sha_file(args.addon)!=pin['archive_sha256']:raise ValueError('Original immutable addon changed')
