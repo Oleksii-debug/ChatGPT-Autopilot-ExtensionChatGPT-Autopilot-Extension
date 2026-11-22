@@ -23,11 +23,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   optional-name-bank-candidate:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ar-bank-mini]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ar-bank-mini]') || contains(github.event.head_commit.message, '[ar-bank-full]')
     runs-on: windows-latest
     timeout-minutes: 35
     env:
-      BANK_SCOPE: ${{ inputs.scope || 'mini' }}
+      BANK_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || contains(github.event.head_commit.message, '[ar-bank-full]') && 'full' || 'mini' }}
       PYTHONDONTWRITEBYTECODE: '1'
       PYTHONUTF8: '1'
       PYTHONIOENCODING: 'utf-8'
@@ -58,6 +58,43 @@ jobs:
           New-Item -ItemType Directory -Path $stage | Out-Null
           New-Item -ItemType Directory -Path dordiai-voices/ar-name-bank-results | Out-Null
           "AR29_STAGE=$stage" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Require pinned successful mini proof before full1305 preparation
+        if: env.BANK_SCOPE == 'full'
+        shell: python
+        run: |
+          import hashlib,json,pathlib
+          base=pathlib.Path('dordiai-voices/evidence')
+          def pinned(name,size,sha256,gitsha):
+              raw=(base/name).read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha256, 'Required reviewed mini proof bytes differ'
+              assert hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()==gitsha, 'Required reviewed mini Git object differs'
+              return raw,json.loads(raw)
+          receipt_raw,receipt=pinned('ar_name_bank_mini_actual_receipt.json',7545,'20133979723d9d915deac54c1d80ad61075c8efd03335ac09d733ac474fea816','7e49fbe1b9ab4d219540f4070ae44ee59506ca8c')
+          report_raw,report=pinned('ar_name_bank_mini_windows_45051688399.json',17440,'74d9b6922da6c00dee02396375e678fc8631da5f253fab0cba11d13904b23168','274dd325e297db140c0fa5a4d879a3a836c4f703')
+          # The reviewed JSON Git object is canonical LF. Independently bind it
+          # to the byte-exact original Windows CRLF report inside the proof ZIP.
+          assert b'\r' not in report_raw
+          original=report_raw.replace(b'\n',b'\r\n')
+          assert len(original)==18002 and hashlib.sha256(original).hexdigest()=='d4ba12515c8e0a4f012c5475a6d83d4d9d3a908a68a32b330a64e00d9436e960'
+          assert receipt['run']==45051688399 and receipt['job']==137297981036
+          assert receipt['status']=='passed-noninstallable-optional-bank-feasibility' and report['status']==receipt['status']
+          assert report['scope']=='mini' and report['native_generation_calls']==2 and report['projection_calls']==4 and report['actual_clip_count']==4
+          assert set(report['selected_profiles'])=={'viktoriia','oksana'} and set(report['selected_glyphs'])=={'ا','ء'}
+          assert report['sample_rate']==24000 and report['native_input_rate']==22050 and report['planned_full_clip_count']==1305
+          assert report['lookup']['warm_read_samples']==400 and len(report['lookup']['lookups'])==4
+          for field in ['model_creation_and_subprocess_forbidden','resource_epoch_stale_rejected','wrong_mode_locale_glyph_and_profile_rejected']:
+              assert report['lookup'][field] is True
+          assert report['original_payloads_unchanged']==10230 and report['original180_banks_untouched'] is True and report['existing_bank_files_modified']==0
+          assert report['previous3330_regenerated'] is False and report['all45_and29_prepared'] is False
+          for field in ['nvda_verified','typing_verified','physical_audio_verified','pronunciation_verified','product_ready','production_registered']:
+              assert report[field] is False
+          assert receipt['full_plan']['actually_completed_here']==4 and receipt['full_plan']['full_batch_launched'] is False
+          assert all(value is False for value in receipt['acceptance'].values())
+          assert report['source_core_sha256']=='908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573'
+          assert report['source_wide_sha256']=='5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262'
+          gate={'format':'dordiai-ar-bank-full-pinned-mini-precondition','status':'passed','required_mini_run':45051688399,'receipt_git_blob':'7e49fbe1b9ab4d219540f4070ae44ee59506ca8c','reviewed_report_git_blob':'274dd325e297db140c0fa5a4d879a3a836c4f703','original_raw_report_sha256':hashlib.sha256(original).hexdigest(),'full_batch_scope':'research preparation only, no installation/default switch/production13 edits','physical_audio_verified':False,'product_ready':False}
+          pathlib.Path('dordiai-voices/ar-name-bank-results/full-precondition.json').write_text(json.dumps(gate,indent=2)+'\n',encoding='utf-8')
+          print('AR_BANK_FULL_REVIEWED_MINI_PRECONDITION_PASS',flush=True)
       - name: Independently acquire hash-verified primary name table without redistributing the book
         shell: python
         run: |

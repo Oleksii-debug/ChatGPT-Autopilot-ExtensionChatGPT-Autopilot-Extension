@@ -16,10 +16,14 @@ EXPECTED_VERSION = "0.13.1-dev.13"
 ANCHOR = "    later(500, open_settings)\n"
 
 
-def modal_allowed(row, process_id, title):
-    return (isinstance(row, dict) and row.get("pid") == process_id
-            and row.get("title") == title and row.get("class") == "#32770"
-            and row.get("visible") is True and row.get("ok_id") == 1)
+def modal_allowed(row, process_id, title, ok_id=5100):
+    return (isinstance(row, dict) and row.get("kind") == "nvda-wx-message-dialog"
+            and row.get("module") == "gui.message" and row.get("class") == "MessageDialog"
+            and row.get("pid") == process_id and row.get("title") == title
+            and row.get("visible") is True and row.get("modal") is True
+            and row.get("ok_id") == ok_id and row.get("button_id") == ok_id
+            and row.get("button_parent_owned") is True and row.get("button_is_wx_button") is True
+            and row.get("button_label") == "OK" and isinstance(row.get("text"), str) and bool(row["text"].strip()))
 
 
 def validate_build_pin(pin):
@@ -65,61 +69,56 @@ PROBE_FUNCTION = r'''
 VOICE_LIFECYCLE = {}
 
 
-def lifecycle_modal_worker(title, state):
-    # Close only the genuine owned-process native OK message box. Never replace
-    # gui.messageBox or return a fake wx dialog/selection result.
+def lifecycle_ack_modal(title, state):
+    """Acknowledge only the genuine owned frozen-NVDA MessageDialog."""
+    if state.get("completion_modal"):
+        return False
     import ctypes
     from ctypes import wintypes
+    from gui.message import MessageDialog
     user = ctypes.WinDLL("user32", use_last_error=True)
-    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-    user.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
-    user.EnumWindows.restype = wintypes.BOOL
-    user.EnumChildWindows.argtypes = [wintypes.HWND, callback_type, wintypes.LPARAM]
-    user.EnumChildWindows.restype = wintypes.BOOL
     user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     user.GetWindowThreadProcessId.restype = wintypes.DWORD
-    user.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
-    user.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
-    user.GetDlgItem.argtypes = [wintypes.HWND, ctypes.c_int]
-    user.GetDlgItem.restype = wintypes.HWND
-    user.IsWindowVisible.argtypes = [wintypes.HWND]
-    user.IsWindowVisible.restype = wintypes.BOOL
-    user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-    user.PostMessageW.restype = wintypes.BOOL
-    while time.monotonic() < state["deadline"] and not FINISHED:
-        eligible = []
-        def visit(hwnd, unused):
-            process_id = wintypes.DWORD()
-            user.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
-            caption, cls = ctypes.create_unicode_buffer(2048), ctypes.create_unicode_buffer(128)
-            user.GetWindowTextW(hwnd, caption, len(caption))
-            user.GetClassNameW(hwnd, cls, len(cls))
-            row = {"pid": int(process_id.value), "title": caption.value, "class": cls.value,
-                   "visible": bool(user.IsWindowVisible(hwnd)), "ok_id": 1 if user.GetDlgItem(hwnd, 1) else None}
-            if modal_allowed(row, os.getpid(), title):
-                eligible.append((hwnd, row))
-            return True
-        user.EnumWindows(callback_type(visit), 0)
-        if len(eligible) > 1:
-            state["modal_error"] = "Ambiguous owned native message box"
-            return
-        if eligible:
-            hwnd, row = eligible[0]
-            texts = []
-            def child_text(child, unused):
-                caption, cls = ctypes.create_unicode_buffer(4096), ctypes.create_unicode_buffer(128)
-                user.GetWindowTextW(child, caption, len(caption))
-                user.GetClassNameW(child, cls, len(cls))
-                if cls.value == "Static" and caption.value:
-                    texts.append(caption.value)
-                return True
-            user.EnumChildWindows(hwnd, callback_type(child_text), 0)
-            row["text"] = "\n".join(texts)
-            row["ok_posted"] = bool(user.PostMessageW(hwnd, 0x111, 1, 0))
-            state["completion_modal"] = row
-            return
-        time.sleep(.05)
-    state["modal_error"] = "No owned completion message box before deadline"
+    eligible, observed = [], []
+    for window in wx.GetTopLevelWindows():
+        if type(window) is not MessageDialog:
+            continue
+        process_id = wintypes.DWORD()
+        user.GetWindowThreadProcessId(window.GetHandle(), ctypes.byref(process_id))
+        button = window.FindWindow(wx.ID_OK)
+        texts = []
+        def visit(parent):
+            for child in parent.GetChildren():
+                if isinstance(child, wx.StaticText) and child.GetLabel():
+                    texts.append(child.GetLabel())
+                visit(child)
+        visit(window)
+        is_button = isinstance(button, wx.Button)
+        row = {"kind": "nvda-wx-message-dialog", "module": type(window).__module__,
+               "class": type(window).__name__, "pid": int(process_id.value),
+               "title": window.GetTitle(), "visible": window.IsShown(), "modal": window.IsModal(),
+               "ok_id": int(wx.ID_OK), "button_id": button.GetId() if is_button else None,
+               "button_parent_owned": is_button and button.GetTopLevelParent() is window,
+               "button_is_wx_button": is_button,
+               "button_label": button.GetLabel().replace("&", "").strip() if is_button else None,
+               "text": "\n".join(texts)}
+        observed.append(row)
+        if modal_allowed(row, os.getpid(), title, int(wx.ID_OK)):
+            eligible.append((button, row))
+    state["observed_message_dialogs"] = observed
+    if len(eligible) > 1:
+        raise RuntimeError("Ambiguous owned NVDA completion MessageDialogs")
+    if not eligible:
+        return False
+    button, row = eligible[0]
+    row["ack_method"] = "wx.EVT_BUTTON"
+    state["completion_modal"] = row
+    event = wx.CommandEvent(wx.EVT_BUTTON.typeId, button.GetId())
+    event.SetEventObject(button)
+    row["ok_posted"] = bool(button.GetEventHandler().ProcessEvent(event))
+    if not row["ok_posted"]:
+        raise RuntimeError("The real NVDA OK button event was not processed")
+    return True
 
 
 def lifecycle_dialog():
@@ -130,13 +129,6 @@ def lifecycle_dialog():
     return None
 
 
-def lifecycle_modal_guarded(title, state):
-    try:
-        lifecycle_modal_worker(title, state)
-    except Exception as error:
-        state["modal_error"] = repr(error)
-        state["modal_traceback"] = traceback.format_exc()
-
 
 def lifecycle_begin():
     global RECOVERY_ORIGINAL_WAVE_FACTORY
@@ -145,10 +137,10 @@ def lifecycle_begin():
         RECOVERY_ORIGINAL_WAVE_FACTORY = nvwave.WavePlayer
         nvwave.WavePlayer = RecordingPCMSink
     result = RESULT["voice_package_lifecycle"] = {
-        "scope": "Real wx dialog async maintenance, genuine installed package assets and real worker replacement",
+        "scope": "Real wx dialog async maintenance, genuine NVDA MessageDialog notices, installed package assets and real worker replacement",
         "api_dispatched_operations": True, "native_file_chooser_interaction_verified": False,
         "full_keyboard_accessibility_verified": False, "actual_restart_upgrade_verified": False,
-        "physical_audio_verified": False, "product_ready": False, "steps": []}
+        "physical_audio_verified": False, "product_ready": False, "process_id": os.getpid(), "steps": []}
     RESULT["scope"] = "actual-NVDA-real-wx-package-maintenance-functional-pipeline"
     module = sys.modules[type(DRIVER).__module__]
     prefs = module._prefs
@@ -215,6 +207,7 @@ def lifecycle_next():
         dialog.voice.SetSelection(dialog.enabled_voice_codes.index(voice))
     dialog.tabs.SetSelection(3)
     row = {"name": name, "old_driver_id": id(DRIVER), "real_dialog_type": type(dialog).__name__,
+           "settings_dialog_title": dialog.title,
            "labels": {key: getattr(dialog, key).GetLabel() for key in ("install_package", "remove_package", "rollback_package")},
            "deadline": time.monotonic() + 150}
     if name in ("install-v1", "install-v2", "install-again"):
@@ -233,7 +226,6 @@ def lifecycle_next():
             row["locked_map"] = mmap.mmap(row["locked_stream"].fileno(), 0, access=mmap.ACCESS_READ)
         operation = lambda: assets.uninstall_voice_package(refs, voice)
     state.update(previous_dialog=dialog, current=row)
-    threading.Thread(target=lifecycle_modal_guarded, args=(dialog.title, row), daemon=True).start()
     dialog._run_package_operation("Перевірка життєвого циклу голосового пакета…", operation)
     row["espeak_selected_before_async_mutation"] = (getattr(synthDriverHandler.getSynth(), "name", None) == "espeak")
     later(100, lifecycle_poll)
@@ -243,10 +235,18 @@ def lifecycle_poll():
     global DRIVER, ORIGINAL_PLAY, ORIGINAL_FEED
     state, row = VOICE_LIFECYCLE, VOICE_LIFECYCLE["current"]
     old = state["previous_dialog"]
+    acknowledged = lifecycle_ack_modal(row["settings_dialog_title"], row)
+    RESULT["voice_package_lifecycle"]["pending_operation"] = {
+        "name": row["name"], "current_synth": getattr(synthDriverHandler.getSynth(), "name", None),
+        "completion_modal": row.get("completion_modal"),
+        "observed_message_dialogs": row.get("observed_message_dialogs", []),
+    }
+    save()
+    if acknowledged:
+        later(100, lifecycle_poll)
+        return
     dialog = lifecycle_dialog()
     active = synthDriverHandler.getSynth()
-    if row.get("modal_error"):
-        raise RuntimeError(row["modal_error"])
     if dialog is None or dialog is old or active is None or getattr(active, "name", None) != "kx47Preview":
         if time.monotonic() >= row["deadline"]:
             raise TimeoutError("Actual package pipeline did not restore a fresh dialog/driver")
@@ -261,7 +261,7 @@ def lifecycle_poll():
         "old_driver_closed": bool(getattr(old.synth, "_closed", False)),
         "old_thread_stopped": not old.synth._thread.is_alive(),
         "espeak_selected_before_async_mutation": row["espeak_selected_before_async_mutation"],
-        "completion_modal": row.get("completion_modal"), "labels": row["labels"],
+        "completion_modal": row.get("completion_modal"), "settings_dialog_title": row["settings_dialog_title"], "labels": row["labels"],
         "active_version": index["active"].get(voice), "inactive_version": index.get("inactive", {}).get(voice),
         "index_format_version": index["format_version"],
         "core_profile_unchanged": hashlib.sha256(state["profile"].read_bytes()).hexdigest() == state["profile_sha"],
@@ -269,6 +269,8 @@ def lifecycle_poll():
         "result_notice": row.get("completion_modal", {}).get("text"),
         "maintenance_released": old._package_speech.get("maintenance_released") is True,
     }
+    RESULT["voice_package_lifecycle"]["current_step_observations"] = details
+    save()
     if details["active_version"] != expected_active or details["inactive_version"] != expected_inactive:
         raise ValueError("Actual package active/inactive ownership differs from expected operation outcome")
     if expected_active:
@@ -284,7 +286,7 @@ def lifecycle_poll():
     if not all(details[key] for key in ("fresh_driver", "old_driver_closed", "old_thread_stopped", "espeak_selected_before_async_mutation", "core_profile_unchanged", "maintenance_released")):
         raise ValueError("Actual driver retirement/reload/core preservation invariant failed")
     if not row.get("completion_modal", {}).get("ok_posted"):
-        raise ValueError("No genuine owned completion message box was acknowledged")
+        raise ValueError("No genuine owned NVDA MessageDialog was acknowledged")
     if not (details["result_notice"] or "").strip():
         raise ValueError("Actual completion/error message text was not captured")
     success_notice = "Пакет змінено й перевірено." in (details["result_notice"] or "")

@@ -897,6 +897,18 @@
       "cancel_tail_accepted": false,
       "physical_audio_verified": false,
       "product_ready": false
+    },
+    "source13_actual_nvda_first": {
+      "run": 45051688055,
+      "status": "eight_passed_plain_fixture_observation_overlap_failed_strictly",
+      "passed_modes": 8,
+      "failed_modes": 1,
+      "plain_source_language_mismatches": 0,
+      "plain_expected_pieces": 102,
+      "plain_observed_pieces": 107,
+      "extra_in_actual_queued_or_driver_sequence": false,
+      "source13_archive_unchanged": true,
+      "evidence": "evidence/source13_nine_mode_first_45051688055.json"
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -1075,6 +1087,21 @@
       "binary_source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
       "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
       "evidence": "evidence/dordiai-core-dev12-backup-receipt.json"
+    },
+    "core13": {
+      "run": 45051688224,
+      "release_id": 454633971,
+      "asset_id": 779924768,
+      "receipt_asset_id": 779930085,
+      "bytes": 1992990314,
+      "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+      "readback_sha256_verified": true,
+      "receipt_readback_sha256_verified": true,
+      "draft": true,
+      "published": false,
+      "binary_source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+      "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+      "evidence": "evidence/dordiai-core-dev13-backup-receipt.json"
     }
   },
   "latest_built_core": {

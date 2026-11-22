@@ -51,8 +51,8 @@ jobs:
               "tools/windows_nvda_typing_scenarios.py":"47f8c1ec06ad41dac17845db5e79af705fb51abc",
               "tools/validate_source12_typing_receipt.py":"9062e5156dbfa005fad6d4b5c5969c3fdf8d77fe",
               "tools/validate_source13_integration_receipt.py":"1d785fb951625b424e4d620426640b5bfab3a73e",
-              "tools/windows_nvda_voice_packages_probe.py":"efec0a54f2ddf9d2a4a56fa283456feec285cc2e",
-              "tools/validate_source13_package_receipt.py":"aaf5a610e757f26d885707f99d34cbb9c82b0704"}
+              "tools/windows_nvda_voice_packages_probe.py":"a942b244281f1db94fd2f434dd2c570922c83583",
+              "tools/validate_source13_package_receipt.py":"9d79c8c91ff437c0345ebfa364a983a363226305"}
           for relative,expected in tools.items():
               path=root/relative
               if not path.is_file() or path.is_symlink() or path.stat().st_size>1024*1024:

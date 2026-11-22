@@ -1,0 +1,29 @@
+{
+  "format": "dordiai-nbl-lwazi-raw-name-guard-reaudit",
+  "format_version": 1,
+  "date": "2026-11-22",
+  "status": "actual-full-source-reread-equal-except-auditor-source-hash",
+  "platform": "Linux CPython3.12; actual Windows rerun not claimed here",
+  "production_changed": false,
+  "training_executed": false,
+  "native_model_ready": false,
+  "original_audit": {
+    "git_blob": "b57624e1dd911f8f9308340f73b948250c7fc735",
+    "sha256": "cf9675fba98f75704085cfa5af5b2ced87d81858e4384ffdf4223c563a81b2bb",
+    "auditor_source_sha256": "6b6db243e9e8d72f3c2eb42c5cbdf92e256a2e239ebf5443f55aab706a7bb52b",
+    "unchanged": true
+  },
+  "new_audit": {
+    "sha256": "6469bfac36bb2d55cdad1b26777d753eed44e7052cd84c584733996c82d6419e",
+    "auditor_git_blob": "a3d9c5fe9157daadee98b1732cec3de9c13a3622",
+    "auditor_source_sha256": "f4914519f2ca85d60763d61aeb1531390b8f2c2ef50ae96ae88c5aafe29d49d3",
+    "all_three_full_archive_hashes_reverified_before_and_after": true,
+    "all_wav_text_grid_crc_reads_rerun": true,
+    "all_remaining_JSON_fields_equal_to_original": true
+  },
+  "synthetic_unit_tests_passed": 18,
+  "corrected_guard": "Check orig_filename against filename; reject actual raw backslash/NUL aliases before platform normalization. Fixture writes real raw ZipInfo bytes; Windows-reader-state regression also runs on Linux.",
+  "native_nbl_utterances": 994,
+  "native_nbl_hours": 1.947677326388888,
+  "english_secondary_clips_not_nbl": 395
+}

@@ -1,0 +1,33 @@
+{
+  "format": "dordiai-source13-package-gui-original-probe-failure",
+  "format_version": 1,
+  "run_id": 45051688410,
+  "job_id": 137297980803,
+  "workflow_commit": "96c8285e1ef14b808226890189f3c6b25975312b",
+  "immutable_binary_source": "2d70515a4c49413efcb23198491bbc675a55db0a",
+  "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "original_probe_git_blob": "efec0a54f2ddf9d2a4a56fa283456feec285cc2e",
+  "accepted": false,
+  "result": "failed-probe-modal-compatibility",
+  "failure": "Probe incorrectly required a native Win32 #32770/IDOK1 completion box, but actual frozen NVDA2026.3.1 uses gui.message.MessageDialog, a real wx modal.",
+  "actual_log_observations": [
+    "17:52:15.884 loaded builtin eSpeak",
+    "17:52:16.414 fresh kx47Preview loaded with Owned lifecycle fixture agnieszka",
+    "17:52:16.419 actual gui.message.MessageDialog.ShowModal entered",
+    "17:54:45.940 package probe timed out waiting for completion/reopened settings; exit was blocked by still-open modal"
+  ],
+  "original_artifact": {
+    "id": 14765917563,
+    "bytes": 14863,
+    "sha256": "a8a2dee04c3c3b4850807ba5388e7c87f7c8689d18a715fb8df55be323326af5",
+    "original_zip_git_blob": "e6fda00b70ed8807efd27b5bd2b47618b203cfbe"
+  },
+  "fix_scope": "Tools-only modern owned MessageDialog type/PID/title/modal/button-event recognition; no product13 archive/runtime edits.",
+  "new_probe_candidate": "a942b244281f1db94fd2f434dd2c570922c83583",
+  "new_probe_tests": "ac16bca69d1a3e5d9b7f727d98b75cc43ce79c57",
+  "paired_strict_gate_packet": "d563b8009dfcfc7dd279246f136915d7ecc9ef5b",
+  "scaffold_tests": 9,
+  "actual_new_probe_run": false,
+  "product_ready": false,
+  "physical_audio_verified": false
+}

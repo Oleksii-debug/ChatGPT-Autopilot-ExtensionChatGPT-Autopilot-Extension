@@ -1,0 +1,68 @@
+{
+  "binary_download_sha256_verified": true,
+  "binary_source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+  "core": {
+    "name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+    "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "size_bytes": 1992990314
+  },
+  "core_asset_id": 779924768,
+  "format": "dordiai-engineering-backup",
+  "format_version": 1,
+  "limitations": [
+    "Source worker workflow does not verify NVDA13 or physical playback",
+    "Native pronunciation, typing and character-name acceptance remain pending",
+    "Exact complete native membership and 180 existing bank files are embedded",
+    "Core archive does not include optional Afri model packs"
+  ],
+  "native_word_membership": {
+    "codes": [
+      "uk",
+      "ru"
+    ],
+    "descriptor_sha256": "2de5611c384e933e19d1cdf5fda37f17bd5c4b7602d09964f53fdb7280877459",
+    "sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+    "size_bytes": 18661227,
+    "word_count": 6642550
+  },
+  "nvda_verified_by_source_workflow": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "pronunciation_verified": false,
+  "release_draft": true,
+  "release_id": 454633971,
+  "release_published_at": null,
+  "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+  "resource_baseline": {
+    "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "core_version": "0.13.1-dev.12",
+    "existing1596_private_runtime_files_byte_identical": true,
+    "existing180_bank_files_byte_identical": true,
+    "existing8510_model_identity_files_byte_identical": true,
+    "new_Arabic29_JSON_sha256": "5966d74af4bcf9e3a7be2221e7d3a04b481b5598332c32a3cc70ec2097092bb8",
+    "old_source_bound_bank_overlay_reapplied": false,
+    "only_one_new_reviewed_Arabic29_JSON": true,
+    "source_run_id": 45040668513
+  },
+  "source_artifact": {
+    "id": 14765535864,
+    "name": "dordiai-source13-development-core-45049806570",
+    "wrapper_sha256": "cb63dadbab699a1c90309a39e3fe77a5adc9e1c2488ba10b30cefb13d83ad0a4",
+    "wrapper_size_bytes": 1992992808
+  },
+  "source_run_conclusion": "success",
+  "source_run_id": 45049806570,
+  "source_validation": {
+    "actual_selected_profile_worker_cases": 225,
+    "actual_windows_voice_package_fault_cases": 30,
+    "blocked_voice_checks": 8,
+    "native_cancel_and_recovery": true,
+    "same_worker_native_package_removal_and_restore": true,
+    "three_default_worker_languages_passed": true,
+    "windows_tests": 1682,
+    "windows_tests_passed": 1627,
+    "windows_tests_skipped": 55
+  },
+  "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+  "tag": "dordiai-voices-dev13-engineering-backup"
+}

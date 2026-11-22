@@ -1,0 +1,141 @@
+{
+  "acceptance": "Each actual trial independently uses its COMPLETE emitted PCM at ONE fixed capture offset and unchanged NCC>=0.98; preserve packet/clock/anchor/drop/cancel scopes, no piecewise/warped pass",
+  "acoustic_latency_verified": false,
+  "actual_nvda_prefetch_variants_run": false,
+  "baseline12_uses_identical_overlay_mechanics": true,
+  "candidate_counts": [
+    12,
+    24,
+    32
+  ],
+  "constructor_model_preload_policy": "Same existing graph/bootstrap policy for every fresh process; RuntimeOnly ready must not be labeled fully warm",
+  "current_actual_source12_evidence": {
+    "cause_not_established_from_timing_alone": true,
+    "complete_fixed_ncc": 0.5856072658391752,
+    "gate_passed": false,
+    "index_git_blob": "8d17528f4f12ebf7857a529b3b24ad7999b4dd1b",
+    "observed_added_intervals_ms": [
+      37.291666666666664,
+      22.916666666666664,
+      8.833333333333334
+    ],
+    "run_id": 45049366545,
+    "whole_zip_git_blob": "52b26e24d47ba3e8ab78f525efeb7d89f7582447"
+  },
+  "first_ready_reserve_added": false,
+  "fixture_tests_passed": 26,
+  "format": "dordiai-future14-bounded-prefetch-research-contract",
+  "format_version": 1,
+  "fresh_process_requirements": [
+    "Fresh official NVDA and private config/extracted archive for every trial",
+    "No reuse of in-memory worker/word caches between variants",
+    "Record original source pin, overlay source pin, actual loaded driver path/code identity, actual profile/rate/multiplier/tempo/request speeds and initial cache/bootstrap state",
+    "Retain exact100 UTF8 SHA c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16; public genuine POSITION_ALL; no manual language commands",
+    "Same guarded90second fullread and separate8second public cancellation capture",
+    "Reap exact own NVDA/helper process tree before deleting only its large private portable/config copy; keep bounded proof files, avoid accumulating multiple2GB extractions on hosted disk"
+  ],
+  "future_actual_input_requirements": {
+    "archive_bytes": null,
+    "archive_sha256": null,
+    "archive_source_sha256": null,
+    "immutable_core_version": "0.13.1-dev.13",
+    "required_before_any_launch": "Actual immutable13 build receipt/artifact plus explicit archive/source pins; no13 measurement claimed by this prototype"
+  },
+  "inconclusive_conditions": [
+    "If baseline12 also passes, these data do not establish that raising count fixed a reproducible defect",
+    "If candidate24/32 fails, preserve exact gaps and do not add startup reserve/warm words/relax thresholds",
+    "All-zero device positions keep original strict clock/cancel gate open; any separate software-only gate needs independent justification"
+  ],
+  "increment_payload_bytes_over12": {
+    "24": 5760,
+    "32": 9600
+  },
+  "inner_explicit_pending_count2_unchanged": true,
+  "memory_budget_scope": "Outer queued mono PCM payload only at actual24kHz/16bit/10ms; excludes Python queue/object overhead, workers, caches and WavePlayer buffers",
+  "model_or_full_word_cache_warmup_added": false,
+  "native_pronunciation_verified": false,
+  "order_scope": "Two fresh trials per count reduce one-direction OS/model initialization timing bias; all model requests and caches still fresh; do not select order after observing results",
+  "original_archive_modified": false,
+  "overlay_only": "Explicit pending_count keyword on outer SynthDriver._run buffered_items call in a fresh owned extracted copy; preserve all other AST and original bytes",
+  "payload_bytes_at_counts": {
+    "12": 5760,
+    "24": 11520,
+    "32": 15360
+  },
+  "physical_audio_verified": false,
+  "planned_counterbalanced_order": [
+    12,
+    24,
+    32,
+    32,
+    24,
+    12
+  ],
+  "product_ready": false,
+  "production_source13_modified": false,
+  "prototype_source_review": {
+    "repository_commit": "e62f46371d0b78c4ada84226f6ccb2c8efab6bc0",
+    "scope": "Current repository source13 AST overlay and real pure buffering-helper tests only; immutable13 archive/model/NVDA variant execution not yet performed",
+    "source_bytes": 93785,
+    "source_sha256": "17eeda6106858c4eb14ede91dd2a698cae0abaa9894d3df3e3d445d374a042ee"
+  },
+  "status": "prototype-fixtures-and-synthetic-mechanics-only-not-launched",
+  "synthetic_inputs": {
+    "chunk_ms": 10,
+    "chunks_per_word": [
+      50,
+      50,
+      50,
+      50
+    ],
+    "scope": "Predeclared synthetic readiness costs; NOT measured feed gap costs or a fitted NVDA latency prediction",
+    "sink_reserve_ms": 0,
+    "whole_word_render_costs_ms": [
+      50,
+      300,
+      300,
+      300
+    ]
+  },
+  "synthetic_results": [
+    {
+      "all_chunks_preserved_in_order": true,
+      "first_play_ms": 50,
+      "first_ready_ms": 50,
+      "last_audio_end_on_cancel_ms": 405,
+      "maximum_pending_items": 12,
+      "maximum_queued_pcm_bytes": 5760,
+      "old_generation_started_after_cancel": false,
+      "pending_count": 12,
+      "startup_reserve_ms": 0,
+      "synthetic_added_gap_ms": 510,
+      "synthetic_cancel_at_ms": 405
+    },
+    {
+      "all_chunks_preserved_in_order": true,
+      "first_play_ms": 50,
+      "first_ready_ms": 50,
+      "last_audio_end_on_cancel_ms": 405,
+      "maximum_pending_items": 24,
+      "maximum_queued_pcm_bytes": 11520,
+      "old_generation_started_after_cancel": false,
+      "pending_count": 24,
+      "startup_reserve_ms": 0,
+      "synthetic_added_gap_ms": 150,
+      "synthetic_cancel_at_ms": 405
+    },
+    {
+      "all_chunks_preserved_in_order": true,
+      "first_play_ms": 50,
+      "first_ready_ms": 50,
+      "last_audio_end_on_cancel_ms": 405,
+      "maximum_pending_items": 32,
+      "maximum_queued_pcm_bytes": 15360,
+      "old_generation_started_after_cancel": false,
+      "pending_count": 32,
+      "startup_reserve_ms": 0,
+      "synthetic_added_gap_ms": 0,
+      "synthetic_cancel_at_ms": 405
+    }
+  ]
+}

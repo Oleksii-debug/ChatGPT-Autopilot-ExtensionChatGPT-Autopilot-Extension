@@ -1,0 +1,48 @@
+{
+  "format": "dordiai-ar-report-line-ending-byte-correction",
+  "format_version": 1,
+  "reason": "Previous Python read_text used universal newline translation when uploading UTF-8 text. Reviewed Git report objects are canonical LF; original Windows raw report bytes are CRLF. Calling the former byte-exact was inaccurate. Both exact raw report objects are now separately preserved; original proof ZIPs always held raw original bytes unchanged.",
+  "reports": [
+    {
+      "scope": "ar29",
+      "reviewed_canonical_lf": {
+        "path": "evidence/ar29_ordinary_names_windows_45046562273.json",
+        "git_blob": "870e6d96d091e83f275b0666de2ef074ad6ca053",
+        "size_bytes": 40346,
+        "sha256": "7e34be218c71abb3d2ba3e13790d652cd97b0a279aad4b77ef7994f827470887"
+      },
+      "byte_exact_original_windows_crlf": {
+        "path": "evidence/ar29_ordinary_names_windows_45046562273.exact-crlf.json",
+        "git_blob": "45aa4ff084b1babfebe58c7e6044818503deded2",
+        "size_bytes": 42035,
+        "sha256": "86df626c7900b6b42332cb8cfd5c805fe6fbaff2c4ab2ead62b10189949c3ab3"
+      },
+      "crlf_lines": 1689,
+      "parsed_json_identical": true,
+      "canonical_lf_reconstructs_exact_original_crlf": true
+    },
+    {
+      "scope": "mini",
+      "reviewed_canonical_lf": {
+        "path": "evidence/ar_name_bank_mini_windows_45051688399.json",
+        "git_blob": "274dd325e297db140c0fa5a4d879a3a836c4f703",
+        "size_bytes": 17440,
+        "sha256": "74d9b6922da6c00dee02396375e678fc8631da5f253fab0cba11d13904b23168"
+      },
+      "byte_exact_original_windows_crlf": {
+        "path": "evidence/ar_name_bank_mini_windows_45051688399.exact-crlf.json",
+        "git_blob": "c60c682078b9c6e8f0bb94d3ecbd78c80f7e6c81",
+        "size_bytes": 18002,
+        "sha256": "d4ba12515c8e0a4f012c5475a6d83d4d9d3a908a68a32b330a64e00d9436e960"
+      },
+      "crlf_lines": 562,
+      "parsed_json_identical": true,
+      "canonical_lf_reconstructs_exact_original_crlf": true
+    }
+  ],
+  "preserve_existing_reviewed_report_and_receipt_objects": true,
+  "inference_pcm_outcomes_unchanged": true,
+  "source13_runtime_and_data_unchanged": true,
+  "full_gate_requirement": "Both reviewed mini objects7e49/274d remain mandatory; verify canonical LF SHA and Git blob, then reconstruct exact CRLF and verify original d4ba SHA. No weaker semantic-only comparison.",
+  "quality_flags_unchanged_false": true
+}

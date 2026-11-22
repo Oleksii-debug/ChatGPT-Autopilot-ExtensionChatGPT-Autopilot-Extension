@@ -1,0 +1,126 @@
+{
+  "format": "dordiai-source13-nine-mode-actual-evidence",
+  "format_version": 1,
+  "run_id": 45051688055,
+  "source_commit": "96c8285e1ef14b808226890189f3c6b25975312b",
+  "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "core_bytes": 1992990314,
+  "passed_modes": 8,
+  "failed_modes": 1,
+  "failed_mode": "plain-text",
+  "product_ready": false,
+  "physical_audio_verified": false,
+  "summary_blob": "24c33bbea3a531f72f4619dd9f527bda3d65da0f",
+  "receipts": [
+    {
+      "job_id": 137297980229,
+      "name": "actual-nvda13 (characters-only)",
+      "conclusion": "success",
+      "gzip_blob": "62271a23e8e09bc7d52a9168952afcf6900fdc75",
+      "encoding": "gzip+base64",
+      "chunks": 3,
+      "json_sha256": "7515a3102b5d85fe3f6e83b1fb059872d73dd98edf94582fd1077497f7037bfe",
+      "gzip_sha256": "b16ddb17ab990898f74d12f8bf5d00ae21d7fd4909c23232558ae04f62342c4c",
+      "json_size_bytes": 324732
+    },
+    {
+      "job_id": 137297980381,
+      "name": "actual-nvda13 (normal)",
+      "conclusion": "success",
+      "gzip_blob": "840e1344e6a32e31feb0ea0c0b1345208a116b71",
+      "encoding": "gzip+base64",
+      "chunks": 2,
+      "json_sha256": "503c7400d4d1d8bed2c7cd6e62e7d64682bc525395751a2238437befc5c31347",
+      "gzip_sha256": "1fa79959af807d435a6da5519fac98f06f126e84dfbaa481d30d796d32cbc9b9",
+      "json_size_bytes": 262986
+    },
+    {
+      "job_id": 137297980388,
+      "name": "actual-nvda13 (forced-uk)",
+      "conclusion": "success",
+      "gzip_blob": "db0008b1834b9d12cb5e82758546e0da21d80129",
+      "encoding": "gzip+base64",
+      "chunks": 2,
+      "json_sha256": "e9b7894388848ab7151fa3f9ab48bb2ca7227ab7f6d83d948a4b40a2cbd63c8f",
+      "gzip_sha256": "9a2fa2cbb15712a0cbfaa2ffab1d418d775df31dbc3727750a095f8bdcaa7d56",
+      "json_size_bytes": 175536
+    },
+    {
+      "job_id": 137297980396,
+      "name": "actual-nvda13 (ru-missing)",
+      "conclusion": "success",
+      "gzip_blob": "c0a5cfb6e1d98e23c8eb68b722abd66cd3db07a8",
+      "encoding": "gzip+base64",
+      "chunks": 2,
+      "json_sha256": "36bec9136346e1491fed6c55a7f3c90b5a9d5d97f0df8fadfd165d30e04811b8",
+      "gzip_sha256": "0be5fc51fc4ddabec2e9a7a3aa669eef0d3eaa01120c6eb9034e16bd2a976ca3",
+      "json_size_bytes": 195689
+    },
+    {
+      "job_id": 137297980439,
+      "name": "actual-nvda13 (typing)",
+      "conclusion": "success",
+      "gzip_blob": "d99fae2d373483412d46691f40c8eb585bd30a6e",
+      "encoding": "gzip+base64",
+      "chunks": 3,
+      "json_sha256": "3bbf3f6b148864fe5a74546a3eb91fe286340b17ca3c7186dc276963e56503e6",
+      "gzip_sha256": "94a7714de0e057696eda37c7c351d73bab52b9c4501291aae90a758482956cbc",
+      "json_size_bytes": 338619
+    },
+    {
+      "job_id": 137297980449,
+      "name": "actual-nvda13 (navigation)",
+      "conclusion": "success",
+      "gzip_blob": "256949c94041c10f0cfa1064bf27000b3be016a9",
+      "encoding": "gzip+base64",
+      "chunks": 2,
+      "json_sha256": "3b4e2a7658e92c93b3170450d954ddbedec23efc910d0061171e1529ad280156",
+      "gzip_sha256": "b75e6d8a56ffb2e0e9353be2dc63a0f5bd9b5d477f5014b79c8124843af49a10",
+      "json_size_bytes": 236909
+    },
+    {
+      "job_id": 137297980471,
+      "name": "actual-nvda13 (descriptor-corruption)",
+      "conclusion": "success",
+      "gzip_blob": "9ca1456cf97ee6bdac9eea9578a8aa43183f706b",
+      "encoding": "gzip+base64",
+      "chunks": 2,
+      "json_sha256": "41215beb8307e4546c37a2e51dd7286ca5d863490a91e4b00de2ab3286a6d6c0",
+      "gzip_sha256": "a04687f7365ad498623a81023de9028e6fc5a0f353e58088d671099d6084513d",
+      "json_size_bytes": 173572
+    },
+    {
+      "job_id": 137297980557,
+      "name": "actual-nvda13 (disabled-ru)",
+      "conclusion": "success",
+      "gzip_blob": "2cc4b778dd161b6c37763f0cd615dd88763d40de",
+      "encoding": "gzip+base64",
+      "chunks": 2,
+      "json_sha256": "7a41b39be647cd0036caa5a4b19bdbba0a317b20c85ef83de8221694387263ac",
+      "gzip_sha256": "40e7a408bfc3241aafbe298518b9b432eb31f644454227b135e158d9b7903178",
+      "json_size_bytes": 175470
+    },
+    {
+      "job_id": 137297980623,
+      "name": "actual-nvda13 (plain-text)",
+      "conclusion": "failure",
+      "gzip_blob": "23103230efdd6913bdb7fc470c99df18379e9a5c",
+      "encoding": "gzip+base64",
+      "chunks": 4,
+      "json_sha256": "a38ac0487a130b7f04890d8d1cfbe15ee2153d6cf3b57d693ed1d4f04c5bd282",
+      "gzip_sha256": "7b6ba79c80c7084d5f73e101f54856e518a7cc8fb8ecab18110481b97ab8cbaa",
+      "json_size_bytes": 643607
+    }
+  ],
+  "plain_failure": {
+    "expected_original_source_words": 100,
+    "expected_lexical_pieces": 102,
+    "observed_lexical_pieces": 107,
+    "language_mismatches": 0,
+    "extra_planned_text": "isolated plain file reading probe",
+    "same_extra_present_in_driver_or_queue_sequence": false,
+    "other_plain_cases_passed": 6,
+    "cleanup_errors": [],
+    "interpretation": "Strict content failure retained. An earlier cancelled owned-focus planner overlapped the active planning observer; intentional queued and driver sequences contain only original input. No claim that this run passed the 100-word content gate."
+  }
+}

@@ -27,7 +27,7 @@ def fixture():
     report.update(addon_sha256=pin["archive_sha256"], installer_sha256=base.INSTALLER_SHA256)
     probe = report["probe"] = copy.deepcopy(document)
     probe["nvda_version_actual"] = "2026.3.1"
-    lifecycle = {"functional_pipeline_verified": True, "api_dispatched_operations": True,
+    lifecycle = {"functional_pipeline_verified": True, "api_dispatched_operations": True, "process_id": 1234,
                  "original_core_profile_sha256": "4"*64, "steps": []}
     for key in ("native_file_chooser_interaction_verified", "full_keyboard_accessibility_verified",
                 "actual_restart_upgrade_verified", "physical_audio_verified", "product_ready"):
@@ -36,9 +36,14 @@ def fixture():
     for index, (name, active, inactive) in enumerate(M.PLAN):
         text = "Помилка перевірки." if name in {"corrupt-rejected", "locked-remove"} else "Пакет змінено й перевірено."
         row = {"name": name, "active_version": active, "inactive_version": inactive,
+               "settings_dialog_title": "Налаштування голосів",
                "index_format_version": 2 if inactive else 1, "old_driver_id": index+1, "new_driver_id": index+2,
                "labels": {key: "Справжня кнопка" for key in ("install_package", "remove_package", "rollback_package")},
-               "completion_modal": {"pid": 1234, "class": "#32770", "visible": True, "ok_id": 1,
+               "completion_modal": {"kind": "nvda-wx-message-dialog", "module": "gui.message",
+                                    "class": "MessageDialog", "pid": 1234, "title": "Налаштування голосів",
+                                    "visible": True, "modal": True, "ok_id": 5100, "button_id": 5100,
+                                    "button_parent_owned": True, "button_is_wx_button": True,
+                                    "button_label": "OK", "ack_method": "wx.EVT_BUTTON",
                                     "ok_posted": True, "text": text}, "result_notice": text,
                "package_list": ["Голос — неактивний"] if inactive else [],
                "managed_profile_sha256": "4"*64 if active else None}
@@ -85,7 +90,10 @@ class ReceiptTests(unittest.TestCase):
             with self.assertRaises(ValueError): M.validate(report, pin, headless=True)
 
     def test_native_modal_and_real_error_notice_are_required(self):
-        for key, value in (("class", "fake"), ("ok_posted", False), ("pid", 0)):
+        for key, value in (("class", "#32770"), ("module", "wx"), ("kind", "fake"),
+                           ("ok_posted", False), ("pid", 0), ("pid", 5678), ("title", "Unowned"),
+                           ("ok_id", 1), ("button_id", 1), ("modal", False), ("button_parent_owned", False),
+                           ("button_is_wx_button", False), ("button_label", "Cancel"), ("ack_method", "fake-return")):
             report, pin = fixture()
             report["probe"]["voice_package_lifecycle"]["steps"][3]["completion_modal"][key] = value
             with self.assertRaises(ValueError): M.validate(report, pin, headless=True)
@@ -126,7 +134,7 @@ class WorkflowContracts(unittest.TestCase):
         self.assertNotIn("contents: write", text)
         self.assertNotIn("actions: write", text)
         self.assertIn('"--build-pin"', text)
-        self.assertIn("efec0a54f2ddf9d2a4a56fa283456feec285cc2e", text)
+        self.assertIn("a942b244281f1db94fd2f434dd2c570922c83583", text)
 
     def test_validator_pin_and_all_inline_python_compile(self):
         raw = (ROOT / "tools/validate_source13_package_receipt.py").read_bytes()

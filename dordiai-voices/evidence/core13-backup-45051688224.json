@@ -1,0 +1,41 @@
+{
+  "format": "dordiai-dev13-actual-draft-backup-proof",
+  "format_version": 1,
+  "backup_run_id": 45051688224,
+  "backup_job_id": 137297980527,
+  "backup_workflow_commit": "96c8285e1ef14b808226890189f3c6b25975312b",
+  "backup_success": true,
+  "tests_passed": 17,
+  "release_id": 454633971,
+  "tag": "dordiai-voices-dev13-engineering-backup",
+  "draft": true,
+  "prerelease": true,
+  "published_at": null,
+  "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+  "binary_source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+  "core_asset": {
+    "id": 779924768,
+    "bytes": 1992990314,
+    "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "full_stream_readback_verified": true
+  },
+  "receipt_asset": {
+    "id": 779930085,
+    "bytes": 2743,
+    "sha256": "d4c2ee084012ac15effcd0c487bc0abb77261080d81e80394458dcc97b726c62",
+    "full_stream_readback_verified": true,
+    "original_bytes_git_blob": "9394749df56c2ff5546e0ef3c49d1f4f1c687f61"
+  },
+  "exact_asset_count": 2,
+  "convenience_receipt_artifact": {
+    "id": 14766405274,
+    "bytes": 2933,
+    "sha256": "779aca3586fc517ab8c637cafd9c6a397067d367605a166268d18c14af5703e2",
+    "downloaded_outer_and_inner_hashes_verified": true
+  },
+  "existing11_and12_untouched": true,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false,
+  "scope": "Actual owned unpublished storage backup, separate from later NVDA pipeline/UI acceptance"
+}

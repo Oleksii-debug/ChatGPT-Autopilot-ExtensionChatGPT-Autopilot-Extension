@@ -1,0 +1,194 @@
+{
+  "format": "dordiai-ar-optional-bank-mini-actual-receipt",
+  "format_version": 1,
+  "source_commit": "96c8285e1ef14b808226890189f3c6b25975312b",
+  "run": 45051688399,
+  "job": 137297981036,
+  "status": "passed-noninstallable-optional-bank-feasibility",
+  "exact_report": {
+    "path": "evidence/ar_name_bank_mini_windows_45051688399.json",
+    "git_blob": "274dd325e297db140c0fa5a4d879a3a836c4f703",
+    "size_bytes": 18002,
+    "sha256": "d4ba12515c8e0a4f012c5475a6d83d4d9d3a908a68a32b330a64e00d9436e960"
+  },
+  "original_proof_archive": {
+    "path": "evidence/audio/ar-name-bank-mini-45051688399.zip",
+    "git_blob": "331413c196c09c8f90b9fa2fd28ccc1c663c9e98",
+    "artifact": 14766106609,
+    "size_bytes": 355765,
+    "sha256": "68f30d1c805905ad2b3189236f71d71a38197f32c0eb76f4c33e13404077345b",
+    "member_count": 15,
+    "wav_count": 6,
+    "pcm_bank_count": 2,
+    "files": [
+      {
+        "path": "network-policy.json",
+        "size_bytes": 196,
+        "sha256": "99ac52b6f326b48a11bf834c4df58a2b6f014694f73f2a94c24f060b3f5c47e9"
+      },
+      {
+        "path": "pcm/00-native.wav",
+        "size_bytes": 59584,
+        "sha256": "15ea12c02309aa0a85c505a5ed0eee74e7921e0107685054c55f25258516af48"
+      },
+      {
+        "path": "pcm/28-native.wav",
+        "size_bytes": 59858,
+        "sha256": "b0b02a691fa8fecbe14082a0b9afba37d619cd6760cc4bf193e1a185838bbcde"
+      },
+      {
+        "path": "pcm/banks/ar/oksana.json",
+        "size_bytes": 125,
+        "sha256": "71d667038beae6099ea9628d9cc02cf102f324255acadc7005e8375a7008184f"
+      },
+      {
+        "path": "pcm/banks/ar/oksana.pcm",
+        "size_bytes": 129292,
+        "sha256": "931dd6a2d187d538a7ccbfaf5f3104f81f57a6ad2e52d6bda54cb3ea9f2e3363"
+      },
+      {
+        "path": "pcm/banks/ar/viktoriia.json",
+        "size_bytes": 125,
+        "sha256": "71d667038beae6099ea9628d9cc02cf102f324255acadc7005e8375a7008184f"
+      },
+      {
+        "path": "pcm/banks/ar/viktoriia.pcm",
+        "size_bytes": 129292,
+        "sha256": "0793995c9449d513dda6080dc8ccd31b74d935ef665ee3aff84ff215f2369b74"
+      },
+      {
+        "path": "pcm/oksana-00-projected24k.wav",
+        "size_bytes": 64690,
+        "sha256": "15752213469e249c8ebd3921dabbc267b29a86eb9509f7857059bde5c44123e0"
+      },
+      {
+        "path": "pcm/oksana-28-projected24k.wav",
+        "size_bytes": 64690,
+        "sha256": "72e95e953eb24955ef6ce37996c477e99b04b96449adca757d8c8883946ebb8f"
+      },
+      {
+        "path": "pcm/report.json",
+        "size_bytes": 18002,
+        "sha256": "d4ba12515c8e0a4f012c5475a6d83d4d9d3a908a68a32b330a64e00d9436e960"
+      },
+      {
+        "path": "pcm/viktoriia-00-projected24k.wav",
+        "size_bytes": 64690,
+        "sha256": "bdcc1321579a9efb4124d436a42a89949963b6c5832490c69e72ff0a46b8ea32"
+      },
+      {
+        "path": "pcm/viktoriia-28-projected24k.wav",
+        "size_bytes": 64690,
+        "sha256": "d4e777bd198d1359a3cbdfbc96e4b9e4422e6aa96133e0a6427769e4b2c916ad"
+      },
+      {
+        "path": "primary-source-acquisition.json",
+        "size_bytes": 452,
+        "sha256": "c9c70425e76cef0f69bc497ad52b103d9d5428beef199956e4c8f76471a68cc3"
+      },
+      {
+        "path": "shared-resource-inventory.json",
+        "size_bytes": 2511,
+        "sha256": "186bef5df3304131c9dc624903687b8ff52387325111cf21e9afcdb2b883104e"
+      },
+      {
+        "path": "stage-receipt.json",
+        "size_bytes": 3772,
+        "sha256": "db2f96b03cdc810d0610deea470ad9fd2569ca31a709213a36cc715a750408be"
+      }
+    ],
+    "safe_member_types": "Bounded JSON, generated WAV and PCM only; no source book, model weights, DLLs, code or secret URLs"
+  },
+  "actual_generation": {
+    "ordinary_names": 2,
+    "profiles": 2,
+    "native_calls": 2,
+    "projections": 4,
+    "bank_sample_rate": 24000,
+    "native_input_sample_rate": 22050,
+    "genuine_core_resampling": true,
+    "native_two_wavs_bitidentical_to_previous29_native_proof": true,
+    "distinct_pcm_by_selected_target": true,
+    "actual_target_identities": {
+      "viktoriia": {
+        "size_bytes": 1152,
+        "sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+      },
+      "oksana": {
+        "size_bytes": 1152,
+        "sha256": "0ccdadd71c5738f2739a777f60a7d9489070f2aaa543dfc03d15c12654b576f5"
+      }
+    }
+  },
+  "actual_prepared_read": {
+    "scope": "Exact immutable driver AST fast_clip/epoch/control methods + actual NativeLetterBank, research caller view only; NOT full NVDA/WavePlayer/typing execution",
+    "driver_sha256": "123e65f70dde9ab9284eba52b754855202cf404e04b6a9f3f75fb0e05a2f03aa",
+    "lookups": [
+      {
+        "profile": "viktoriia",
+        "glyph": "ا",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "d2e83fab99679f98865dfae224ea04d3cd2103c6bb215bcd434ece2e2260f0f9"
+      },
+      {
+        "profile": "viktoriia",
+        "glyph": "ء",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "835390d05fb713c0ed920bb665f3ca0f90dbb223a84ad7f7f6f24a56b9bb642a"
+      },
+      {
+        "profile": "oksana",
+        "glyph": "ا",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "cdfca8d2852d713c61e09408e8e37d3d5bc25781d840a01bca43b43ef439395f"
+      },
+      {
+        "profile": "oksana",
+        "glyph": "ء",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "a7b000b1aa9b45ae83fa709c78c6bb9a89e15e8d14ea0237014f014076b4551b"
+      }
+    ],
+    "model_creation_and_subprocess_forbidden": true,
+    "resource_epoch_stale_rejected": true,
+    "wrong_mode_locale_glyph_and_profile_rejected": true,
+    "warm_read_samples": 400,
+    "warm_lookup_ms": {
+      "minimum": 1.5383,
+      "median": 1.6477499999999998,
+      "p95": 1.8562,
+      "maximum": 2.3802
+    }
+  },
+  "preservation": {
+    "original_runtime_files_byte_identical": 10230,
+    "original180_banks_untouched": true,
+    "previous3330_not_regenerated": true,
+    "production13_modified": false,
+    "original_core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "original_wide_outer_sha256": "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262"
+  },
+  "future14_requirements": [
+    "This is a NONINSTALLABLE research result. Existing wide lookup can read flat ar-char keys, but production13 does not enforce the new per-target manifest.",
+    "Before activation, verify both bank files and current target embedding pins, retain existing resource epoch and managed-profile guard, and verify current ordinary-name facts match the generation recipe.",
+    "New managed voices must carry their own native_letters role pair, using the existing ar namespace for managed fast lookup; the same source carrier/projection pipeline can supply new target vectors without retraining. Do not expose legacy builtin AR banks to a replacement target.",
+    "Any new optional resource pack must add new files only, retain all old180 bank bytes and old overlay identity protections.",
+    "Full1305 means ONLY29 reviewed ordinary Arabic base/hamza names for45 allowed profiles; it is not all Arabic Unicode forms/symbols, all135 languages or keyboard acceptance."
+  ],
+  "full_plan": {
+    "allowed_profiles": 45,
+    "reviewed_ordinary_names": 29,
+    "clip_count": 1305,
+    "actually_completed_here": 4,
+    "full_batch_launched": false
+  },
+  "acceptance": {
+    "native_pronunciation_verified": false,
+    "listener_quality_verified": false,
+    "real_nvda_verified": false,
+    "typing_verified": false,
+    "physical_audio_verified": false,
+    "production_activated": false,
+    "product_ready": false
+  }
+}

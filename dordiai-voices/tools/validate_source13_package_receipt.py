@@ -35,6 +35,7 @@ def validate(report, pin, *, headless):
         require(row.get(name) is False, "API-dispatch-only pipeline cannot claim " + name)
     steps = row.get("steps")
     require(isinstance(steps, list) and len(steps) == len(PLAN), "Ten real package operations are required")
+    require(type(row.get("process_id")) is int and row["process_id"] > 0, "Owned NVDA process identity missing")
     profile_sha = row.get("original_core_profile_sha256")
     require(isinstance(profile_sha, str) and base.re.fullmatch("[0-9a-f]{64}", profile_sha) is not None,
             "Original permitted core profile SHA is missing")
@@ -53,9 +54,16 @@ def validate(report, pin, *, headless):
         require(all(isinstance(labels.get(key), str) and labels[key].strip() for key in
                     ("install_package", "remove_package", "rollback_package")), "Real wx button labels missing")
         modal = step.get("completion_modal", {})
-        require(type(modal.get("pid")) is int and modal["pid"] > 0 and modal.get("class") == "#32770"
-                and modal.get("visible") is True and modal.get("ok_id") == 1 and modal.get("ok_posted") is True,
-                "Genuine owned native completion modal not observed")
+        require(modal.get("kind") == "nvda-wx-message-dialog" and modal.get("module") == "gui.message"
+                and modal.get("class") == "MessageDialog" and type(modal.get("pid")) is int
+                and modal["pid"] == row["process_id"] and isinstance(step.get("settings_dialog_title"), str)
+                and step["settings_dialog_title"].strip() and modal.get("title") == step["settings_dialog_title"]
+                and all(modal.get(key) is True for key in
+                        ("visible", "modal", "button_parent_owned", "button_is_wx_button", "ok_posted"))
+                and type(modal.get("ok_id")) is int and modal["ok_id"] == 5100
+                and type(modal.get("button_id")) is int and modal["button_id"] == 5100
+                and modal.get("button_label") == "OK" and modal.get("ack_method") == "wx.EVT_BUTTON",
+                "Genuine owned NVDA2026.3.1 wx completion dialog/button not observed")
         notice = step.get("result_notice")
         require(isinstance(notice, str) and notice.strip() and notice == modal.get("text"),
                 "Actual completion/error notice missing")

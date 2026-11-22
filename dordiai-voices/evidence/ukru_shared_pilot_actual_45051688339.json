@@ -1,0 +1,480 @@
+{
+  "format": "dordiai-ukru-existing-shared-pilot-actual-review",
+  "format_version": 1,
+  "run_id": 45051688339,
+  "job_id": 137297981181,
+  "head_sha": "96c8285e1ef14b808226890189f3c6b25975312b",
+  "runner_git_blob": "1c8348b8bd9d2e1217fad3a8588c261fdf509c67",
+  "workflow_git_blob": "555481e8658665a543a6ccb87b08a0e8be06d116",
+  "status": "completed-controlled-pilot-shared-not-a-speed-improvement",
+  "cheap_contract_tests_passed": 13,
+  "scope": "Actual unchanged private core12 Windows Python3.14.5/ORT1.26.0, explicit Viktoriia, four fresh processes in two reverse-order rounds of the SAME20 literal inputs. Core UK Holos and RU NativeMultilingual profile versus original trained Shared F1 carrier and unchanged OpenVoice/Viktoriia projection. Controlled shared source tempo1, exact requested driver-rate80 factor1.515716566510398 applied after projection. Generation-to-array timings; not NVDA, device, pronunciation or default-switch proof.",
+  "baseline_verified": {
+    "uk_renderer": "baseline (original UkrainianVoices/Holos selected-profile family)",
+    "ru_renderer": "profile (original NativeMultilingual, exact nonempty RU plans on all10words in both rounds)",
+    "selected_profile": "viktoriia",
+    "conditioning": "Original family-specific voice conditioning and delivery settings retained in raw report; no invented NativeLocaleUK/RU or silent RU fallback",
+    "prior_adam_plain100_measurement_used": false,
+    "prepared_navigation_clips_bypassed": true
+  },
+  "all_twenty_literal_words_and_nfkd_conditioned_ids_verified": true,
+  "prepared_input_rows_identical_across_four_processes_sha256": "e49afbdccdb943ea9f28fb72734821a776a033c3c026997487adf90d040e2f29",
+  "trained_language_support": {
+    "actual_packed_count": 31,
+    "actual_model_condition_ids": [
+      "uk",
+      "ru"
+    ],
+    "neutral_na_or_alias_used": false
+  },
+  "payload_files_unchanged_per_process": 10230,
+  "shared_audio_cache_per_process": {
+    "hits": 0,
+    "misses": 20
+  },
+  "owned_russian_children_per_core_process": 1,
+  "all_owned_children_reaped": true,
+  "cleanup_errors": [],
+  "interpretation": {
+    "full_generation": "Core9.524–9.596s versus Shared+projection17.789–17.840s for20words: candidate roughly1.86times slower under this controlled recipe.",
+    "first_software_block": "Core medians201.6–204.5ms versus Shared876.6–877.0ms, roughly4.3times later. These exclude real audio/NVDA and do not establish physical latency.",
+    "shared_stage_cost": "Shared native generation totals about7.19s, unchanged projection about10.4s per20words. Omitting projection would also omit the requested Viktoriia conditioning and is not a valid speed win.",
+    "limits": "Different original families and output durations remain disclosed. This is a finite pilot at source tempo1 and8steps, not proof that every possible Shared recipe is slower or a pronunciation comparison.",
+    "decision": "Do not switch production/defaults or prune existing models based on this pilot."
+  },
+  "summary": {
+    "format": "dordiai-ukru-existing-shared-matched-pilot-summary",
+    "format_version": 1,
+    "scope": "Two reverse-order rounds, each fresh private Python process and the SAME20literalinputs. Original core family conditioning versus Shared plus original Viktoriia projection. No NVDA/physical/pronunciation/default readiness claim. Timings are generation to array, excluding saving. Model opening reported separately.",
+    "comparisons": [
+      {
+        "case": "round-1-core",
+        "backend": "core",
+        "status": "passed-isolated20word-generation-pilot",
+        "count": 20,
+        "profile": "viktoriia",
+        "model_open_seconds": 1.0999069000000077,
+        "generation_wall_total_seconds": 9.595698799999923,
+        "delivered_audio_total_seconds": 10.364458333333333,
+        "aggregate_real_time_factor": 0.9258273313848937,
+        "median_first_software_block_seconds": 0.20446390000000747
+      },
+      {
+        "case": "round-1-shared",
+        "backend": "shared",
+        "status": "passed-isolated20word-generation-pilot",
+        "count": 20,
+        "profile": "viktoriia",
+        "model_open_seconds": 1.7093896000000086,
+        "generation_wall_total_seconds": 17.788862199999926,
+        "delivered_audio_total_seconds": 9.52,
+        "aggregate_real_time_factor": 1.8685779621848662,
+        "median_first_software_block_seconds": 0.8770250000000033
+      },
+      {
+        "case": "round-2-core",
+        "backend": "core",
+        "status": "passed-isolated20word-generation-pilot",
+        "count": 20,
+        "profile": "viktoriia",
+        "model_open_seconds": 1.0897261999999728,
+        "generation_wall_total_seconds": 9.524450500000057,
+        "delivered_audio_total_seconds": 10.368083333333333,
+        "aggregate_real_time_factor": 0.9186317464655207,
+        "median_first_software_block_seconds": 0.20161544999999137
+      },
+      {
+        "case": "round-2-shared",
+        "backend": "shared",
+        "status": "passed-isolated20word-generation-pilot",
+        "count": 20,
+        "profile": "viktoriia",
+        "model_open_seconds": 1.7130349000000251,
+        "generation_wall_total_seconds": 17.839995399999964,
+        "delivered_audio_total_seconds": 9.52,
+        "aggregate_real_time_factor": 1.8739490966386518,
+        "median_first_software_block_seconds": 0.8766220500000372
+      }
+    ],
+    "production_changed": false,
+    "native_pronunciation_verified": false,
+    "windows_nvda_verified": false,
+    "physical_audio_verified": false,
+    "product_ready": false
+  },
+  "proofs": [
+    {
+      "case": "round-1-core",
+      "path": "evidence/ukru_shared_pilot_round-1-core_45051688339.json.gz",
+      "size_bytes": 26456,
+      "sha256": "521219a3e6b9cf6332c48a5218c2b49aafa59137f1cff93707f778b7bef6ba6f",
+      "envelope_sha256": "eca55583a28f976a1412e669e57f47f0822da01d750d94974aa02b9a3467e3d3",
+      "file_size_bytes": 77306,
+      "file_sha256": "24099bfa6009527624621b55663504641f4b978a5054735be7e9072d2bb44717",
+      "summary": {
+        "status": "passed-isolated20word-generation-pilot",
+        "backend": "core",
+        "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+        "onnxruntime": "1.26.0",
+        "profile": "viktoriia",
+        "requested_speed": 1.515716566510398,
+        "shared_source_tempo": 1,
+        "support": {
+          "packed_language_count": 31,
+          "requested_conditions": [
+            "uk",
+            "ru"
+          ],
+          "unsupported_language_aliases_used": false,
+          "neutral_na_condition_used": false
+        },
+        "conditioning": {
+          "uk": "Original Holos selected-profile style via UkrainianVoices.chunks",
+          "ru": "Original NativeMultilingual plan/preferred_speech with core fallback",
+          "request_flags_source_inferred_not_observed_nvda": {
+            "uk_nativeProfile": false,
+            "ru_nativeProfile": true
+          },
+          "initial_ru_native_plan_available": true,
+          "holos_threads": 4,
+          "native_multilingual_threads": 3,
+          "original_native_profile_delivery_settings": {
+            "json_sha256": "76e12075bd60ebdb5c53f75d2881a22718d138c4622cb4ff8f40015bc403c629",
+            "json_bytes": 94,
+            "scope": "Exact settings retained in raw report; omitted in index"
+          },
+          "original_holos_delivery_settings": {
+            "json_sha256": "a7e48229132780c94b0e80c5d8203246214a183a9f5b92f5ea079e8e9be8ad7e",
+            "json_bytes": 1141,
+            "scope": "Exact settings retained in raw report; omitted in index"
+          }
+        },
+        "model_open_seconds": 1.0999069000000077,
+        "actual_cases": 20,
+        "original_payloads_unchanged": 10230,
+        "owned_russian_children_reaped": true,
+        "owned_russian_child_count": 1,
+        "cleanup_errors": [],
+        "original_viktoriia_resource_summary": {
+          "count": 180,
+          "json_sha256": "d8176f66efa96d6769d2e45d84fac1a6b49fb78187514aa934c89c46a9fd9ce8",
+          "scope": "Exact full file/hash mapping retained in raw report"
+        },
+        "per_language": {
+          "uk": {
+            "count": 10,
+            "wall_seconds": 4.124608900000055,
+            "audio_seconds": 6.276625,
+            "median_first_block_seconds": 0.20579920000002971,
+            "renderers": [
+              "baseline"
+            ],
+            "actual_plan_nonempty_count": 0
+          },
+          "ru": {
+            "count": 10,
+            "wall_seconds": 5.471089899999868,
+            "audio_seconds": 4.087833333333333,
+            "median_first_block_seconds": 0.15968394999998736,
+            "renderers": [
+              "profile"
+            ],
+            "actual_plan_nonempty_count": 10
+          }
+        },
+        "all20literal_inputs_and_nfkd_marks_and_ids_verified": true,
+        "prepared_input_sha256": "e49afbdccdb943ea9f28fb72734821a776a033c3c026997487adf90d040e2f29",
+        "projection_pins_verified": true,
+        "shared_audio_cache": null
+      },
+      "git_blob": "83b4b021c1922ace9ed3d35e2a10f5a8667b28a2"
+    },
+    {
+      "case": "round-1-shared",
+      "path": "evidence/ukru_shared_pilot_round-1-shared_45051688339.json.gz",
+      "size_bytes": 29243,
+      "sha256": "23e49c49a2eb25aab3b2bb4563822caaf04c921236502dac236e97a561290675",
+      "envelope_sha256": "ef656d5e9e023190508f50adb69f871aeba0fbe401187b117a7822bdbb9609cc",
+      "file_size_bytes": 86003,
+      "file_sha256": "f6bb61a39caee3779b5cc7effa0e2ed80f6dc2dea966e0de7ed97b5728eaa48d",
+      "summary": {
+        "status": "passed-isolated20word-generation-pilot",
+        "backend": "shared",
+        "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+        "onnxruntime": "1.26.0",
+        "profile": "viktoriia",
+        "requested_speed": 1.515716566510398,
+        "shared_source_tempo": 1,
+        "support": {
+          "packed_language_count": 31,
+          "requested_conditions": [
+            "uk",
+            "ru"
+          ],
+          "unsupported_language_aliases_used": false,
+          "neutral_na_condition_used": false
+        },
+        "conditioning": {
+          "carrier": "Original F1 internal style, exact uk/ru tags and calibrated shared source",
+          "profile": "Original OpenVoice encoder-flow/decoder and unchanged Viktoriia target",
+          "native_model_rate": 44100,
+          "carrier_resamples_to": 24000,
+          "common_audio_rate": 22050,
+          "projection_rate": 22050,
+          "delivery_rate": 24000,
+          "source_tempo": 1,
+          "post_projection_tempo": 1.515716566510398,
+          "steps": 8,
+          "session_threads": 4,
+          "scope": "Controlled original carrier/projection recipe at source tempo1; final existing tempo applies exact requested driver-rate80 factor after projection"
+        },
+        "model_open_seconds": 1.7093896000000086,
+        "actual_cases": 20,
+        "original_payloads_unchanged": 10230,
+        "owned_russian_children_reaped": true,
+        "owned_russian_child_count": 0,
+        "cleanup_errors": [],
+        "original_viktoriia_resource_summary": {
+          "count": 180,
+          "json_sha256": "d8176f66efa96d6769d2e45d84fac1a6b49fb78187514aa934c89c46a9fd9ce8",
+          "scope": "Exact full file/hash mapping retained in raw report"
+        },
+        "per_language": {
+          "uk": {
+            "count": 10,
+            "wall_seconds": 9.002936099999886,
+            "audio_seconds": 4.88,
+            "median_first_block_seconds": 0.8793844999999862,
+            "renderers": [
+              "existing-trained-shared-plus-original-projection"
+            ],
+            "actual_plan_nonempty_count": 0,
+            "native_generation_seconds": 3.6213889000000563,
+            "projection_seconds": 5.250670000000014,
+            "native_audio_seconds": 13.84766439909297
+          },
+          "ru": {
+            "count": 10,
+            "wall_seconds": 8.78592610000004,
+            "audio_seconds": 4.64,
+            "median_first_block_seconds": 0.8733580500000073,
+            "renderers": [
+              "existing-trained-shared-plus-original-projection"
+            ],
+            "actual_plan_nonempty_count": 0,
+            "native_generation_seconds": 3.5672089000000256,
+            "projection_seconds": 5.147694399999921,
+            "native_audio_seconds": 13.639501133786847
+          }
+        },
+        "all20literal_inputs_and_nfkd_marks_and_ids_verified": true,
+        "prepared_input_sha256": "e49afbdccdb943ea9f28fb72734821a776a033c3c026997487adf90d040e2f29",
+        "projection_pins_verified": true,
+        "shared_audio_cache": {
+          "hits": 0,
+          "misses": 20,
+          "maxsize": 16,
+          "currsize": 16
+        }
+      },
+      "git_blob": "83af6f0811cc4194df21c697ea8599c780ec7fa2"
+    },
+    {
+      "case": "round-2-shared",
+      "path": "evidence/ukru_shared_pilot_round-2-shared_45051688339.json.gz",
+      "size_bytes": 29164,
+      "sha256": "4a0b898b6374b4f508c726a35d5ba33bcb965d2e22ade32436abdd4ce28db294",
+      "envelope_sha256": "9f7d1f013939be22b2b396db27217e3f9a8c69c89441ab2813e3138ef7df5069",
+      "file_size_bytes": 86012,
+      "file_sha256": "ea366500eed20642aafdcef3f48e73475827b88fe9369f3b92349a053e882d0b",
+      "summary": {
+        "status": "passed-isolated20word-generation-pilot",
+        "backend": "shared",
+        "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+        "onnxruntime": "1.26.0",
+        "profile": "viktoriia",
+        "requested_speed": 1.515716566510398,
+        "shared_source_tempo": 1,
+        "support": {
+          "packed_language_count": 31,
+          "requested_conditions": [
+            "uk",
+            "ru"
+          ],
+          "unsupported_language_aliases_used": false,
+          "neutral_na_condition_used": false
+        },
+        "conditioning": {
+          "carrier": "Original F1 internal style, exact uk/ru tags and calibrated shared source",
+          "profile": "Original OpenVoice encoder-flow/decoder and unchanged Viktoriia target",
+          "native_model_rate": 44100,
+          "carrier_resamples_to": 24000,
+          "common_audio_rate": 22050,
+          "projection_rate": 22050,
+          "delivery_rate": 24000,
+          "source_tempo": 1,
+          "post_projection_tempo": 1.515716566510398,
+          "steps": 8,
+          "session_threads": 4,
+          "scope": "Controlled original carrier/projection recipe at source tempo1; final existing tempo applies exact requested driver-rate80 factor after projection"
+        },
+        "model_open_seconds": 1.7130349000000251,
+        "actual_cases": 20,
+        "original_payloads_unchanged": 10230,
+        "owned_russian_children_reaped": true,
+        "owned_russian_child_count": 0,
+        "cleanup_errors": [],
+        "original_viktoriia_resource_summary": {
+          "count": 180,
+          "json_sha256": "d8176f66efa96d6769d2e45d84fac1a6b49fb78187514aa934c89c46a9fd9ce8",
+          "scope": "Exact full file/hash mapping retained in raw report"
+        },
+        "per_language": {
+          "uk": {
+            "count": 10,
+            "wall_seconds": 9.021596499999873,
+            "audio_seconds": 4.88,
+            "median_first_block_seconds": 0.8783047000000295,
+            "renderers": [
+              "existing-trained-shared-plus-original-projection"
+            ],
+            "actual_plan_nonempty_count": 0,
+            "native_generation_seconds": 3.643125600000076,
+            "projection_seconds": 5.248361799999884,
+            "native_audio_seconds": 13.84766439909297
+          },
+          "ru": {
+            "count": 10,
+            "wall_seconds": 8.81839890000009,
+            "audio_seconds": 4.64,
+            "median_first_block_seconds": 0.8746328500000118,
+            "renderers": [
+              "existing-trained-shared-plus-original-projection"
+            ],
+            "actual_plan_nonempty_count": 0,
+            "native_generation_seconds": 3.544061400000146,
+            "projection_seconds": 5.205743499999983,
+            "native_audio_seconds": 13.639501133786847
+          }
+        },
+        "all20literal_inputs_and_nfkd_marks_and_ids_verified": true,
+        "prepared_input_sha256": "e49afbdccdb943ea9f28fb72734821a776a033c3c026997487adf90d040e2f29",
+        "projection_pins_verified": true,
+        "shared_audio_cache": {
+          "hits": 0,
+          "misses": 20,
+          "maxsize": 16,
+          "currsize": 16
+        }
+      },
+      "git_blob": "c4fce91dc4908e68e4fba96fe92396b41cb1f6aa"
+    },
+    {
+      "case": "round-2-core",
+      "path": "evidence/ukru_shared_pilot_round-2-core_45051688339.json.gz",
+      "size_bytes": 26417,
+      "sha256": "435c2b0e5d93c7c90ee4f2be6980910a08f8ca9d4298676ca5860587fd19a248",
+      "envelope_sha256": "8fec6708f4a6d7365d7fd7db7cc3eb146ec0ca8a53f72d621a8a1f2d23352f8d",
+      "file_size_bytes": 77288,
+      "file_sha256": "595e4ba4f56a177d711d4658351f548dd5189b8037b1554863bc780cc16ab083",
+      "summary": {
+        "status": "passed-isolated20word-generation-pilot",
+        "backend": "core",
+        "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+        "onnxruntime": "1.26.0",
+        "profile": "viktoriia",
+        "requested_speed": 1.515716566510398,
+        "shared_source_tempo": 1,
+        "support": {
+          "packed_language_count": 31,
+          "requested_conditions": [
+            "uk",
+            "ru"
+          ],
+          "unsupported_language_aliases_used": false,
+          "neutral_na_condition_used": false
+        },
+        "conditioning": {
+          "uk": "Original Holos selected-profile style via UkrainianVoices.chunks",
+          "ru": "Original NativeMultilingual plan/preferred_speech with core fallback",
+          "request_flags_source_inferred_not_observed_nvda": {
+            "uk_nativeProfile": false,
+            "ru_nativeProfile": true
+          },
+          "initial_ru_native_plan_available": true,
+          "holos_threads": 4,
+          "native_multilingual_threads": 3,
+          "original_native_profile_delivery_settings": {
+            "json_sha256": "76e12075bd60ebdb5c53f75d2881a22718d138c4622cb4ff8f40015bc403c629",
+            "json_bytes": 94,
+            "scope": "Exact settings retained in raw report; omitted in index"
+          },
+          "original_holos_delivery_settings": {
+            "json_sha256": "a7e48229132780c94b0e80c5d8203246214a183a9f5b92f5ea079e8e9be8ad7e",
+            "json_bytes": 1141,
+            "scope": "Exact settings retained in raw report; omitted in index"
+          }
+        },
+        "model_open_seconds": 1.0897261999999728,
+        "actual_cases": 20,
+        "original_payloads_unchanged": 10230,
+        "owned_russian_children_reaped": true,
+        "owned_russian_child_count": 1,
+        "cleanup_errors": [],
+        "original_viktoriia_resource_summary": {
+          "count": 180,
+          "json_sha256": "d8176f66efa96d6769d2e45d84fac1a6b49fb78187514aa934c89c46a9fd9ce8",
+          "scope": "Exact full file/hash mapping retained in raw report"
+        },
+        "per_language": {
+          "uk": {
+            "count": 10,
+            "wall_seconds": 4.109794999999963,
+            "audio_seconds": 6.276625,
+            "median_first_block_seconds": 0.20776129999998716,
+            "renderers": [
+              "baseline"
+            ],
+            "actual_plan_nonempty_count": 0
+          },
+          "ru": {
+            "count": 10,
+            "wall_seconds": 5.414655500000094,
+            "audio_seconds": 4.091458333333334,
+            "median_first_block_seconds": 0.15109344999999053,
+            "renderers": [
+              "profile"
+            ],
+            "actual_plan_nonempty_count": 10
+          }
+        },
+        "all20literal_inputs_and_nfkd_marks_and_ids_verified": true,
+        "prepared_input_sha256": "e49afbdccdb943ea9f28fb72734821a776a033c3c026997487adf90d040e2f29",
+        "projection_pins_verified": true,
+        "shared_audio_cache": null
+      },
+      "git_blob": "f8dc60a47f544cf5287c54419cfc0162290201b7"
+    }
+  ],
+  "artifact": {
+    "id": 14766380854,
+    "size_bytes": 3921276,
+    "sha256": "dad8394f95805924bd35ea641590d0830a3f1d0b792fff7cb6afd2d5910d5f08",
+    "member_count": 169,
+    "expanded_bytes": 7092634,
+    "all_wav_receipts_verified": 160,
+    "inventory_git_blob": "22257f4d18670db16afd5c726e0e20397652671a",
+    "inventory_path": "evidence/ukru_shared_pilot_artifact_inventory_45051688339.json"
+  },
+  "production_changed": false,
+  "production_registered": false,
+  "model_weights_modified": false,
+  "new_language_ids_added": false,
+  "native_pronunciation_verified": false,
+  "listener_quality_verified": false,
+  "windows_nvda_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false
+}

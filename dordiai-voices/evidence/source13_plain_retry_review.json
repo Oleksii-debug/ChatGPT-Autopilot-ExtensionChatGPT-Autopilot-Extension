@@ -1,0 +1,23 @@
+{
+  "format": "dordiai-source13-plain-boundary-retry-candidate",
+  "format_version": 1,
+  "launch_tag": "[source13-plain-retry]",
+  "actual_core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "files": {
+    ".github/workflows/dordiai-source13-plain-retry.yml": "07174d697e3bca5847558cdb30fea47e7d5fe943",
+    "dordiai-voices/tools/windows_nvda_plain_text13_probe.py": "5d85c22fc4c12cc530e39e73df36ff2c120a748d",
+    "dordiai-voices/tests/test_windows_nvda_plain_text13_probe.py": "bb9ce61ab5e54c2256f4055819c8d09f6af12e02"
+  },
+  "historical_helper_unchanged": "3db4eadd4b1b9bc029d33a3272b8f083dcfcbb79",
+  "original_100_input_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+  "source_workload_metadata_read_auditor_functions_ast_identical": true,
+  "content_filtering": false,
+  "audio_warmup": false,
+  "production_changes": false,
+  "local_tests": 8,
+  "passed": 8,
+  "inline_python_steps_compile": 4,
+  "old_failure_evidence_blob": "dc916f6858380a89db6f441d6763f6cfb7f52f0d",
+  "actual_retry_run": false,
+  "product_ready": false
+}

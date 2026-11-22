@@ -34,13 +34,23 @@ class OwnedLifecycleScaffoldingTests(unittest.TestCase):
                     "archive_bytes": len(raw), "archive_sha256": sha256(raw).hexdigest(),
                     "source_commit": "a" * 40, "source_run_id": 123, "product_ready": False}
 
-    def test_only_owned_visible_native_ok_modal_is_eligible(self):
-        expected = {"pid": 123, "title": "Dordiai settings", "class": "#32770", "visible": True, "ok_id": 1}
+    def test_only_owned_visible_modern_nvda_ok_modal_is_eligible(self):
+        expected = {"kind": "nvda-wx-message-dialog", "module": "gui.message", "class": "MessageDialog",
+                    "pid": 123, "title": "Dordiai settings", "visible": True, "modal": True,
+                    "ok_id": 5100, "button_id": 5100, "button_parent_owned": True,
+                    "button_is_wx_button": True, "button_label": "OK", "text": "Actual completion text"}
         self.assertTrue(probe.modal_allowed(expected, 123, "Dordiai settings"))
-        for key, wrong in (("pid", 999), ("title", "Other app"), ("class", "wxWindowNR"),
-                           ("visible", False), ("ok_id", None)):
+        for key, wrong in (("pid", 999), ("title", "Other app"), ("class", "#32770"),
+                           ("module", "unrelated"), ("visible", False), ("modal", False),
+                           ("ok_id", 1), ("button_id", 1), ("button_parent_owned", False),
+                           ("button_is_wx_button", False), ("button_label", "Cancel"), ("text", "")):
             with self.subTest(key=key):
                 self.assertFalse(probe.modal_allowed({**expected, key: wrong}, 123, "Dordiai settings"))
+
+    def test_old_native_win32_modal_cannot_be_mistaken_for_frozen_nvda_dialog(self):
+        self.assertFalse(probe.modal_allowed(
+            {"pid": 123, "title": "Dordiai settings", "class": "#32770", "visible": True, "ok_id": 1},
+            123, "Dordiai settings"))
 
     def test_wrong_version_pin_or_promoted_product_flag_is_rejected(self):
         for key, value in (("version", "0.13.1-dev.12"), ("archive_bytes", True),

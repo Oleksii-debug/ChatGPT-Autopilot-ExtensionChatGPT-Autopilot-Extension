@@ -1,0 +1,209 @@
+name: Actual source13 strict plain read boundary retry
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-plain13-retry:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[source13-plain-retry]')
+    runs-on: windows-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [plain-text]
+    env:
+      PYTHONUTF8: '1'
+      NVDA_PROBE_MODE: ${{ matrix.mode }}
+    steps:
+      - name: Preserve source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Check actual probe contracts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m unittest discover -s dordiai-voices/tests -p "test_windows_nvda*probe.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s dordiai-voices/tests -p "test_source13_integration_receipt.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m py_compile dordiai-voices/tools/validate_source13_integration_receipt.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fail closed until the actual source13 build and artifact are verified
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import hashlib,importlib.util,json,os,pathlib,urllib.request
+          root=pathlib.Path("dordiai-voices")
+          tools={
+              "tools/windows_nvda_probe.py":"ec3d93b5b6e3f92af70d0b989ca9e280db5a840f",
+              "tools/windows_nvda_membership_integration_probe.py":"7386bb6575b45d004eca276c6092549bcb88d52f",
+              "tools/windows_nvda_plain_text_probe.py":"3db4eadd4b1b9bc029d33a3272b8f083dcfcbb79",
+              "tools/windows_nvda_native_descriptor_probe.py":"003a5fcc43aa19c6a89543c827488c555cc57b1d",
+              "tools/windows_nvda_typing_probe.py":"4e59482c7e5964fabb8699b9209307b183d6b24f",
+              "tools/windows_nvda_typing_scenarios.py":"47f8c1ec06ad41dac17845db5e79af705fb51abc",
+              "tools/validate_source12_typing_receipt.py":"9062e5156dbfa005fad6d4b5c5969c3fdf8d77fe",
+              "tools/validate_source13_integration_receipt.py":"1d785fb951625b424e4d620426640b5bfab3a73e",
+              "tools/windows_nvda_plain_text13_probe.py":"5d85c22fc4c12cc530e39e73df36ff2c120a748d"}
+          for relative,expected in tools.items():
+              path=root/relative
+              if not path.is_file() or path.is_symlink() or path.stat().st_size>1024*1024:
+                  raise ValueError("Reviewed probe file is not bounded/regular: "+relative)
+              raw=path.read_bytes()
+              if hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+b"\0"+raw).hexdigest()!=expected:
+                  raise ValueError("Historical probe/auditor changed: "+relative)
+          spec=importlib.util.spec_from_file_location("_reviewed_source13_receipt",root/"tools/validate_source13_integration_receipt.py")
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          # Placeholder rejection occurs before any API request or core download.
+          pin=module.read_pin(root/"tools/data/source13_build_pin.json")
+          repo=os.environ["GITHUB_REPOSITORY"]
+          if repo!="Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension":
+              raise ValueError("Only the owned project repository is allowed")
+          def fetch(suffix):
+              request=urllib.request.Request("https://api.github.com/repos/"+repo+suffix,
+                  headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"User-Agent":"dordiai-source13-proof",
+                           "Accept":"application/vnd.github+json"})
+              with urllib.request.urlopen(request,timeout=30) as response:return json.load(response)
+          actual=fetch("/actions/runs/"+str(pin["source_run_id"]))
+          if (actual.get("id")!=pin["source_run_id"] or actual.get("head_sha")!=pin["source_commit"]
+              or actual.get("head_branch")!="dordiai-voices/audit-20261122"
+              or actual.get("path")!=pin["source_workflow_path"]
+              or actual.get("status")!="completed" or actual.get("conclusion")!="success"
+              or actual.get("repository",{}).get("full_name")!=repo):
+              raise RuntimeError("Pinned source13 build is not the exact successful owned run")
+          artifact=fetch("/actions/artifacts/"+str(pin["artifact_id"]))
+          if (artifact.get("id")!=pin["artifact_id"] or artifact.get("name")!=pin["artifact_name"]
+              or artifact.get("expired") is not False or artifact.get("size_in_bytes")!=pin["artifact_bytes"]
+              or artifact.get("digest")!="sha256:"+pin["artifact_sha256"]
+              or artifact.get("workflow_run",{}).get("id")!=pin["source_run_id"]
+              or artifact.get("workflow_run",{}).get("head_sha")!=pin["source_commit"]):
+              raise RuntimeError("Pinned source13 artifact differs from its actual owned receipt")
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as environment:
+              for key,value in {"SOURCE13_CORE_RUN":str(pin["source_run_id"]),"CORE_SOURCE_SHA":pin["source_commit"],
+                  "CORE_ARTIFACT_NAME":pin["artifact_name"],"CORE_SHA256":pin["archive_sha256"],
+                  "CORE_BYTES":str(pin["archive_bytes"])}.items():
+                  environment.write(key+"="+value+"\n")
+          print(json.dumps({"actual_source13_pin_verified":True,"pin":pin}),flush=True)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.CORE_ARTIFACT_NAME }}
+          run-id: ${{ env.SOURCE13_CORE_RUN }}
+          github-token: ${{ github.token }}
+          path: dordiai-voices/dist
+      - name: Verify exact unchanged source13 archive
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,zipfile
+          files=list(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
+          if len(files)!=1 or files[0].name!="dordiai-voices-0.13.1-dev.13.nvda-addon" or files[0].stat().st_size!=int(os.environ["CORE_BYTES"]):
+              raise RuntimeError("Expected exact immutable source13 addon")
+          with files[0].open("rb") as stream:digest=hashlib.file_digest(stream,"sha256").hexdigest()
+          if digest!=os.environ["CORE_SHA256"]:raise RuntimeError("Immutable source13 archive hash differs")
+          with zipfile.ZipFile(files[0]) as archive:
+              if json.loads(archive.read("dordiai-release.json")).get("version")!="0.13.1-dev.13":
+                  raise RuntimeError("Pinned archive does not identify as source13")
+          print(json.dumps({"source_run":int(os.environ["SOURCE13_CORE_RUN"]),"source_commit":os.environ["CORE_SOURCE_SHA"],
+              "archive":files[0].name,"sha256":digest,"bytes":files[0].stat().st_size,"mode":os.environ["NVDA_PROBE_MODE"]}),flush=True)
+      - name: Probe existing audio endpoints
+        run: python dordiai-voices/tools/setup_audio_endpoint.py --output dordiai-voices/windows-results/audio --ephemeral-ci --start-existing-services
+        continue-on-error: true
+      - name: Real fresh owned NVDA exact source13 integration
+        shell: python
+        run: |
+          import json,os,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          output=root/"windows-results/nvda"
+          mode=os.environ["NVDA_PROBE_MODE"]
+          scenarios={"characters-only","navigation","forced-uk","disabled-ru"}
+          tool=("windows_nvda_plain_text13_probe.py" if mode=="plain-text" else
+                "windows_nvda_native_descriptor_probe.py" if mode=="descriptor-corruption" else
+                "windows_nvda_membership_integration_probe.py")
+          command=[sys.executable,str(root/"tools"/tool),"--addon",
+              str(root/"dist/dordiai-voices-0.13.1-dev.13.nvda-addon"),"--output",str(output),
+              "--long-installed-config","--timeout","1800" if mode=="plain-text" else "600"]
+          if mode=="normal":command.append("--fatal-recovery-probe")
+          elif mode=="typing" or mode in scenarios:
+              command.append("--typing-probe")
+              if mode in scenarios:command.extend(("--typing-scenario",mode))
+          elif mode=="ru-missing":command.append("--required-resource-recovery-probe")
+          audio=root/"windows-results/audio/audio-endpoint.json"
+          headless=audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after")==0
+          if headless:command.append("--headless-ui-probe")
+          result=subprocess.run(command,check=False)
+          if result.returncode not in ({0,2} if headless else {0}):
+              raise subprocess.CalledProcessError(result.returncode,command)
+          validation=[sys.executable,str(root/"tools/validate_source13_integration_receipt.py"),
+              "--pin",str(root/"tools/data/source13_build_pin.json"),
+              "--report",str(output/"windows-nvda-probe.json"),"--mode",mode]
+          if headless:validation.append("--headless")
+          if mode=="descriptor-corruption":
+              validation.extend(("--descriptor-restoration",str(output/"native-descriptor-restoration.json")))
+          subprocess.run(validation,check=True)
+          document=json.loads((output/"windows-nvda-probe.json").read_text(encoding="utf-8"))
+          rows=document["probe"]["actual_plain_text"]["cases"]
+          if len(rows)!=7:raise ValueError("Exact seven original plain cases required")
+          for row in rows:
+              boundary=row.get("pre_read_quiescence",{})
+              samples=boundary.get("samples",[])
+              if (boundary.get("passed") is not True or boundary.get("observer_active_before_read") is not False
+                  or len(samples)<2 or not all(sample.get("active_planners")==0
+                      and sample.get("queued_driver_jobs")==0 and sample.get("nvda_is_speaking") is False
+                      and sample.get("quiet_ms",0)>=250 for sample in samples[-2:])):
+                  raise ValueError("Actual owned pre-read planner drain was not established")
+          print(json.dumps({"pre_read_boundary_checks":7,"strict_original_auditor_unchanged":True,"product_ready":False}),flush=True)
+
+      - name: Collect bounded diagnostics
+        if: always()
+        run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
+      - name: Preserve exact engineering JSON receipts
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/windows-evidence")
+          files={}
+          for path in sorted(root.rglob("*.json")):
+              raw=path.read_bytes()
+              if len(raw)>4*1024*1024:raise ValueError("Report exceeds quota")
+              files[path.relative_to(root).as_posix()]={"sha256":hashlib.sha256(raw).hexdigest(),
+                  "size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}
+              document=json.loads(raw)
+              if path.name=="nvda-probe.json":
+                  native=document.get("native_membership",{})
+                  print("SOURCE13_NATIVE_MANAGER "+json.dumps({key:native.get(key) for key in ("lookup_timings","statistics_after","scope")}),flush=True)
+                  for row in (document.get("actual_plain_text") or {}).get("cases",[]):
+                      print("SOURCE13_PLAIN_CASE "+json.dumps({key:row.get(key) for key in ("case","functional_passed","route_audit","driver_error","observed_language_fields","default_locale_pinning_observation","pcm_metrics")},ensure_ascii=True),flush=True)
+                  print("SOURCE13_PLAIN_CLEANUP "+json.dumps((document.get("actual_plain_text") or {}).get("cleanup")),flush=True)
+                  for key in ("native_descriptor_recovery","required_resource_recovery","actual_typing"):
+                      row=document.get(key)
+                      if row is not None:print("SOURCE13_"+key.upper()+" "+json.dumps(row,ensure_ascii=True),flush=True)
+                  print("SOURCE13_NONPASSING "+json.dumps([row for row in document.get("checks",[]) if row.get("status")!="passed"]),flush=True)
+          document={"format":"dordiai-exact-source13-plain-retry-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "core_run_id":int(os.environ.get("SOURCE13_CORE_RUN","0")),"core_source_commit":os.environ.get("CORE_SOURCE_SHA"),"core_archive_sha256":os.environ.get("CORE_SHA256"),
+              "mode":os.environ["NVDA_PROBE_MODE"],"scope":"Exact engineering evidence; never acoustic or physical acceptance","files":files}
+          encoded=json.dumps(document,sort_keys=True,ensure_ascii=True,separators=(",",":")).encode()
+          if len(encoded)>16*1024*1024:raise ValueError("JSON bundle exceeds quota")
+          compressed=gzip.compress(encoded,mtime=0)
+          payload=base64.b64encode(compressed).decode("ascii")
+          if len(payload)>1024*1024:raise ValueError("Compressed bundle exceeds log quota")
+          chunks=[payload[i:i+24000] for i in range(0,len(payload),24000)]
+          print("DORDIAI_SOURCE13_PLAIN_RETRY_JSON_META "+json.dumps({"encoding":"gzip+base64","chunks":len(chunks),
+              "json_sha256":hashlib.sha256(encoded).hexdigest(),"gzip_sha256":hashlib.sha256(compressed).hexdigest(),
+              "json_size_bytes":len(encoded)}),flush=True)
+          for i,part in enumerate(chunks):print("DORDIAI_SOURCE13_PLAIN_RETRY_GZIP_B64_%03d "%i+part,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-source13-plain-retry-${{ matrix.mode }}
+          path: dordiai-voices/windows-evidence
+          if-no-files-found: warn
+          retention-days: 30
+

@@ -361,6 +361,21 @@
         "binary_source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
         "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
         "evidence": "evidence/dordiai-core-dev12-backup-receipt.json"
+      },
+      "core13": {
+        "run": 45051688224,
+        "release_id": 454633971,
+        "asset_id": 779924768,
+        "receipt_asset_id": 779930085,
+        "bytes": 1992990314,
+        "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+        "readback_sha256_verified": true,
+        "receipt_readback_sha256_verified": true,
+        "draft": true,
+        "published": false,
+        "binary_source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+        "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+        "evidence": "evidence/dordiai-core-dev13-backup-receipt.json"
       }
     },
     "word_candidate_review": {
@@ -1364,6 +1379,53 @@
       "cancel_tail_accepted": false,
       "evidence": "evidence/source12_longread_45049366545.json",
       "scope": "Frozen12 control, not13 acceptance; local aligned segments are diagnostic only, never a replacement for failed full-reference gate."
+    },
+    "source13_actual_nvda_first": {
+      "run": 45051688055,
+      "status": "eight_passed_plain_fixture_observation_overlap_failed_strictly",
+      "passed_modes": 8,
+      "failed_modes": 1,
+      "plain_source_language_mismatches": 0,
+      "plain_expected_pieces": 102,
+      "plain_observed_pieces": 107,
+      "extra_in_actual_queued_or_driver_sequence": false,
+      "source13_archive_unchanged": true,
+      "evidence": "evidence/source13_nine_mode_first_45051688055.json"
+    },
+    "source13_package_gui_first": {
+      "run": 45051688410,
+      "status": "probe_native_modal_type_assumption_failed",
+      "product_fault_established": false,
+      "observed_v1_install_and_driver_reload": true,
+      "evidence": "evidence/source13-package-gui-45051688410.json"
+    },
+    "uk_ru_shared_carrier_pilot": {
+      "run": 45051688339,
+      "status": "rejected_as_speed_replacement",
+      "core20_seconds": [
+        9.596,
+        9.524
+      ],
+      "shared_with_projection20_seconds": [
+        17.789,
+        17.84
+      ],
+      "source_payloads_unchanged": 10230,
+      "profile": "viktoriia",
+      "scope": "Private model-to-array timing, not NVDA latency or pronunciation; source12 research inputs separate from immutable13.",
+      "evidence": "evidence/ukru_shared_pilot_actual_45051688339.json"
+    },
+    "ar_name_bank_mini": {
+      "run": 45051688399,
+      "native_cases": 2,
+      "projected_cases": 4,
+      "warm_reads": 400,
+      "lookup_p95_ms": 1.856,
+      "old_banks_unchanged": true,
+      "noninstallable_research": true,
+      "nvda_verified": false,
+      "full1305_prepared": false,
+      "evidence": "evidence/ar_name_bank_mini_actual_receipt.json"
     }
   },
   "pending_decisions": [],

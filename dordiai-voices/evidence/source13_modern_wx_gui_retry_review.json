@@ -1,0 +1,50 @@
+{
+  "format": "dordiai-source13-modern-wx-package-retry-candidate",
+  "format_version": 1,
+  "launch_tag": "[source13-package-gui]",
+  "files": {
+    ".github/workflows/dordiai-source13-package-gui.yml": "808828d9a379df2677b20be04e30f081dbc0c3d3",
+    "dordiai-voices/tools/validate_source13_package_receipt.py": "9d79c8c91ff437c0345ebfa364a983a363226305",
+    "dordiai-voices/tests/test_source13_package_receipt.py": "b0f19d05ddc0ec9146416899bcc2027f86410ef1",
+    "dordiai-voices/tools/windows_nvda_voice_packages_probe.py": "a942b244281f1db94fd2f434dd2c570922c83583",
+    "dordiai-voices/tests/test_windows_nvda_voice_packages_probe.py": "ac16bca69d1a3e5d9b7f727d98b75cc43ce79c57"
+  },
+  "actual_core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "actual_core_bytes": 1992990314,
+  "historical_failure": {
+    "run_id": 45051688410,
+    "artifact_id": 14765917563,
+    "reason": "Pinned NVDA2026.3.1 uses genuine gui.message.MessageDialog, not Win32#32770 modal assumed in original tool; V1 package installed and freshdriver returned before obsolete modal matcher timedout.",
+    "retained": true
+  },
+  "correction": {
+    "production_files_changed": false,
+    "modern_dialog_kind": "nvda-wx-message-dialog",
+    "module": "gui.message",
+    "exact_type": "MessageDialog",
+    "ack_method": "Real owned wx.Button.ProcessEvent(wx.EVT_BUTTON) on NVDA main thread",
+    "root_and_modal_PID_equal": true,
+    "title_equal_to_settings_dialog": true,
+    "visible_modal": true,
+    "exact_ok_button_id": 5100,
+    "old_Win32_branch_removed": true,
+    "step_checks_and_observations_parity_preserved": true
+  },
+  "scope": {
+    "api_dispatched_real_wx": true,
+    "operations": 10,
+    "native_file_chooser_interaction": false,
+    "full_keyboard_accessibility": false,
+    "restart_upgrade": false,
+    "physical_audio": false,
+    "pronunciation": false,
+    "product_ready": false
+  },
+  "tests": {
+    "receipt_gate": 10,
+    "harness_scaffold": 9,
+    "passed": 19,
+    "inline_python_steps_compile": 4
+  },
+  "actual_retry_run": false
+}

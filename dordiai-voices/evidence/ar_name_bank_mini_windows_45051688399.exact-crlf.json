@@ -1,0 +1,562 @@
+{
+  "format": "dordiai-ar-name-bank-isolated-proof",
+  "format_version": 1,
+  "status": "passed-noninstallable-optional-bank-feasibility",
+  "source_commit": "96c8285e1ef14b808226890189f3c6b25975312b",
+  "preparation_tool_sha256": "602cdf0782e49d84dc61139d76aa26bb0d4df195746c0a98b7480ebce68ade60",
+  "recipe_tool_sha256": "c1225d834980c59cbb6795caf632c493b953a712ee995d96a28524ef6a488004",
+  "scope": "mini",
+  "source_core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+  "source_wide_sha256": "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262",
+  "candidate_sha256": "17ec9499b5e685b4385d0f1c0b1aa3fe6ca7beb9725d4300bb0336c142513ecc",
+  "native_source_sha256": "643fd8c683786aa4af6619ac59f2227588034b214db05ef94137e5743b598447",
+  "target_identities": {
+    "adam": {
+      "size_bytes": 1152,
+      "sha256": "269911a9190e9cb5c448d52a55de9b48cec08b84f1103665e0278570935d31bd"
+    },
+    "agnieszka": {
+      "size_bytes": 1152,
+      "sha256": "6346bfbddafeb4ec325b1435c3839f0f25260bc354764b78d27f977fdca3885a"
+    },
+    "alex": {
+      "size_bytes": 1152,
+      "sha256": "2b6dd34c0e64fb0730dc34cdaa75fb5d048a5b2e7f002be26330e5768755b98f"
+    },
+    "alice_day1": {
+      "size_bytes": 1152,
+      "sha256": "d177454f0dcc33b2f853880f8060baac042badde381f44b5d1fb44c4d458c669"
+    },
+    "astra_day2": {
+      "size_bytes": 1152,
+      "sha256": "50946d4301f8c72e980ccac5e73bab24a2455cbb2e3b264e9643ba8fbec4a7fc"
+    },
+    "bella": {
+      "size_bytes": 1152,
+      "sha256": "fdceebd36d51dcff5394609b031f4ad68f71e68a05c60c8d3bbbb97737203fb1"
+    },
+    "brian": {
+      "size_bytes": 1152,
+      "sha256": "03a8d135ccabbac75a7f1d0142115410ca019e646881a0749535ebe8d8b5f353"
+    },
+    "brian_studio": {
+      "size_bytes": 1152,
+      "sha256": "663061a16130a16462bb167abd71fa3413385302b6bee6dcbeeda70c200a21ba"
+    },
+    "brianna": {
+      "size_bytes": 1152,
+      "sha256": "935a60a75e60a413cb0351e91b2e08d2232a6d6b7b8bc8f1c1ef0d9624b31e15"
+    },
+    "callum_day1": {
+      "size_bytes": 1152,
+      "sha256": "2bbde3fac94735b1e915b1b78258073152ba5bc06396db85c07118fae77ec619"
+    },
+    "charlie_day1": {
+      "size_bytes": 1152,
+      "sha256": "081e6be677daf0868fe43f9ceb363668ea716fc4116a01e447800b1075c7fb14"
+    },
+    "chris": {
+      "size_bytes": 1152,
+      "sha256": "be90636cc259f50b8e94b69bc29ba8cfe33ab097df02dc79214a4a5bf233444c"
+    },
+    "claude_day2": {
+      "size_bytes": 1152,
+      "sha256": "0f82511f76051b51b96a934b5abf7597a0b8c85e46b503491bb1976f426dfe44"
+    },
+    "daniel": {
+      "size_bytes": 1152,
+      "sha256": "0c624bd6a91bc4234629599dfb007a923ac4ec977f4e03dd4722b1b502fd0fe0"
+    },
+    "daniel_day1": {
+      "size_bytes": 1152,
+      "sha256": "e51a36541a9768e0b9989487935140bdfbcf2a64f962d3e2eb9bf62e9784f123"
+    },
+    "david": {
+      "size_bytes": 1152,
+      "sha256": "bb804816178bc2e00606411eef67d9eebd1fef913bafcbdd05a08ef6d743cfa3"
+    },
+    "elis": {
+      "size_bytes": 1152,
+      "sha256": "0f5b3cfb67d7606e5b32b25e39c6255be1455c334893c2cf535a796f35bd0d11"
+    },
+    "gemini_day2": {
+      "size_bytes": 1152,
+      "sha256": "a049b48401f7588c85950b4b437575966001eeac21cd5cee6c096f71ca43a994"
+    },
+    "george": {
+      "size_bytes": 1152,
+      "sha256": "1f858b27c6ecdd0b14cbfbb6f02dd71d6748d7ca2d49471b4deb4d6bbe816a5c"
+    },
+    "george_unpacked": {
+      "size_bytes": 1152,
+      "sha256": "69ed3ac153f59e1a57f1a6d6ca85687be50735382bf6504c6834cf47f7a34eb6"
+    },
+    "gpt_day2": {
+      "size_bytes": 1152,
+      "sha256": "cf51e8332353598c35b84515ffe1a3e1a09e56f810f1aaf858a015885302d6c5"
+    },
+    "grok_day2": {
+      "size_bytes": 1152,
+      "sha256": "d58185a348c983a1cc631db65178e35ef6e05681b42910afc1dc8dd6bfb07aea"
+    },
+    "harry": {
+      "size_bytes": 1152,
+      "sha256": "479c1d15b08950530275a7e6ca16e431c7a57a9264b079aa26a82e87490878e1"
+    },
+    "hazel": {
+      "size_bytes": 1152,
+      "sha256": "9c5a03d16a63aa2751c6ca21240e4ac5ec91930b0979ef4dfecc520df37d2597"
+    },
+    "keeper": {
+      "size_bytes": 1152,
+      "sha256": "694a59954da902a2997c19ea12b1830e30b7d0f00d6949534f08b21cc6227460"
+    },
+    "laura_day1": {
+      "size_bytes": 1152,
+      "sha256": "0eddd9ebdfcec3af97cecf8f4fd3916f758326d38c61969c2b43ba5e8a4cde56"
+    },
+    "laura_unpacked": {
+      "size_bytes": 1152,
+      "sha256": "009a7d479576afb9d4886dc571f03a51f5784439c5c307504f0276d3b759599e"
+    },
+    "lian": {
+      "size_bytes": 1152,
+      "sha256": "667f2161a586751330aa64a38a87dcff039b90c1e4578f9537ec3676d282d517"
+    },
+    "liza": {
+      "size_bytes": 1152,
+      "sha256": "abd949f6ae8604fc6ad8c2062199e5e633baec11081a866e0e21bf336caf757e"
+    },
+    "liza_talk": {
+      "size_bytes": 1152,
+      "sha256": "78d4e14489342a4496e64f0c30c64a6c3f9984e7927d735a5d2ed82db5624d05"
+    },
+    "mark": {
+      "size_bytes": 1152,
+      "sha256": "f25faa9571b4aac24cb7dd072f7481c9b00c026380fa125462940fbdf115fee0"
+    },
+    "mykola": {
+      "size_bytes": 1152,
+      "sha256": "28f867508a52d12717ebde06e4127988d91cf0fd18a82edc0720d144721abb8b"
+    },
+    "oksana": {
+      "size_bytes": 1152,
+      "sha256": "0ccdadd71c5738f2739a777f60a7d9489070f2aaa543dfc03d15c12654b576f5"
+    },
+    "oleksii": {
+      "size_bytes": 1152,
+      "sha256": "cd9a5b83e164db649e0e41c81da071c2f940fe7618b70fe3dd8507d80070f691"
+    },
+    "oleksii_day1": {
+      "size_bytes": 1152,
+      "sha256": "23742eb3b253a7aa588c70485736f77b6543e33de43fe64e2161d7b68ed1e80f"
+    },
+    "oleksii_day2": {
+      "size_bytes": 1152,
+      "sha256": "1e85ffa1e290a1952d3c691f266b316d748a2ae3e4f14dc3ae7343753ef1780f"
+    },
+    "oleksii_unpacked": {
+      "size_bytes": 1152,
+      "sha256": "3b7668b094972c5b12d1a7d5f201fb4aad07bcdd5099b3822ef0830e6927bfb2"
+    },
+    "olena": {
+      "size_bytes": 1152,
+      "sha256": "07af96d62f9d032485e975393e613d1f7a3cb9e0f6d70ac14332071f7708d309"
+    },
+    "sara": {
+      "size_bytes": 1152,
+      "sha256": "a5b0fb62497f0bcb055e88a4b21105a958e48e675737599176f4e839c601f6ac"
+    },
+    "sara_archive": {
+      "size_bytes": 1152,
+      "sha256": "605702f0e87182cbc458bebbbfc441f6e33c2d25dbb9f20949f4d6eb9c6eea2b"
+    },
+    "studio_day1": {
+      "size_bytes": 1152,
+      "sha256": "eccfb1fb3c8141a770f191dde6aed6f4127dd82ffed2cfe7e4f852d7b9b58191"
+    },
+    "veren": {
+      "size_bytes": 1152,
+      "sha256": "7f01be2f78cfe38acd834260ec486bcc0baf7cc8d1cadcc9bc6d2a52588d948b"
+    },
+    "viktoriia": {
+      "size_bytes": 1152,
+      "sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+    },
+    "will": {
+      "size_bytes": 1152,
+      "sha256": "0ce3774f7ef058d4d32a160a3a71301f98f5c2563210dd9c99a427ce3fc49904"
+    },
+    "yevhen": {
+      "size_bytes": 1152,
+      "sha256": "b76574c246db0eb0b1e4cd63c4f02316d53d7d75bb0314433e1c09c7c0943800"
+    }
+  },
+  "all45_profile_ids": [
+    "adam",
+    "agnieszka",
+    "alex",
+    "alice_day1",
+    "astra_day2",
+    "bella",
+    "brian",
+    "brian_studio",
+    "brianna",
+    "callum_day1",
+    "charlie_day1",
+    "chris",
+    "claude_day2",
+    "daniel",
+    "daniel_day1",
+    "david",
+    "elis",
+    "gemini_day2",
+    "george",
+    "george_unpacked",
+    "gpt_day2",
+    "grok_day2",
+    "harry",
+    "hazel",
+    "keeper",
+    "laura_day1",
+    "laura_unpacked",
+    "lian",
+    "liza",
+    "liza_talk",
+    "mark",
+    "mykola",
+    "oksana",
+    "oleksii",
+    "oleksii_day1",
+    "oleksii_day2",
+    "oleksii_unpacked",
+    "olena",
+    "sara",
+    "sara_archive",
+    "studio_day1",
+    "veren",
+    "viktoriia",
+    "will",
+    "yevhen"
+  ],
+  "planned_full_clip_count": 1305,
+  "selected_profiles": [
+    "viktoriia",
+    "oksana"
+  ],
+  "selected_glyphs": [
+    "ا",
+    "ء"
+  ],
+  "sample_rate": 24000,
+  "native_input_rate": 22050,
+  "bank_key_language": "ar-char",
+  "data_only_new_location": "research banks/ar/<profile>.json+.pcm, no production installable resource manifest",
+  "existing_bank_files_modified": 0,
+  "previous3330_regenerated": false,
+  "model_retraining": false,
+  "new_model_weights": false,
+  "nvda_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false,
+  "production_registered": false,
+  "generation": [
+    {
+      "kind": "native_source_once",
+      "glyph": "ا",
+      "ordinary_name": "ألف",
+      "render_seconds": 0.3653636000000233,
+      "wave": {
+        "samples": 29770,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3501133786848072,
+        "peak": 0.484823077917099,
+        "wav_sha256": "15ea12c02309aa0a85c505a5ed0eee74e7921e0107685054c55f25258516af48",
+        "file": "00-native.wav"
+      },
+      "native_input": {
+        "source_text": "ألف",
+        "nfkd_text": "ألف",
+        "marked_text": "<ar>ألف</ar>",
+        "native_input_ids": [
+          29,
+          60,
+          77,
+          31,
+          290,
+          330,
+          314,
+          311,
+          29,
+          16,
+          60,
+          77,
+          31
+        ],
+        "native_input_mask": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "native_source_once",
+      "glyph": "ء",
+      "ordinary_name": "همزة",
+      "render_seconds": 0.3366368999999736,
+      "wave": {
+        "samples": 29907,
+        "sample_rate": 22050,
+        "audio_seconds": 1.356326530612245,
+        "peak": 0.2648067772388458,
+        "wav_sha256": "b0b02a691fa8fecbe14082a0b9afba37d619cd6760cc4bf193e1a185838bbcde",
+        "file": "28-native.wav"
+      },
+      "native_input": {
+        "source_text": "همزة",
+        "nfkd_text": "همزة",
+        "marked_text": "<ar>همزة</ar>",
+        "native_input_ids": [
+          29,
+          60,
+          77,
+          31,
+          317,
+          315,
+          301,
+          292,
+          29,
+          16,
+          60,
+          77,
+          31
+        ],
+        "native_input_mask": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "same_selected_profile_projection",
+      "profile": "viktoriia",
+      "glyph": "ا",
+      "ordinary_name": "ألف",
+      "projection_and_real_resampling_seconds": 0.5993010000000254,
+      "wave": {
+        "samples": 32323,
+        "sample_rate": 24000,
+        "audio_seconds": 1.3467916666666666,
+        "peak": 0.43243205547332764,
+        "wav_sha256": "bdcc1321579a9efb4124d436a42a89949963b6c5832490c69e72ff0a46b8ea32",
+        "file": "viktoriia-00-projected24k.wav"
+      },
+      "target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+      "pcm_sha256": "d2e83fab99679f98865dfae224ea04d3cd2103c6bb215bcd434ece2e2260f0f9"
+    },
+    {
+      "kind": "same_selected_profile_projection",
+      "profile": "viktoriia",
+      "glyph": "ء",
+      "ordinary_name": "همزة",
+      "projection_and_real_resampling_seconds": 0.5822489999999902,
+      "wave": {
+        "samples": 32323,
+        "sample_rate": 24000,
+        "audio_seconds": 1.3467916666666666,
+        "peak": 0.31105494499206543,
+        "wav_sha256": "d4e777bd198d1359a3cbdfbc96e4b9e4422e6aa96133e0a6427769e4b2c916ad",
+        "file": "viktoriia-28-projected24k.wav"
+      },
+      "target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+      "pcm_sha256": "835390d05fb713c0ed920bb665f3ca0f90dbb223a84ad7f7f6f24a56b9bb642a"
+    },
+    {
+      "kind": "same_selected_profile_projection",
+      "profile": "oksana",
+      "glyph": "ا",
+      "ordinary_name": "ألف",
+      "projection_and_real_resampling_seconds": 0.5821776000000227,
+      "wave": {
+        "samples": 32323,
+        "sample_rate": 24000,
+        "audio_seconds": 1.3467916666666666,
+        "peak": 0.32480552792549133,
+        "wav_sha256": "15752213469e249c8ebd3921dabbc267b29a86eb9509f7857059bde5c44123e0",
+        "file": "oksana-00-projected24k.wav"
+      },
+      "target_sha256": "0ccdadd71c5738f2739a777f60a7d9489070f2aaa543dfc03d15c12654b576f5",
+      "pcm_sha256": "cdfca8d2852d713c61e09408e8e37d3d5bc25781d840a01bca43b43ef439395f"
+    },
+    {
+      "kind": "same_selected_profile_projection",
+      "profile": "oksana",
+      "glyph": "ء",
+      "ordinary_name": "همزة",
+      "projection_and_real_resampling_seconds": 0.6132083999999622,
+      "wave": {
+        "samples": 32323,
+        "sample_rate": 24000,
+        "audio_seconds": 1.3467916666666666,
+        "peak": 0.2590501010417938,
+        "wav_sha256": "72e95e953eb24955ef6ce37996c477e99b04b96449adca757d8c8883946ebb8f",
+        "file": "oksana-28-projected24k.wav"
+      },
+      "target_sha256": "0ccdadd71c5738f2739a777f60a7d9489070f2aaa543dfc03d15c12654b576f5",
+      "pcm_sha256": "a7b000b1aa9b45ae83fa709c78c6bb9a89e15e8d14ea0237014f014076b4551b"
+    }
+  ],
+  "banks": {
+    "viktoriia": {
+      "profile": "viktoriia",
+      "kind": "ar-char",
+      "sample_rate": 24000,
+      "channels": 1,
+      "sample_width": 2,
+      "clips": [
+        {
+          "glyph": "ا",
+          "ordinary_name": "ألف",
+          "key": "5ee55ab3ea7df5526900b86e",
+          "offset": 0,
+          "size_bytes": 64646,
+          "pcm_sha256": "d2e83fab99679f98865dfae224ea04d3cd2103c6bb215bcd434ece2e2260f0f9"
+        },
+        {
+          "glyph": "ء",
+          "ordinary_name": "همزة",
+          "key": "c47e34250dbddba2d3622110",
+          "offset": 64646,
+          "size_bytes": 64646,
+          "pcm_sha256": "835390d05fb713c0ed920bb665f3ca0f90dbb223a84ad7f7f6f24a56b9bb642a"
+        }
+      ],
+      "index": {
+        "name": "viktoriia.json",
+        "size_bytes": 125,
+        "sha256": "71d667038beae6099ea9628d9cc02cf102f324255acadc7005e8375a7008184f"
+      },
+      "audio": {
+        "name": "viktoriia.pcm",
+        "size_bytes": 129292,
+        "sha256": "0793995c9449d513dda6080dc8ccd31b74d935ef665ee3aff84ff215f2369b74"
+      },
+      "target_identity": {
+        "size_bytes": 1152,
+        "sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+      }
+    },
+    "oksana": {
+      "profile": "oksana",
+      "kind": "ar-char",
+      "sample_rate": 24000,
+      "channels": 1,
+      "sample_width": 2,
+      "clips": [
+        {
+          "glyph": "ا",
+          "ordinary_name": "ألف",
+          "key": "5ee55ab3ea7df5526900b86e",
+          "offset": 0,
+          "size_bytes": 64646,
+          "pcm_sha256": "cdfca8d2852d713c61e09408e8e37d3d5bc25781d840a01bca43b43ef439395f"
+        },
+        {
+          "glyph": "ء",
+          "ordinary_name": "همزة",
+          "key": "c47e34250dbddba2d3622110",
+          "offset": 64646,
+          "size_bytes": 64646,
+          "pcm_sha256": "a7b000b1aa9b45ae83fa709c78c6bb9a89e15e8d14ea0237014f014076b4551b"
+        }
+      ],
+      "index": {
+        "name": "oksana.json",
+        "size_bytes": 125,
+        "sha256": "71d667038beae6099ea9628d9cc02cf102f324255acadc7005e8375a7008184f"
+      },
+      "audio": {
+        "name": "oksana.pcm",
+        "size_bytes": 129292,
+        "sha256": "931dd6a2d187d538a7ccbfaf5f3104f81f57a6ad2e52d6bda54cb3ea9f2e3363"
+      },
+      "target_identity": {
+        "size_bytes": 1152,
+        "sha256": "0ccdadd71c5738f2739a777f60a7d9489070f2aaa543dfc03d15c12654b576f5"
+      }
+    }
+  },
+  "native_generation_calls": 2,
+  "projection_calls": 4,
+  "model_sessions_created_before_lookup": 6,
+  "lookup": {
+    "scope": "Exact immutable driver AST fast_clip/epoch/control methods + actual NativeLetterBank, research caller view only; NOT full NVDA/WavePlayer/typing execution",
+    "driver_sha256": "123e65f70dde9ab9284eba52b754855202cf404e04b6a9f3f75fb0e05a2f03aa",
+    "lookups": [
+      {
+        "profile": "viktoriia",
+        "glyph": "ا",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "d2e83fab99679f98865dfae224ea04d3cd2103c6bb215bcd434ece2e2260f0f9"
+      },
+      {
+        "profile": "viktoriia",
+        "glyph": "ء",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "835390d05fb713c0ed920bb665f3ca0f90dbb223a84ad7f7f6f24a56b9bb642a"
+      },
+      {
+        "profile": "oksana",
+        "glyph": "ا",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "cdfca8d2852d713c61e09408e8e37d3d5bc25781d840a01bca43b43ef439395f"
+      },
+      {
+        "profile": "oksana",
+        "glyph": "ء",
+        "pcm_bytes": 64646,
+        "pcm_sha256": "a7b000b1aa9b45ae83fa709c78c6bb9a89e15e8d14ea0237014f014076b4551b"
+      }
+    ],
+    "model_creation_and_subprocess_forbidden": true,
+    "resource_epoch_stale_rejected": true,
+    "wrong_mode_locale_glyph_and_profile_rejected": true,
+    "warm_read_samples": 400,
+    "warm_lookup_ms": {
+      "minimum": 1.5383,
+      "median": 1.6477499999999998,
+      "p95": 1.8562,
+      "maximum": 2.3802
+    }
+  },
+  "actual_clip_count": 4,
+  "all45_and29_prepared": false,
+  "original_payloads_unchanged": 10230,
+  "original180_banks_untouched": true,
+  "existing_generic_schema_consumed": true,
+  "minimal_future14_hook": "Verify optional bank/profile identity and file pins through BoundReader plus existing resource epoch; managed replacement profiles must never use legacy builtin bank. No production13 hook changed."
+}
