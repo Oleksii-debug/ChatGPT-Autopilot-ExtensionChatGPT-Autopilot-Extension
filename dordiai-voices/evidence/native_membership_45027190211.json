@@ -1,0 +1,206 @@
+{
+  "format": "dordiai-actual-compact-native-membership-evidence",
+  "format_version": 1,
+  "source_run": 45027190211,
+  "source_commit": "e877c90bf892e6f4c73ab32742f33fe40102e1a6",
+  "source_acquisition_run": 45022418783,
+  "build": {
+    "format": "dordiai-compact-native-word-membership-build",
+    "format_version": 1,
+    "status": "built-and-source-sample-checked",
+    "artifact": {
+      "filename": "native-word-membership.bin",
+      "bytes": 18661227,
+      "sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+      "word_count": 6642550,
+      "codes": [
+        "uk",
+        "ru"
+      ],
+      "block_count": 25948,
+      "index_bytes": 1118818,
+      "metadata_bytes": 2746,
+      "reader_validation": "actual pure-stdlib authenticated full-index/full-block semantic validation",
+      "full_validation": {
+        "validated_blocks": 25948,
+        "validated_words": 6642550,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689"
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1762266,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      }
+    },
+    "acquisition_report_sha256": "d7c8157a3cfc44d3e6cce9daf45099fb34c4f5f1e80edfed70a50e6cde2d6199",
+    "source_union_count": 6642550,
+    "actual_source_sample_checks": 96,
+    "runtime_third_party_extension_required": false,
+    "private_python_abi_extension_required": false,
+    "runtime_network_required": false,
+    "language_identification_infallible": false,
+    "scope": "actual finite source compaction and stdlib lookup proof; NVDA integration and pronunciation remain separate"
+  },
+  "hosts": [
+    {
+      "source_job": 137223569725,
+      "status": "passed-exact-finite-lookup",
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+      "instance_open_summary": {
+        "count": 5,
+        "minimum_ms": 58.4922,
+        "median_ms": 59.2584,
+        "p95_ms": 62.9021,
+        "p99_ms": 62.9021,
+        "maximum_ms": 62.9021
+      },
+      "first_pass_summary": {
+        "count": 97,
+        "minimum_ms": 0.0697,
+        "median_ms": 1.7889,
+        "p95_ms": 2.9012,
+        "p99_ms": 3.3222,
+        "maximum_ms": 3.3222
+      },
+      "resident_lookup_summary": {
+        "count": 9700,
+        "minimum_ms": 0.0302,
+        "median_ms": 1.748,
+        "p95_ms": 2.0989,
+        "p99_ms": 2.7906,
+        "maximum_ms": 10.641
+      },
+      "working_set_increase_bytes": 10158080,
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1818963,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "nvda_verified": false,
+      "physical_audio_verified": false
+    },
+    {
+      "source_job": 137223569753,
+      "status": "passed-exact-finite-lookup",
+      "platform": "Linux-7.0.0-1020-azure-x86_64-with-glibc2.43",
+      "python": "3.13.18 (main, Oct 26 2026, 14:19:33) [GCC 15.2.0]",
+      "instance_open_summary": {
+        "count": 5,
+        "minimum_ms": 56.061214,
+        "median_ms": 56.834356,
+        "p95_ms": 63.114847,
+        "p99_ms": 63.114847,
+        "maximum_ms": 63.114847
+      },
+      "first_pass_summary": {
+        "count": 97,
+        "minimum_ms": 0.033563,
+        "median_ms": 1.826275,
+        "p95_ms": 2.070551,
+        "p99_ms": 2.61715,
+        "maximum_ms": 2.61715
+      },
+      "resident_lookup_summary": {
+        "count": 9700,
+        "minimum_ms": 0.016241,
+        "median_ms": 1.820384,
+        "p95_ms": 2.065862,
+        "p99_ms": 2.327099,
+        "maximum_ms": 3.90962
+      },
+      "working_set_increase_bytes": 15085568,
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1818963,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "nvda_verified": false,
+      "physical_audio_verified": false
+    }
+  ],
+  "exact_original_json_receipts": [
+    {
+      "kind": "build",
+      "source_run": 45027190211,
+      "source_job": 137222663348,
+      "source_artifact": 14756187576,
+      "exact_json_document_sha256": "c3f38c06f6b6d8e88b5ff05559c5b069bd69ad03826b50c2227558c0caf24152",
+      "gzip_blob_sha": "8e4ff3eea7624a7b26f6a880d4b6505f08902640",
+      "chunks": 1
+    },
+    {
+      "kind": "host-windows",
+      "source_run": 45027190211,
+      "source_job": 137223569725,
+      "source_artifact": 14755624411,
+      "exact_json_document_sha256": "c54b98ea6d72c5db8dc6af21690bdb9f98ee887ef4eb68a88124e1dcb4f30f0e",
+      "gzip_blob_sha": "99fa7b525904670cff451aaca52c6fc565c8610b",
+      "chunks": 2
+    },
+    {
+      "kind": "host-linux",
+      "source_run": 45027190211,
+      "source_job": 137223569753,
+      "source_artifact": 14756750333,
+      "exact_json_document_sha256": "bcb828d8009a7c0e1a90ff2f3b222e154b80549cdb50f25808b51eac6de9d809",
+      "gzip_blob_sha": "0a44c6e76adb781877a92340395a066860a2f277",
+      "chunks": 3
+    }
+  ],
+  "descriptor": {
+    "path": "models/WordLanguage/native-word-membership.json",
+    "blob_sha": "1c8975b6383b6319cae932a777a0191d4ec4f943",
+    "sha256": "2de5611c384e933e19d1cdf5fda37f17bd5c4b7602d09964f53fdb7280877459",
+    "bytes": 558
+  },
+  "limitations": [
+    "Actual finite lookup and CPython3.13 host compatibility, not yet frozen-NVDA integration.",
+    "Full-hash open timings use new reader/mmap instances; OS file cache was not evicted.",
+    "Resident workload includes32-block cache misses across96primary-source samples and one invalid-token negative control repeated100times; not a universal per-word SLA.",
+    "OS working-set change includes mapped pages and interpreter allocations; charged decoded cache is a conservative software bound, not total RAM.",
+    "196509shared spellings retainbothcodes; absence means no source evidence, not a preferred language. Author intent is not infallibly identified."
+  ]
+}
