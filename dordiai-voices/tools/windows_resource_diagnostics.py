@@ -52,9 +52,17 @@ except Exception as error:
 import stressonnx.download as download
 import stressonnx.backends.ruaccent as ruaccent
 report["stressor_download_source"]=inspect.getsource(download._download_files)[:12000]
+report["stressor_download_module_source"]=inspect.getsource(download)[:24000]
 report["stressor_load_source"]=inspect.getsource(ruaccent.RuAccentStressor._load)[:12000] if hasattr(ruaccent,"RuAccentStressor") else None
 report["stress_module_classes"]=[key for key,value in vars(ruaccent).items() if isinstance(value,type)]
-cache=runtime/"models/stress"
+cache=runtime/"models/PocketTTS/stress"
+report["mixed_path_checks"]=[]
+for cachevalue in (str(cache),private_runtime_path(cache)):
+ raw=os.path.join(cachevalue,"ru_ruaccent","nn_omograph/model.onnx")
+ normalized=os.path.normpath(raw)
+ report["mixed_path_checks"].append({"prefix":cachevalue.startswith(chr(92)*2+"?"+chr(92)),
+    "raw_exists":os.path.exists(raw),"normalized_exists":os.path.exists(normalized),
+    "raw_length":len(raw),"normalized_length":len(normalized)})
 report["stress_cache"]=[{"relative":str(p.relative_to(cache)),"bytes":p.stat().st_size}
  for p in cache.rglob("*") if p.is_file()]
 from stressonnx import make_stressor
