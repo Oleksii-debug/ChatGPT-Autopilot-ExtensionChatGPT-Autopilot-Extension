@@ -1,0 +1,13 @@
+{
+  "names": [
+    "DordiaiZghNative-45040668464-0"
+  ],
+  "scope": "own-ephemeral-CI-private-python-only",
+  "direction": "Outbound",
+  "enabled": true,
+  "action": "Block",
+  "all_firewall_profiles_enabled": true,
+  "programs": [
+    "D:\\a\\_temp\\dordiai-zgh-source11-45040668464\\kx47Runtime\\python\\python.exe"
+  ]
+}

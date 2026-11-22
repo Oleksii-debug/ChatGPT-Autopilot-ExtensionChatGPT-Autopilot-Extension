@@ -1,0 +1,76 @@
+{
+  "declared_training_hours": 1.19,
+  "files": {
+    "OpenVoiceV2/tone_ref_encoder.onnx": {
+      "sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+      "size_bytes": 3259275
+    },
+    "SharedOmniONNX/LICENSE-HIGGS-AUDIO-2.txt": {
+      "sha256": "ac933dc084d119bd20401956b90d11ae87c248b2da62622cd580d82cdf2fa049",
+      "size_bytes": 9171
+    },
+    "SharedOmniONNX/LICENSE-LLAMA3.txt": {
+      "sha256": "4fa551d4f938f68b8c1e6afa9d28befb70e3f33f75d0753248d530364aeea40f",
+      "size_bytes": 12403
+    },
+    "SharedOmniONNX/README.md": {
+      "sha256": "5e56b0f55925bb9f6eefdbfbbae73c7d19a80832d151fe919065a4f4fcb781aa",
+      "size_bytes": 4247
+    },
+    "SharedOmniONNX/backbone.int8.onnx": {
+      "sha256": "241610742675b990eb1cc50b32a86d7088762e43f070a8db36a501227ff855b7",
+      "size_bytes": 993287060
+    },
+    "SharedOmniONNX/encoder.fp32.onnx": {
+      "sha256": "8e9697cf64ad4a2b66b6ae8cf2eedc2e3d80732568fde0ee6177164d8b32fbb9",
+      "size_bytes": 654395766
+    },
+    "SharedOmniONNX/tokenizer.json": {
+      "sha256": "408f669b7e2b045fdf54201d815bd364e6667dbd845115da81239c40bc6dcfd1",
+      "size_bytes": 11423986
+    },
+    "SharedOmniONNX/vocoder.fp32.onnx": {
+      "sha256": "cfea73af6cf8fe93d16f18e4f8c4a54c9bf37389d5c296e49a896dc3a04c9e4c",
+      "size_bytes": 803873
+    },
+    "SharedOmniONNX/vocoder.fp32.onnx.data": {
+      "sha256": "ebbdf1cf7ddb8502fa02abf13be9ca0554657954b455cffd839440238da8ffc3",
+      "size_bytes": 86310912
+    }
+  },
+  "fixture_sha256": "f0914b056a4dbf131f54eb1cf8cbfbb45097f5539b883ecc17ced740021a1c42",
+  "format": "dordiai-zgh-pinned-model-acquisition-v1",
+  "language": "zgh",
+  "language_table_git_blob": "ac4cfedc4cf33e0589952ccf9f49b87bf970bbaf",
+  "language_table_revision": "c8c0a6257b9b652dc7d239df9d911dbb1f9dabdf",
+  "licences": {
+    "Higgs_audio": "Included LICENSE-HIGGS-AUDIO-2.txt",
+    "Llama": "Included LICENSE-LLAMA3.txt",
+    "Omni_weights": "CC-BY-NC upstream OmniVoice; existing third-party INT8 export unchanged",
+    "OpenVoiceV2_reference_encoder": "MIT",
+    "native_reference": "Apache-2.0"
+  },
+  "model_repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+  "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+  "models_executed": false,
+  "native_source": {
+    "attribution": "Abdelhaque Id Ali; Mohamed Aymane Farhi; Tamazight-NLP",
+    "dataset_card_git_blob": "3a359c784e778776d5e261495f052169025a0046",
+    "dataset_card_sha256": "6c2f304a39b93012850243f614612715254cc8ba4b29c0f4a0cbe46c06def002",
+    "file": "data/train-00000-of-00001.parquet",
+    "human_pronunciation_validated_by_us": false,
+    "licence": "Apache-2.0",
+    "raw_creator_repository": "abdelhaqueidali/Amazigh-Speech-Dataset",
+    "reader": "PyArrow22.0.0 first row group, unaltered rows0..2",
+    "recorded_speaker": "Abdelhaque Id Ali",
+    "repository": "Tamazight-NLP/TOSD",
+    "revision": "8bbbc8e9efc363f13d5fd9a92d5c625102cab66a",
+    "sha256": "0eea3e83739d8e49dabbc6659cb9b62ef249b0f8ad4cbba1e03fe79a37812e41",
+    "size_bytes": 587038815,
+    "speaker_accent": "Southern Moroccan Amazigh speaker reading publisher-declared Standard Moroccan texts",
+    "split": "train",
+    "whole_file_sha256_actually_verified": true
+  },
+  "not_alias_of": "kab",
+  "product_integrated": false
+}

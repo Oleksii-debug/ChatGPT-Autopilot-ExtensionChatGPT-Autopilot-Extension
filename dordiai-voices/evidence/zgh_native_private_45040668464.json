@@ -1,0 +1,452 @@
+{
+  "actual_source_identity": {
+    "basis": "actual-generated-ZGH-calibration-audio-from-this-same-reference-and-pinned-model",
+    "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+    "norm": 10.371970176696777,
+    "not_copied_from_other_language_or_target_voice": true,
+    "shape": [
+      1,
+      256,
+      1
+    ],
+    "source_native_float_sha256": "66aa93588be04a577e7338c62c6dbf7a42b3e588f42e1e9d249b854099d1fbf1",
+    "source_npy": {
+      "sha256": "8255a25ea8c8c8eadd8809636aa2e29b9315459928a2b654d6aee5a2371bec36",
+      "size_bytes": 1152
+    }
+  },
+  "all_model_files_unchanged": true,
+  "all_original_private_files_unchanged": true,
+  "authentic_reference_encoding_seconds": 1.6898708999999883,
+  "cases": [
+    {
+      "generated_codes_sha256": "b53fa6db2d2b97964b4eed2ba20a7aaccdba16f71f74e8dcc34576e9be29db2e",
+      "generated_codes_shape": [
+        8,
+        37
+      ],
+      "guidance": 2.0,
+      "literal_language_id": "zgh",
+      "name": "calibration",
+      "native_rtf": 22.177394054054044,
+      "native_seconds": 32.822543199999984,
+      "native_wave": {
+        "file": "calibration-native.wav",
+        "float32_sha256": "66aa93588be04a577e7338c62c6dbf7a42b3e588f42e1e9d249b854099d1fbf1",
+        "peak": 0.41361144185066223,
+        "rms": 0.034191299229860306,
+        "sample_rate": 24000,
+        "samples": 35520,
+        "seconds": 1.48,
+        "sha256": "73c5300b09222a5dcae377bec84f9111c3024cdde8f1a3b991521d5883bb34f3",
+        "size_bytes": 71084
+      },
+      "process_memory": {
+        "commit_bytes": 1483845632,
+        "peak_commit_bytes": 1488138240,
+        "peak_working_set_bytes": 1368883200,
+        "working_set_bytes": 1364660224
+      },
+      "projected_wave": {
+        "file": "calibration-viktoriia.wav",
+        "float32_sha256": "2a77a2170b3112505ab50d3a563ab0d69196eb78634f5ba38a3ca0726ecf7bb8",
+        "peak": 0.2760947048664093,
+        "rms": 0.031736258417367935,
+        "sample_rate": 24000,
+        "samples": 35520,
+        "seconds": 1.48,
+        "sha256": "9e617649b5b902f9e284ebbccb82ce6013b5cd393141f5f56342f7b50d650c2d",
+        "size_bytes": 71084
+      },
+      "projection": {
+        "actual_original_code": "source11.WideVoices.converted",
+        "actual_original_models": [
+          "OpenVoiceV2/encoder-flow.onnx",
+          "OpenVoiceV2/decoder.onnx"
+        ],
+        "decoder_calls": 2,
+        "flow_calls": 1,
+        "profile": "viktoriia",
+        "source_binding_passed": true,
+        "target_binding_passed": true
+      },
+      "projection_seconds": 0.8011141999999722,
+      "seed": 0,
+      "steps": 32,
+      "text": "ⵎⴰⴷ ⴰⴽ ⵉⵙⵎ ?"
+    },
+    {
+      "generated_codes_sha256": "ae604c04a7c01d6ee96ad80b915a0ebaee57267863a692a67f5dde9d01e39d20",
+      "generated_codes_shape": [
+        8,
+        29
+      ],
+      "guidance": 2.0,
+      "literal_language_id": "zgh",
+      "name": "word",
+      "native_rtf": 22.27918232758621,
+      "native_seconds": 25.8438515,
+      "native_wave": {
+        "file": "word-native.wav",
+        "float32_sha256": "6d8069c7a1e0e6565ae567abd78413df601c4ea2397e05b7f47fe8835ffdecd3",
+        "peak": 0.19906306266784668,
+        "rms": 0.01661772094666958,
+        "sample_rate": 24000,
+        "samples": 27840,
+        "seconds": 1.16,
+        "sha256": "4e29c798dfc7ab39d2378a19c401be6373990f2782e31ed9c19101374e9e8bb8",
+        "size_bytes": 55724
+      },
+      "process_memory": {
+        "commit_bytes": 1485914112,
+        "peak_commit_bytes": 1490206720,
+        "peak_working_set_bytes": 1372225536,
+        "working_set_bytes": 1367969792
+      },
+      "projected_wave": {
+        "file": "word-viktoriia.wav",
+        "float32_sha256": "0e816a4636805ee0044b7b2b3a1fabfa1c3a3fdb55ad665632a081b20857a823",
+        "peak": 0.1476583629846573,
+        "rms": 0.018197473138570786,
+        "sample_rate": 24000,
+        "samples": 27840,
+        "seconds": 1.16,
+        "sha256": "7d2813bf7ff68e349c3ea150f619af91e44677404cdad4b36cb395d81d9712c1",
+        "size_bytes": 55724
+      },
+      "projection": {
+        "actual_original_code": "source11.WideVoices.converted",
+        "actual_original_models": [
+          "OpenVoiceV2/encoder-flow.onnx",
+          "OpenVoiceV2/decoder.onnx"
+        ],
+        "decoder_calls": 3,
+        "flow_calls": 1,
+        "profile": "viktoriia",
+        "source_binding_passed": true,
+        "target_binding_passed": true
+      },
+      "projection_seconds": 0.7955956000000128,
+      "seed": 0,
+      "steps": 32,
+      "text": "ⴷⴰⵔⵉ"
+    },
+    {
+      "generated_codes_sha256": "742b8f726461c5c35e5d0e471725b0edef8ae809507a6a113fa8dcd992fadd23",
+      "generated_codes_shape": [
+        8,
+        44
+      ],
+      "guidance": 2.0,
+      "literal_language_id": "zgh",
+      "name": "phrase",
+      "native_rtf": 20.257424829545474,
+      "native_seconds": 35.65306770000004,
+      "native_wave": {
+        "file": "phrase-native.wav",
+        "float32_sha256": "90e83fa8c588f70d503161d8acb18de64ba55ca5396335d3af06c46ed359b33b",
+        "peak": 0.379337877035141,
+        "rms": 0.03933653607964516,
+        "sample_rate": 24000,
+        "samples": 42240,
+        "seconds": 1.76,
+        "sha256": "e94f55416700af53f2dd04cda691f15d292512fb1d1c4f7c478324725fcc1860",
+        "size_bytes": 84524
+      },
+      "process_memory": {
+        "commit_bytes": 1555263488,
+        "peak_commit_bytes": 1559678976,
+        "peak_working_set_bytes": 1400549376,
+        "working_set_bytes": 1396215808
+      },
+      "projected_wave": {
+        "file": "phrase-viktoriia.wav",
+        "float32_sha256": "120798dd954aee2757368aaf4478f2209fabee2530c48cd474682bedff930a30",
+        "peak": 0.2627308666706085,
+        "rms": 0.03296799585223198,
+        "sample_rate": 24000,
+        "samples": 42240,
+        "seconds": 1.76,
+        "sha256": "80a7990b38895985be52c02d54390b17c36f88c6d831b1646dc1122b9839e2c7",
+        "size_bytes": 84524
+      },
+      "projection": {
+        "actual_original_code": "source11.WideVoices.converted",
+        "actual_original_models": [
+          "OpenVoiceV2/encoder-flow.onnx",
+          "OpenVoiceV2/decoder.onnx"
+        ],
+        "decoder_calls": 3,
+        "flow_calls": 1,
+        "profile": "viktoriia",
+        "source_binding_passed": true,
+        "target_binding_passed": true
+      },
+      "projection_seconds": 1.0410918000000038,
+      "seed": 0,
+      "steps": 32,
+      "text": "ⵉⵙ ⴰⵔ ⴽⴰ ⵙⵎⵓⵇⵇⵓⵍⵖ."
+    }
+  ],
+  "character_names_verified": false,
+  "core_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+  "declared_training_hours": 1.19,
+  "fixture_sha256": "f0914b056a4dbf131f54eb1cf8cbfbb45097f5539b883ecc17ced740021a1c42",
+  "format": "dordiai-zgh-actual-private-native-projection-v1",
+  "language": "zgh",
+  "language_standard_count_increment": 0,
+  "model_files": {
+    "OpenVoiceV2/tone_ref_encoder.onnx": {
+      "sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+      "size_bytes": 3259275
+    },
+    "SharedOmniONNX/LICENSE-HIGGS-AUDIO-2.txt": {
+      "sha256": "ac933dc084d119bd20401956b90d11ae87c248b2da62622cd580d82cdf2fa049",
+      "size_bytes": 9171
+    },
+    "SharedOmniONNX/LICENSE-LLAMA3.txt": {
+      "sha256": "4fa551d4f938f68b8c1e6afa9d28befb70e3f33f75d0753248d530364aeea40f",
+      "size_bytes": 12403
+    },
+    "SharedOmniONNX/README.md": {
+      "sha256": "5e56b0f55925bb9f6eefdbfbbae73c7d19a80832d151fe919065a4f4fcb781aa",
+      "size_bytes": 4247
+    },
+    "SharedOmniONNX/backbone.int8.onnx": {
+      "sha256": "241610742675b990eb1cc50b32a86d7088762e43f070a8db36a501227ff855b7",
+      "size_bytes": 993287060
+    },
+    "SharedOmniONNX/encoder.fp32.onnx": {
+      "sha256": "8e9697cf64ad4a2b66b6ae8cf2eedc2e3d80732568fde0ee6177164d8b32fbb9",
+      "size_bytes": 654395766
+    },
+    "SharedOmniONNX/tokenizer.json": {
+      "sha256": "408f669b7e2b045fdf54201d815bd364e6667dbd845115da81239c40bc6dcfd1",
+      "size_bytes": 11423986
+    },
+    "SharedOmniONNX/vocoder.fp32.onnx": {
+      "sha256": "cfea73af6cf8fe93d16f18e4f8c4a54c9bf37389d5c296e49a896dc3a04c9e4c",
+      "size_bytes": 803873
+    },
+    "SharedOmniONNX/vocoder.fp32.onnx.data": {
+      "sha256": "ebbdf1cf7ddb8502fa02abf13be9ca0554657954b455cffd839440238da8ffc3",
+      "size_bytes": 86310912
+    }
+  },
+  "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+  "native_graph_contracts": {
+    "backbone.int8.onnx": {
+      "inputs": [
+        {
+          "name": "input_ids",
+          "shape": [
+            "B",
+            8,
+            "S"
+          ],
+          "type": "tensor(int64)"
+        },
+        {
+          "name": "audio_mask",
+          "shape": [
+            "B",
+            "S"
+          ],
+          "type": "tensor(bool)"
+        },
+        {
+          "name": "attention_mask",
+          "shape": [
+            "B",
+            1,
+            "S",
+            "S"
+          ],
+          "type": "tensor(bool)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "logits",
+          "shape": [
+            "B",
+            8,
+            "S",
+            1025
+          ],
+          "type": "tensor(float)"
+        }
+      ],
+      "providers": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "vocoder.fp32.onnx": {
+      "inputs": [
+        {
+          "name": "audio_codes",
+          "shape": [
+            "B",
+            8,
+            "T"
+          ],
+          "type": "tensor(int64)"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio_values",
+          "shape": [
+            "B",
+            1,
+            "960*T"
+          ],
+          "type": "tensor(float)"
+        }
+      ],
+      "providers": [
+        "CPUExecutionProvider"
+      ]
+    }
+  },
+  "native_model_execution_verified": true,
+  "native_pronunciation_verified": false,
+  "native_source": {
+    "attribution": "Abdelhaque Id Ali; Mohamed Aymane Farhi; Tamazight-NLP",
+    "dataset_card_git_blob": "3a359c784e778776d5e261495f052169025a0046",
+    "dataset_card_sha256": "6c2f304a39b93012850243f614612715254cc8ba4b29c0f4a0cbe46c06def002",
+    "file": "data/train-00000-of-00001.parquet",
+    "human_pronunciation_validated_by_us": false,
+    "licence": "Apache-2.0",
+    "raw_creator_repository": "abdelhaqueidali/Amazigh-Speech-Dataset",
+    "reader": "PyArrow22.0.0 first row group, unaltered rows0..2",
+    "recorded_speaker": "Abdelhaque Id Ali",
+    "repository": "Tamazight-NLP/TOSD",
+    "revision": "8bbbc8e9efc363f13d5fd9a92d5c625102cab66a",
+    "sha256": "0eea3e83739d8e49dabbc6659cb9b62ef249b0f8ad4cbba1e03fe79a37812e41",
+    "size_bytes": 587038815,
+    "speaker_accent": "Southern Moroccan Amazigh speaker reading publisher-declared Standard Moroccan texts",
+    "split": "train",
+    "whole_file_sha256_actually_verified": true
+  },
+  "network_policy": {
+    "action": "Block",
+    "all_firewall_profiles_enabled": true,
+    "direction": "Outbound",
+    "enabled": true,
+    "names": [
+      "DordiaiZghNative-45040668464-0"
+    ],
+    "programs": [
+      "D:\\a\\_temp\\dordiai-zgh-source11-45040668464\\kx47Runtime\\python\\python.exe"
+    ],
+    "scope": "own-ephemeral-CI-private-python-only"
+  },
+  "not_alias_of": "kab",
+  "nvda_verified": false,
+  "perceived_selected_voice_similarity_verified": false,
+  "physical_audio_verified": false,
+  "private_bootstrap": {
+    "directory_present_after_reset": false,
+    "inherited_directory_present": false,
+    "reset_to_default": true,
+    "status": "reset"
+  },
+  "process_memory": {
+    "commit_bytes": 611631104,
+    "peak_commit_bytes": 1562648576,
+    "peak_working_set_bytes": 1403514880,
+    "working_set_bytes": 309071872
+  },
+  "product_integrated": false,
+  "readiness": "Real native/projection CPU proof only; pronunciation, NVDA, character names and interactive latency remain unaccepted",
+  "reference_codes": {
+    "actual_native_audio_sha256": "f08b5ae2c53c1888c0988570e26ef74726ec0d1d2ac475f22fcd12284cd5586a",
+    "actual_native_text": "ⴷⴰⵔⵉ ⵢⴰⵏ ⵓⵎⵓⴽⵔⵉⵙ",
+    "sha256": "01bc2343f67a63014dcc9554adbd3dd3dd7b210669b991f856b266e535294415",
+    "shape": [
+      8,
+      35
+    ]
+  },
+  "research_only_language_gate": {
+    "added_only_in_process": [
+      "zgh"
+    ],
+    "before": [
+      "brx",
+      "ig",
+      "ks",
+      "ln",
+      "mni",
+      "nso",
+      "rm",
+      "wo",
+      "xh",
+      "zu"
+    ],
+    "production_files_modified": false,
+    "standard_evidence_git_blob": "ac4cfedc4cf33e0589952ccf9f49b87bf970bbaf"
+  },
+  "resource_count_increment": 0,
+  "runtime": {
+    "executable": "D:\\a\\_temp\\dordiai-zgh-source11-45040668464\\kx47Runtime\\python\\python.exe",
+    "imports": {
+      "numpy": {
+        "file": "D:\\a\\_temp\\dordiai-zgh-source11-45040668464\\kx47Runtime\\python\\Lib\\site-packages\\numpy\\__init__.py",
+        "version": "2.5.4"
+      },
+      "onnxruntime": {
+        "file": "D:\\a\\_temp\\dordiai-zgh-source11-45040668464\\kx47Runtime\\python\\Lib\\site-packages\\onnxruntime\\__init__.py",
+        "version": "1.26.0"
+      },
+      "tokenizers": {
+        "file": "D:\\a\\_temp\\dordiai-zgh-source11-45040668464\\kx47Runtime\\python\\Lib\\site-packages\\tokenizers\\__init__.py",
+        "version": "0.23.1"
+      }
+    },
+    "ort": "1.26.0",
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "same_process_fixed_seed_repeat_byte_identical": true,
+  "selected_profile": {
+    "asset": "models\\voices\\classmate_locales\\viktoriia.npy",
+    "binding": "immutable-core catalogue + actual NativeLocaleVoices.target_profile + verified asset resolver + exact original file hash",
+    "catalog_entry": "Вікторія",
+    "human_biometric_identity_independently_verified": false,
+    "original_target_resolver": "NativeLocaleVoices.target_profile",
+    "profile": "viktoriia",
+    "sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+    "size_bytes": 1152
+  },
+  "selected_profile_projection_mechanically_verified": true,
+  "status": "actual-private-ZGH-native-and-selected-profile-projection-passed-unintegrated",
+  "tokenizer": {
+    "kab_marker_ids": [
+      151670,
+      74,
+      370,
+      151671
+    ],
+    "kab_marker_tokens": [
+      "<|lang_start|>",
+      "k",
+      "ab",
+      "<|lang_end|>"
+    ],
+    "language_code_is_regular_subwords_between_control_tokens": true,
+    "native_text_roundtrip": true,
+    "zgh_marker_ids": [
+      151670,
+      89,
+      866,
+      151671
+    ],
+    "zgh_marker_tokens": [
+      "<|lang_start|>",
+      "z",
+      "gh",
+      "<|lang_end|>"
+    ]
+  }
+}

@@ -86,7 +86,7 @@ class PlainTextFixtureAndAccountingTests(unittest.TestCase):
             current=row["expected_language"]
 
     def test_forced_disabled_and_real_metadata_priority_have_separate_cases(self):
-        self.assertEqual(len(self.cases),6)
+        self.assertEqual(len(self.cases),7)
         for case in self.cases:
             if case["mode"]=="forced" or "ru" not in case["enabled"]:
                 self.assertEqual({row["expected_language"] for row in case["words"]},{"uk"})
@@ -248,6 +248,102 @@ class GenuineHandlerAndCompositionTests(unittest.TestCase):
         self.assertEqual(helper.MEMBERSHIP_HELPER_GIT_BLOB,
                          "7386bb6575b45d004eca276c6092549bcb88d52f")
 
+
+
+class ExplicitMarkerAndIsolatedReportingTests(unittest.TestCase):
+    def functions(self,names,namespace=None):
+        tree=ast.parse(helper.PLUGIN_CODE)
+        body=[node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name in names]
+        ns={} if namespace is None else namespace
+        exec(compile(ast.fix_missing_locations(ast.Module(body=body,type_ignores=[])),
+            "probe-only-marker-and-reporting-logic","exec"),ns)
+        return ns
+
+    def test_marker_observer_records_false_and_true_without_altering_items(self):
+        ns=self.functions({"_plain_sequence"})
+        a=types.SimpleNamespace(explicit=False)
+        b=types.SimpleNamespace(explicit=True)
+        sequence=[a,"text",b]
+        rows=ns["_plain_sequence"](sequence)
+        self.assertIs(rows[0]["explicit"],False)
+        self.assertIs(rows[2]["explicit"],True)
+        self.assertIs(sequence[0],a)
+        self.assertIs(sequence[2],b)
+
+    def test_actual_enum_off_is_applied_and_previous_value_restored_exactly(self):
+        import sys
+        from unittest.mock import patch
+        enum=types.SimpleNamespace(ReportNotSupportedLanguage=types.SimpleNamespace(OFF=types.SimpleNamespace(value=77)))
+        ns=self.functions({"_plain_set_language_reporting","_plain_restore_language_reporting"})
+        for original in (0,1,2,91):
+            with self.subTest(original=original):
+                state={}
+                config=types.SimpleNamespace(conf={"speech":{"reportNotSupportedLanguage":original}})
+                with patch.dict(sys.modules,{"config":config,"config.configFlags":enum}):
+                    self.assertEqual(ns["_plain_set_language_reporting"](config,state),77)
+                    self.assertEqual(state["saved_report_not_supported_language"],original)
+                    ns["_plain_restore_language_reporting"](config,state)
+                self.assertEqual(config.conf["speech"]["reportNotSupportedLanguage"],original)
+
+    def test_real_cleanup_executes_exact_reporting_and_format_restoration(self):
+        import sys
+        from unittest.mock import patch
+        for original in (0,1,2):
+            with self.subTest(original=original):
+                restored=[]
+                driver=types.SimpleNamespace(name="owned",_planned_parts=None,
+                    _player=types.SimpleNamespace(feed=None),_dordiai_apply=lambda *a,**kw:None,rate=80)
+                state={"cleaned":False,"active":None,"pre_speech_point":None,
+                    "original_parts":object(),"original_feed":object(),
+                    "preferences":{"voices":[],"languages":["uk"],"default":"uk","voice":"v",
+                        "mode":"auto","voice_map":{},"rate":50,"config":{}},
+                    "saved_report_not_supported_language":original,"saved_detect_format_after_cursor":False,
+                    "saved_auto_language":False,"saved_speech_mode":"previous",
+                    "frame":types.SimpleNamespace(Destroy=lambda:restored.append("destroyed"))}
+                speech=types.SimpleNamespace(
+                    pre_speechQueued=types.SimpleNamespace(unregister=lambda callback:None),
+                    cancelSpeech=lambda:None,setSpeechMode=lambda mode:restored.append(mode))
+                config=types.SimpleNamespace(conf={"speech":{"owned":{},"reportNotSupportedLanguage":77,
+                    "autoLanguageSwitching":True},"documentFormatting":{"detectFormatAfterCursor":True}})
+                ns=self.functions({"_plain_cleanup","_plain_restore_language_reporting"},{
+                    "_PLAIN":state,"DRIVER":driver,"RESULT":{"actual_plain_text":{}},
+                    "synthDriverHandler":types.SimpleNamespace(getSynth=lambda:driver,
+                        pre_synthSpeak=types.SimpleNamespace(unregister=lambda callback:None)),
+                    "_plain_on_queued":object(),"_plain_on_synth":object(),"check":lambda *a,**kw:None})
+                with patch.dict(sys.modules,{"config":config,"speech":speech}):
+                    ns["_plain_cleanup"]()
+                    ns["_plain_cleanup"]()
+                self.assertEqual(config.conf["speech"]["reportNotSupportedLanguage"],original)
+                self.assertFalse(config.conf["documentFormatting"]["detectFormatAfterCursor"])
+                self.assertFalse(config.conf["speech"]["autoLanguageSwitching"])
+                self.assertEqual(restored,["previous","destroyed"])
+                self.assertEqual(ns["RESULT"]["actual_plain_text"]["cleanup"]["errors"],[])
+
+    def test_additional_compound_guard_checks_whole_and_both_ambiguous_components(self):
+        tree=ast.parse(helper.PLUGIN_CODE)
+        assignment=next(node for node in tree.body if isinstance(node,ast.Assign) and
+            any(isinstance(t,ast.Name) and t.id=="PLAIN_COMPOUND_SOURCE" for t in node.targets))
+        source=ast.literal_eval(assignment.value)
+        ns=self.functions({"_plain_compound_evidence"},{"PLAIN_COMPOUND_SOURCE":source})
+        expected=source["memberships"]
+        manager=types.SimpleNamespace(candidates=lambda word:set(expected[word]))
+        evidence=ns["_plain_compound_evidence"](manager)
+        self.assertEqual(len(evidence["rows"]),3)
+        self.assertEqual(evidence["rows"][0]["actual"],["ru"])
+        for bad in (set(),{"ru","uk"},{"uk"}):
+            invalid=types.SimpleNamespace(candidates=lambda word,bad=bad:
+                bad if word=="пресс-центр" else set(expected[word]))
+            with self.assertRaises(ValueError):ns["_plain_compound_evidence"](invalid)
+
+    def test_original_six_cases_and100_source_forms_remain_unchanged(self):
+        cases=logic()["_plain_cases"]()
+        self.assertEqual([c["name"] for c in cases[:6]],[
+            "auto_unmarked_100","forced_uk_unmarked_12","disabled_ru_unmarked_12",
+            "native_rich_metadata_6","forced_uk_native_metadata_6","disabled_ru_native_metadata_6"])
+        self.assertEqual(len(cases[0]["words"]),100)
+        self.assertEqual(cases[6]["name"],"auto_native_known_compound_1")
+        self.assertEqual(cases[6]["text"],"пресс-центр")
+        self.assertEqual(cases[6]["words"][0]["expected_language"],"ru")
 
 if __name__=="__main__":
     unittest.main()

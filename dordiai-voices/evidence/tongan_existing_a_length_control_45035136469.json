@@ -1,0 +1,128 @@
+{
+  "format": "dordiai-existing-tongan-single-vowel-length-control",
+  "format_version": 1,
+  "source_run_id": 45035136469,
+  "source_artifact_id": 14759865910,
+  "source_artifact_sha256": "34b53f3835b5b5c6503ff9fbab3b1462e93193e2ff163a782dd064a81bff8263",
+  "source_raw_proof_sha256": "77e4b82dc8b08f671220d4eaa0476a897bdf45683f65c8c10dd2c0df54f04a74",
+  "scope": "Read-only recheck of EXISTING original40-case output; no new rendering, edits or full5-vowel short-control acceptance",
+  "sample_rate": 22050,
+  "one_short_versus_long_control_verified": true,
+  "short_control_vowel": "a",
+  "all_five_short_versus_long_controls_verified": false,
+  "remaining_short_controls": [
+    "ke",
+    "ki",
+    "ko",
+    "ku"
+  ],
+  "rows": [
+    {
+      "case_index": 17,
+      "text": "ka",
+      "encoded": "[['k|a]]",
+      "native_samples": 5648,
+      "vowel_events": 1,
+      "actual_events": [
+        {
+          "ipa": "k",
+          "audio_position_ms": 46,
+          "sample": 1036
+        },
+        {
+          "ipa": "ˈa",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 249,
+          "sample": 5494
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 256,
+          "sample": 5648
+        }
+      ],
+      "native_wav_sha256": "91b39a65d910565602d5795feeef820fda368f763e5e301cd4a7a91667515a8c",
+      "projected_samples": 5632,
+      "projected_wav_sha256": "36a697e193e599cb98798c854ffc1bc2e8e01ff2460858f6b50f2041fa762d60"
+    },
+    {
+      "case_index": 30,
+      "text": "kā",
+      "encoded": "[['k|a|:]]",
+      "native_samples": 6899,
+      "vowel_events": 1,
+      "actual_events": [
+        {
+          "ipa": "k",
+          "audio_position_ms": 46,
+          "sample": 1036
+        },
+        {
+          "ipa": "ˈa",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 305,
+          "sample": 6745
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 312,
+          "sample": 6899
+        }
+      ],
+      "native_wav_sha256": "3113e9282a78362b4006933e79fcd415116c9934dd115afd4f279303ba44e320",
+      "projected_samples": 6656,
+      "projected_wav_sha256": "ce248ec611a9e199372c81b00be9392447127880581d35be9240233f911778ea"
+    },
+    {
+      "case_index": 31,
+      "text": "kaa",
+      "encoded": "[['k|a|a]]",
+      "native_samples": 6975,
+      "vowel_events": 2,
+      "actual_events": [
+        {
+          "ipa": "k",
+          "audio_position_ms": 46,
+          "sample": 1036
+        },
+        {
+          "ipa": "ˈa",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 210,
+          "sample": 4641
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 309,
+          "sample": 6821
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 316,
+          "sample": 6975
+        }
+      ],
+      "native_wav_sha256": "705cd4709a40fc663f05e0f1530889fd536fefa19312e72db5a669dd341b3ac5",
+      "projected_samples": 6912,
+      "projected_wav_sha256": "165253d38a17e6fd88921d330a2e0f5e2f69425447b64d9e66287b747531c648"
+    }
+  ],
+  "interpretation": "Nativecolon modifier was not ignored for a: ka/kā bothhave one vowel event but distinctwaveforms andlonger vowelspan for kā. kaa has twovowelevents. This is technicalphoneme/length differentiation, not Tongan phonetic/listener quality.",
+  "native_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "physical_audio_verified": false,
+  "registered": false,
+  "product_ready": false
+}
