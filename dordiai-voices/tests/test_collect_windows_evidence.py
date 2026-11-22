@@ -74,6 +74,28 @@ class EvidenceCollectionTests(unittest.TestCase):
         self.assertIn("missing native library", text)
         self.assertNotIn('"status": "passed"', text)
 
+    def test_portable_creation_timeout_exposes_bootstrap_before_nvda_log_exists(self):
+        self.put("nvda-typing/windows-nvda-probe.json", json.dumps({
+            "status": "failed", "error": "Owned NVDA process exceeded the probe watchdog",
+            "checks": [{"name": "official_installer_checksum", "status": "passed"}]
+        }).encode("utf-8"))
+        self.put("nvda-typing/run/portable-creation.log",
+                 b"ERROR: portable creation failed before addon extraction\n")
+        self.put("nvda-typing/run/portable-creation-console.log",
+                 b"bootstrap native-loader diagnostic\n")
+        self.put("nvda-typing/run/nvda-console.log", b"isolated process diagnostic\n")
+        self.put("nvda-typing/run/portable/portable-creation.log",
+                 b"excluded nested portable data")
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            collector.print_diagnostics(self.source)
+        output = buffer.getvalue()
+        self.assertIn("portable creation failed before addon extraction", output)
+        self.assertIn("bootstrap native-loader diagnostic", output)
+        self.assertIn("isolated process diagnostic", output)
+        self.assertNotIn("excluded nested portable data", output)
+        self.assertIn("exceeded the probe watchdog", output)
+
     def test_missing_results_are_labeled_and_stale_output_removed(self):
         self.destination.mkdir()
         (self.destination / "old-model.bin").write_bytes(b"stale")

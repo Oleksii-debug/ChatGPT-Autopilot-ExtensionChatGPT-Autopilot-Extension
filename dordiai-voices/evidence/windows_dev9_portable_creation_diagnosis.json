@@ -1,0 +1,32 @@
+{
+  "run": 45014461174,
+  "artifact": 14752285091,
+  "core_version": "0.13.1-dev.9",
+  "core_archive_sha256": "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a",
+  "source_commit": "b364060750b4fda22eb7f06b5c52085c3f4e0bfc",
+  "all_683_tests_passed": true,
+  "all_core_and_sampled_extended_engines_passed": true,
+  "original_and_shared_mms_passed": true,
+  "standard_nvda_functional_passed": true,
+  "typing_and_required_probe_status": "blocked_by_official_portable_creation_failure_not_yet_executed",
+  "cause": "Official NVDA installer WinError206 creating portable/include/nvda-mathcat/assets/Rules/Languages/zh/tw/SharedRules under longer nvda-typing/nvda-required test output roots.",
+  "failed_directory_lengths": [
+    248,
+    250
+  ],
+  "normal_successful_directory_length": 241,
+  "fix": "Use nt/nr short mode roots (directory239) while preserving >260 model/navigation paths in the copied addon. No production payload changes.",
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "first_use_predevice_summary": {
+    "count": 176,
+    "p50_ms": 2.7529,
+    "p95_ms": 238.2162,
+    "p99_ms": 282.9965,
+    "minimum_ms": 2.1221,
+    "maximum_ms": 291.2245
+  },
+  "known_remaining_cold_requests_per_profile": 72,
+  "evidence": "evidence/windows_dev9_initial_45014461174.json.gz",
+  "evidence_sha256": "9f01d1146d93cd6c19f62331793354ce0fe42548fea5e8ccccdb6d4ec55a42f8"
+}

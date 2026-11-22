@@ -76,7 +76,8 @@ def print_diagnostics(source):
         except (OSError, ValueError, TypeError) as error:
             print("Unreadable diagnostic report " + str(path) + ": " + repr(error), flush=True)
     for path in sorted(files):
-        if path.name != "nvda.log":
+        if path.name not in {"nvda.log", "nvda-console.log",
+                             "portable-creation.log", "portable-creation-console.log"}:
             continue
         text = _tail(path, CONSOLE_LOG_TAIL_BYTES).decode("utf-8", errors="replace")
         # Keep traceback continuation lines, not just lines with ERROR tokens.

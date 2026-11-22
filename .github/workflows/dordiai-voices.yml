@@ -101,25 +101,25 @@ jobs:
         with:
           name: dordiai-voices-development-core
           path: dordiai-voices/dist
-          run-id: 45005894766
+          run-id: 45014461174
           github-token: ${{ github.token }}
       - name: Verify exact previously tested archive bytes
         shell: python
         run: |
           import hashlib, pathlib
-          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.8.nvda-addon")
+          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.9.nvda-addon")
           with path.open("rb") as stream:
               actual = hashlib.file_digest(stream, "sha256").hexdigest()
-          # Artifact origin is pinned to the completed dev8 build run above.
+          # Artifact origin is pinned to the completed dev9 build run above.
           # Record outer SHA and verify every payload checksum before execution.
           import json,subprocess,sys,zipfile
-          if actual != "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6":
-              raise RuntimeError("Pinned core8 archive checksum mismatch")
-          print(json.dumps({"verified_run":45005894766,"core_archive_sha256":actual,"core_archive_bytes":path.stat().st_size}),flush=True)
+          if actual != "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a":
+              raise RuntimeError("Pinned core9 archive checksum mismatch")
+          print(json.dumps({"verified_run":45014461174,"core_archive_sha256":actual,"core_archive_bytes":path.stat().st_size}),flush=True)
           subprocess.run([sys.executable,"dordiai-voices/tools/verify_release.py",str(path)],check=True)
           with zipfile.ZipFile(path) as archive:
               manifest=json.loads(archive.read("dordiai-release.json"))
-          if manifest.get("version")!="0.13.1-dev.8":
+          if manifest.get("version")!="0.13.1-dev.9":
               raise RuntimeError("Diagnostic core version does not match pinned build run")
       - name: Prove actual owned keyboard or required-resource NVDA behavior
         shell: python
@@ -128,7 +128,7 @@ jobs:
           root = pathlib.Path("dordiai-voices")
           subprocess.run([sys.executable, str(root / "tools/setup_audio_endpoint.py"), "--output", str(root / "windows-results/audio"), "--ephemeral-ci", "--start-existing-services"], check=False)
           probe_flag = "--typing-probe" if os.environ["DORDIAI_NVDA_PROBE_KIND"] == "typing" else "--required-resource-recovery-probe"
-          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.8.nvda-addon"), "--output", str(root / "windows-results/nvda"), probe_flag, "--timeout", "240"]
+          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.9.nvda-addon"), "--output", str(root / "windows-results/nvda"), probe_flag, "--timeout", "240"]
           audio = root / "windows-results/audio/audio-endpoint.json"
           if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               command.append("--headless-ui-probe")
@@ -187,7 +187,7 @@ jobs:
               print(text.encode("ascii", errors="backslashreplace").decode("ascii"), flush=True)
           for path in sorted(root.rglob("*.log")):
               relative=path.relative_to(root)
-              if relative.parts[0] in {"nvda-typing","nvda-required"}:
+              if relative.parts[0] in {"nvda-typing","nvda-required","nt","nr"}:
                   print("DEV9 EXTRA BOOTSTRAP LOG "+relative.as_posix(),flush=True)
                   print(path.read_bytes()[-65536:].decode("utf-8",errors="replace").encode("ascii",errors="backslashreplace").decode("ascii"),flush=True)
           for path in root.rglob("nvda-probe.json"):
@@ -343,7 +343,7 @@ jobs:
           headless=audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after")==0
           failures=[]
           for mode,flag in (("typing","--typing-probe"),("required","--required-resource-recovery-probe")):
-              output=root/("windows-results/nvda-"+mode)
+              output=root/("windows-results/"+{"typing":"nt","required":"nr"}[mode])
               command=[sys.executable,str(root/"tools/windows_nvda_probe.py"),"--addon",str(root/"dist/dordiai-voices-0.13.1-dev.9.nvda-addon"),"--output",str(output),flag,"--timeout","300"]
               if headless:
                   command.append("--headless-ui-probe")
