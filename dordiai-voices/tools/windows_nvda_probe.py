@@ -107,8 +107,23 @@ try:
             report["installed_path_import"] = {"status": "passed"}
         except Exception as error:
             report["installed_path_import"] = {"status": "failed", "error": error_details(error)}
-            if origin is not None and origin.is_file():
-                with tempfile.TemporaryDirectory(prefix="dv-pyd-") as temporary:
+            if os.name == "nt" and origin is not None and origin.is_file():
+                extended = ("\\\\?\\UNC\\" + str(origin)[2:] if str(origin).startswith("\\\\")
+                            else "\\\\?\\" + str(origin))
+                report["extended_path_length"] = len(extended)
+                try:
+                    sys.modules.pop("marisa_trie", None)
+                    extended_spec = importlib.util.spec_from_file_location("marisa_trie", extended)
+                    module = importlib.util.module_from_spec(extended_spec)
+                    sys.modules["marisa_trie"] = module
+                    extended_spec.loader.exec_module(module)
+                    from marisa_trie import RecordTrie
+                    report["extended_path_import"] = {"status": "passed", "same_origin_bytes": True}
+                except Exception as extended_error:
+                    sys.modules.pop("marisa_trie", None)
+                    report["extended_path_import"] = {"status": "failed", "error": error_details(extended_error)}
+            if origin is not None and origin.is_file() and report.get("extended_path_import", {}).get("status") != "passed":
+                with tempfile.TemporaryDirectory(prefix="dv-pyd-", ignore_cleanup_errors=True) as temporary:
                     short_path = Path(temporary) / origin.name
                     shutil.copyfile(origin, short_path)
                     report["short_copy"] = dict(path_row(short_path), same_bytes=digest(short_path) == digest(origin))
@@ -124,7 +139,8 @@ try:
                         sys.modules.pop("marisa_trie", None)
                         report["short_copy_import"] = {"status": "failed", "error": error_details(short_error)}
         report["loaded_after"] = loaded_dlls()
-        if report.get("installed_path_import", {}).get("status") == "passed" or report.get("short_copy_import", {}).get("status") == "passed":
+        if any(report.get(key, {}).get("status") == "passed" for key in
+               ("installed_path_import", "extended_path_import", "short_copy_import")):
             try:
                 from ukrainian_stress import dictionary
                 dictionary()
