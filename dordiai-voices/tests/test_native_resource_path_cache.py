@@ -30,7 +30,8 @@ class PathSpellingCacheTests(unittest.TestCase):
         candidate._plain_path_ancestry.cache_clear()
 
     def test_resource_lifecycle_and_every_other_definition_ast_are_identical(self):
-        original, changed = ast.parse(BASE.read_text()), ast.parse(CANDIDATE.read_text())
+        original = ast.parse(BASE.read_text(encoding="utf-8"))
+        changed = ast.parse(CANDIDATE.read_text(encoding="utf-8"))
         names = {n.name for n in original.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
         for name in names - {"_signature"}:
             a = next(n for n in original.body if isinstance(n, (ast.FunctionDef, ast.ClassDef)) and n.name == name)

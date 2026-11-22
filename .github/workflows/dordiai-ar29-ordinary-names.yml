@@ -1,0 +1,136 @@
+name: Dordiai isolated Arabic29 ordinary names native and Viktoriia PCM
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-ar29-ordinary-names.yml'
+      - 'dordiai-voices/tools/research/probe_ar_ordinary_names.py'
+      - 'dordiai-voices/tools/research/ar_ordinary_name_candidate.json'
+      - 'dordiai-voices/tests/test_ar_ordinary_names.py'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-ar29-ordinary-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native29-candidate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ar29-ordinary]')
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - name: Preserve exact source byte identities
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install host-only test NumPy
+        run: python -m pip install --disable-pip-version-check numpy==1.26.4
+      - name: Run ordinary facts no-drop Unicode frontend and PCM-rate regressions
+        run: python -m unittest discover -s dordiai-voices/tests -p test_ar_ordinary_names.py -v
+      - name: Create fresh owned research roots
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('dordiai-ar29-'+$env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $stage) { throw 'Use a fresh owned research root' }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          New-Item -ItemType Directory -Path dordiai-voices/ar29-results | Out-Null
+          "AR29_STAGE=$stage" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Independently acquire hash-verified primary name table without redistributing the book
+        shell: python
+        run: |
+          import hashlib,json,pathlib,urllib.request
+          candidate=json.loads(pathlib.Path('dordiai-voices/tools/research/ar_ordinary_name_candidate.json').read_text(encoding='utf-8'))
+          with urllib.request.urlopen(candidate['source']['url'],timeout=60) as response:
+              raw=response.read(6*1024*1024+1)
+          assert len(raw)==5475624 and raw.startswith(b'%PDF')
+          assert hashlib.sha256(raw).hexdigest()=='940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385'
+          report={'format':'arabic-ordinary-primary-acquisition','url':candidate['source']['url'],'size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'location':'Printed169/PDF170 Figure1','original_pdf_redistributed':False,'scope':'Source byte verification only; visual factual transcription reviewed separately; no pronunciation claim'}
+          pathlib.Path('dordiai-voices/ar29-results/primary-source-acquisition.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+      - name: Acquire exact immutable source12 private runtime and converter
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: '14761553443'
+          run-id: 45040668513
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ar29-original-core12
+      - name: Download exact owned wide artifact without forwarding repository credentials
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $handler=[System.Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect=$false
+          $client=[System.Net.Http.HttpClient]::new($handler)
+          $request=[System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get,"https://api.github.com/repos/$env:REPOSITORY/actions/artifacts/14754247478/zip")
+          $request.Headers.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$env:GH_TOKEN)
+          $request.Headers.UserAgent.ParseAdd('dordiai-own-arabic-name-research')
+          $response=$client.SendAsync($request).GetAwaiter().GetResult()
+          if ([int]$response.StatusCode -ne 302 -or $response.Headers.Location.Scheme -ne 'https') { throw 'Unexpected artifact redirect' }
+          $anonymous=[System.Net.Http.HttpClient]::new()
+          $stream=$anonymous.GetStreamAsync($response.Headers.Location).GetAwaiter().GetResult()
+          $zip=Join-Path $env:AR29_STAGE 'wide-artifact.zip'
+          $file=[System.IO.File]::Open($zip,[System.IO.FileMode]::CreateNew)
+          try { $stream.CopyTo($file) } finally { $file.Dispose();$stream.Dispose();$anonymous.Dispose();$response.Dispose();$request.Dispose();$client.Dispose();$handler.Dispose() }
+          if ((Get-Item $zip).Length -ne 552777798) { throw 'Wide wrapper byte count changed' }
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262') { throw 'Wide wrapper SHA changed' }
+      - name: Stage exact12 core and original shared acoustic subset with all per-file pins
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $core=@(Get-ChildItem -Path "$env:RUNNER_TEMP/ar29-original-core12" -Recurse -Filter '*.nvda-addon')
+          if ($core.Count -ne 1) { throw 'Expected exactly one immutable12 addon' }
+          python dordiai-voices/tools/research/probe_ar_ordinary_names.py stage --core ($core[0].FullName) --wide "$env:AR29_STAGE/wide-artifact.zip" --candidate dordiai-voices/tools/research/ar_ordinary_name_candidate.json --output "$env:AR29_STAGE/core12"
+          if ($LASTEXITCODE -ne 0) { throw 'Exact isolated Arabic shared-carrier stage failed' }
+          python -c "import json,pathlib; p=pathlib.Path(r'$env:AR29_STAGE/core12/ar29-stage.json'); d=json.loads(p.read_text(encoding='utf-8')); d.pop('existing_payload_hashes'); pathlib.Path('dordiai-voices/ar29-results/stage-receipt.json').write_text(json.dumps(d,indent=2),encoding='utf-8')"
+          if ($LASTEXITCODE -ne 0) { throw 'Stage receipt failed' }
+      - name: Render29 source names with unchanged private runtime and original selected-profile graphs offline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $private=[IO.Path]::GetFullPath("$env:AR29_STAGE/core12/kx47Runtime/python/python.exe")
+          if (@(Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Count -ne 0) { throw 'Firewall profiles must remain enabled' }
+          $rule='Dordiai-AR29-'+[guid]::NewGuid().ToString('N')
+          try {
+            New-NetFirewallRule -Name $rule -DisplayName $rule -Direction Outbound -Action Block -Enabled True -Profile Any -Program $private | Out-Null
+            @{scope='owned ephemeral CI VM and exact private Python only';network='outbound blocked before ML imports';physical_audio_verified=$false;production_registered=$false} | ConvertTo-Json | Set-Content -Encoding utf8 dordiai-voices/ar29-results/network-policy.json
+            & $private -B (Resolve-Path dordiai-voices/tools/research/probe_ar_ordinary_names.py).Path probe --runtime "$env:AR29_STAGE/core12/kx47Runtime" --candidate (Resolve-Path dordiai-voices/tools/research/ar_ordinary_name_candidate.json).Path --output dordiai-voices/ar29-results/pcm
+            if ($LASTEXITCODE -ne 0) { throw 'Actual29 native/shared and selected-profile PCM proof failed' }
+          } finally {
+            Remove-NetFirewallRule -Name $rule -ErrorAction Continue
+          }
+      - name: Print exact bounded result with no listening or NVDA claims
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,pathlib
+          p=pathlib.Path('dordiai-voices/ar29-results/pcm/report.json')
+          if p.is_file():
+              raw=p.read_bytes()
+              if len(raw)>512*1024:raise ValueError('Unexpected AR29 report size')
+              print('AR29_EXACT_JSON_SHA256 '+hashlib.sha256(raw).hexdigest(),flush=True)
+              print('AR29_EXACT_GZIP_BASE64 '+base64.b64encode(gzip.compress(raw,mtime=0)).decode(),flush=True)
+          else:print('AR29_REPORT_NOT_CREATED',flush=True)
+      - name: Preserve bounded proof and all58 ordinary-name WAVs even after failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-ar29-ordinary-name-candidate-${{ github.run_id }}
+          path: dordiai-voices/ar29-results
+          if-no-files-found: warn
+          retention-days: 90
