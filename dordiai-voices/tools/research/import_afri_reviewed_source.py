@@ -163,7 +163,7 @@ def validated_payload(raw, files=FILES, vendor=VENDOR):
                 raise ValueError("Unexpected or linked artifact member")
             limit = files[name]["bytes"] if name in files else 16384
             if entry.file_size > limit or name in files and entry.file_size != limit:
-                raise ValueError("Artifact member size differs")
+                raise ValueError("Artifact member size differs: " + name + " actual=" + str(entry.file_size) + " expected=" + str(limit))
             with archive.open(entry) as source:
                 data = source.read(limit + 1)
             if len(data) != entry.file_size:
@@ -230,20 +230,57 @@ def publish_blob(token, data):
     return result["sha"]
 
 
+
+def inspect_owned(raw):
+    """Metadata only after exact outer ZIP pin; no source execution or Git write."""
+    rows, seen = [], set()
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        for entry in archive.infolist():
+            if entry.is_dir():
+                continue
+            name = entry.filename
+            if name not in set(FILES)|{MANIFEST} or name.casefold() in seen:
+                raise ValueError("Unexpected/duplicate source artifact member")
+            seen.add(name.casefold())
+            if entry.file_size > 1024**2:
+                raise ValueError("Oversized reviewed text source")
+            data = archive.read(entry)
+            row = {"path":name,"raw_bytes":len(data),"raw_git_blob":git_blob(data),
+                   "raw_sha256":sha256(data).hexdigest(),"expected":FILES.get(name),
+                   "crlf_pairs":data.count(b"\r\n")}
+            if name in ("wide_afri_six.py","wide_afri_frontend.py"):
+                canonical = data.replace(b"\r\n",b"\n")
+                row.update(lf_bytes=len(canonical),lf_git_blob=git_blob(canonical),
+                           lf_matches_reviewed_pin=(len(canonical)==FILES[name]["bytes"]
+                               and git_blob(canonical)==FILES[name]["git_blob_sha1"]))
+            rows.append(row)
+            print("AFRI_SOURCE_RAW_MEMBER "+json.dumps(row,sort_keys=True),flush=True)
+    if seen != set(FILES)|{MANIFEST}:
+        raise ValueError("Missing source artifact member")
+    return rows
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--archive", type=Path, help="Verify a local exact archive instead of downloading")
     parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--inspect-only", action="store_true", help="Print exact bounded ZIP member pins; never publish")
     args = parser.parse_args()
     if args.report.exists() or args.report.is_symlink():
         parser.error("Report must be a new owned path")
     token = os.environ.get("GITHUB_TOKEN", "")
-    if not token and (not args.verify_only or args.archive is None):
+    if not token and (not (args.verify_only or args.inspect_only) or args.archive is None):
         parser.error("GitHub token required for acquisition or unattached blob publication")
     raw = args.archive.read_bytes() if args.archive is not None else acquire(token)
     if len(raw) != ARTIFACT_BYTES or sha256(raw).hexdigest() != ARTIFACT_SHA256:
         raise ValueError("Full immutable artifact pin differs")
+    if args.inspect_only:
+        report = {"format":"dordiai-exact-owned-source-artifact-inspection","artifact_id":ARTIFACT,
+                  "artifact_sha256":ARTIFACT_SHA256,"files":inspect_owned(raw),
+                  "source_executed":False,"git_blobs_created":False,"refs_updated":False}
+        args.report.parent.mkdir(parents=True,exist_ok=True)
+        args.report.write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
+        return 0
     payload = validated_payload(raw)
     report = {"format":"dordiai-reviewed-afri-source-import-v1",
               "artifact_id":ARTIFACT,"artifact_sha256":ARTIFACT_SHA256,"source_run":SOURCE_RUN,

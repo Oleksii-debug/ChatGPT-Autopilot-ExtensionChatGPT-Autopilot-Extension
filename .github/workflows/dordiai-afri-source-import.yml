@@ -30,7 +30,7 @@ jobs:
       - name: Verify own immutable source artifact and create unattached Git blobs only
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python dordiai-voices/tools/research/import_afri_reviewed_source.py --report output/afri-source-import.json
+        run: python dordiai-voices/tools/research/import_afri_reviewed_source.py --inspect-only --report output/afri-source-import.json
       - name: Preserve exact production-path to Git-blob mapping
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
