@@ -1,0 +1,955 @@
+{
+  "format": "dordiai-word-lid-evaluation-v1",
+  "sources": [
+    {
+      "path": "latin_dictionary.json.gz",
+      "sha256": "cfd2b15e2e6893c4f9a07c18dc617fd3a8122477036f178ae7e078db3171efb9",
+      "bytes": 1730689
+    },
+    {
+      "path": "models/WideLanguages/wide_words.json.gz",
+      "sha256": "cacae56b3af199580ee70ff2a8bb3cc683427955e84c2eb676709c645036b0f5",
+      "bytes": 112533
+    },
+    {
+      "language": "uk",
+      "path": "training-data/word-lid/frequencywords-2018-uk.txt.gz",
+      "source_url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/uk/uk_50k.txt",
+      "source_sha256": "881686fe66a168b79f6a9ee2f6cbbf944cfb12bfb7040913ef535cb29bd86ec9",
+      "source_bytes": 887259,
+      "stored_sha256": "647c11ef3dfc875ebaa7f622c3c763b4c65abd38751ea14868f3f15e0534b474",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Hermit Dave, FrequencyWords 2018; derived from OpenSubtitles"
+    },
+    {
+      "language": "ru",
+      "path": "training-data/word-lid/frequencywords-2018-ru.txt.gz",
+      "source_url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ru/ru_50k.txt",
+      "source_sha256": "6095f507cc167488ec66ada5a85ac50433503a08ad24a07c6eabdf54352c4e7f",
+      "source_bytes": 998861,
+      "stored_sha256": "0c3c091ae7f5c8ec1a2b73a928379e68ccdf607add902a66b330d539eb70b29b",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Hermit Dave, FrequencyWords 2018; derived from OpenSubtitles"
+    }
+  ],
+  "label_quality": "Weak lexical labels; this is not a human-annotated language benchmark",
+  "label_policy": "Merge every source's labels per normalised spelling; Latin relative frequency band <=24; shared labels retained",
+  "split_policy": "SHA256('dordiai-word-split-v1:' + normalised_word), 80/10/10, global across source/label",
+  "normalised_words": 383389,
+  "trained_words": 50883,
+  "training_words_per_language": {
+    "af": 186,
+    "az": 425,
+    "bg": 315,
+    "ca": 240,
+    "cs": 365,
+    "da": 5000,
+    "de": 5000,
+    "en": 5000,
+    "es": 5000,
+    "et": 475,
+    "fi": 500,
+    "fr": 5000,
+    "ga": 116,
+    "gn": 82,
+    "ht": 92,
+    "hu": 474,
+    "id": 154,
+    "is": 376,
+    "it": 5000,
+    "ky": 176,
+    "la": 142,
+    "lb": 298,
+    "lt": 478,
+    "lv": 308,
+    "mk": 366,
+    "mn": 311,
+    "ms": 199,
+    "mt": 325,
+    "nb": 273,
+    "nl": 252,
+    "pl": 5000,
+    "pt": 205,
+    "qu": 276,
+    "ro": 470,
+    "ru": 5000,
+    "sk": 5000,
+    "sl": 353,
+    "sq": 341,
+    "sv": 306,
+    "sw": 255,
+    "tk": 375,
+    "tr": 432,
+    "uk": 5000,
+    "uz": 181,
+    "vi": 178
+  },
+  "split_words": {
+    "train": 306192,
+    "validation": 38819,
+    "test": 38378
+  },
+  "split_digests_sha256": {
+    "train": "a0c23a7758d626901c5dd28ca9ad4f8658d71db85960c6c157f29fab9b45a0c0",
+    "validation": "3e9902fc0bb1101cf12211e31bf0ef38203df554dd15676d4beaf6bac5dc8903",
+    "test": "0cd94a36975d88871553a2752449a31362f6927b9311efc54f036e4f2fb4bbda"
+  },
+  "word_overlap_train_validation_test": 0,
+  "languages": [
+    "af",
+    "az",
+    "bg",
+    "ca",
+    "cs",
+    "da",
+    "de",
+    "en",
+    "es",
+    "et",
+    "fi",
+    "fr",
+    "ga",
+    "gn",
+    "ht",
+    "hu",
+    "id",
+    "is",
+    "it",
+    "ky",
+    "la",
+    "lb",
+    "lt",
+    "lv",
+    "mk",
+    "mn",
+    "ms",
+    "mt",
+    "nb",
+    "nl",
+    "pl",
+    "pt",
+    "qu",
+    "ro",
+    "ru",
+    "sk",
+    "sl",
+    "sq",
+    "sv",
+    "sw",
+    "tk",
+    "tr",
+    "uk",
+    "uz",
+    "vi"
+  ],
+  "not_a_claim_of_support_for_all_selected_languages": true,
+  "dimensions": 16384,
+  "max_words_per_language": 5000,
+  "character_features": "binary presence of hashed character 2/3/4-grams with word boundaries; no whole-word lookup feature",
+  "algorithm": "multinomial naive Bayes, uniform class prior, alpha=.2, quantised log likelihoods",
+  "temperature_selected_on_validation": 4.0,
+  "validation_nll_by_temperature": {
+    "0.5": 2.8157257272514062,
+    "1.0": 1.5779270869675726,
+    "2.0": 0.9435974658089963,
+    "4.0": 0.8242159741373796,
+    "8.0": 1.172070660190244,
+    "16.0": 1.8267422669083095
+  },
+  "confidence_threshold_selected_on_validation": 0.92,
+  "threshold_search": [
+    {
+      "threshold": 0.5,
+      "accepted": 27181,
+      "label_match": 0.8714911151171775
+    },
+    {
+      "threshold": 0.6,
+      "accepted": 22880,
+      "label_match": 0.9086538461538461
+    },
+    {
+      "threshold": 0.7,
+      "accepted": 19118,
+      "label_match": 0.93812114237891
+    },
+    {
+      "threshold": 0.8,
+      "accepted": 15447,
+      "label_match": 0.9603159189486632
+    },
+    {
+      "threshold": 0.85,
+      "accepted": 13463,
+      "label_match": 0.9701403847582263
+    },
+    {
+      "threshold": 0.9,
+      "accepted": 11271,
+      "label_match": 0.978440244876231
+    },
+    {
+      "threshold": 0.92,
+      "accepted": 10220,
+      "label_match": 0.9827788649706458
+    },
+    {
+      "threshold": 0.95,
+      "accepted": 8365,
+      "label_match": 0.9881649731022116
+    },
+    {
+      "threshold": 0.97,
+      "accepted": 6827,
+      "label_match": 0.9910648894096968
+    },
+    {
+      "threshold": 0.98,
+      "accepted": 5786,
+      "label_match": 0.9920497753197373
+    },
+    {
+      "threshold": 0.99,
+      "accepted": 4347,
+      "label_match": 0.9947089947089947
+    },
+    {
+      "threshold": 0.995,
+      "accepted": 3288,
+      "label_match": 0.9975669099756691
+    },
+    {
+      "threshold": 0.999,
+      "accepted": 1791,
+      "label_match": 1.0
+    }
+  ],
+  "validation": {
+    "words": 38819,
+    "top1_label_match": 0.7457688245446817,
+    "accepted": 10220,
+    "correct_accepted": 10044,
+    "coverage": 0.2632731394420258,
+    "selective_label_match": 0.9827788649706458,
+    "per_language": {
+      "af": {
+        "words": 24,
+        "accepted": 7,
+        "correct": 6
+      },
+      "az": {
+        "words": 60,
+        "accepted": 32,
+        "correct": 31
+      },
+      "bg": {
+        "words": 33,
+        "accepted": 10,
+        "correct": 10
+      },
+      "ca": {
+        "words": 37,
+        "accepted": 8,
+        "correct": 8
+      },
+      "cs": {
+        "words": 37,
+        "accepted": 19,
+        "correct": 19
+      },
+      "da": {
+        "words": 4502,
+        "accepted": 739,
+        "correct": 712
+      },
+      "de": {
+        "words": 4544,
+        "accepted": 1250,
+        "correct": 1232
+      },
+      "en": {
+        "words": 4485,
+        "accepted": 263,
+        "correct": 239
+      },
+      "es": {
+        "words": 4807,
+        "accepted": 760,
+        "correct": 739
+      },
+      "et": {
+        "words": 69,
+        "accepted": 30,
+        "correct": 30
+      },
+      "fi": {
+        "words": 49,
+        "accepted": 27,
+        "correct": 25
+      },
+      "fr": {
+        "words": 4400,
+        "accepted": 837,
+        "correct": 828
+      },
+      "ga": {
+        "words": 14,
+        "accepted": 5,
+        "correct": 5
+      },
+      "gn": {
+        "words": 14,
+        "accepted": 3,
+        "correct": 3
+      },
+      "ht": {
+        "words": 13,
+        "accepted": 1,
+        "correct": 1
+      },
+      "hu": {
+        "words": 76,
+        "accepted": 44,
+        "correct": 44
+      },
+      "id": {
+        "words": 18,
+        "accepted": 7,
+        "correct": 6
+      },
+      "is": {
+        "words": 57,
+        "accepted": 29,
+        "correct": 29
+      },
+      "it": {
+        "words": 4629,
+        "accepted": 1058,
+        "correct": 1042
+      },
+      "ky": {
+        "words": 22,
+        "accepted": 15,
+        "correct": 15
+      },
+      "la": {
+        "words": 14,
+        "accepted": 4,
+        "correct": 4
+      },
+      "lb": {
+        "words": 39,
+        "accepted": 13,
+        "correct": 13
+      },
+      "lt": {
+        "words": 48,
+        "accepted": 24,
+        "correct": 23
+      },
+      "lv": {
+        "words": 30,
+        "accepted": 15,
+        "correct": 15
+      },
+      "mk": {
+        "words": 49,
+        "accepted": 26,
+        "correct": 26
+      },
+      "mn": {
+        "words": 33,
+        "accepted": 26,
+        "correct": 26
+      },
+      "ms": {
+        "words": 15,
+        "accepted": 2,
+        "correct": 1
+      },
+      "mt": {
+        "words": 42,
+        "accepted": 16,
+        "correct": 16
+      },
+      "nb": {
+        "words": 40,
+        "accepted": 19,
+        "correct": 18
+      },
+      "nl": {
+        "words": 43,
+        "accepted": 17,
+        "correct": 14
+      },
+      "pl": {
+        "words": 4888,
+        "accepted": 2373,
+        "correct": 2365
+      },
+      "pt": {
+        "words": 29,
+        "accepted": 11,
+        "correct": 10
+      },
+      "qu": {
+        "words": 36,
+        "accepted": 27,
+        "correct": 27
+      },
+      "ro": {
+        "words": 48,
+        "accepted": 26,
+        "correct": 25
+      },
+      "ru": {
+        "words": 4776,
+        "accepted": 406,
+        "correct": 370
+      },
+      "sk": {
+        "words": 4763,
+        "accepted": 1113,
+        "correct": 1086
+      },
+      "sl": {
+        "words": 51,
+        "accepted": 25,
+        "correct": 25
+      },
+      "sq": {
+        "words": 48,
+        "accepted": 29,
+        "correct": 29
+      },
+      "sv": {
+        "words": 39,
+        "accepted": 15,
+        "correct": 15
+      },
+      "sw": {
+        "words": 20,
+        "accepted": 7,
+        "correct": 7
+      },
+      "tk": {
+        "words": 50,
+        "accepted": 22,
+        "correct": 22
+      },
+      "tr": {
+        "words": 49,
+        "accepted": 27,
+        "correct": 27
+      },
+      "uk": {
+        "words": 4706,
+        "accepted": 1034,
+        "correct": 1016
+      },
+      "uz": {
+        "words": 20,
+        "accepted": 11,
+        "correct": 10
+      },
+      "vi": {
+        "words": 14,
+        "accepted": 2,
+        "correct": 2
+      }
+    }
+  },
+  "test": {
+    "words": 38378,
+    "top1_label_match": 0.7458700297045182,
+    "accepted": 10204,
+    "correct_accepted": 10018,
+    "coverage": 0.26588149460628485,
+    "selective_label_match": 0.9817718541748334,
+    "per_language": {
+      "af": {
+        "words": 29,
+        "accepted": 4,
+        "correct": 3
+      },
+      "az": {
+        "words": 51,
+        "accepted": 24,
+        "correct": 23
+      },
+      "bg": {
+        "words": 39,
+        "accepted": 17,
+        "correct": 17
+      },
+      "ca": {
+        "words": 24,
+        "accepted": 5,
+        "correct": 5
+      },
+      "cs": {
+        "words": 53,
+        "accepted": 20,
+        "correct": 20
+      },
+      "da": {
+        "words": 4485,
+        "accepted": 696,
+        "correct": 667
+      },
+      "de": {
+        "words": 4613,
+        "accepted": 1366,
+        "correct": 1346
+      },
+      "en": {
+        "words": 4401,
+        "accepted": 238,
+        "correct": 203
+      },
+      "es": {
+        "words": 4732,
+        "accepted": 783,
+        "correct": 758
+      },
+      "et": {
+        "words": 65,
+        "accepted": 29,
+        "correct": 29
+      },
+      "fi": {
+        "words": 55,
+        "accepted": 30,
+        "correct": 30
+      },
+      "fr": {
+        "words": 4287,
+        "accepted": 853,
+        "correct": 841
+      },
+      "ga": {
+        "words": 24,
+        "accepted": 11,
+        "correct": 11
+      },
+      "gn": {
+        "words": 8,
+        "accepted": 5,
+        "correct": 5
+      },
+      "ht": {
+        "words": 11,
+        "accepted": 3,
+        "correct": 2
+      },
+      "hu": {
+        "words": 59,
+        "accepted": 28,
+        "correct": 27
+      },
+      "id": {
+        "words": 13,
+        "accepted": 2,
+        "correct": 1
+      },
+      "is": {
+        "words": 48,
+        "accepted": 27,
+        "correct": 27
+      },
+      "it": {
+        "words": 4586,
+        "accepted": 1060,
+        "correct": 1041
+      },
+      "ky": {
+        "words": 24,
+        "accepted": 15,
+        "correct": 15
+      },
+      "la": {
+        "words": 16,
+        "accepted": 3,
+        "correct": 3
+      },
+      "lb": {
+        "words": 48,
+        "accepted": 17,
+        "correct": 15
+      },
+      "lt": {
+        "words": 63,
+        "accepted": 34,
+        "correct": 34
+      },
+      "lv": {
+        "words": 41,
+        "accepted": 23,
+        "correct": 23
+      },
+      "mk": {
+        "words": 52,
+        "accepted": 22,
+        "correct": 22
+      },
+      "mn": {
+        "words": 33,
+        "accepted": 25,
+        "correct": 25
+      },
+      "ms": {
+        "words": 28,
+        "accepted": 2,
+        "correct": 2
+      },
+      "mt": {
+        "words": 35,
+        "accepted": 12,
+        "correct": 12
+      },
+      "nb": {
+        "words": 29,
+        "accepted": 11,
+        "correct": 10
+      },
+      "nl": {
+        "words": 29,
+        "accepted": 10,
+        "correct": 10
+      },
+      "pl": {
+        "words": 4744,
+        "accepted": 2334,
+        "correct": 2331
+      },
+      "pt": {
+        "words": 30,
+        "accepted": 17,
+        "correct": 17
+      },
+      "qu": {
+        "words": 46,
+        "accepted": 36,
+        "correct": 36
+      },
+      "ro": {
+        "words": 51,
+        "accepted": 22,
+        "correct": 22
+      },
+      "ru": {
+        "words": 4707,
+        "accepted": 433,
+        "correct": 408
+      },
+      "sk": {
+        "words": 4630,
+        "accepted": 1064,
+        "correct": 1033
+      },
+      "sl": {
+        "words": 47,
+        "accepted": 20,
+        "correct": 20
+      },
+      "sq": {
+        "words": 43,
+        "accepted": 18,
+        "correct": 18
+      },
+      "sv": {
+        "words": 42,
+        "accepted": 15,
+        "correct": 14
+      },
+      "sw": {
+        "words": 40,
+        "accepted": 13,
+        "correct": 12
+      },
+      "tk": {
+        "words": 44,
+        "accepted": 22,
+        "correct": 22
+      },
+      "tr": {
+        "words": 39,
+        "accepted": 14,
+        "correct": 14
+      },
+      "uk": {
+        "words": 4638,
+        "accepted": 1036,
+        "correct": 1020
+      },
+      "uz": {
+        "words": 20,
+        "accepted": 8,
+        "correct": 7
+      },
+      "vi": {
+        "words": 25,
+        "accepted": 2,
+        "correct": 2
+      }
+    }
+  },
+  "model_bytes": 296044,
+  "model_sha256": "c2a4439182df69ffd652df6fe9a2f96eb0540b81fb38172a2e1c2bc7fc8ebbe4",
+  "supplemental_cyrillic_lexicon": {
+    "words": 74834,
+    "ambiguous_words": 21959,
+    "bytes": 271296,
+    "sha256": "190e4cdad6a26877cff5e475072b184c4621f8dae564584d7a8e0d7cdbf94eed"
+  },
+  "abstention": "Fewer than 4 characters, mixed/unknown script, low selected confidence, <25% seen grams, disabled predicted language",
+  "test_failure_examples": [
+    {
+      "word": "aaaaah",
+      "labels": [
+        "en",
+        "fr"
+      ],
+      "predicted": "ms",
+      "score": 0.29868476469492017
+    },
+    {
+      "word": "aahh",
+      "labels": [
+        "en",
+        "fr",
+        "it"
+      ],
+      "predicted": "ms",
+      "score": 0.23484541866248831
+    },
+    {
+      "word": "aahhh",
+      "labels": [
+        "en"
+      ],
+      "predicted": "uz",
+      "score": 0.2195224164938134
+    },
+    {
+      "word": "aarohi",
+      "labels": [
+        "sk"
+      ],
+      "predicted": "uz",
+      "score": 0.2734684458103429
+    },
+    {
+      "word": "aarons",
+      "labels": [
+        "da",
+        "de"
+      ],
+      "predicted": "en",
+      "score": 0.2914629891498196
+    },
+    {
+      "word": "aaru",
+      "labels": [
+        "en"
+      ],
+      "predicted": "id",
+      "score": 0.10900752878332903
+    },
+    {
+      "word": "aayan",
+      "labels": [
+        "da"
+      ],
+      "predicted": "ms",
+      "score": 0.6246263744441626
+    },
+    {
+      "word": "abandonneras",
+      "labels": [
+        "fr"
+      ],
+      "predicted": "es",
+      "score": 0.741472333288831
+    },
+    {
+      "word": "abbys",
+      "labels": [
+        "da",
+        "de"
+      ],
+      "predicted": "en",
+      "score": 0.2763221357481151
+    },
+    {
+      "word": "abdo",
+      "labels": [
+        "fr"
+      ],
+      "predicted": "sw",
+      "score": 0.1961644305605926
+    },
+    {
+      "word": "aben",
+      "labels": [
+        "da"
+      ],
+      "predicted": "de",
+      "score": 0.4804751711817449
+    },
+    {
+      "word": "abfuhr",
+      "labels": [
+        "de"
+      ],
+      "predicted": "ga",
+      "score": 0.1370616308906517
+    },
+    {
+      "word": "abide",
+      "labels": [
+        "en"
+      ],
+      "predicted": "da",
+      "score": 0.2013679362488497
+    },
+    {
+      "word": "abituale",
+      "labels": [
+        "it"
+      ],
+      "predicted": "es",
+      "score": 0.3851516583243631
+    },
+    {
+      "word": "abnormale",
+      "labels": [
+        "de"
+      ],
+      "predicted": "da",
+      "score": 0.22643338847998326
+    },
+    {
+      "word": "abnormalities",
+      "labels": [
+        "en"
+      ],
+      "predicted": "fr",
+      "score": 0.3464851393340494
+    },
+    {
+      "word": "aborcja",
+      "labels": [
+        "pl"
+      ],
+      "predicted": "mt",
+      "score": 0.21921344541764565
+    },
+    {
+      "word": "abracé",
+      "labels": [
+        "es"
+      ],
+      "predicted": "fr",
+      "score": 0.511277244077859
+    },
+    {
+      "word": "abrakadabra",
+      "labels": [
+        "de",
+        "pl"
+      ],
+      "predicted": "es",
+      "score": 0.3172018753493168
+    },
+    {
+      "word": "abris",
+      "labels": [
+        "fr"
+      ],
+      "predicted": "es",
+      "score": 0.26453457704704714
+    },
+    {
+      "word": "abrite",
+      "labels": [
+        "fr"
+      ],
+      "predicted": "sl",
+      "score": 0.24266590815122696
+    },
+    {
+      "word": "abrí",
+      "labels": [
+        "es"
+      ],
+      "predicted": "ga",
+      "score": 0.2981026391028708
+    },
+    {
+      "word": "absolve",
+      "labels": [
+        "en"
+      ],
+      "predicted": "es",
+      "score": 0.6961041462373291
+    },
+    {
+      "word": "absolvent",
+      "labels": [
+        "de",
+        "sk"
+      ],
+      "predicted": "fr",
+      "score": 0.4716533157963136
+    },
+    {
+      "word": "absorbed",
+      "labels": [
+        "en"
+      ],
+      "predicted": "da",
+      "score": 0.3093772864266411
+    },
+    {
+      "word": "absurden",
+      "labels": [
+        "de"
+      ],
+      "predicted": "nl",
+      "score": 0.2921601157065338
+    },
+    {
+      "word": "absurdity",
+      "labels": [
+        "en"
+      ],
+      "predicted": "es",
+      "score": 0.34388551572910386
+    },
+    {
+      "word": "abusare",
+      "labels": [
+        "it"
+      ],
+      "predicted": "es",
+      "score": 0.670483535242625
+    },
+    {
+      "word": "abyss",
+      "labels": [
+        "en"
+      ],
+      "predicted": "la",
+      "score": 0.14872455987839214
+    },
+    {
+      "word": "abysse",
+      "labels": [
+        "fr"
+      ],
+      "predicted": "la",
+      "score": 0.29383076472376096
+    }
+  ]
+}

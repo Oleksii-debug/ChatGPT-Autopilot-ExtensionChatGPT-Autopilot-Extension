@@ -2,3 +2,6 @@ packages/
 downloads/
 __pycache__/
 *.pyc
+dist/
+probe-package/
+windows-results/

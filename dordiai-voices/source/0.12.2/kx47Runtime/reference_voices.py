@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 
 import numpy as np
+from voice_assets import asset_path
+from voice_policy import require_voice_allowed
 
 
 REFERENCE_NAMES = {"brianna": "Бріанна", "sara": "Сара"}
@@ -32,10 +34,15 @@ class ReferenceVoices:
         return backend.load(self.models, self.threads)
 
     def synthesize(self, profile, language, text, speed=1.0):
+        require_voice_allowed(profile)
         engine = self.engine
         if profile not in self.prompts:
-            reference = self.references / (REFERENCE_NAMES[profile] + ".wav")
-            transcript = reference.with_suffix(".txt").read_text(encoding="utf-8").strip()
+            reference = asset_path(self.references, profile, "reference_audio", required=True)
+            transcript_path = asset_path(self.references, profile, "reference_text", required=True)
+            if reference is None:
+                reference = self.references / (REFERENCE_NAMES[profile] + ".wav")
+                transcript_path = reference.with_suffix(".txt")
+            transcript = transcript_path.read_text(encoding="utf-8").strip()
             if not transcript:
                 raise ValueError("The voice reference needs a transcript.")
             self.prompts[profile] = engine.create_voice_clone_prompt(

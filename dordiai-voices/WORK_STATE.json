@@ -1,0 +1,22 @@
+{
+  "product": "dordiai-voices",
+  "authorization": "User said старт on 2026-11-22",
+  "status": "implementation_in_progress",
+  "base_version": "0.12.2",
+  "target_version": "0.13.0-dev.1",
+  "selected_catalogue_entries": 135,
+  "allowed_voice_profiles": 45,
+  "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
+  "completed": [],
+  "open_requirements": [
+    "135-entry language resource and pronunciation coverage",
+    "Windows/NVDA actual audio and accessibility acceptance",
+    "measured latency requirements",
+    "release packaging and compatibility validation"
+  ],
+  "environment": {
+    "os": "Linux",
+    "windows_nvda_available": false,
+    "windows_verification_route": "Investigating GitHub Windows runner; not yet executed"
+  }
+}

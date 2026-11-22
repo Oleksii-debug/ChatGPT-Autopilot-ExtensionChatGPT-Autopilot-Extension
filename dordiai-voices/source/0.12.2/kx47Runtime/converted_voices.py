@@ -13,6 +13,8 @@ from reference_voices import REFERENCE_NAMES
 from voice_catalog import PROFILES
 from speech_text import english_text, split_mixed
 from session_control import GuardedSession, SynthesisCancelled
+from voice_assets import asset_path
+from voice_policy import require_voice_allowed
 
 
 VOICE_FILES = {"uk": "uk_UA-tetiana-high.onnx", "en": "en_US-amy-low.onnx", "en_male": "en_US-ryan-low.onnx"}
@@ -156,8 +158,18 @@ class ConvertedVoices:
         return self.encoder.run(None, {"spec": spectrogram(audio)[None]})[0].reshape(1, 256, 1)
 
     def _reference(self, profile):
+        require_voice_allowed(profile)
         if profile not in self.reference_embeddings:
             filename = profile + ".npy"
+            managed = asset_path(self.references, profile, "english_embedding")
+            if managed is None:
+                managed = asset_path(self.references, profile, "target_embedding", required=True)
+            if managed is not None:
+                value = np.load(managed, allow_pickle=False)
+                if value.shape != (1, 256, 1) or not np.isfinite(value).all():
+                    raise ValueError("Invalid installed target voice identity")
+                self.reference_embeddings[profile] = value
+                return value
             calibrated = self.references / "english" / filename
             embedding = calibrated if calibrated.is_file() else self.references / filename
             if embedding.is_file():

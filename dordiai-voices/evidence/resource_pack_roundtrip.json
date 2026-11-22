@@ -1,0 +1,32 @@
+{
+  "kind": "real-resource-pack-install-uninstall",
+  "artifacts": "development-build",
+  "results": [
+    {
+      "id": "european-piper",
+      "version": "0.13.0-dev.1",
+      "restart_required": true,
+      "installed_files": 23,
+      "installed_bytes": 443948917,
+      "elapsed_seconds": 3.492
+    },
+    {
+      "id": "slovak-rhvoice",
+      "version": "0.13.0-dev.1",
+      "restart_required": true,
+      "installed_files": 33,
+      "installed_bytes": 44961310,
+      "elapsed_seconds": 0.319
+    },
+    {
+      "id": "wide-languages",
+      "version": "0.13.0-dev.1",
+      "restart_required": true,
+      "installed_files": 760,
+      "installed_bytes": 652862862,
+      "elapsed_seconds": 5.418
+    }
+  ],
+  "all_removed_cleanly": true,
+  "windows_nvda_validation": false
+}

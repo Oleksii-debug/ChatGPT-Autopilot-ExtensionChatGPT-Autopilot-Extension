@@ -130,7 +130,9 @@ class NativeLocaleVoices(ConvertedVoices):
 
     @lru_cache(maxsize=1024)
     def target_profile(self,profile):
-        value=np.load(self.resource(self.references,profile+'.npy'),allow_pickle=False)
+        from voice_assets import asset_path
+        managed = asset_path(self.references.parent, profile, 'target_embedding', required=True)
+        value=np.load(managed if managed is not None else self.resource(self.references,profile+'.npy'),allow_pickle=False)
         if value.shape!=(1,256,1) or not np.isfinite(value).all():raise ValueError('Invalid target identity')
         return value
 

@@ -1,0 +1,2119 @@
+{
+  "format": 1,
+  "source_package": "0.12.2",
+  "selected_scope": "selected_languages.json",
+  "inventory_type": "registration-and-nonempty-resource-presence-only",
+  "summary": {
+    "selected_catalogue_entries": 135,
+    "registered_with_resources_present": 83,
+    "registered_with_missing_resources": 0,
+    "not_registered": 52,
+    "windows_audio_verified": 0,
+    "existing_unselected_registry_entries": 38,
+    "backend_counts_resources_present": {
+      "pocket-neural": 2,
+      "piper-neural+voice-conversion": 6,
+      "holos-neural": 1,
+      "shared-neural+voice-conversion": 21,
+      "espeak+voice-conversion": 51,
+      "rhvoice-statistical+voice-conversion": 1,
+      "hebrew-neural+voice-conversion": 1
+    }
+  },
+  "regions": [
+    {
+      "name_uk": "Європа",
+      "priority": 1,
+      "selected_entries_in_region": 37,
+      "resources_present": 35,
+      "missing": 2
+    },
+    {
+      "name_uk": "Північна Америка, Центральна Америка та Кариби",
+      "priority": 2,
+      "selected_entries_in_region": 4,
+      "resources_present": 4,
+      "missing": 0
+    },
+    {
+      "name_uk": "Південна Америка",
+      "priority": 3,
+      "selected_entries_in_region": 8,
+      "resources_present": 6,
+      "missing": 2
+    },
+    {
+      "name_uk": "Азія",
+      "priority": 4,
+      "selected_entries_in_region": 54,
+      "resources_present": 41,
+      "missing": 13
+    },
+    {
+      "name_uk": "Африка",
+      "priority": 5,
+      "selected_entries_in_region": 39,
+      "resources_present": 10,
+      "missing": 29
+    },
+    {
+      "name_uk": "Австралія та Океанія",
+      "priority": 6,
+      "selected_entries_in_region": 9,
+      "resources_present": 3,
+      "missing": 6
+    }
+  ],
+  "languages": [
+    {
+      "id": "en",
+      "name_uk": "Англійська",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Південна Америка",
+        "Азія",
+        "Африка",
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "en",
+      "registered": true,
+      "backend": "pocket-neural",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ru",
+      "name_uk": "Російська",
+      "regions": [
+        "Європа",
+        "Азія"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "ru",
+      "registered": true,
+      "backend": "pocket-neural",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "de",
+      "name_uk": "Німецька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "de",
+      "registered": true,
+      "backend": "piper-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "fr",
+      "name_uk": "Французька",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Африка",
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "fr",
+      "registered": true,
+      "backend": "piper-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "it",
+      "name_uk": "Італійська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "it",
+      "registered": true,
+      "backend": "piper-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "es",
+      "name_uk": "Іспанська",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Південна Америка"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "es",
+      "registered": true,
+      "backend": "piper-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "pl",
+      "name_uk": "Польська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "pl",
+      "registered": true,
+      "backend": "piper-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "uk",
+      "name_uk": "Українська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "uk",
+      "registered": true,
+      "backend": "holos-neural",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ro",
+      "name_uk": "Румунська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "ro",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "nl",
+      "name_uk": "Нідерландська",
+      "regions": [
+        "Європа",
+        "Південна Америка"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "nl",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "pt",
+      "name_uk": "Португальська",
+      "regions": [
+        "Європа",
+        "Південна Америка",
+        "Азія",
+        "Африка"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "pt",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "el",
+      "name_uk": "Грецька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "el",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "cs",
+      "name_uk": "Чеська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "cs",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "hu",
+      "name_uk": "Угорська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "hu",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sv",
+      "name_uk": "Шведська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "sv",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sr",
+      "name_uk": "Сербська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "sr",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "bg",
+      "name_uk": "Болгарська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "bg",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sq",
+      "name_uk": "Албанська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "sq",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "hr",
+      "name_uk": "Хорватська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "hr",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ca",
+      "name_uk": "Каталонська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "ca",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "da",
+      "name_uk": "Данська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "da",
+      "registered": true,
+      "backend": "piper-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "fi",
+      "name_uk": "Фінська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "fi",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sk",
+      "name_uk": "Словацька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "sk",
+      "registered": true,
+      "backend": "rhvoice-statistical+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "no",
+      "name_uk": "Норвезька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "nb",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "lt",
+      "name_uk": "Литовська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "lt",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "bs",
+      "name_uk": "Боснійська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "bs",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sl",
+      "name_uk": "Словенська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "sl",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mk",
+      "name_uk": "Македонська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "mk",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "lv",
+      "name_uk": "Латиська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "lv",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "et",
+      "name_uk": "Естонська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "et",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ga",
+      "name_uk": "Ірландська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "ga",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "cnr",
+      "name_uk": "Чорногорська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "cnr",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "lb",
+      "name_uk": "Люксембурзька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "lb",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mt",
+      "name_uk": "Мальтійська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "mt",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "is",
+      "name_uk": "Ісландська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "is",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "rm",
+      "name_uk": "Ретороманська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "rm",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "la",
+      "name_uk": "Латинська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа",
+      "runtime_code": "la",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ht",
+      "name_uk": "Гаїтянська креольська",
+      "regions": [
+        "Північна Америка, Центральна Америка та Кариби"
+      ],
+      "first_priority_region": "Північна Америка, Центральна Америка та Кариби",
+      "runtime_code": "ht",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "qu",
+      "name_uk": "Кечуа",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка",
+      "runtime_code": "qu",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "gn",
+      "name_uk": "Гуарані",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка",
+      "runtime_code": "gn",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ay",
+      "name_uk": "Аймара",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка",
+      "runtime_code": "ay",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ito",
+      "name_uk": "Ітонама",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка",
+      "runtime_code": "ito",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "cmn",
+      "name_uk": "Китайська — стандартна мандаринська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "cmn",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "hi",
+      "name_uk": "Гінді",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "hi",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ar",
+      "name_uk": "Арабська",
+      "regions": [
+        "Азія",
+        "Африка"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ar",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "bn",
+      "name_uk": "Бенгальська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "bn",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ur",
+      "name_uk": "Урду",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ur",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "id",
+      "name_uk": "Індонезійська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "id",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ja",
+      "name_uk": "Японська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ja",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "pa",
+      "name_uk": "Панджабі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "pa",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mr",
+      "name_uk": "Маратхі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "mr",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "te",
+      "name_uk": "Телугу",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "te",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tr",
+      "name_uk": "Турецька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "tr",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ta",
+      "name_uk": "Тамільська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ta",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "vi",
+      "name_uk": "В’єтнамська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "vi",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ko",
+      "name_uk": "Корейська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ko",
+      "registered": true,
+      "backend": "shared-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "fa",
+      "name_uk": "Перська, включно з дарі без окремого підрахунку",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "fa",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "th",
+      "name_uk": "Тайська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "th",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "gu",
+      "name_uk": "Гуджараті",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "gu",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "kn",
+      "name_uk": "Каннада",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "kn",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ms",
+      "name_uk": "Малайська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ms",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "my",
+      "name_uk": "Бірманська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "my",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ml",
+      "name_uk": "Малаялам",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ml",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "fil",
+      "name_uk": "Філіппінська — стандарт на тагальській основі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "fil",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "or",
+      "name_uk": "Одія",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "or",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ps",
+      "name_uk": "Пушту",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ps",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "uz",
+      "name_uk": "Узбецька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "uz",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sd",
+      "name_uk": "Синдхі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "sd",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ne",
+      "name_uk": "Непальська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ne",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ku",
+      "name_uk": "Курдська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ku",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "si",
+      "name_uk": "Сингальська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "si",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "as",
+      "name_uk": "Асамська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "as",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "az",
+      "name_uk": "Азербайджанська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "az",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "kk",
+      "name_uk": "Казахська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "kk",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "km",
+      "name_uk": "Кхмерська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "km",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tg",
+      "name_uk": "Таджицька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "tg",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "he",
+      "name_uk": "Іврит",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "he",
+      "registered": true,
+      "backend": "hebrew-neural+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "lo",
+      "name_uk": "Лаоська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "lo",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mai",
+      "name_uk": "Майтілі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "mai",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sat",
+      "name_uk": "Санталі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "sat",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ks",
+      "name_uk": "Кашмірська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ks",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "hy",
+      "name_uk": "Вірменська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "hy",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tk",
+      "name_uk": "Туркменська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "tk",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ky",
+      "name_uk": "Киргизька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ky",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ka",
+      "name_uk": "Грузинська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "ka",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mn",
+      "name_uk": "Монгольська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "mn",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "kok",
+      "name_uk": "Конкані",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "kok",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "doi",
+      "name_uk": "Догрі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "doi",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mni",
+      "name_uk": "Маніпурі, або мейтей",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "mni",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "brx",
+      "name_uk": "Бодо",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "brx",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "dv",
+      "name_uk": "Дівехі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "dv",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "dz",
+      "name_uk": "Дзонг-кха",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "dz",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tet",
+      "name_uk": "Тетум",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія",
+      "runtime_code": "tet",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sw",
+      "name_uk": "Суахілі",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "sw",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ha",
+      "name_uk": "Хауса",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ha",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "am",
+      "name_uk": "Амхарська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "am",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "om",
+      "name_uk": "Оромо",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "om",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "yo",
+      "name_uk": "Йоруба",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "yo",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ff",
+      "name_uk": "Фула, або фульфульде",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ff",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ig",
+      "name_uk": "Ігбо",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ig",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mg",
+      "name_uk": "Малагасійська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "mg",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "so",
+      "name_uk": "Сомалійська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "so",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ln",
+      "name_uk": "Лінгала",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ln",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "zu",
+      "name_uk": "Зулу",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "zu",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sn",
+      "name_uk": "Шона",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "sn",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "rw",
+      "name_uk": "Кіньяруанда",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "rw",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "rn",
+      "name_uk": "Кірунді",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "rn",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ny",
+      "name_uk": "Чичева, або чева",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ny",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "xh",
+      "name_uk": "Коса",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "xh",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ak",
+      "name_uk": "Акан",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ak",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "bm",
+      "name_uk": "Бамбара",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "bm",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "dyu",
+      "name_uk": "Діула",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "dyu",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mos",
+      "name_uk": "Мооре, або моссі",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "mos",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "wo",
+      "name_uk": "Волоф",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "wo",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "af",
+      "name_uk": "Африкаанс",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "af",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ti",
+      "name_uk": "Тигринья",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ti",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tamazight",
+      "name_uk": "Тамазигхт",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "tamazight",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "st",
+      "name_uk": "Сесото",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "st",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tn",
+      "name_uk": "Тсвана",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "tn",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "nso",
+      "name_uk": "Північна сото, або сепеді",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "nso",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ts",
+      "name_uk": "Тсонга",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ts",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ss",
+      "name_uk": "Сісваті",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ss",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ve",
+      "name_uk": "Венда",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "ve",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "nd",
+      "name_uk": "Північна ндебеле",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "nd",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "nr",
+      "name_uk": "Південна ндебеле",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "nr",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "aa",
+      "name_uk": "Афарська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "aa",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sg",
+      "name_uk": "Санго",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "sg",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "comorian",
+      "name_uk": "Коморська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка",
+      "runtime_code": "comorian",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "tpi",
+      "name_uk": "Ток-пісін",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "tpi",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "sm",
+      "name_uk": "Самоанська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "sm",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "fj",
+      "name_uk": "Фіджійська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "fj",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "to",
+      "name_uk": "Тонганська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "to",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "mi",
+      "name_uk": "Маорі",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "mi",
+      "registered": true,
+      "backend": "espeak+voice-conversion",
+      "resources_present": true,
+      "status": "resources-present-unverified",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "gil",
+      "name_uk": "Гілбертська, або кірибаті",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "gil",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    },
+    {
+      "id": "ho",
+      "name_uk": "Хірі-моту",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія",
+      "runtime_code": "ho",
+      "registered": false,
+      "backend": "not-registered",
+      "resources_present": false,
+      "status": "not-registered",
+      "missing_resources": [],
+      "windows_audio_verified": false
+    }
+  ],
+  "scope_notes_uk": [
+    "135 пунктів є вибраним каталогом, а не 135 доведеними акустичними можливостями.",
+    "83 позитивні записи — наявні зареєстровані файли; вимову, запуск Windows/NVDA й затримки цей аудит не перевіряє.",
+    "Норвезьку зіставлено з nb; існуючий nn залишається окремим необов’язковим варіантом ресурсу, а не додатковою вибраною мовою.",
+    "Коморська і Тамазигхт — групові назви; до підбору моделей потрібно визначити точний стандарт.",
+    "Для групових записів на кшталт кечуа, фула чи курдської потрібна перевірка конкретного стандарту: один готовий ресурс не доводить покриття всіх різновидів.",
+    "Мандаринську не замінено всіма китайськими мовами; філіппінську та чорногорську не підмінено іншими ресурсами через близькість назв.",
+    "Наявні 38 записів поза вибором не збільшують виконання цільового каталогу."
+  ]
+}

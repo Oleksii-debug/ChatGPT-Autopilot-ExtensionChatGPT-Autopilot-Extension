@@ -6,8 +6,15 @@ import json
 import os
 from pathlib import Path
 import sys
+import traceback
 from queue import Queue
-from threading import Event, Thread
+from threading import Thread
+
+# The embedded interpreter is launched with -I and a restricted ._pth file;
+# sibling modules must be reachable before importing request-control helpers.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from session_control import RequestCancellation, SynthesisCancelled
+from voice_policy import require_voice_allowed
 
 
 OUTPUT_RATE = 24000
@@ -61,7 +68,6 @@ def main():
     # Libraries can write diagnostics to either standard stream. Keep the pipe for replies only.
     with os.fdopen(os.dup(sys.stdout.fileno()), "w", encoding="ascii", newline="\n") as replies:
         os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
         engine = None
         reference_voices = None
         if args.references:
@@ -82,6 +88,18 @@ def main():
         renderer = {}
         native_loader = None
         incoming = Queue()
+        cancellations = RequestCancellation()
+        stream_cancellation = None
+
+        def close_stream():
+            nonlocal stream, stream_cancellation
+            previous, stream = stream, None
+            try:
+                if previous is not None:
+                    previous.close()
+            finally:
+                cancellations.release(stream_cancellation)
+                stream_cancellation = None
 
         def get_classmate_locales():
             nonlocal classmate_locales
@@ -155,18 +173,14 @@ def main():
                         warmup_gate.finished()
                         if classmate_forecast is not None:
                             classmate_forecast.discard()
-                        if current is not None:
-                            current.set()
-                            from session_control import cancel_running
-                            cancel_running(reference_voices, current)
+                        cancellations.cancel(reference_voices)
                         continue  # Out-of-band signal, no response in the audio pipe.
                     if request["mode"] == "reference":
                         warmup_gate.reference(bool(request.get("wideLocale")))
-                        current = Event()
+                        current = cancellations.new()
                     incoming.put((request, current))
             finally:
-                if current is not None:
-                    current.set()
+                cancellations.cancel(reference_voices)
                 warmup_gate.close()
                 incoming.put(None)
 
@@ -174,6 +188,16 @@ def main():
         while (entry := incoming.get()) is not None:
             try:
                 request, cancellation = entry
+                if "profile" in request:
+                    require_voice_allowed(request["profile"])
+                if request["mode"] == "reference":
+                    close_stream()
+                    if cancellation is not None and cancellation.is_set():
+                        warmup_gate.finished()
+                        cancellations.release(cancellation)
+                        replies.write('{"finished": true}\n')
+                        replies.flush()
+                        continue
                 if request["mode"] == "reference" and reference_voices is not None:
                     reference_voices.cancel_event = cancellation
                 if request["mode"] == "preload":
@@ -287,20 +311,23 @@ def main():
                     rate = getattr(reference_voices, "output_rate", reference_voices.sampling_rate)
                     stream = delivered_audio(blocks, rate, args.references, request, controls,
                                              condition=cached is None and args.reference_engine == "holos")
+                    stream_cancellation = cancellation
                 elif request["mode"] == "drop":
                     warmup_gate.finished()
-                    if stream is not None:
-                        stream.close()
-                    stream = None
+                    close_stream()
                     replies.write('{"finished": true}\n')
                     replies.flush()
                     continue
                 if request["mode"] == "next" or request.get("stream") and stream is not None:
                     try:
+                        if stream_cancellation is not None and stream_cancellation.is_set():
+                            raise SynthesisCancelled()
                         block = next(stream) if stream is not None else None
                     except StopIteration:
-                        stream = None
+                        close_stream()
                         block = None
+                    if stream_cancellation is not None and stream_cancellation.is_set():
+                        raise SynthesisCancelled()
                     if block is None:
                         warmup_gate.finished()
                     result = {"finished": True} if block is None else {
@@ -316,6 +343,9 @@ def main():
                     audio, rate = reference_voices.synthesize(
                         request["profile"], request["language"], request["text"], request["speed"],
                     )
+                    if cancellation is not None and cancellation.is_set():
+                        raise SynthesisCancelled()
+                    cancellations.release(cancellation)
                 else:
                     if engine is None:
                         from kx47 import LocalSynthesizer, PROFILES
@@ -331,13 +361,19 @@ def main():
                 response = {"pcm": pcm_response(audio, rate)}
             except Exception as error:
                 warmup_gate.finished()
-                if stream is not None:
-                    stream.close()
-                stream = None
-                from session_control import SynthesisCancelled
+                if not isinstance(error, SynthesisCancelled):
+                    # Keep diagnostics out of the JSON audio pipe. The engine
+                    # probe retains this stream for actionable model failures.
+                    traceback.print_exc(file=sys.stderr)
+                try:
+                    close_stream()
+                except Exception as cleanup_error:
+                    print(f"Speech stream cleanup failed: {type(cleanup_error).__name__}", file=sys.stderr)
+                cancellations.release(cancellation)
                 response = {"finished": True} if isinstance(error, SynthesisCancelled) else {"error": type(error).__name__}
             replies.write(json.dumps(response) + "\n")
             replies.flush()
+        close_stream()
         if classmate_forecast is not None:
             classmate_forecast.close()
         if classmate_locales is not None:

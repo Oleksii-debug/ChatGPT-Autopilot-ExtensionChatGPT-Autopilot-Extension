@@ -10,6 +10,7 @@ from converted_voices import ConvertedVoices
 from speech_text import split_mixed, speak_numbers
 from ukrainian_stress import accent_text
 from session_control import GuardedSession
+from voice_assets import asset_path
 
 SPACE = re.compile(r"\s+")
 SENTENCES = re.compile('.+?(?:[.!?…]+[»”’"\\)\\]]*(?=\\s|$)|$)', re.DOTALL)
@@ -160,7 +161,11 @@ class UkrainianVoices(ConvertedVoices):
 
     @lru_cache(maxsize=16)
     def _holos_style(self, profile):
-        return np.load(self.references / "holos" / (profile + ".npy"), allow_pickle=False)
+        managed = asset_path(self.references, profile, "holos_profile", required=True)
+        value = np.load(managed if managed is not None else self.references / "holos" / (profile + ".npy"), allow_pickle=False)
+        if value.shape != (1, 256) or not np.isfinite(value).all():
+            raise ValueError("Invalid Holos voice identity")
+        return value
 
     def _ukrainian(self, profile, text, speed):
         from ipa_uk import ipa

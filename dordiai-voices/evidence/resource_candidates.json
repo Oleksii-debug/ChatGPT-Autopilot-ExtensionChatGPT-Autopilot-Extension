@@ -1,0 +1,4188 @@
+{
+  "format": 1,
+  "checked_date": "2026-11-22",
+  "scope": "52 selected catalogue entries without registered resources in original main0.12.2",
+  "summary": {
+    "missing_selected_entries": 52,
+    "entries_with_upstream_model_candidates": 44,
+    "entries_without_established_model_candidates": 8,
+    "MMS_candidates_matching_selected_groups": 29,
+    "OmniVoice_candidates_matching_selected_groups": 29,
+    "MMS_or_OmniVoice_matching_selected_groups": 40,
+    "MMS_candidate_unique_model_weights_bytes": 4211656216,
+    "OmniVoice_model_and_audio_tokenizer_weights_bytes": 3256009740,
+    "models_adopted": 0,
+    "new_languages_integrated": 0,
+    "windows_audio_verified": 0
+  },
+  "sources": [
+    {
+      "url": "https://huggingface.co/facebook/mms-tts",
+      "kind": "official model card and full language list"
+    },
+    {
+      "url": "https://huggingface.co/api/models?author=facebook&search=mms-tts-&limit=1000",
+      "kind": "official model registry API, both pages checked"
+    },
+    {
+      "url": "https://github.com/k2-fsa/OmniVoice/blob/master/docs/languages.md",
+      "kind": "official 646-language list"
+    },
+    {
+      "url": "https://huggingface.co/k2-fsa/OmniVoice",
+      "kind": "official weights card, non-commercial license and API"
+    },
+    {
+      "url": "https://github.com/espeak-ng/espeak-ng/blob/master/docs/languages.md",
+      "kind": "official language inventory"
+    },
+    {
+      "url": "https://huggingface.co/datasets/google/fleurs",
+      "kind": "official supervised speech dataset, not a trained TTS model"
+    },
+    {
+      "url": "https://github.com/Balkansmedia/tts-ai-",
+      "kind": "project authors describe Croatian-only available training and future Montenegrin data collection"
+    },
+    {
+      "url": "https://repo.sadilar.org/items/9a9b5d8c-a768-4265-b1bb-632bb284268a",
+      "kind": "Siswati corpus; CC-BY-NC-ND3.0SA, not a ready redistributable trained TTS engine"
+    },
+    {
+      "url": "https://glottolog.org/resource/languoid/id/iton1250",
+      "kind": "language documentation; not a TTS model"
+    }
+  ],
+  "languages": [
+    {
+      "selected_id": "cnr",
+      "name_uk": "Чорногорська",
+      "first_priority_region": "Європа",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No approved local Montenegrin checkpoint established. The inspected ex-Yu SpeechT5 project says its available training is Croatian and Montenegrin collection is future work.",
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "cnr"
+      ],
+      "targeted_hub_search": {
+        "query": "Montenegrin",
+        "url": "https://huggingface.co/api/models?search=Montenegrin&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "rm",
+      "name_uk": "Ретороманська",
+      "first_priority_region": "Європа",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Romansh",
+              "id": "rm",
+              "iso": "roh",
+              "hours": 9.21
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "roh"
+      ]
+    },
+    {
+      "selected_id": "ay",
+      "name_uk": "Аймара",
+      "first_priority_region": "Південна Америка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-ayr",
+          "upstream_language_id": "ayr",
+          "match": "standard-needs-validation"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "Central Aymara (ayr) is a particular standard within the selected Aymara group; do not infer every Aymara variety."
+      ],
+      "checked_iso_candidates": [
+        "aym",
+        "ayr",
+        "ayc"
+      ]
+    },
+    {
+      "selected_id": "ito",
+      "name_uk": "Ітонама",
+      "first_priority_region": "Південна Америка",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No ready Itonama TTS checkpoint was established in the official eSpeak/MMS/OmniVoice lists and targeted searches. Documentation/recordings are not a trained TTS engine; search absence is not proof no model exists.",
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "ito"
+      ],
+      "targeted_hub_search": {
+        "query": "Itonama",
+        "url": "https://huggingface.co/api/models?search=Itonama&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "fil",
+      "name_uk": "Філіппінська — стандарт на тагальській основі",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-tgl",
+          "upstream_language_id": "tgl",
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Filipino",
+              "id": "fil",
+              "iso": "fil",
+              "hours": 7.71
+            }
+          ],
+          "match": "standard-needs-validation"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "The selected Filipino standard is Tagalog-based; upstream tgl requires standard/script and pronunciation validation before registering fil."
+      ],
+      "checked_iso_candidates": [
+        "fil",
+        "tgl"
+      ]
+    },
+    {
+      "selected_id": "km",
+      "name_uk": "Кхмерська",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-khm",
+          "upstream_language_id": "khm",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Khmer",
+              "id": "km",
+              "iso": "khm",
+              "hours": 7.1
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "khm"
+      ]
+    },
+    {
+      "selected_id": "tg",
+      "name_uk": "Таджицька",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-tgk",
+          "upstream_language_id": "tgk",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Tajik",
+              "id": "tg",
+              "iso": "tgk",
+              "hours": 9.23
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "tgk"
+      ]
+    },
+    {
+      "selected_id": "lo",
+      "name_uk": "Лаоська",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-lao",
+          "upstream_language_id": "lao",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Lao",
+              "id": "lo",
+              "iso": "lao",
+              "hours": 7.63
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "lao"
+      ]
+    },
+    {
+      "selected_id": "mai",
+      "name_uk": "Майтілі",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-mai",
+          "upstream_language_id": "mai",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Maithili",
+              "id": "mai",
+              "iso": "mai",
+              "hours": 131.37
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "mai"
+      ]
+    },
+    {
+      "selected_id": "sat",
+      "name_uk": "Санталі",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Santali",
+              "id": "sat",
+              "iso": "sat",
+              "hours": 98.37
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "kaushalkrishnax/santali-piper-vits",
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "openarcane/Volt-TTS",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "sat"
+      ]
+    },
+    {
+      "selected_id": "ks",
+      "name_uk": "Кашмірська",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Kashmiri",
+              "id": "ks",
+              "iso": "kas",
+              "hours": 110.42
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "openarcane/Volt-TTS",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "kas",
+        "kas-script_devanagari",
+        "kas-script_arabic"
+      ]
+    },
+    {
+      "selected_id": "doi",
+      "name_uk": "Догрі",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-dgo",
+          "upstream_language_id": "dgo",
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Dogri",
+              "id": "dgo",
+              "iso": "dgo",
+              "hours": 117.04
+            }
+          ],
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "openarcane/Volt-TTS",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "Upstream dgo identifies Dogri; explicit macro-language/standard alignment is needed before catalog registration."
+      ],
+      "checked_iso_candidates": [
+        "doi",
+        "dgo"
+      ]
+    },
+    {
+      "selected_id": "mni",
+      "name_uk": "Маніпурі, або мейтей",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Manipuri",
+              "id": "mni",
+              "iso": "mni",
+              "hours": 44.46
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "openarcane/Volt-TTS",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "mni",
+        "mni-script_bengali",
+        "mni-script_meetei"
+      ]
+    },
+    {
+      "selected_id": "brx",
+      "name_uk": "Бодо",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Bodo",
+              "id": "brx",
+              "iso": "brx",
+              "hours": 231.57
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "openarcane/Volt-TTS",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "brx"
+      ]
+    },
+    {
+      "selected_id": "dv",
+      "name_uk": "Дівехі",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-div",
+          "upstream_language_id": "div",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Dhivehi",
+              "id": "dv",
+              "iso": "div",
+              "hours": 38.61
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "div"
+      ]
+    },
+    {
+      "selected_id": "dz",
+      "name_uk": "Дзонг-кха",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-dzo",
+          "upstream_language_id": "dzo",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "dzo"
+      ]
+    },
+    {
+      "selected_id": "tet",
+      "name_uk": "Тетум",
+      "first_priority_region": "Азія",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "tet"
+      ],
+      "targeted_hub_search": {
+        "query": "Tetum",
+        "url": "https://huggingface.co/api/models?search=Tetum&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "ha",
+      "name_uk": "Хауса",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-hau",
+          "upstream_language_id": "hau",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Hausa",
+              "id": "ha",
+              "iso": "hau",
+              "hours": 17.75
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "hau"
+      ]
+    },
+    {
+      "selected_id": "yo",
+      "name_uk": "Йоруба",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-yor",
+          "upstream_language_id": "yor",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Yoruba",
+              "id": "yo",
+              "iso": "yor",
+              "hours": 15.66
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "yor"
+      ]
+    },
+    {
+      "selected_id": "ff",
+      "name_uk": "Фула, або фульфульде",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-ful",
+          "upstream_language_id": "ful",
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Adamawa Fulfulde",
+              "id": "fub",
+              "iso": "fub",
+              "hours": 13.12
+            },
+            {
+              "name": "Fulah",
+              "id": "ff",
+              "iso": "ful",
+              "hours": 13.84
+            },
+            {
+              "name": "Nigerian Fulfulde",
+              "id": "fuv",
+              "iso": "fuv",
+              "hours": 9.97
+            },
+            {
+              "name": "Pulaar",
+              "id": "fuc",
+              "iso": "fuc",
+              "hours": 14.77
+            },
+            {
+              "name": "Pular",
+              "id": "fuf",
+              "iso": "fuf",
+              "hours": 13.77
+            }
+          ],
+          "match": "standard-needs-validation"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "Fula/Fulfulde is a broad catalogue group with multiple standards; upstream ful is not proof of every standard."
+      ],
+      "checked_iso_candidates": [
+        "ful",
+        "fuv",
+        "fuf",
+        "fuc",
+        "fub"
+      ]
+    },
+    {
+      "selected_id": "ig",
+      "name_uk": "Ігбо",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Igbo",
+              "id": "ig",
+              "iso": "ibo",
+              "hours": 13.69
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "multilingual-tts/VITS-OpenBible-Igbo",
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "travis-moore/sema-tts-afro",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "ibo"
+      ]
+    },
+    {
+      "selected_id": "mg",
+      "name_uk": "Малагасійська",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-mlg",
+          "upstream_language_id": "mlg",
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Plateau Malagasy",
+              "id": "plt",
+              "iso": "plt",
+              "hours": 19.39
+            }
+          ],
+          "match": "standard-needs-validation"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "Malagasy model IDs do not establish coverage of every Malagasy variety; validate the selected standard."
+      ],
+      "checked_iso_candidates": [
+        "mlg",
+        "plt"
+      ]
+    },
+    {
+      "selected_id": "so",
+      "name_uk": "Сомалійська",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-som",
+          "upstream_language_id": "som",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Somali",
+              "id": "so",
+              "iso": "som",
+              "hours": 13.22
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "som"
+      ]
+    },
+    {
+      "selected_id": "ln",
+      "name_uk": "Лінгала",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Lingala",
+              "id": "ln",
+              "iso": "lin",
+              "hours": 17.99
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "DigitalUmuganda/lingala_vits_tts",
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "multilingual-tts/VITS-OpenBible-Lingala",
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "travis-moore/sema-tts-afro",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "lin"
+      ]
+    },
+    {
+      "selected_id": "zu",
+      "name_uk": "Зулу",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Zulu",
+              "id": "zu",
+              "iso": "zul",
+              "hours": 14.83
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "travis-moore/sema-tts-afro",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "zul"
+      ]
+    },
+    {
+      "selected_id": "sn",
+      "name_uk": "Шона",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-sna",
+          "upstream_language_id": "sna",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Shona",
+              "id": "sn",
+              "iso": "sna",
+              "hours": 9.96
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "sna"
+      ]
+    },
+    {
+      "selected_id": "rw",
+      "name_uk": "Кіньяруанда",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-kin",
+          "upstream_language_id": "kin",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Kinyarwanda",
+              "id": "rw",
+              "iso": "kin",
+              "hours": 2021.66
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "kin"
+      ]
+    },
+    {
+      "selected_id": "rn",
+      "name_uk": "Кірунді",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-run",
+          "upstream_language_id": "run",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "run"
+      ]
+    },
+    {
+      "selected_id": "ny",
+      "name_uk": "Чичева, або чева",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-nya",
+          "upstream_language_id": "nya",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Chichewa",
+              "id": "ny",
+              "iso": "nya",
+              "hours": 10.8
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "nya"
+      ]
+    },
+    {
+      "selected_id": "xh",
+      "name_uk": "Коса",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Xhosa",
+              "id": "xh",
+              "iso": "xho",
+              "hours": 13.35
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "travis-moore/sema-tts-afro",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "xho"
+      ]
+    },
+    {
+      "selected_id": "ak",
+      "name_uk": "Акан",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-aka",
+          "upstream_language_id": "aka",
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Twi",
+              "id": "tw",
+              "iso": "twi",
+              "hours": 0.25
+            }
+          ],
+          "match": "standard-needs-validation"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "Akan is a broader group; Twi candidates are a specific variety and must not silently replace the selected standard."
+      ],
+      "checked_iso_candidates": [
+        "aka",
+        "twi"
+      ]
+    },
+    {
+      "selected_id": "bm",
+      "name_uk": "Бамбара",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-bam",
+          "upstream_language_id": "bam",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "bam"
+      ]
+    },
+    {
+      "selected_id": "dyu",
+      "name_uk": "Діула",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-dyu",
+          "upstream_language_id": "dyu",
+          "match": "iso-code-candidate"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Dyula",
+              "id": "dyu",
+              "iso": "dyu",
+              "hours": 0.34
+            }
+          ],
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "dyu"
+      ]
+    },
+    {
+      "selected_id": "mos",
+      "name_uk": "Мооре, або моссі",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-mos",
+          "upstream_language_id": "mos",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "mos"
+      ]
+    },
+    {
+      "selected_id": "wo",
+      "name_uk": "Волоф",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Wolof",
+              "id": "wo",
+              "iso": "wol",
+              "hours": 8.71
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "travis-moore/sema-tts-afro",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "wol"
+      ]
+    },
+    {
+      "selected_id": "tamazight",
+      "name_uk": "Тамазигхт",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-kab",
+          "upstream_language_id": "kab",
+          "match": "standard-needs-validation"
+        },
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Kabyle",
+              "id": "kab",
+              "iso": "kab",
+              "hours": 529.52
+            },
+            {
+              "name": "Standard Moroccan Tamazight",
+              "id": "zgh",
+              "iso": "zgh",
+              "hours": 1.19
+            }
+          ],
+          "match": "standard-needs-validation"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "The selected group has not been narrowed to a standard. Kabyle (kab) is not automatically Standard Moroccan Tamazight (zgh)."
+      ],
+      "checked_iso_candidates": [
+        "zgh",
+        "tzm",
+        "kab"
+      ]
+    },
+    {
+      "selected_id": "st",
+      "name_uk": "Сесото",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "other-TTS",
+          "repo_id": "UBC-NLP/Simba-TTS-sot",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "sot"
+      ],
+      "targeted_hub_search": {
+        "query": "Sotho",
+        "url": "https://huggingface.co/api/models?search=Sotho&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "nso",
+      "name_uk": "Північна сото, або сепеді",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "OmniVoice",
+          "repo_id": "k2-fsa/OmniVoice",
+          "upstream_languages": [
+            {
+              "name": "Pedi",
+              "id": "nso",
+              "iso": "nso",
+              "hours": 12.64
+            }
+          ],
+          "match": "declared-language-candidate"
+        },
+        {
+          "family": "other-TTS",
+          "repo_id": "travis-moore/sema-tts-afro",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "nso"
+      ]
+    },
+    {
+      "selected_id": "ts",
+      "name_uk": "Тсонга",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-tso",
+          "upstream_language_id": "tso",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "tso"
+      ]
+    },
+    {
+      "selected_id": "ss",
+      "name_uk": "Сісваті",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "ssw"
+      ],
+      "targeted_hub_search": {
+        "query": "Swati",
+        "url": "https://huggingface.co/api/models?search=Swati&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "ve",
+      "name_uk": "Венда",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "ven"
+      ],
+      "targeted_hub_search": {
+        "query": "Venda",
+        "url": "https://huggingface.co/api/models?search=Venda&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "nd",
+      "name_uk": "Північна ндебеле",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "other-TTS",
+          "repo_id": "multilingual-tts/F5-TTS-OpenBible-Ndebele",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "The OpenBible candidate is labelled Northern Ndebele. It is not evidence of Southern Ndebele support."
+      ],
+      "checked_iso_candidates": [
+        "nde"
+      ],
+      "targeted_hub_search": {
+        "query": "Ndebele",
+        "url": "https://huggingface.co/api/models?search=Ndebele&filter=text-to-speech&limit=30",
+        "repos": [
+          "multilingual-tts/VITS-OpenBible-Ndebele",
+          "multilingual-tts/F5-TTS-OpenBible-Ndebele",
+          "multilingual-tts/EveryVoice-OpenBible-Ndebele"
+        ]
+      }
+    },
+    {
+      "selected_id": "nr",
+      "name_uk": "Південна ндебеле",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "Northern Ndebele checkpoint must not be substituted for Southern Ndebele.",
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "nbl"
+      ],
+      "targeted_hub_search": {
+        "query": "Ndebele",
+        "url": "https://huggingface.co/api/models?search=Ndebele&filter=text-to-speech&limit=30",
+        "repos": [
+          "multilingual-tts/VITS-OpenBible-Ndebele",
+          "multilingual-tts/F5-TTS-OpenBible-Ndebele",
+          "multilingual-tts/EveryVoice-OpenBible-Ndebele"
+        ]
+      }
+    },
+    {
+      "selected_id": "aa",
+      "name_uk": "Афарська",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "other-TTS",
+          "repo_id": "michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "aar"
+      ],
+      "targeted_hub_search": {
+        "query": "Afar",
+        "url": "https://huggingface.co/api/models?search=Afar&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "sg",
+      "name_uk": "Санго",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-sag",
+          "upstream_language_id": "sag",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "sag"
+      ]
+    },
+    {
+      "selected_id": "comorian",
+      "name_uk": "Коморська",
+      "first_priority_region": "Африка",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "other-TTS",
+          "repo_id": "rifailabs/shikomori-tts",
+          "match": "declared-language-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [
+        "Group must be narrowed to an island/language standard. An upstream Comorian model is manually gated and has no established public license in inspected metadata."
+      ],
+      "checked_iso_candidates": [
+        "zdj",
+        "wni",
+        "wlc",
+        "swb"
+      ],
+      "targeted_hub_search": {
+        "query": "shikomori",
+        "url": "https://huggingface.co/api/models?search=shikomori&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "tpi",
+      "name_uk": "Ток-пісін",
+      "first_priority_region": "Австралія та Океанія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-tpi",
+          "upstream_language_id": "tpi",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "tpi"
+      ]
+    },
+    {
+      "selected_id": "sm",
+      "name_uk": "Самоанська",
+      "first_priority_region": "Австралія та Океанія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-smo",
+          "upstream_language_id": "smo",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "smo"
+      ]
+    },
+    {
+      "selected_id": "fj",
+      "name_uk": "Фіджійська",
+      "first_priority_region": "Австралія та Океанія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-fij",
+          "upstream_language_id": "fij",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "fij"
+      ]
+    },
+    {
+      "selected_id": "to",
+      "name_uk": "Тонганська",
+      "first_priority_region": "Австралія та Океанія",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "ton"
+      ],
+      "targeted_hub_search": {
+        "query": "Tongan",
+        "url": "https://huggingface.co/api/models?search=Tongan&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    },
+    {
+      "selected_id": "gil",
+      "name_uk": "Гілбертська, або кірибаті",
+      "first_priority_region": "Австралія та Океанія",
+      "current_status": "not-integrated",
+      "candidates": [
+        {
+          "family": "MMS-TTS",
+          "repo_id": "facebook/mms-tts-gil",
+          "upstream_language_id": "gil",
+          "match": "iso-code-candidate"
+        }
+      ],
+      "candidate_found": true,
+      "audio_verified": false,
+      "notes": [],
+      "checked_iso_candidates": [
+        "gil"
+      ]
+    },
+    {
+      "selected_id": "ho",
+      "name_uk": "Хірі-моту",
+      "first_priority_region": "Австралія та Океанія",
+      "current_status": "not-integrated",
+      "candidates": [],
+      "candidate_found": false,
+      "audio_verified": false,
+      "notes": [
+        "No ready local checkpoint established in the inspected sources; additional data/model research remains open."
+      ],
+      "checked_iso_candidates": [
+        "hmo"
+      ],
+      "targeted_hub_search": {
+        "query": "Hiri Motu",
+        "url": "https://huggingface.co/api/models?search=Hiri%20Motu&filter=text-to-speech&limit=30",
+        "repos": []
+      }
+    }
+  ],
+  "models": {
+    "facebook/mms-tts-aka": {
+      "repo_id": "facebook/mms-tts-aka",
+      "url": "https://huggingface.co/facebook/mms-tts-aka",
+      "revision": "c20caea1cb234579cb5e3338b117a67d8235db1c",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145221368,
+          "sha256": "e93643449acf79071e0b43a2dc257efffea8454bdc573e1cae13e1399ee1500d"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 327,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-ayr": {
+      "repo_id": "facebook/mms-tts-ayr",
+      "url": "https://huggingface.co/facebook/mms-tts-ayr",
+      "revision": "8e79a97785a908d9e84bf7784e03671227d8bb91",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145229816,
+          "sha256": "8937df7790b969e8a3c01a759ecf6e66edddd6c81723f8b6bc85867e61aae923"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 457,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-bam": {
+      "repo_id": "facebook/mms-tts-bam",
+      "url": "https://huggingface.co/facebook/mms-tts-bam",
+      "revision": "11905f69c2982bf15106044f035d957815aafb1d",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145225976,
+          "sha256": "0bbc837195a415c12259c9750c832ab30a147d0fa6954d598fbcc6490205be86"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 395,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-dgo": {
+      "repo_id": "facebook/mms-tts-dgo",
+      "url": "https://huggingface.co/facebook/mms-tts-dgo",
+      "revision": "6c7e3dbf0f2f7981383abf895de3c5b4120aafe3",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145247480,
+          "sha256": "77abdde43c770abe54872246c8dd440605e01462dcfb7f341f576eeeb1bd0fdc"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 815,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-div": {
+      "repo_id": "facebook/mms-tts-div",
+      "url": "https://huggingface.co/facebook/mms-tts-div",
+      "revision": "c46cd80259e81f90b0c82bf6936845cb3e74ad5d",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145239032,
+          "sha256": "05ac0fdef580a2e032545be6bacf3cc5e28a13fc33fcaed8bd8962afe5ae7987"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 626,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-dyu": {
+      "repo_id": "facebook/mms-tts-dyu",
+      "url": "https://huggingface.co/facebook/mms-tts-dyu",
+      "revision": "aa3d245f1e0a6d0fd89519a8363126471aa73a42",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145222904,
+          "sha256": "b65683bdca75424b97e816f2acc3ce1ad05db60bdc1abf60fd4383a048da30fd"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 349,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-dzo": {
+      "repo_id": "facebook/mms-tts-dzo",
+      "url": "https://huggingface.co/facebook/mms-tts-dzo",
+      "revision": "27340b656f4a4477091aee1da3b999f37aa179dc",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145242872,
+          "sha256": "4863781e6130df309d1ea1d9ff1de4c6fcbb5834a030ce54386f14e70929e992"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 49,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 289,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 745,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-fij": {
+      "repo_id": "facebook/mms-tts-fij",
+      "url": "https://huggingface.co/facebook/mms-tts-fij",
+      "revision": "3268dafbd9243a09f986926a38975174e60b78d3",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145225976,
+          "sha256": "942c762ff0ffb4374fa2e7ae9a84f52dba50f96af1ccd157fd83fa72cd5239ae"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 393,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-ful": {
+      "repo_id": "facebook/mms-tts-ful",
+      "url": "https://huggingface.co/facebook/mms-tts-ful",
+      "revision": "3fad6a46405c074e35d0de5b246b5010cf116f7c",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145229816,
+          "sha256": "ab724e06ef6c906211a6df91b71223348b0ec9f8840900b684100b8b3f86021c"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 452,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-gil": {
+      "repo_id": "facebook/mms-tts-gil",
+      "url": "https://huggingface.co/facebook/mms-tts-gil",
+      "revision": "5415a61c7e4a214f07ee3695a26f0ac2b26c5b98",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145219064,
+          "sha256": "be73a64fb965301f5526fb907d972b3e22cae777f73f24741339e122e5043a08"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 290,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-hau": {
+      "repo_id": "facebook/mms-tts-hau",
+      "url": "https://huggingface.co/facebook/mms-tts-hau",
+      "revision": "f0eb02aa37f7259f35349da63cafe0556cf93e3d",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145224440,
+          "sha256": "8a68b8c658853a92fd50eca25fcfd76d069616052f99aa84719c5e40c133249d"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 374,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-kab": {
+      "repo_id": "facebook/mms-tts-kab",
+      "url": "https://huggingface.co/facebook/mms-tts-kab",
+      "revision": "3383f668a1fb3078e572305d7d075926b476e301",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145227512,
+          "sha256": "d87cb9154a5db9ce12a77254293c59cff4e04110ce9048610b41edc57dfeb808"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 429,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-khm": {
+      "repo_id": "facebook/mms-tts-khm",
+      "url": "https://huggingface.co/facebook/mms-tts-khm",
+      "revision": "d10bc04c97208d31fa61cf46074c02f12f887534",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145255160,
+          "sha256": "0a0175ee25d009ac6e551c9050952426efe06ddc8c90465ddfd6e347e56df00c"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 49,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 289,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 945,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-kin": {
+      "repo_id": "facebook/mms-tts-kin",
+      "url": "https://huggingface.co/facebook/mms-tts-kin",
+      "revision": "71d00a03419b9bfd203a6bfa4d6bc565cbe3c4e0",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145232120,
+          "sha256": "33ac99db4e303d9e520eb970f6d795f245713fabaa6002140a418e576e5e650b"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 482,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-lao": {
+      "repo_id": "facebook/mms-tts-lao",
+      "url": "https://huggingface.co/facebook/mms-tts-lao",
+      "revision": "6b43d7f355b5d185b1dbc8f2b804a720dbe28417",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145237496,
+          "sha256": "32aceb1cf2deb6285bb7b5bbcaaff05a4a77dc701883669343a0082842e787d5"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 49,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 289,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 648,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-mai": {
+      "repo_id": "facebook/mms-tts-mai",
+      "url": "https://huggingface.co/facebook/mms-tts-mai",
+      "revision": "8607c3059206ed4c1991521e80c2b1df07b7c80e",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145249016,
+          "sha256": "af00259d232e39186086b4bc8c4b61384560def7db5ba196aae7d96410d05304"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 843,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-mlg": {
+      "repo_id": "facebook/mms-tts-mlg",
+      "url": "https://huggingface.co/facebook/mms-tts-mlg",
+      "revision": "315fb13a7db845580c6fa7f0e3b55d617542a2ef",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145221368,
+          "sha256": "18b21824f8273648cf529aaf6866f9302043efaef63d3dec48661aea388c319f"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 329,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-mos": {
+      "repo_id": "facebook/mms-tts-mos",
+      "url": "https://huggingface.co/facebook/mms-tts-mos",
+      "revision": "7a204e8f555123ebc8a3f94e6ebb52ea4185ba83",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145225208,
+          "sha256": "91b4fc127e446cb129d1470135442ebe3267e9f2c172e27c9dce72be8c31fa5b"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 389,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-nya": {
+      "repo_id": "facebook/mms-tts-nya",
+      "url": "https://huggingface.co/facebook/mms-tts-nya",
+      "revision": "bd19fd2c0facbd46412426a262ca6f04af74e32c",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145228280,
+          "sha256": "961c7c280547a63abf631167897c09f153bd8c8adaa8fe6eb5bb7db0409007c9"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 423,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-run": {
+      "repo_id": "facebook/mms-tts-run",
+      "url": "https://huggingface.co/facebook/mms-tts-run",
+      "revision": "f98e94332ca1fb56f7a994daab06276df6925aef",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145220600,
+          "sha256": "8eaf7a6e7e17e358955b7427c6ecdf993ed19a67dd1a902d3a3724d8a6f65594"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 314,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-sag": {
+      "repo_id": "facebook/mms-tts-sag",
+      "url": "https://huggingface.co/facebook/mms-tts-sag",
+      "revision": "9d358a2beea981ba75845bbe6a7205fa3aab63be",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145229048,
+          "sha256": "a145acd49ed5560f05304ea74e18b9ee2dbd1a27b99eb4555d67d93fc1fa3339"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 444,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-smo": {
+      "repo_id": "facebook/mms-tts-smo",
+      "url": "https://huggingface.co/facebook/mms-tts-smo",
+      "revision": "22a60243712186eeaeabd45ab86e89b2c8e8a63d",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145218296,
+          "sha256": "2a0fd173e8738b7f8e2c87abf0e388ae54f755cb2eddb9b62228af952dbe5c69"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 284,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-sna": {
+      "repo_id": "facebook/mms-tts-sna",
+      "url": "https://huggingface.co/facebook/mms-tts-sna",
+      "revision": "129b8ba61c8dbce8daaeb1a134e2cb45c29870ad",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145223672,
+          "sha256": "b5260f7ee0fcf240fdebe2b2d09c517c472eaaba568fbb8a2dda06b9c2eb5e1c"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 357,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-som": {
+      "repo_id": "facebook/mms-tts-som",
+      "url": "https://huggingface.co/facebook/mms-tts-som",
+      "revision": "8ddd841a6b4303b2bf778ea8ce93ea2ef349d182",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145219064,
+          "sha256": "1cdd22aa91cf5de6bdcac5e289a56722467ce1cc82985e47f413f886cf9fd52c"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 290,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-tgk": {
+      "repo_id": "facebook/mms-tts-tgk",
+      "url": "https://huggingface.co/facebook/mms-tts-tgk",
+      "revision": "df7cb4bd7ab732587045120cb502d5bda8d8c68c",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145229816,
+          "sha256": "81bd5918d71f6f85274721ff5e1c83013a2a5d94ce97d69732eef7c7d03f870e"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 48,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 288,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 485,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-tgl": {
+      "repo_id": "facebook/mms-tts-tgl",
+      "url": "https://huggingface.co/facebook/mms-tts-tgl",
+      "revision": "79182edde3d60484a9e7a666240917f454138a0b",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145231352,
+          "sha256": "e12d614f3cfae247a5bd08e3c0d8cf31e3130e4a8587729009400245c01d8477"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 470,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-tpi": {
+      "repo_id": "facebook/mms-tts-tpi",
+      "url": "https://huggingface.co/facebook/mms-tts-tpi",
+      "revision": "c3dc8583a93ef46dd5a897d809c22e8e91c94428",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145226744,
+          "sha256": "a6456f1161ee5e157f07ba0e29eec03987e8977419e957ae07c37ebf961148d3"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 400,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-tso": {
+      "repo_id": "facebook/mms-tts-tso",
+      "url": "https://huggingface.co/facebook/mms-tts-tso",
+      "revision": "4eee11614c5a79417a5f41309af5398ae39ace2b",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145221368,
+          "sha256": "79509b0959ae9b57d81d665ce59df5b496ce64983ffe1697b29e42dd1ff60894"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 323,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "facebook/mms-tts-yor": {
+      "repo_id": "facebook/mms-tts-yor",
+      "url": "https://huggingface.co/facebook/mms-tts-yor",
+      "revision": "d359e06b481cb5402e2e4215475b90c07a3f12e2",
+      "license": "cc-by-nc-4.0",
+      "gated": false,
+      "architecture": "vits",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1641,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145231352,
+          "sha256": "aa4e892d1d4feecec41e60757a116de8beac58517a042849340861cfb17043c5"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 47,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 287,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 488,
+          "sha256": null
+        }
+      ],
+      "preferred_weight_file": "model.safetensors",
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Validate target language/standard and orthography",
+        "Prepare a local inference adapter/ONNX export and matching tokenizer",
+        "Prepare and validate an allowed identity source if using voice conversion",
+        "Package license/attribution and dependencies",
+        "Validate symbols, numbers, latency, cancellation and native pronunciation in Windows/NVDA"
+      ]
+    },
+    "k2-fsa/OmniVoice": {
+      "repo_id": "k2-fsa/OmniVoice",
+      "url": "https://huggingface.co/k2-fsa/OmniVoice",
+      "revision": "3fc979d1cd72492cd679c5ac2611e0d7ac047ba1",
+      "license": "CC-BY-NC (explicit model-card prose; code Apache-2.0)",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1570,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 9424,
+          "sha256": null
+        },
+        {
+          "path": "audio_tokenizer/.gitattributes",
+          "size": 1519,
+          "sha256": null
+        },
+        {
+          "path": "audio_tokenizer/LICENSE",
+          "size": 9171,
+          "sha256": null
+        },
+        {
+          "path": "audio_tokenizer/README.md",
+          "size": 734,
+          "sha256": null
+        },
+        {
+          "path": "audio_tokenizer/config.json",
+          "size": 2531,
+          "sha256": null
+        },
+        {
+          "path": "audio_tokenizer/model.safetensors",
+          "size": 805665628,
+          "sha256": "fe7c5e8785e0a05833e1bfc3e002ec7f55af21e306b2e7154a448c1f54ccfb0d"
+        },
+        {
+          "path": "audio_tokenizer/preprocessor_config.json",
+          "size": 206,
+          "sha256": null
+        },
+        {
+          "path": "chat_template.jinja",
+          "size": 4168,
+          "sha256": null
+        },
+        {
+          "path": "config.json",
+          "size": 2238,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 2450344112,
+          "sha256": "730839316de585f4c8298ec0e1712efc10fb19c6fa4e36eb741cb8d51ebcf6aa"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 11423986,
+          "sha256": "408f669b7e2b045fdf54201d815bd364e6667dbd845115da81239c40bc6dcfd1"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 533,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Separate heavy optional backend and dependencies; baseline NVDA runtime has no OmniVoice adapter",
+        "Validate supported language IDs against the selected standard",
+        "Use suitable same-language reference audio to avoid the cross-lingual accent caveat documented upstream",
+        "Benchmark actual CPU/Windows first-audio latency; published fast RTF does not establish character-echo latency",
+        "Review non-commercial weight license before product inclusion; code license does not relicense model weights"
+      ]
+    },
+    "kaushalkrishnax/santali-piper-vits": {
+      "repo_id": "kaushalkrishnax/santali-piper-vits",
+      "url": "https://huggingface.co/kaushalkrishnax/santali-piper-vits",
+      "revision": "50da29423065a25393d58d48d83de21ad85c4d4d",
+      "license": "apache-2.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 177,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 7197,
+          "sha256": null
+        },
+        {
+          "path": "SantaliPhonemizer.kt",
+          "size": 8807,
+          "sha256": null
+        },
+        {
+          "path": "config.json",
+          "size": 7161,
+          "sha256": null
+        },
+        {
+          "path": "dataset/rasa_female_metadata.csv",
+          "size": 3376326,
+          "sha256": null
+        },
+        {
+          "path": "dataset/rasa_female_metadata.parquet",
+          "size": 1232688,
+          "sha256": "8301fcdc55eba3a56642f5aac540d5926580a7f5cbb064cafb99ed3714fa3255"
+        },
+        {
+          "path": "model/santali_piper_vits.onnx",
+          "size": 63502227,
+          "sha256": "4b77ff657567a9163f99e7128fd832e2db95bba1aedf44310e6e60ebf3c11970"
+        },
+        {
+          "path": "model/santali_piper_vits.onnx.json",
+          "size": 7225,
+          "sha256": null
+        },
+        {
+          "path": "model_manifest.json",
+          "size": 1612,
+          "sha256": null
+        },
+        {
+          "path": "phoneme_id_map.json",
+          "size": 5363,
+          "sha256": null
+        },
+        {
+          "path": "phoneme_training.csv",
+          "size": 5503191,
+          "sha256": null
+        },
+        {
+          "path": "phoneme_training_metadata.parquet",
+          "size": 3106399,
+          "sha256": "02221378462c985b5025ed5529416eb5def61ae58d5a81b9ddc24545317358a1"
+        },
+        {
+          "path": "runtime_config.json",
+          "size": 561,
+          "sha256": null
+        },
+        {
+          "path": "santali_phonemizer.py",
+          "size": 6324,
+          "sha256": null
+        },
+        {
+          "path": "santali_piper_vits_onnx_android.tar.gz",
+          "size": 58247036,
+          "sha256": "d6a50b0cdf2e5f27e70cc829e75a2476df2322ede03198b34032991a7a4d1e08"
+        },
+        {
+          "path": "training/best.ckpt",
+          "size": 845850957,
+          "sha256": "fdb73a7171ea7ed75329a9817a2b6b75d6a5097665f431d8c518d5f6e8e3ef15"
+        },
+        {
+          "path": "training/best_mos.ckpt",
+          "size": 845850957,
+          "sha256": "10e1b1c6aa5baec522f27db1c26ec4e96362386260efc3024efa78478e4abe0f"
+        },
+        {
+          "path": "training/checkpoint_index.json",
+          "size": 164,
+          "sha256": null
+        },
+        {
+          "path": "training/config.json",
+          "size": 7161,
+          "sha256": null
+        },
+        {
+          "path": "training/last.ckpt",
+          "size": 845850957,
+          "sha256": "0b3082a0ad4bab3b555d23bc0708bbfb103e856be3e3df72230ff9170cee5636"
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Use required Ol Chiki Santali phonemizer and matching custom phoneme ID map",
+        "Adapt Piper-style inference without substituting unsupported eSpeak language",
+        "Prepare source identity only if doing voice conversion",
+        "Test actual pronunciation, isolated symbols, Windows latency and NVDA interaction"
+      ]
+    },
+    "multilingual-tts/VITS-OpenBible-Igbo": {
+      "repo_id": "multilingual-tts/VITS-OpenBible-Igbo",
+      "url": "https://huggingface.co/multilingual-tts/VITS-OpenBible-Igbo",
+      "revision": "c16a6383362260f3f0005adbb7a053e1b38bea67",
+      "license": "cc-by-sa-4.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1519,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 3568,
+          "sha256": null
+        },
+        {
+          "path": "config.json",
+          "size": 7797,
+          "sha256": null
+        },
+        {
+          "path": "model_last.pth",
+          "size": 997786115,
+          "sha256": "3306a77aa09f41354b6f0aa6cb49810f4a4ac18107be1a5de4e0c96e1b8e1694"
+        },
+        {
+          "path": "speakers.pth",
+          "size": 1389,
+          "sha256": "b9bd57cb57f2c521bff2b1d07360a3eb29cd999a86bf316764812b09a68db999"
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    },
+    "DigitalUmuganda/lingala_vits_tts": {
+      "repo_id": "DigitalUmuganda/lingala_vits_tts",
+      "url": "https://huggingface.co/DigitalUmuganda/lingala_vits_tts",
+      "revision": "5b186f7bb3290562657723d9092c35482aa05fe0",
+      "license": "not-established",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1477,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 816,
+          "sha256": null
+        },
+        {
+          "path": "config.yaml",
+          "size": 8066,
+          "sha256": null
+        },
+        {
+          "path": "train.total_count.best.pth",
+          "size": 373265408,
+          "sha256": "9c338961d978526b48d5e8743bc5f2ded332a266595e07d5a741358f67a39137"
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Resolve missing model license before any redistribution",
+        "Adapt ESPnet2 VITS model or verified export and tokenizer; baseline runtime does not load this checkpoint"
+      ]
+    },
+    "multilingual-tts/VITS-OpenBible-Lingala": {
+      "repo_id": "multilingual-tts/VITS-OpenBible-Lingala",
+      "url": "https://huggingface.co/multilingual-tts/VITS-OpenBible-Lingala",
+      "revision": "76ef440703b0b929b7fd52b8d960e9ae55c9e034",
+      "license": "cc-by-sa-4.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1519,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 3589,
+          "sha256": null
+        },
+        {
+          "path": "config.json",
+          "size": 7630,
+          "sha256": null
+        },
+        {
+          "path": "model_last.pth",
+          "size": 997712323,
+          "sha256": "7d61939608b391eb0d0ed1302f6a18b8b549bb1be7f135f0a1f4ed2938a5b586"
+        },
+        {
+          "path": "speakers.pth",
+          "size": 1325,
+          "sha256": "fd10305cad782e4b05b1dc7204891201507f8992081c710d2cb37fa57cc581a1"
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    },
+    "openarcane/Volt-TTS": {
+      "repo_id": "openarcane/Volt-TTS",
+      "url": "https://huggingface.co/openarcane/Volt-TTS",
+      "revision": "57319e57c7dd9643e82e8021668c8e1aaec1187c",
+      "license": "apache-2.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 2079,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 14437,
+          "sha256": null
+        },
+        {
+          "path": "Volt-TTS-teaser.mp4",
+          "size": 50138206,
+          "sha256": "1f1656e0ec7c47248538386d4f8db5d7c40bed0c69a9c48758d1dfdb8c68b3da"
+        },
+        {
+          "path": "config.json",
+          "size": 5035,
+          "sha256": null
+        },
+        {
+          "path": "generation_config.json",
+          "size": 245,
+          "sha256": null
+        },
+        {
+          "path": "merges.txt",
+          "size": 2791207,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 4043216528,
+          "sha256": "a316c8eccf4ae863893ae5f92f0226a49ab8b11634ee726c438e3f4d84987d34"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 127,
+          "sha256": null
+        },
+        {
+          "path": "samples/arjun_kannada.wav",
+          "size": 568364,
+          "sha256": "a4a05feb5bd5a8632b10aa72c2be21296287f7023e7417d702bb749f7c2c467b"
+        },
+        {
+          "path": "samples/arjun_malayalam.wav",
+          "size": 529964,
+          "sha256": "e823012cded47ad250cc8cbe45588cff162a8c7f328610500b6f91ed5f5a6186"
+        },
+        {
+          "path": "samples/arjun_telugu.wav",
+          "size": 549164,
+          "sha256": "77e36d795a254f072496c386bb4aa989a2ae84f195764c2e081d33a28a995620"
+        },
+        {
+          "path": "samples/meera_bengali.wav",
+          "size": 476204,
+          "sha256": "766cb3ddb5396e648453a22fceec15f69fe7240996153419ba67f3a70ebd3d2d"
+        },
+        {
+          "path": "samples/meera_hindi.wav",
+          "size": 549164,
+          "sha256": "ad558e19e848da023a85e57bd50fb4e5d9ac19bd890642bf83e8db38140856dd"
+        },
+        {
+          "path": "samples/meera_marathi.wav",
+          "size": 529964,
+          "sha256": "1d47ce6eacf87ea4cf925465b2f9195e53187c87401a456755fdc6e52b974afc"
+        },
+        {
+          "path": "samples/meera_tamil.wav",
+          "size": 514604,
+          "sha256": "f91abf2402a86f75c44821894ce5cf95676324fc78becebb014a2db20039ca49"
+        },
+        {
+          "path": "speakers/arjun.safetensors",
+          "size": 21984,
+          "sha256": "c646f105d8723eccafb8a9a2e8da09975fa4ef39de5a549747ec3bf8dd758295"
+        },
+        {
+          "path": "speakers/meera.safetensors",
+          "size": 23056,
+          "sha256": "72f8104ba44fdeb3f22d73738006165a20b2fef7004e12a391be8ea255414618"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 518,
+          "sha256": null
+        },
+        {
+          "path": "speech_tokenizer/config.json",
+          "size": 2336,
+          "sha256": null
+        },
+        {
+          "path": "speech_tokenizer/configuration.json",
+          "size": 76,
+          "sha256": null
+        },
+        {
+          "path": "speech_tokenizer/model.safetensors",
+          "size": 682293092,
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258"
+        },
+        {
+          "path": "speech_tokenizer/preprocessor_config.json",
+          "size": 234,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 9026662,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 7354,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 4649361,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    },
+    "travis-moore/sema-tts-afro": {
+      "repo_id": "travis-moore/sema-tts-afro",
+      "url": "https://huggingface.co/travis-moore/sema-tts-afro",
+      "revision": "e75930db3091598773b87b32d356f57e3b10fd34",
+      "license": "apache-2.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 8872,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 6873,
+          "sha256": null
+        },
+        {
+          "path": "card_afro_gaps.png",
+          "size": 110727,
+          "sha256": "1889e0db80e1b325e33e4f0b58794b770de4997ca931cf42f5424f17d5492577"
+        },
+        {
+          "path": "samples/angelo/afro_english.mp3",
+          "size": 114092,
+          "sha256": "91d5ad747f5987d82b96128ea6d62b94b9de269841f12b7ab8d38783e2bc2e43"
+        },
+        {
+          "path": "samples/angelo/afro_hausa.mp3",
+          "size": 106604,
+          "sha256": "1ad29217103dd8a10e81ebf66bca848f5295303362593c6a0474924b4c883428"
+        },
+        {
+          "path": "samples/angelo/afro_pidgin.mp3",
+          "size": 126476,
+          "sha256": "c9d46cfee9c511ad94c2d388e0d640352a1161e84bf16a89fd0c99be154ff013"
+        },
+        {
+          "path": "samples/angelo/afro_swahili.mp3",
+          "size": 98828,
+          "sha256": null
+        },
+        {
+          "path": "samples/angelo/afro_twi.mp3",
+          "size": 103148,
+          "sha256": "f55c6c8637e373515996e315b11fb0d4df0e6b9a4b07cb2ce6a177fde3a2f4d7"
+        },
+        {
+          "path": "samples/angelo/afro_yoruba.mp3",
+          "size": 110924,
+          "sha256": "86c25014b4bc2694f1391ab5543c78396524e78c12a8e86565558abf6e43151b"
+        },
+        {
+          "path": "samples/step_100000/afrikaans.wav",
+          "size": 200236,
+          "sha256": "2fc489610811926635339794730e9cf03b2b3d6637709e495bd7f6787f2fb4ba"
+        },
+        {
+          "path": "samples/step_100000/amharic.wav",
+          "size": 485932,
+          "sha256": "cea1e0a750ae660f938f3ad6e246eb0f12fa941d3d39fdd559d7e9100033b62d"
+        },
+        {
+          "path": "samples/step_100000/fula.wav",
+          "size": 338988,
+          "sha256": "ecd753120c69616ceb5198192c65116638ca5b7c566adb09ed53511abec705b9"
+        },
+        {
+          "path": "samples/step_100000/hausa.wav",
+          "size": 887340,
+          "sha256": "e2ed265014a474bdedb78ee31c9e7960626ab6c5ebb5b54c047e1d0504887ff6"
+        },
+        {
+          "path": "samples/step_100000/igbo.wav",
+          "size": 652812,
+          "sha256": "26ca389cd62a54464f380a6fef7cc6b76c29cd6666853a8841283777f09de7cd"
+        },
+        {
+          "path": "samples/step_100000/kabuverdianu.wav",
+          "size": 445996,
+          "sha256": "6eb5a102c7a7b116b3a005ee3a4ed899e8bb268324969c030153c61fca119896"
+        },
+        {
+          "path": "samples/step_100000/kamba.wav",
+          "size": 435756,
+          "sha256": "abd3681162429a4f8788a365d74ca2c2256aff016e8591034668cab40301399d"
+        },
+        {
+          "path": "samples/step_100000/lingala.wav",
+          "size": 218156,
+          "sha256": "4dfe8f02bd7a37e52a44c2cee3c58f434887373c1cfc9a55d832553262235978"
+        },
+        {
+          "path": "samples/step_100000/luganda.wav",
+          "size": 487468,
+          "sha256": "edc1e2be48609f7ea395276bfa5672ee63c1de426234095da3a3149dc64cf040"
+        },
+        {
+          "path": "samples/step_100000/luo.wav",
+          "size": 398380,
+          "sha256": "ab3a5b46bb9cd64fcd42b9a7450d1e46ec895f597e28f8d67d21d671c6b78610"
+        },
+        {
+          "path": "samples/step_100000/northsotho.wav",
+          "size": 340012,
+          "sha256": "b7a094629567e465df2d453aadb68e41c938b1242a6f734133b1446505e933d7"
+        },
+        {
+          "path": "samples/step_100000/nyanja.wav",
+          "size": 495148,
+          "sha256": "4c7844e2554abfb192b2e894f3af65afdb8d5b55a0c8e21ac1eeea9d28179cac"
+        },
+        {
+          "path": "samples/step_100000/oromo.wav",
+          "size": 121900,
+          "sha256": "faf3dc0ca94c55c89b91e6efc98dfe20172ffa1f614e01a016a9c717706f7e49"
+        },
+        {
+          "path": "samples/step_100000/shona.wav",
+          "size": 490028,
+          "sha256": "ab2c7bdfa0b9a9b6e0dc387e308c0167f0068e9163c2bb1ee611705b7a9c3c90"
+        },
+        {
+          "path": "samples/step_100000/somali.wav",
+          "size": 555052,
+          "sha256": "5516c330bea05b2dce2b2c8d0ba27db408ecb29e4a12e49c3c57269e2df37d5a"
+        },
+        {
+          "path": "samples/step_100000/swahili.wav",
+          "size": 505900,
+          "sha256": "ad370c5b42de332457efbebd0956b4c3828b99fa93e05a27959d87a64a887c7b"
+        },
+        {
+          "path": "samples/step_100000/umbundu.wav",
+          "size": 511532,
+          "sha256": "1c5870125dede4f081b571a8fd0eebb3924965a15a496c667d3369f379cd2e29"
+        },
+        {
+          "path": "samples/step_100000/wolof.wav",
+          "size": 141868,
+          "sha256": "620cc288c05c66e81d4d052d3c48489156f2f8b131ca1529a0a1509dd6b09916"
+        },
+        {
+          "path": "samples/step_100000/xhosa.wav",
+          "size": 101932,
+          "sha256": "796cd2d71558f3f70ef6e5e7e8391aec2fab8e6b9da9d4ea9dcba03969eab70d"
+        },
+        {
+          "path": "samples/step_100000/yoruba.wav",
+          "size": 728620,
+          "sha256": "46d216a9039708e8e5e547880a837b847eccda842355612867a1faac2dd6a1d6"
+        },
+        {
+          "path": "samples/step_100000/zulu.wav",
+          "size": 489004,
+          "sha256": "faa16b4fdf09c6249735630f1745b48e35113891bd8a7cfbbd822b03e0fc5ee6"
+        },
+        {
+          "path": "samples/step_20000/afrikaans.wav",
+          "size": 200236,
+          "sha256": "89d867f1acf2bd3a1be3f88431451866a04ecfd19e5862c5241748e7f6794659"
+        },
+        {
+          "path": "samples/step_20000/amharic.wav",
+          "size": 485932,
+          "sha256": "0a96ff6b903af5402abb2dae51b62cae827d65791db3ef5c47e987bb0514fcb0"
+        },
+        {
+          "path": "samples/step_20000/fula.wav",
+          "size": 338988,
+          "sha256": "c44a0cdb4d0ec96e1d727bbab97dbb16f02a2e5cc08adf58a0fc329e30732f1f"
+        },
+        {
+          "path": "samples/step_20000/hausa.wav",
+          "size": 887340,
+          "sha256": "ff12782d784dab7f9fdf1dc1151801fc54568e11b08d31d62481bff8ac1beecf"
+        },
+        {
+          "path": "samples/step_20000/igbo.wav",
+          "size": 652812,
+          "sha256": "f1347ab6e3f31468e21933a2cb92d0e1f56d16e959204cd609ae9ed8b86b4dc1"
+        },
+        {
+          "path": "samples/step_20000/kabuverdianu.wav",
+          "size": 445996,
+          "sha256": "4598e69212bf97edc20d0725f253c7b5cf61a5c034571c3678a4eeb0f11ec489"
+        },
+        {
+          "path": "samples/step_20000/kamba.wav",
+          "size": 435756,
+          "sha256": "2715a773acea45ceb7f784827de527ea767ebcb4efda3b9a182675f368a04a59"
+        },
+        {
+          "path": "samples/step_20000/lingala.wav",
+          "size": 218156,
+          "sha256": "b71e2e7d09b0a633817371c0281eec3a7a0cbe88ea5bb550debe4fd04a78fc4b"
+        },
+        {
+          "path": "samples/step_20000/luganda.wav",
+          "size": 487468,
+          "sha256": "6dd73f55c6f28414a61b718ce90793d8bd9e12f6b8169c4c42ec5a6423b34a76"
+        },
+        {
+          "path": "samples/step_20000/luo.wav",
+          "size": 398380,
+          "sha256": "bcf37628cfce2efb4e74c433762b727dfea40f2532aea051796c05529750f63b"
+        },
+        {
+          "path": "samples/step_20000/northsotho.wav",
+          "size": 340012,
+          "sha256": "8b4b444d40d66d60b29f7b81ca9fdb6da61188b5a3055eb0a05c975f9f2058c4"
+        },
+        {
+          "path": "samples/step_20000/nyanja.wav",
+          "size": 495148,
+          "sha256": "2f6a913f8ca548185305eb8d4ed87f88c4b3c413669c49a7f9267e658adf7c08"
+        },
+        {
+          "path": "samples/step_20000/oromo.wav",
+          "size": 121900,
+          "sha256": "faf3dc0ca94c55c89b91e6efc98dfe20172ffa1f614e01a016a9c717706f7e49"
+        },
+        {
+          "path": "samples/step_20000/shona.wav",
+          "size": 490028,
+          "sha256": "34a994a4b4004672b84380178f5f65727d22949636a8c46911c85f87557215de"
+        },
+        {
+          "path": "samples/step_20000/somali.wav",
+          "size": 555052,
+          "sha256": "3a162669dcfde5c4bfeb7c08a1827d947a99359d4e398901a3e324509ba8bb1c"
+        },
+        {
+          "path": "samples/step_20000/swahili.wav",
+          "size": 505900,
+          "sha256": "afa250595c3eb90b6ad5546e04ad3a8b32cd82ad26282cdfef7275a609a7689d"
+        },
+        {
+          "path": "samples/step_20000/umbundu.wav",
+          "size": 511532,
+          "sha256": "eb7679e521cf60bccaca7dbffbe7c95274141ed0d3d9bb64e0af97387401920f"
+        },
+        {
+          "path": "samples/step_20000/wolof.wav",
+          "size": 141868,
+          "sha256": "620cc288c05c66e81d4d052d3c48489156f2f8b131ca1529a0a1509dd6b09916"
+        },
+        {
+          "path": "samples/step_20000/xhosa.wav",
+          "size": 101932,
+          "sha256": "796cd2d71558f3f70ef6e5e7e8391aec2fab8e6b9da9d4ea9dcba03969eab70d"
+        },
+        {
+          "path": "samples/step_20000/yoruba.wav",
+          "size": 728620,
+          "sha256": "f573135f67d511269c84d144b1586279919fe94e91321962498bf57d50692b41"
+        },
+        {
+          "path": "samples/step_20000/zulu.wav",
+          "size": 489004,
+          "sha256": "a88416c65fe4a4919899c85d03182b33f02bbc25cc5a3508745302d9bbacb7d6"
+        },
+        {
+          "path": "samples/step_40000/afrikaans.wav",
+          "size": 200236,
+          "sha256": "66e690b7e2a4c1adb8a73cc2d96ff132e02bcf4666d32b2c110fc7a0fe63fb13"
+        },
+        {
+          "path": "samples/step_40000/amharic.wav",
+          "size": 485932,
+          "sha256": "9a6ad7b6b9f2b580391f4981063a2fe93f283a434b284d8aa4006f3a74482d98"
+        },
+        {
+          "path": "samples/step_40000/fula.wav",
+          "size": 338988,
+          "sha256": "dcb37477ce03ebcfdd07d01a3428eaf1742aa6210e7d11868630910ff2a551d7"
+        },
+        {
+          "path": "samples/step_40000/hausa.wav",
+          "size": 887340,
+          "sha256": "fbaf27e3676a741bf6e6a533518f99725ed00352ca8bd8a16100490e959091ea"
+        },
+        {
+          "path": "samples/step_40000/igbo.wav",
+          "size": 652812,
+          "sha256": "29e7b16a01ac0d5fd9b169cf1d7ed4e5e09d789fed5fcf0cfdb69ea94c9ca71d"
+        },
+        {
+          "path": "samples/step_40000/kabuverdianu.wav",
+          "size": 445996,
+          "sha256": "359c2c7d8d10d96bd745690a871d493473855c8d1937cdc4a0e45074e772ea58"
+        },
+        {
+          "path": "samples/step_40000/kamba.wav",
+          "size": 435756,
+          "sha256": "59e23bfb2c245622fb5e29f104d697bd50c76e0abb2e39ae91a88afbdd9ccff7"
+        },
+        {
+          "path": "samples/step_40000/lingala.wav",
+          "size": 218156,
+          "sha256": "54eefa5485c718f8de4ed919709e982a0d04b1dd89e63b971cf71d886057556a"
+        },
+        {
+          "path": "samples/step_40000/luganda.wav",
+          "size": 487468,
+          "sha256": "7870d1c8be777feef944e25cbb8cbf2d68c939c2b1559bc816f30b59ec59b0eb"
+        },
+        {
+          "path": "samples/step_40000/luo.wav",
+          "size": 398380,
+          "sha256": "477a57565b92fa21475e3088459e38aa4626b3202030a738d1f066045beb55af"
+        },
+        {
+          "path": "samples/step_40000/northsotho.wav",
+          "size": 340012,
+          "sha256": "dc504f7705aadd4408448f9ed24fc6ce9e91a16f366e40032fe2e60edfdc09b4"
+        },
+        {
+          "path": "samples/step_40000/nyanja.wav",
+          "size": 495148,
+          "sha256": "8a94d1aa8b728be2e638a45f58fcb490f28ba9c61a16dbb7b19b490b204fb071"
+        },
+        {
+          "path": "samples/step_40000/oromo.wav",
+          "size": 121900,
+          "sha256": "faf3dc0ca94c55c89b91e6efc98dfe20172ffa1f614e01a016a9c717706f7e49"
+        },
+        {
+          "path": "samples/step_40000/shona.wav",
+          "size": 490028,
+          "sha256": "ac77e1e4edee5f9ed5762c736088c78d463bf1ec2fcd63c1624f4aa6870aa2a0"
+        },
+        {
+          "path": "samples/step_40000/somali.wav",
+          "size": 555052,
+          "sha256": "6754688e6f39c4fdac8d1a0699ce90df7c8038a65eacb7b7c9be21aea1532441"
+        },
+        {
+          "path": "samples/step_40000/swahili.wav",
+          "size": 505900,
+          "sha256": "4c9a50d12134acec0d12e1f91469e6d0dca280373b90eee1330f3a5321d487ea"
+        },
+        {
+          "path": "samples/step_40000/umbundu.wav",
+          "size": 511532,
+          "sha256": "cbd82250b05a38e9fdb0fa431a42f908f764fda2e7f64ac954a76188073f4129"
+        },
+        {
+          "path": "samples/step_40000/wolof.wav",
+          "size": 141868,
+          "sha256": "620cc288c05c66e81d4d052d3c48489156f2f8b131ca1529a0a1509dd6b09916"
+        },
+        {
+          "path": "samples/step_40000/xhosa.wav",
+          "size": 101932,
+          "sha256": "796cd2d71558f3f70ef6e5e7e8391aec2fab8e6b9da9d4ea9dcba03969eab70d"
+        },
+        {
+          "path": "samples/step_40000/yoruba.wav",
+          "size": 728620,
+          "sha256": "812a64d1671487d983d9acc4d8efdccc652b91dec54808cbc4d9b29689aff278"
+        },
+        {
+          "path": "samples/step_40000/zulu.wav",
+          "size": 489004,
+          "sha256": "5d111fc0a75a2bb639698793bf8bc5c0634a95595f0449c5db109466de47f51b"
+        },
+        {
+          "path": "samples/step_60000/afrikaans.wav",
+          "size": 200236,
+          "sha256": "26143c1c42287b5a0c00b16fa1d44300acdcd941daa4797e0bf3ca5e4b04d695"
+        },
+        {
+          "path": "samples/step_60000/amharic.wav",
+          "size": 485932,
+          "sha256": "84b7e6b6001873017dcf0070048f67e74173474b79226b6de13ee58c3568e0c5"
+        },
+        {
+          "path": "samples/step_60000/fula.wav",
+          "size": 338988,
+          "sha256": "476b09b9f0d41e6f8feae26c4c41bf6a8b03541b8fdcdcedb818e4922deef1c0"
+        },
+        {
+          "path": "samples/step_60000/hausa.wav",
+          "size": 887340,
+          "sha256": "6b677151304bb41c3f45ee9081ca6d25fae3a14a0fd48fbec2e7379b59f53d22"
+        },
+        {
+          "path": "samples/step_60000/igbo.wav",
+          "size": 652812,
+          "sha256": "01caa14252810714eaeb9b749e37edb5f521397be27b0d0e28612e3e383ebe91"
+        },
+        {
+          "path": "samples/step_60000/kabuverdianu.wav",
+          "size": 445996,
+          "sha256": "c5f2621fb099eb41400162b5d59d89935a2f7294e87a88efe2af3f02f4a540e6"
+        },
+        {
+          "path": "samples/step_60000/kamba.wav",
+          "size": 435756,
+          "sha256": "36239ecb113e9bbcbb4459e6487201918a317c895dd8ac90f54e9c59fd5065ed"
+        },
+        {
+          "path": "samples/step_60000/lingala.wav",
+          "size": 218156,
+          "sha256": "575013142660f947c4a86d7940e849a2309415eabc87749bcb6893aae2b030f1"
+        },
+        {
+          "path": "samples/step_60000/luganda.wav",
+          "size": 487468,
+          "sha256": "eab6f24f28480ec204342a3f442deb5cfd33edb88afd8841df444a5e27a06730"
+        },
+        {
+          "path": "samples/step_60000/luo.wav",
+          "size": 398380,
+          "sha256": "7b8d38c5526606d25081a367e23774d7da7f4b4155356bd259418037e8a53f3a"
+        },
+        {
+          "path": "samples/step_60000/northsotho.wav",
+          "size": 340012,
+          "sha256": "6000114aaa52e7e6518dbe4d26cd9b436500c5be407c21348d14c1a1e42500db"
+        },
+        {
+          "path": "samples/step_60000/nyanja.wav",
+          "size": 495148,
+          "sha256": "8ddf5ac35b986b881f4e5d9a973c5168164cff0a60dc2a7e7fc6ba4760352a77"
+        },
+        {
+          "path": "samples/step_60000/oromo.wav",
+          "size": 121900,
+          "sha256": "faf3dc0ca94c55c89b91e6efc98dfe20172ffa1f614e01a016a9c717706f7e49"
+        },
+        {
+          "path": "samples/step_60000/shona.wav",
+          "size": 490028,
+          "sha256": "6b307adf7c9a6cd5751fb68cb3b1aff9c08043df55eec018ed0d8edbfbc0d9fe"
+        },
+        {
+          "path": "samples/step_60000/somali.wav",
+          "size": 555052,
+          "sha256": "0e52e812a13102a4be23aeb41b45b59aed126885aafc8aa2135fd1f7aba53ef4"
+        },
+        {
+          "path": "samples/step_60000/swahili.wav",
+          "size": 505900,
+          "sha256": "be5bb8078ec60747622e132683c4309f342e8c3e77978726da788da8f8945f44"
+        },
+        {
+          "path": "samples/step_60000/umbundu.wav",
+          "size": 511532,
+          "sha256": "c3079096d7f3c52cbf48237087cd8cdbd8c25145a2f4f85c8ba99fd8c6fcf60d"
+        },
+        {
+          "path": "samples/step_60000/wolof.wav",
+          "size": 141868,
+          "sha256": "620cc288c05c66e81d4d052d3c48489156f2f8b131ca1529a0a1509dd6b09916"
+        },
+        {
+          "path": "samples/step_60000/xhosa.wav",
+          "size": 101932,
+          "sha256": "796cd2d71558f3f70ef6e5e7e8391aec2fab8e6b9da9d4ea9dcba03969eab70d"
+        },
+        {
+          "path": "samples/step_60000/yoruba.wav",
+          "size": 728620,
+          "sha256": "8347e99da97886b8397e5e8072aed477bcdc17ccaf09036ea1a83ceb1bf8312c"
+        },
+        {
+          "path": "samples/step_60000/zulu.wav",
+          "size": 489004,
+          "sha256": "75edaa893d56c237ef8bc11008d0270dfd854d5c46751a88c9ad8c25c40fbd20"
+        },
+        {
+          "path": "samples/step_80000/afrikaans.wav",
+          "size": 200236,
+          "sha256": "1b150c3e99ef70a3edff5a22282e9058ac2877e92fe5f8d6da63ea69030a98d8"
+        },
+        {
+          "path": "samples/step_80000/amharic.wav",
+          "size": 485932,
+          "sha256": "36dae01cdee8999b3ef37c66bb176b4abef992602227493776fc177e9af989f1"
+        },
+        {
+          "path": "samples/step_80000/fula.wav",
+          "size": 338988,
+          "sha256": "31821230f4efd197e7ad75deb2e0534557809b55688884021adfc44ba79108ed"
+        },
+        {
+          "path": "samples/step_80000/hausa.wav",
+          "size": 887340,
+          "sha256": "318a2d55a9937b6e9e57dcab00e6ff35780e82d8afc38f7c8e70c85d99ad43fa"
+        },
+        {
+          "path": "samples/step_80000/igbo.wav",
+          "size": 652812,
+          "sha256": "15a4865d7507608aa4cd55d2d97e25f1699d8a9da4ff4322aacd8c5fcfe60317"
+        },
+        {
+          "path": "samples/step_80000/kabuverdianu.wav",
+          "size": 445996,
+          "sha256": "e8d66ab1986ffcbd0d89c9e463a5997e93289aa89d1a6f3c656704fc4f725a5f"
+        },
+        {
+          "path": "samples/step_80000/kamba.wav",
+          "size": 435756,
+          "sha256": "932ec232708cf009b79f8330e97244b2d11793ba790cec75e604d06a7acebd7c"
+        },
+        {
+          "path": "samples/step_80000/lingala.wav",
+          "size": 218156,
+          "sha256": "ad5c677c53b9dbbb9ea1612d24eb4aea180ed5a025a4b0ffdcf08e3cfcc6ca85"
+        },
+        {
+          "path": "samples/step_80000/luganda.wav",
+          "size": 487468,
+          "sha256": "8e44ff05c33d46630ef680ff68a30a1c61de73a4930632252425543ecd509eb1"
+        },
+        {
+          "path": "samples/step_80000/luo.wav",
+          "size": 398380,
+          "sha256": "041908dacb0c5fcc79aa6d7ef5d92ef7ab9c3970eaaee764b63c945055295887"
+        },
+        {
+          "path": "samples/step_80000/northsotho.wav",
+          "size": 340012,
+          "sha256": "2469c24d4bf79cc95ceb3a3858bdcd94c1ebe6aa871c464fc8c85b6c2584aa02"
+        },
+        {
+          "path": "samples/step_80000/nyanja.wav",
+          "size": 495148,
+          "sha256": "594d6898593c335dc5c5f214feccfd49531fffcaf1e2e61477f4ae8d0530270c"
+        },
+        {
+          "path": "samples/step_80000/oromo.wav",
+          "size": 121900,
+          "sha256": "faf3dc0ca94c55c89b91e6efc98dfe20172ffa1f614e01a016a9c717706f7e49"
+        },
+        {
+          "path": "samples/step_80000/shona.wav",
+          "size": 490028,
+          "sha256": "c278c3a7fdb87f11191e180e76313a29250a39b9e7837e76d1dfffe99b5f30b5"
+        },
+        {
+          "path": "samples/step_80000/somali.wav",
+          "size": 555052,
+          "sha256": "740a819241829eb7cb0ee6272d50a87dc214ec209229f960c0f9149caafcd03b"
+        },
+        {
+          "path": "samples/step_80000/swahili.wav",
+          "size": 505900,
+          "sha256": "e3209792c3a6a7033d8832d9e1dda146d2bfa954d5be5ff25e245351ac1f3b20"
+        },
+        {
+          "path": "samples/step_80000/umbundu.wav",
+          "size": 511532,
+          "sha256": "ed8b7f7f61438929f069ce9104f0b9240d1e052af0e927bc6f7eccaa66b3bb39"
+        },
+        {
+          "path": "samples/step_80000/wolof.wav",
+          "size": 141868,
+          "sha256": "620cc288c05c66e81d4d052d3c48489156f2f8b131ca1529a0a1509dd6b09916"
+        },
+        {
+          "path": "samples/step_80000/xhosa.wav",
+          "size": 101932,
+          "sha256": "796cd2d71558f3f70ef6e5e7e8391aec2fab8e6b9da9d4ea9dcba03969eab70d"
+        },
+        {
+          "path": "samples/step_80000/yoruba.wav",
+          "size": 728620,
+          "sha256": "16ca20429bee2455085ad3ebd9dd58acfba20dbf76acf0fcca6a33372f28810f"
+        },
+        {
+          "path": "samples/step_80000/zulu.wav",
+          "size": 489004,
+          "sha256": "c38dae4b5d5f76f1cdb682653933331fbf31848d1a4d3072dff096cea233ad6c"
+        },
+        {
+          "path": "sema_afro_v1.pt",
+          "size": 5404647100,
+          "sha256": "623d997a1435394714baf7f49d3a15ea8f60d31b92e6fbe0a4ecd5ff9e4d670a"
+        },
+        {
+          "path": "vocab.txt",
+          "size": 14679,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    },
+    "michsethowusu/voxcpm-afrispeech-full-inference-20260606": {
+      "repo_id": "michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+      "url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+      "revision": "4e9e70cccd9b54949fa45963952a74834ec39e1c",
+      "license": "apache-2.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1519,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 2526,
+          "sha256": null
+        },
+        {
+          "path": "audiovae.pth",
+          "size": 301494192,
+          "sha256": "5b93f34c771281679b0ff93be3d1c1681eb1f301c3892e701db8f10a725b20a9"
+        },
+        {
+          "path": "config.json",
+          "size": 2602,
+          "sha256": null
+        },
+        {
+          "path": "pytorch_model.bin",
+          "size": 2609273198,
+          "sha256": "0b25598a4e2f9b63273744e5863cb06733dada7cb445b531bc625d6e2a581bf6"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 1632,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 3676778,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 4952,
+          "sha256": null
+        },
+        {
+          "path": "training_state.json",
+          "size": 15,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    },
+    "UBC-NLP/Simba-TTS-sot": {
+      "repo_id": "UBC-NLP/Simba-TTS-sot",
+      "url": "https://huggingface.co/UBC-NLP/Simba-TTS-sot",
+      "revision": "4cf607a7d28f3125272d80643d2769af7bf33772",
+      "license": "cc-by-4.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1519,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 6371,
+          "sha256": null
+        },
+        {
+          "path": "added_tokens.json",
+          "size": 18,
+          "sha256": null
+        },
+        {
+          "path": "config.json",
+          "size": 2025,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 145224568,
+          "sha256": "c798a9db7a0fa506b31ebe6212af4c4b5b84d74428448e578bb3e1e48db5ead5"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 254,
+          "sha256": null
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 275,
+          "sha256": null
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 670,
+          "sha256": null
+        },
+        {
+          "path": "vocab.json",
+          "size": 323,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    },
+    "rifailabs/shikomori-tts": {
+      "repo_id": "rifailabs/shikomori-tts",
+      "url": "https://huggingface.co/rifailabs/shikomori-tts",
+      "revision": "feda5d3b79778a20acaa41e5e8c2451aed043636",
+      "license": "not-established",
+      "gated": "manual",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1570,
+          "sha256": null
+        },
+        {
+          "path": "chat_template.jinja",
+          "size": 4168,
+          "sha256": null
+        },
+        {
+          "path": "config.json",
+          "size": 2238,
+          "sha256": null
+        },
+        {
+          "path": "model.safetensors",
+          "size": 2450344144,
+          "sha256": "27e03a6b9ebf2908288f4ad0ab302b9b97421761ec59160449d94f4370e9805e"
+        },
+        {
+          "path": "optimizer.bin",
+          "size": 4900882075,
+          "sha256": "25aaa205d6e8bba36cde67bb74e0306edfa9f47b5ffa0300bd94e8217d60e857"
+        },
+        {
+          "path": "random_states_0.pkl",
+          "size": 14821,
+          "sha256": "62d7c4b218285b339b87ccd468e172656fcee997a915c5bcb04db17afe5ad10e"
+        },
+        {
+          "path": "scaler.pt",
+          "size": 1383,
+          "sha256": "2d8f16be0cd9a6c6e6dc1a617be5e2fb2dc996836d5d37ae4721c5ff8da405d2"
+        },
+        {
+          "path": "scheduler.bin",
+          "size": 1465,
+          "sha256": "f25b67a4d43ca8310db0044942465dc883088ae27d4808afc034fe2c958a99aa"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 11423986,
+          "sha256": "408f669b7e2b045fdf54201d815bd364e6667dbd845115da81239c40bc6dcfd1"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 562,
+          "sha256": null
+        },
+        {
+          "path": "train_config.json",
+          "size": 1425,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false,
+      "required_work": [
+        "Select exact Comorian standard",
+        "Obtain upstream gated access legitimately; no access granted in this task",
+        "Establish model license and redistribution conditions",
+        "Inspect/download eligible files and build/validate adapter only after those dependencies are resolved"
+      ]
+    },
+    "multilingual-tts/F5-TTS-OpenBible-Ndebele": {
+      "repo_id": "multilingual-tts/F5-TTS-OpenBible-Ndebele",
+      "url": "https://huggingface.co/multilingual-tts/F5-TTS-OpenBible-Ndebele",
+      "revision": "1dc9bae8b284aaf761363a761c3e338d3dee6459",
+      "license": "cc-by-sa-4.0",
+      "gated": false,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1519,
+          "sha256": null
+        },
+        {
+          "path": "F5-TTS_OpenBible_Ndebele.yaml",
+          "size": 2070,
+          "sha256": null
+        },
+        {
+          "path": "README.md",
+          "size": 4099,
+          "sha256": null
+        },
+        {
+          "path": "model_last.pt",
+          "size": 5374131852,
+          "sha256": "da97886ada408b3b024de99d720b704606163067a7a78b7ea0aa7a5350b7f813"
+        },
+        {
+          "path": "vocab.txt",
+          "size": 211,
+          "sha256": null
+        }
+      ],
+      "product_adoption_approved": false,
+      "integrated": false,
+      "audio_verified": false
+    }
+  },
+  "interpretation_notes": [
+    "Candidate existence does not imply correct pronunciation, affordable CPU inference, permission for all product uses, or integration.",
+    "Models were not downloaded or run; only public metadata/model-card text was read.",
+    "The same model may cover many entries; its weights are counted once, not multiplied by voice or language count.",
+    "MMS and OmniVoice weights have non-commercial conditions and were not automatically adopted.",
+    "No country or population is a substitute for language-specific resources.",
+    "Do not use a Northern Ndebele model as Southern Ndebele.",
+    "FLEURS can support research/evaluation for its languages but is not an off-the-shelf TTS checkpoint."
+  ]
+}

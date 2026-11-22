@@ -148,46 +148,85 @@ def _phrase_language(text,script):
 _SENTENCE_END = re.compile(r'(?:[.!?…]+(?:["»”’)]*)[ \t]+|[\r\n]+)')
 
 
-def _word_spans(text,script,preferred):
-    # Each sentence supplies its own context when several scripts share one alphabet.
+def _word_spans(text,script,preferred,enabled_languages=None,mode="context",priorities=()):
+    # Each sentence supplies context, while every lexical token remains eligible
+    # for a different language in a multilingual dictionary/list.
     start=0
     for stop in _SENTENCE_END.finditer(text):
         end=stop.end()
-        yield from _phrase_spans(text[start:end],script,preferred)
+        yield from _phrase_spans(text[start:end],script,preferred,enabled_languages,mode,priorities)
         start=end
     if start<len(text):
-        yield from _phrase_spans(text[start:],script,preferred)
+        yield from _phrase_spans(text[start:],script,preferred,enabled_languages,mode,priorities)
 
 
-def _phrase_spans(text,script,preferred):
+@lru_cache(maxsize=8192)
+def _lexical_candidates(word,script):
+    """Merge extended and core lexical evidence; never overwrite a homograph."""
+    candidates=set()
+    entry=_words().get(word)
+    if isinstance(entry,str):
+        candidates.add(entry)
+    elif isinstance(entry,(list,tuple,set,dict)):
+        candidates.update(code for code in entry if isinstance(code,str))
+    if script=="latin":
+        candidates.update(_auxiliary("latin_languages").word_candidates(word))
+    elif script=="cyrillic":
+        candidates.update(_auxiliary("speech_text").cyrillic_word_candidates(word))
+        candidates.intersection_update(FAMILIES["cyrillic"])
+    return frozenset(code for code in candidates if code in CODES|CORE)
+
+
+def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",priorities=()):
+    policy=_auxiliary("language_routing")
+    enabled=policy.enabled_keys(enabled_languages)
+    preferred=policy.fallback_language(preferred,enabled,priorities)
     if PERSONAL:
         local=_personal_catalog.detect_phrase(text,script,PERSONAL)
-        if local:return [(local,text)]
-    context=_tag(script,text,preferred)
+        if local and (enabled is None or local in enabled):return [(local,text)]
+    context=_tag(script,text,preferred) if mode=="context" else None
+    if enabled is not None and context not in enabled:context=None
     matches=list(re.finditer(r"[^\W\d_]+(?:['’][^\W\d_]+)*",text))
     if not matches:return [(context,text)]
-    sentence_tag,sentence_score=_phrase_language(text,script) if len(matches)>1 else (None,0.)
-    strong=len(matches)>=3 and sentence_tag in CODES|CORE and sentence_score>=.85
+    sentence_tag,sentence_score=_phrase_language(text,script) if len(matches)>1 and mode=="context" else (None,0.)
+    if sentence_tag not in CODES|CORE or (enabled is not None and sentence_tag not in enabled):
+        sentence_tag=None
+    strong=len(matches)>=3 and sentence_tag is not None and sentence_score>=.85
     labels=[]
+    current=preferred
     for m in matches:
-        word=unicodedata.normalize("NFC",m.group()).casefold()
-        guess=_words().get(word)
-        if not guess and len(word)>=4:
-            candidate,confidence=_identify(word)
-            if confidence >= (.97 if len(word)<7 else .92):
-                guess=candidate
-            elif len(word)>=8 and candidate and confidence>=.82 and _profiles().predict(word,script)[0]==candidate:
-                guess=candidate
-        if guess and guess!=sentence_tag and strong:
-            # Short common words such as "in" and "ma" can occur in many
-            # languages. Isolated low-confidence guesses destabilise whole lines.
-            separate,probability=_identify(word) if len(word)>=5 else (None,0.)
-            corroborated=len(word)>=8 and probability>=.82 and _profiles().predict(word,script)[0]==guess
-            if separate!=guess or (probability<.90 and not corroborated):
-                guess=None
-        if guess is not None and script=="cyrillic" and guess not in FAMILIES["cyrillic"]:
+        word=policy.normalize_word(m.group())
+        if len(word)<=1:
+            # Shared letters are keyboard/spelling context, not language samples.
+            guess=current if current in CODES else None
+            labels.append(guess)
+            continue
+        candidates=_lexical_candidates(word,script)
+        if enabled is not None:candidates=candidates & enabled
+        if candidates:
+            preference=sentence_tag if strong and sentence_tag in candidates else current
+            decision=policy.resolve_word(word,preference,enabled,candidates=candidates,priorities=priorities)
+            guess=decision.language
+        else:
             guess=None
-        labels.append((guess if guess in CODES else None) if guess else context)
+            if len(word)>=4:
+                candidate,confidence=policy.classify_word(word,enabled)
+                if candidate:
+                    guess=candidate
+                elif not policy.has_word_classifier() or mode=="context":
+                    candidate,confidence=_identify(word)
+                    threshold=.97 if len(word)<7 else .92
+                    if confidence>=threshold:
+                        guess=candidate
+                    elif len(word)>=8 and candidate and confidence>=.82 and _profiles().predict(word,script)[0]==candidate:
+                        guess=candidate
+            if guess not in CODES|CORE or (enabled is not None and guess not in enabled):guess=None
+            if script=="cyrillic" and guess not in FAMILIES["cyrillic"]:guess=None
+            if guess is None:
+                guess=(sentence_tag if strong else context) if mode=="context" else preferred
+        if enabled is not None and guess not in enabled:guess=None
+        labels.append(guess)
+        if guess is not None:current=guess
     offset=0;current=labels[0];spans=[]
     for m,tag in zip(matches[1:],labels[1:]):
         if tag!=current:
@@ -275,10 +314,22 @@ def _tag(script,text,preferred):
     return None
 
 
-def split_extended(text,preferred="uk",explicit=False):
-    """Return exact slices. None delegates to the original ten-language planner."""
+def split_extended(text,preferred="uk",explicit=False,*,enabled_languages=None,mode="context",priorities=()):
+    """Return exact slices; None delegates to the core-language planner.
+
+    Restrict automatic guesses to enabled languages. An explicit language pins
+    the whole span; script changes must not override NVDA/user language marks.
+    """
+    if mode not in {"context","words"}:raise ValueError("Unknown language routing mode: "+str(mode))
+    policy=_auxiliary("language_routing")
+    enabled=policy.enabled_keys(enabled_languages)
+    preferred=policy.fallback_language(preferred,enabled,priorities)
     if not text:return []
     requested=registered(preferred)
+    if explicit:
+        return [(requested,text)]
+    if sum(char.isalpha() for char in text)<=1:
+        return [(requested,text)]
     pinned=(requested or preferred).lower().replace("_","-").split("-")[0]
     def label(script,span):
         if explicit and requested in PERSONAL and script==PERSONAL[requested]['script']:
@@ -290,7 +341,8 @@ def split_extended(text,preferred="uk",explicit=False):
             if script==usual or (pinned=="ja" and script=="han") or (
                 pinned in {"sr","uz","az","kaa"} and script in {"latin","cyrillic"}):
                 return requested
-        return _tag(script,span,requested or preferred)
+        result=_tag(script,span,requested or preferred)
+        return result if enabled is None or result in enabled else None
     spans=[]
     def add(code,value):
         if spans and spans[-1][0]==code:
@@ -298,7 +350,7 @@ def split_extended(text,preferred="uk",explicit=False):
         else:spans.append((code,value))
     def finish(script,value):
         if not explicit and script in {"latin","cyrillic"}:
-            for code,part in _word_spans(value,script,requested or preferred):add(code,part)
+            for code,part in _word_spans(value,script,requested or preferred,enabled,mode,priorities):add(code,part)
         elif not explicit and script=="he" and "yi" in CODES:
             start=0
             for cut in _SENTENCE_END.finditer(value):

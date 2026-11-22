@@ -83,12 +83,15 @@ class NativeLookahead:
             if job.key != (language, text):
                 self._discard()
                 return None
-        while not job.result.done():
-            if cancellation.is_set() or job.stop.wait(.008):
+            if cancellation.is_set():
                 raise SynthesisCancelled()
-        with self.changed:
-            if self.selected is job:
-                self.selected = None
+            # Lookahead is optional: waiting for an unfinished forecast turns
+            # a language transition into an unbounded pause. Use only work
+            # already prepared; otherwise cancel it and render normally.
+            if not job.result.done():
+                self._discard()
+                return None
+            self.selected = None
         if cancellation.is_set():
             raise SynthesisCancelled()
         return job.result.result()
@@ -113,7 +116,9 @@ class NativeLookahead:
                     if first is not None and next(source, None) is None:
                         audio = first
                 finally:
-                    source.close()
+                    close = getattr(source, "close", None)
+                    if close is not None:
+                        close()
             except Exception:
                 # A forecast is optional. The speaking thread can render
                 # an uncancelled request through the ordinary path.

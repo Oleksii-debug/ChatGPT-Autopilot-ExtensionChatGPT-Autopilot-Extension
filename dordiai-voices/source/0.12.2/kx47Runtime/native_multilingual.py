@@ -16,6 +16,8 @@ from session_control import SynthesisCancelled
 from speech_tempo import stream_tempo
 from speech_text import english_text, number_parts, speak_numbers, split_mixed
 from voice_delivery import compact_padding, condition_shared
+from voice_assets import asset_path, native_settings, discover_voices, supports_language
+from voice_policy import require_voice_allowed
 
 
 class RussianPipe:
@@ -134,6 +136,12 @@ class NativeMultilingual:
         self._russian_lock = Lock()
         self._english_lock = Lock()
         self.settings = json.loads((self.profiles / "delivery.json").read_text(encoding="utf-8"))
+        self._package_russian = {}
+        for profile in discover_voices(self.profiles.parent, engine_id="holos"):
+            settings = native_settings(self.profiles.parent, profile)
+            # A managed voice can use neutral delivery defaults. Optional
+            # enrollment assets decide which native backend is actually usable.
+            self.settings[profile] = settings
 
     def warm_russian(self):
         with self._russian_lock:
@@ -185,14 +193,24 @@ class NativeMultilingual:
 
     @lru_cache(maxsize=4)
     def english_state(self, profile):
-        with np.load(self.profiles / (profile + ".npz"), allow_pickle=False) as state:
+        managed = asset_path(self.profiles.parent, profile, "pocket_english_state", required=True)
+        with np.load(managed if managed is not None else self.profiles / (profile + ".npz"), allow_pickle=False) as state:
             return {
                 name: state[name] if name == "state_offset" else state[name].astype(np.float32)
                 for name in (spec["name"] for spec in self.english.flow_states)
             }
 
     def available(self, profile, language, text):
+        require_voice_allowed(profile)
+        language = language.lower().replace("_", "-")
         lang = {"en": "en-us", "ru-ru": "ru"}.get(language, language)
+        supported = supports_language(self.profiles.parent, profile, language)
+        if supported is False:
+            return False
+        if supported is True:
+            role = "pocket_russian_prompt" if lang == "ru" else "pocket_english_state"
+            if asset_path(self.profiles.parent, profile, role) is None:
+                return False
         if profile not in self.settings or any(char.isdecimal() for char in text):
             return False
         if lang in {"en-us", "en-gb"}:
@@ -235,8 +253,25 @@ class NativeMultilingual:
     def close(self):
         if "russian" in self.__dict__:
             self.russian.close()
+        for pipe in self._package_russian.values():
+            pipe.close()
+        self._package_russian.clear()
+
+    def _russian_for(self, profile):
+        managed = asset_path(self.profiles.parent, profile, "pocket_russian_prompt", required=True)
+        if managed is None:
+            return self.russian
+        directory = str(managed.parent)
+        if directory not in self._package_russian:
+            # Bound the extra processes when the user changes voice repeatedly.
+            if len(self._package_russian) >= 2:
+                oldest = next(iter(self._package_russian))
+                self._package_russian.pop(oldest).close()
+            self._package_russian[directory] = RussianPipe(self.models / "ru", managed.parent)
+        return self._package_russian[directory]
 
     def stream(self, profile, language, text, speed=1.0, cancelled=lambda: False):
+        require_voice_allowed(profile)
         key = "ru" if language.startswith("ru") else "en"
         settings = self.settings.get(profile, {}).get(key, {})
         if key == "ru":
@@ -245,7 +280,7 @@ class NativeMultilingual:
                     if cancelled():
                         raise SynthesisCancelled()
                     marked = self.russian_text(text)
-                    yield from self.russian.stream(profile, marked, cancelled, seed=settings.get("seed"))
+                    yield from self._russian_for(profile).stream(profile, marked, cancelled, seed=settings.get("seed"))
             chunks = russian_chunks()
         else:
             with self._english_lock:

@@ -1,13 +1,15 @@
 """Keep mixed-language runs and standalone numbers with the surrounding phrase."""
 from bisect import bisect_left
 from functools import lru_cache
+import importlib.util
+import gzip
 import json
 from pathlib import Path
 import re
 from zlib import crc32
 
 WORDS = re.compile(
-    r"[A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+(?:['’][A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+)*|[А-Яа-яІіЇїЄєҐґЁё\u0301]+|"
+    r"[A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+(?:['’][A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+)*|[А-Яа-яІіЇїЄєҐґЁё\u0301]+(?:['’][А-Яа-яІіЇїЄєҐґЁё\u0301]+)*|"
     r"\d+(?:[.,:/-]\d+)*(?:[\u00a0\u202f]\d{3})*"
 )
 NUMBER = {
@@ -22,6 +24,14 @@ DIGIT_WORDS = {
     "en": ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"),
     "ru": ("ноль", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"),
 }
+
+
+@lru_cache(maxsize=1)
+def routing_policy():
+    spec = importlib.util.spec_from_file_location("_dordiai_word_routing", Path(__file__).with_name("language_routing.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def word_language(token):
@@ -44,7 +54,8 @@ RUSSIAN_CUES = frozenset((
     "она", "они", "куда", "ушел", "ушёл", "человек", "оставил", "оставила", "закрой", "закройте",
     "сохрани", "сохранить", "сохранять", "открой", "открыть", "скажи", "спрашивает", "спросил",
     "отправить", "получить", "можно", "нужно", "необходимо", "выбрать", "добавить", "нажмите",
-    "загрузки", "загрузка", "загрузок",
+    "загрузки", "загрузка", "загрузок", "где", "кто", "какой", "какая", "какие", "нет", "есть",
+    "пользователь", "свойства", "настройки",
     "записал", "поставил", "взял", "пошел", "пошёл", "разговаривал", "разговаривает",
 ))
 UKRAINIAN_CUES = frozenset((
@@ -72,6 +83,69 @@ def cyrillic_word_index():
 def contains_hash(values, key):
     position = bisect_left(values, key)
     return position < len(values) and values[position] == key
+
+
+# Common shared spellings are explicitly retained because the recovered hashed
+# lexicons are incomplete and a missing RU/UA entry does not prove uniqueness.
+SHARED_CYRILLIC_WORDS = frozenset((
+    "голос", "кнопка", "мама", "вода", "сад", "дар", "мир", "роман", "спорт", "порт", "парк",
+    "банк", "балкон", "салон", "телефон", "текст", "автор", "команда", "номер", "метр", "тонна", "том",
+    "так", "там", "тут", "то", "за", "на", "до", "по", "про", "без", "не", "нас", "вас", "вам", "нам",
+    "я", "в", "у", "з", "а", "ну", "о", "об", "завтра", "сказала", "рада", "рано", "стоп", "старт", "меню",
+))
+
+
+@lru_cache(maxsize=1)
+def supplemental_cyrillic_index():
+    """Exact word->language bitset with both labels retained for homographs."""
+    path = Path(__file__).with_name("models") / "WordLanguage" / "cyrillic-lexicon.json.gz"
+    try:
+        with gzip.open(path, "rt", encoding="utf8") as stream:
+            document = json.load(stream)
+        if document.get("format") != "dordiai-cyrillic-lexicon-v1" or document.get("codes") != ["uk", "ru"]:
+            return {}
+        words = document["words"]
+        if not isinstance(words, dict) or any(not isinstance(word, str) or bits not in (1, 2, 3)
+                                              for word, bits in words.items()):
+            return {}
+        return words
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+@lru_cache(maxsize=4096)
+def cyrillic_word_candidates(word):
+    """Return all lexical UA/RU candidates, preserving shared spellings."""
+    word = routing_policy().normalize_word(word)
+    ukrainian = any(letter in word for letter in "іїєґ")
+    russian = any(letter in word for letter in "ыэёъ")
+    if ukrainian != russian:
+        return frozenset(("uk" if ukrainian else "ru",))
+    # Mixed exclusive letters indicate a typo/mixed token, not a confident label.
+    if ukrainian and russian:
+        return frozenset()
+    if word in SHARED_CYRILLIC_WORDS:
+        return frozenset(("uk", "ru"))
+    bits = supplemental_cyrillic_index().get(word)
+    if bits:
+        return frozenset(code for index, code in enumerate(("uk", "ru")) if bits & (1 << index))
+    uk_cue = word in UKRAINIAN_CUES
+    ru_cue = word in RUSSIAN_CUES
+    if uk_cue != ru_cue:
+        return frozenset(("uk" if uk_cue else "ru",))
+    candidates = set()
+    if word in UKRAINIAN_CUES:
+        candidates.add("uk")
+    if word in RUSSIAN_CUES:
+        candidates.add("ru")
+    if len(word) >= 3:
+        uk_words, ru_words = cyrillic_word_index()
+        key = crc32(word.encode("utf8"))
+        if contains_hash(uk_words, key):
+            candidates.add("uk")
+        if contains_hash(ru_words, key):
+            candidates.add("ru")
+    return frozenset(candidates)
 
 
 @lru_cache(maxsize=4096)
@@ -106,24 +180,46 @@ def cyrillic_ngram_score(word):
     return max(-8., min(8., score))
 
 
-def cyrillic_language(text, fallback="uk"):
+def cyrillic_language(text, fallback="uk", *, enabled_languages=None):
+    policy = routing_policy()
+    fallback = policy.fallback_language(fallback, enabled_languages)
+    allowed = policy.enabled_keys(enabled_languages)
     words = tuple(dict.fromkeys(match.group() for match in WORDS.finditer(text.casefold().replace("\u0301", ""))
                                 if word_language(match.group()) == "uk"))
+    if not words or sum(map(len, words)) <= 1:
+        return fallback
+    if len(words) == 1:
+        candidates = cyrillic_word_candidates(words[0])
+        if candidates:
+            return policy.resolve_word(words[0], fallback, allowed, candidates=candidates).language
     spread = "".join(words)
     uk = any(letter in spread for letter in "іїєґ")
     ru = any(letter in spread for letter in "ыэёъ")
     if uk != ru:
-        return "uk" if uk else "ru"
+        result = "uk" if uk else "ru"
+        return result if allowed is None or result in allowed else fallback
+    candidates = [cyrillic_word_candidates(word) for word in words]
+    unique = {next(iter(options)) for options in candidates if len(options) == 1}
+    if len(unique) == 1:
+        result = next(iter(unique))
+        return result if allowed is None or result in allowed else fallback
+    if candidates and all(options == {"uk", "ru"} for options in candidates):
+        # Character statistics cannot disambiguate a line of known homographs.
+        return fallback
     hints = set(words)
     cue_uk = len((hints & UKRAINIAN_CUES) - RUSSIAN_CUES)
     cue_ru = len((hints & RUSSIAN_CUES) - UKRAINIAN_CUES)
     lexical = sum(map(cyrillic_word_score, words))
     statistics = sum(map(cyrillic_ngram_score, words)) if any(len(word) > 1 for word in words) else 0.
     score = statistics + .42 * lexical + 3.25 * (cue_ru - cue_uk)
-    return "ru" if score >= 1.3 else "uk" if score <= -1.3 else fallback
+    result = "ru" if score >= 1.3 else "uk" if score <= -1.3 else fallback
+    return result if allowed is None or result in allowed else fallback
 
 
-def split_mixed(text, fallback="uk", *, detect_russian=False):
+def split_mixed(text, fallback="uk", *, detect_russian=False, enabled_languages=None, word_mode=False):
+    policy = routing_policy()
+    fallback = policy.fallback_language(fallback, enabled_languages)
+    allowed = policy.enabled_keys(enabled_languages)
     matches = list(WORDS.finditer(text))
     if not matches:
         yield fallback, text
@@ -154,6 +250,30 @@ def split_mixed(text, fallback="uk", *, detect_russian=False):
                 languages[left:right] = [locale if language == "uk" else language for language in languages[left:right]]
                 left = right
             sentence_start = sentence_end
+        # Strong lexical words must not be swallowed by the language of a whole
+        # Cyrillic clause. In context mode, short ambiguous words stay stable.
+        current = fallback
+        for i, match in enumerate(matches):
+            if languages[i] not in {"uk", "ru"}:
+                continue
+            word = policy.normalize_word(match.group())
+            candidates = cyrillic_word_candidates(word)
+            if len(candidates) == 1 or word_mode:
+                preferred = current if word_mode else languages[i]
+                def classify_unknown(token):
+                    if policy.has_word_classifier():
+                        return policy.classify_word(token, allowed)
+                    score = cyrillic_ngram_score(token)
+                    # The existing character model supplies relative evidence,
+                    # not a calibrated probability of language correctness.
+                    confidence = min(1., abs(score) / 3.)
+                    return ("ru" if score > 0 else "uk"), confidence
+                decision = policy.resolve_word(word, preferred, allowed, candidates=candidates,
+                                               classifier=classify_unknown)
+                languages[i] = decision.language
+            current = languages[i]
+    if allowed is not None:
+        languages = [language if language is None or language in allowed else fallback for language in languages]
     next_language = fallback
     for i in range(len(matches) - 1, -1, -1):
         if i < len(matches) - 1 and sentence_breaks[i + 1]:

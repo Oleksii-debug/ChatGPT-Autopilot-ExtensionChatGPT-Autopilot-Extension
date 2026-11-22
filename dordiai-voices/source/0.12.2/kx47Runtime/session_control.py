@@ -1,5 +1,38 @@
 """Cancel stale speech between model stages without discarding loaded models."""
 
+from threading import Event, RLock
+
+
+class RequestCancellation:
+    """Track every queued or streaming request until its final response.
+
+    The input reader may receive several requests before the synthesis thread
+    finishes one. Cancelling just the latest event leaves the current graph
+    running; retain all events and interrupt the one actually in the graph.
+    """
+    def __init__(self):
+        self._lock = RLock()
+        self._requests = set()
+
+    def new(self):
+        event = Event()
+        with self._lock:
+            self._requests.add(event)
+        return event
+
+    def release(self, event):
+        with self._lock:
+            self._requests.discard(event)
+
+    def cancel(self, owner=None):
+        with self._lock:
+            pending = tuple(self._requests)
+            for event in pending:
+                event.set()
+        for event in pending:
+            cancel_running(owner, event)
+
+
 
 class SynthesisCancelled(Exception):
     pass

@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "language": "uk",
+      "path": "frequencywords-2018-uk.txt.gz",
+      "source_url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/uk/uk_50k.txt",
+      "source_sha256": "881686fe66a168b79f6a9ee2f6cbbf944cfb12bfb7040913ef535cb29bd86ec9",
+      "source_bytes": 887259,
+      "stored_sha256": "647c11ef3dfc875ebaa7f622c3c763b4c65abd38751ea14868f3f15e0534b474",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Hermit Dave, FrequencyWords 2018; derived from OpenSubtitles"
+    },
+    {
+      "language": "ru",
+      "path": "frequencywords-2018-ru.txt.gz",
+      "source_url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ru/ru_50k.txt",
+      "source_sha256": "6095f507cc167488ec66ada5a85ac50433503a08ad24a07c6eabdf54352c4e7f",
+      "source_bytes": 998861,
+      "stored_sha256": "0c3c091ae7f5c8ec1a2b73a928379e68ccdf607add902a66b330d539eb70b29b",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Hermit Dave, FrequencyWords 2018; derived from OpenSubtitles"
+    }
+  ],
+  "changes": "Stored exact original frequency lists using deterministic gzip; training normalises/filter words and merges language labels."
+}

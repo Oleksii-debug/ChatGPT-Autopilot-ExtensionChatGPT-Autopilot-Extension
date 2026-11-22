@@ -1,0 +1,77 @@
+name: Dordiai voices validation and Windows probes
+
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths: ["dordiai-voices/**", ".github/workflows/dordiai-voices.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-voices-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Runtime regression tests
+        run: python -m unittest discover -s dordiai-voices/tests -v
+
+  windows-probes:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows]')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Windows runtime regression tests
+        run: python -m unittest discover -s dordiai-voices/tests -v
+      - name: Restore audited main baseline
+        run: python dordiai-voices/tools/restore_main.py --cache "${{ runner.temp }}/dordiai-download" --discard-downloads
+      - name: Build modular development release
+        run: python dordiai-voices/tools/build_release.py
+      - name: Verify archives and prepare engine probe
+        shell: python
+        run: |
+          import pathlib, subprocess, sys, zipfile
+          root = pathlib.Path("dordiai-voices")
+          files = sorted(root.joinpath("dist").glob("*.zip")) + sorted(root.joinpath("dist").glob("*.nvda-addon"))
+          if not files:
+              raise RuntimeError("No release archives were built")
+          subprocess.run([sys.executable, str(root / "tools/verify_release.py"), *map(str, files)], check=True)
+          addon = next(root.joinpath("dist").glob("*.nvda-addon"))
+          with zipfile.ZipFile(addon) as archive:
+              archive.extractall(root / "probe-package")
+      - name: Actual Windows speech engine probe
+        run: python dordiai-voices/tools/windows_engine_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/engine
+      - name: Actual NVDA integration probe
+        if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
+        shell: python
+        run: |
+          import pathlib, subprocess, sys
+          addon = next(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
+          subprocess.run([sys.executable, "dordiai-voices/tools/windows_nvda_probe.py", "--addon", str(addon), "--output", "dordiai-voices/windows-results/nvda"], check=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-voices-windows-evidence
+          path: dordiai-voices/windows-results
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
+        with:
+          name: dordiai-voices-development-build
+          path: dordiai-voices/dist
+          compression-level: 0
+          retention-days: 7

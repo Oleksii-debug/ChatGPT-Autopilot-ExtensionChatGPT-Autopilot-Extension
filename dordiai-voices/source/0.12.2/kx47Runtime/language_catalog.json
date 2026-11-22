@@ -1,0 +1,1113 @@
+{
+  "format": 1,
+  "selected_count": 135,
+  "language_aliases": {
+    "no": "nb",
+    "iw": "he",
+    "in": "id",
+    "zh": "cmn",
+    "zh-cmn": "cmn",
+    "zh-yue": "yue",
+    "hy-arevmda": "hyw",
+    "mo": "ro",
+    "gom": "kok"
+  },
+  "entries": [
+    {
+      "id": "en",
+      "name_uk": "Англійська",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Південна Америка",
+        "Азія",
+        "Африка",
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "ru",
+      "name_uk": "Російська",
+      "regions": [
+        "Європа",
+        "Азія"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "de",
+      "name_uk": "Німецька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "fr",
+      "name_uk": "Французька",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Африка",
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "it",
+      "name_uk": "Італійська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "es",
+      "name_uk": "Іспанська",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Південна Америка"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "pl",
+      "name_uk": "Польська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "uk",
+      "name_uk": "Українська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "ro",
+      "name_uk": "Румунська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "nl",
+      "name_uk": "Нідерландська",
+      "regions": [
+        "Європа",
+        "Південна Америка"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "pt",
+      "name_uk": "Португальська",
+      "regions": [
+        "Європа",
+        "Південна Америка",
+        "Азія",
+        "Африка"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "el",
+      "name_uk": "Грецька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "cs",
+      "name_uk": "Чеська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "hu",
+      "name_uk": "Угорська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "sv",
+      "name_uk": "Шведська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "sr",
+      "name_uk": "Сербська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "bg",
+      "name_uk": "Болгарська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "sq",
+      "name_uk": "Албанська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "hr",
+      "name_uk": "Хорватська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "ca",
+      "name_uk": "Каталонська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "da",
+      "name_uk": "Данська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "fi",
+      "name_uk": "Фінська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "sk",
+      "name_uk": "Словацька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "no",
+      "name_uk": "Норвезька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "lt",
+      "name_uk": "Литовська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "bs",
+      "name_uk": "Боснійська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "sl",
+      "name_uk": "Словенська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "mk",
+      "name_uk": "Македонська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "lv",
+      "name_uk": "Латиська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "et",
+      "name_uk": "Естонська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "ga",
+      "name_uk": "Ірландська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "cnr",
+      "name_uk": "Чорногорська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "lb",
+      "name_uk": "Люксембурзька",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "mt",
+      "name_uk": "Мальтійська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "is",
+      "name_uk": "Ісландська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "rm",
+      "name_uk": "Ретороманська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "la",
+      "name_uk": "Латинська",
+      "regions": [
+        "Європа"
+      ],
+      "first_priority_region": "Європа"
+    },
+    {
+      "id": "ht",
+      "name_uk": "Гаїтянська креольська",
+      "regions": [
+        "Північна Америка, Центральна Америка та Кариби"
+      ],
+      "first_priority_region": "Північна Америка, Центральна Америка та Кариби"
+    },
+    {
+      "id": "qu",
+      "name_uk": "Кечуа",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка"
+    },
+    {
+      "id": "gn",
+      "name_uk": "Гуарані",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка"
+    },
+    {
+      "id": "ay",
+      "name_uk": "Аймара",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка"
+    },
+    {
+      "id": "ito",
+      "name_uk": "Ітонама",
+      "regions": [
+        "Південна Америка"
+      ],
+      "first_priority_region": "Південна Америка"
+    },
+    {
+      "id": "cmn",
+      "name_uk": "Китайська — стандартна мандаринська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "hi",
+      "name_uk": "Гінді",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ar",
+      "name_uk": "Арабська",
+      "regions": [
+        "Азія",
+        "Африка"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "bn",
+      "name_uk": "Бенгальська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ur",
+      "name_uk": "Урду",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "id",
+      "name_uk": "Індонезійська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ja",
+      "name_uk": "Японська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "pa",
+      "name_uk": "Панджабі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "mr",
+      "name_uk": "Маратхі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "te",
+      "name_uk": "Телугу",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "tr",
+      "name_uk": "Турецька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ta",
+      "name_uk": "Тамільська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "vi",
+      "name_uk": "В’єтнамська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ko",
+      "name_uk": "Корейська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "fa",
+      "name_uk": "Перська, включно з дарі без окремого підрахунку",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "th",
+      "name_uk": "Тайська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "gu",
+      "name_uk": "Гуджараті",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "kn",
+      "name_uk": "Каннада",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ms",
+      "name_uk": "Малайська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "my",
+      "name_uk": "Бірманська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ml",
+      "name_uk": "Малаялам",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "fil",
+      "name_uk": "Філіппінська — стандарт на тагальській основі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "or",
+      "name_uk": "Одія",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ps",
+      "name_uk": "Пушту",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "uz",
+      "name_uk": "Узбецька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "sd",
+      "name_uk": "Синдхі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ne",
+      "name_uk": "Непальська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ku",
+      "name_uk": "Курдська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "si",
+      "name_uk": "Сингальська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "as",
+      "name_uk": "Асамська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "az",
+      "name_uk": "Азербайджанська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "kk",
+      "name_uk": "Казахська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "km",
+      "name_uk": "Кхмерська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "tg",
+      "name_uk": "Таджицька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "he",
+      "name_uk": "Іврит",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "lo",
+      "name_uk": "Лаоська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "mai",
+      "name_uk": "Майтілі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "sat",
+      "name_uk": "Санталі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ks",
+      "name_uk": "Кашмірська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "hy",
+      "name_uk": "Вірменська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "tk",
+      "name_uk": "Туркменська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ky",
+      "name_uk": "Киргизька",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "ka",
+      "name_uk": "Грузинська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "mn",
+      "name_uk": "Монгольська",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "kok",
+      "name_uk": "Конкані",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "doi",
+      "name_uk": "Догрі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "mni",
+      "name_uk": "Маніпурі, або мейтей",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "brx",
+      "name_uk": "Бодо",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "dv",
+      "name_uk": "Дівехі",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "dz",
+      "name_uk": "Дзонг-кха",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "tet",
+      "name_uk": "Тетум",
+      "regions": [
+        "Азія"
+      ],
+      "first_priority_region": "Азія"
+    },
+    {
+      "id": "sw",
+      "name_uk": "Суахілі",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ha",
+      "name_uk": "Хауса",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "am",
+      "name_uk": "Амхарська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "om",
+      "name_uk": "Оромо",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "yo",
+      "name_uk": "Йоруба",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ff",
+      "name_uk": "Фула, або фульфульде",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ig",
+      "name_uk": "Ігбо",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "mg",
+      "name_uk": "Малагасійська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "so",
+      "name_uk": "Сомалійська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ln",
+      "name_uk": "Лінгала",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "zu",
+      "name_uk": "Зулу",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "sn",
+      "name_uk": "Шона",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "rw",
+      "name_uk": "Кіньяруанда",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "rn",
+      "name_uk": "Кірунді",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ny",
+      "name_uk": "Чичева, або чева",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "xh",
+      "name_uk": "Коса",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ak",
+      "name_uk": "Акан",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "bm",
+      "name_uk": "Бамбара",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "dyu",
+      "name_uk": "Діула",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "mos",
+      "name_uk": "Мооре, або моссі",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "wo",
+      "name_uk": "Волоф",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "af",
+      "name_uk": "Африкаанс",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ti",
+      "name_uk": "Тигринья",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "tamazight",
+      "name_uk": "Тамазигхт",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "st",
+      "name_uk": "Сесото",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "tn",
+      "name_uk": "Тсвана",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "nso",
+      "name_uk": "Північна сото, або сепеді",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ts",
+      "name_uk": "Тсонга",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ss",
+      "name_uk": "Сісваті",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "ve",
+      "name_uk": "Венда",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "nd",
+      "name_uk": "Північна ндебеле",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "nr",
+      "name_uk": "Південна ндебеле",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "aa",
+      "name_uk": "Афарська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "sg",
+      "name_uk": "Санго",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "comorian",
+      "name_uk": "Коморська",
+      "regions": [
+        "Африка"
+      ],
+      "first_priority_region": "Африка"
+    },
+    {
+      "id": "tpi",
+      "name_uk": "Ток-пісін",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    },
+    {
+      "id": "sm",
+      "name_uk": "Самоанська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    },
+    {
+      "id": "fj",
+      "name_uk": "Фіджійська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    },
+    {
+      "id": "to",
+      "name_uk": "Тонганська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    },
+    {
+      "id": "mi",
+      "name_uk": "Маорі",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    },
+    {
+      "id": "gil",
+      "name_uk": "Гілбертська, або кірибаті",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    },
+    {
+      "id": "ho",
+      "name_uk": "Хірі-моту",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "first_priority_region": "Австралія та Океанія"
+    }
+  ]
+}

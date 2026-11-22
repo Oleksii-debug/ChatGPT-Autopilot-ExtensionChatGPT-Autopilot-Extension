@@ -1,5 +1,7 @@
 """Voice labels and authorized local source entries used by the build."""
-PROFILES = {
+from voice_policy import filter_voice_catalog
+
+PROFILES = filter_voice_catalog({
     "sara_archive": ("Сара 1", "05", "en"),
     "sara": ("Сара 2", "17", "en"),
     "brianna": ("Бріанна", "03", "en"),
@@ -43,11 +45,6 @@ PROFILES = {
     "chris": ("Кріс", None, "en_male"),
     "lian": ("Ліан", None, "en_male"),
     "oleksii_unpacked": ("Олексій 4", None, "en_male"),
-    "inna": ("Інна", None, "en"),
-    "kostia": ("Костя", None, "en_male"),
-    "veronika": ("Вероніка", None, "en"),
     "agnieszka": ("Агнешка", None, "en"),
     "veren": ("Верен", None, "en"),
-    "innesa": ("Іннеса", None, "en"),
-    "vira": ("Віра", None, "en"),
-}
+})

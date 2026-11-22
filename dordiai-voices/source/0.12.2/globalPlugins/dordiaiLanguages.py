@@ -1,4 +1,4 @@
-"""Accessible entry point to the existing WorldVoice language-role editor."""
+"""Accessible entry point to the active dordiai language and voice assignments."""
 import globalPluginHandler
 import globalVars
 import gui
@@ -16,26 +16,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         gui.mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, self._open, self._item)
 
     def _open(self, event):
-        for plugin in globalPluginHandler.runningPlugins:
-            if plugin.__class__.__module__.lower() == "globalplugins.worldvoice":
-                opener = getattr(plugin, "popupSpeechSettingsDialog", None)
-                if callable(opener):
-                    from synthDriverHandler import getSynth
-                    if getattr(getSynth(), "name", "").lower() != "worldvoice":
-                        gui.messageBox("Спочатку виберіть синтезатор WorldVoice через NVDA+Ctrl+S. "
-                                       "Потім відкрийте цей пункт знову, щоб призначити голоси мовам.",
-                                       "Поєднання голосів за мовами", wx.OK | wx.ICON_INFORMATION)
-                        return
-                    opener(event)
-                    return
+        from synthDriverHandler import getSynth
+        synth = getSynth()
+        opener = getattr(synth, "_dordiai_open_settings", None)
+        if callable(opener):
+            wx.CallAfter(opener)
+            return
         gui.messageBox(
-            "Для поєднання голосів установіть WorldVoice 7.1 і перезапустіть NVDA. "
-            "Потім виберіть синтезатор WorldVoice через NVDA+Ctrl+S. "
-            "У його налаштуваннях вимкніть вимогу однакового рушія для мов. "
-            "Синхронізацію основного голосу з голосом його мови залиште ввімкненою. "
-            "У розділі голосів призначте українській Лізу, Браяна чи інший голос dordiai-voices, "
-            "а іншим мовам — доступні голоси відповідних синтезаторів. "
-            "Самостійний синтезатор dordiai-voices також залишається доступним.",
+            "Спочатку виберіть синтезатор dordiai-voices через NVDA+Ctrl+S. "
+            "Потім відкрийте цей пункт для вибору мов і призначення голосів.",
             "Поєднання голосів за мовами", wx.OK | wx.ICON_INFORMATION,
         )
 

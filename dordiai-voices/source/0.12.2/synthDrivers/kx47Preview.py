@@ -11,6 +11,7 @@ from pathlib import Path
 from queue import Empty, Full, Queue
 import re
 import subprocess
+import sys
 from time import monotonic
 from threading import Condition, Thread, RLock
 from unicodedata import normalize
@@ -26,6 +27,24 @@ from synthDriverHandler import SynthDriver as BaseDriver, VoiceInfo, synthDoneSp
 
 SAMPLE_RATE = 24000
 RUNTIME = Path(__file__).resolve().parent.parent / "kx47Runtime"
+
+
+def _runtime_module(name):
+    """Load the same pure runtime helper in NVDA and the isolated worker."""
+    key = "_dordiai_main_" + name
+    if key not in sys.modules:
+        spec = importlib.util.spec_from_file_location(key, RUNTIME / (name + ".py"))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[key] = module
+        try:
+            spec.loader.exec_module(module)
+        except Exception:
+            sys.modules.pop(key, None)
+            raise
+    return sys.modules[key]
+
+
+_voice_policy = _runtime_module("voice_policy")
 _pref_spec = importlib.util.spec_from_file_location("_dordiai_main_preferences", RUNTIME / "preferences.py")
 _prefs = importlib.util.module_from_spec(_pref_spec)
 _pref_spec.loader.exec_module(_prefs)
@@ -93,9 +112,13 @@ def latin_letter_language(lower, language):
     return candidates[0] if len(candidates) == 1 else None
 
 
-def character_parts(text, language, english, spelling_language="auto", explicit=False):
+def character_parts(text, language, english, spelling_language="auto", explicit=False,
+                    enabled_languages=None):
     preferred = _wide.registered(language)
-    for code,span in _wide.split_extended(normalize("NFC",text),preferred=language,explicit=explicit or bool(preferred)):
+    # A keyboard event is already associated with the current language. In
+    # particular a shared Latin letter is not evidence for a new language.
+    for code,span in _wide.split_extended(normalize("NFC",text), preferred=language,
+                                        explicit=True, enabled_languages=enabled_languages):
         if code is None and preferred and not any(ch.isalpha() for ch in span):
             code = preferred
         if code is None:
@@ -165,18 +188,26 @@ def text_chunks(text, limit=280, first_limit=None):
         yield text
 
 
-def language_runs(text, language, english, detect_russian=False, explicit=False):
-    for code,span in _wide.split_extended(text,preferred=language,explicit=explicit):
+def language_runs(text, language, english, detect_russian=False, explicit=False,
+                  enabled_languages=None, priorities=()):
+    if explicit:
+        yield language, text
+        return
+    for code,span in _wide.split_extended(text, preferred=language, explicit=False,
+                                        enabled_languages=enabled_languages,
+                                        mode="words", priorities=priorities):
         if code is None and _wide.registered(language) and not any(ch.isalpha() for ch in span):
             code = language
         if code is not None:
             yield code, span
         else:
             base = "uk" if _wide.registered(language) else language
-            yield from core_language_runs(span,base,english,detect_russian,explicit and base==language)
+            yield from core_language_runs(span, base, english, detect_russian,
+                                          enabled_languages=enabled_languages, priorities=priorities)
 
 
-def core_language_runs(text, language, english, detect_russian=False, explicit=False):
+def core_language_runs(text, language, english, detect_russian=False, explicit=False,
+                       enabled_languages=None, priorities=()):
     """Route marked spans and use the local frequency dictionary for unmarked Latin."""
     default = language.lower().split("-")[0]
     if not re.search(r"[А-Яа-яІіЇїЄєҐґЁё]", text) and explicit and (default in _latin.EXTRA or default=="en"):
@@ -185,63 +216,71 @@ def core_language_runs(text, language, english, detect_russian=False, explicit=F
     latin = language if default in _latin.EXTRA or default=="en" else english
     preferred = latin.lower().split("-")[0]
     cyrillic = "ru" if language == "ru" else "uk"
-    for target, run in _speech_text.split_mixed(text, cyrillic, detect_russian=detect_russian and cyrillic == "uk" and not explicit):
+    for target, run in _speech_text.split_mixed(
+            text, cyrillic, detect_russian=detect_russian and cyrillic == "uk" and not explicit,
+            enabled_languages=enabled_languages, word_mode=True):
         if target == "en":
             if explicit and default in _latin.CODES:
                 yield latin, run
             else:
-                for code, span in _latin.split_latin(run, preferred):
+                for code, span in _latin.split_latin(run, preferred,
+                                                     enabled_languages=enabled_languages,
+                                                     mode="words", priorities=priorities):
                     yield (english if code=="en" else code), span
         else:
             yield ("ru" if language=="ru" else target), run
 
 
-def text_parts(pending, language, english, mixed, detect_russian=False, spelling_language="auto", explicit=False):
+def text_parts(pending, language, english, mixed, detect_russian=False, spelling_language="auto", explicit=False,
+               enabled_languages=None, priorities=()):
     text = normalize("NFC", " ".join(pending))
     if not text:
         return
-    if len(text)==1 and text.isalpha():
-        guess = next((code for code,_ in _wide.split_extended(text,preferred=language,explicit=explicit) if code),None)
-        if guess:
-            yield "character", (guess,text)
-            return
     # NVDA can disable its CharacterMode commands, including through another
     # synthesizer's language router. A lone letter still needs its name; bare
     # consonant phonemes are not a reliable utterance for the neural model.
     if len(text) == 1 and (text.lower() in (UK_LETTERS.keys() | EN_LETTERS.keys() | RU_LETTERS.keys()) or _latin.LATIN.fullmatch(text.lower())):
-        target = _speech_text.cyrillic_language(text, language) if detect_russian and language == "uk" and not explicit else language
-        yield from character_parts(text, target, english, spelling_language, explicit)
+        yield from character_parts(text, language, english, spelling_language, explicit,
+                                   enabled_languages=enabled_languages)
         return
     if mixed:
         runs = ((code if code is not None else None if language=="uk" or _wide.registered(language) else language,span)
-                for code,span in _wide.split_extended(text,preferred=language,explicit=explicit))
+                for code,span in _wide.split_extended(text, preferred=language, explicit=explicit,
+                                                     enabled_languages=enabled_languages,
+                                                     mode="words", priorities=priorities))
     else:
-        runs = language_runs(text,language,english,detect_russian,explicit)
+        runs = language_runs(text, language, english, detect_russian, explicit,
+                             enabled_languages=enabled_languages, priorities=priorities)
     for target, run in runs:
         chunks = text_chunks(run, limit=165)
         for chunk in chunks:
             yield "text", (target, chunk)
 
 
-def speech_parts(sequence, fallback, english, mixed=False, detect_russian=False, spelling_language="auto"):
+def speech_parts(sequence, fallback, english, mixed=False, detect_russian=False, spelling_language="auto",
+                 enabled_languages=None, priorities=(), forced=False):
     lang = fallback
-    explicit = False
+    explicit = forced
     pending = []
     characters = False
     for item in sequence:
         if isinstance(item, str):
             if characters:
-                yield from character_parts(item, lang, english, spelling_language, explicit)
+                yield from character_parts(item, lang, english, spelling_language, explicit,
+                                           enabled_languages=enabled_languages)
             elif item.strip():
                 pending.append(item.strip())
             continue
         if isinstance(item, (LangChangeCommand, BreakCommand, IndexCommand, PitchCommand,
                              CharacterModeCommand, RateCommand, VolumeCommand)):
-            yield from text_parts(pending, lang, english, mixed, detect_russian, spelling_language, explicit)
+            yield from text_parts(pending, lang, english, mixed, detect_russian, spelling_language, explicit,
+                                  enabled_languages=enabled_languages, priorities=priorities)
             pending.clear()
             if isinstance(item, LangChangeCommand):
-                lang = language_code(item.lang, fallback, english)
-                explicit = bool(item.lang)
+                lang = fallback if forced else language_code(item.lang, fallback, english)
+                if enabled_languages is not None and _prefs.language_key(lang) not in enabled_languages:
+                    lang = fallback
+                explicit = forced or bool(item.lang)
             elif isinstance(item, BreakCommand):
                 yield "break", max(0, item.time)
             elif isinstance(item, PitchCommand):
@@ -254,16 +293,26 @@ def speech_parts(sequence, fallback, english, mixed=False, detect_russian=False,
                 characters = item.state
             else:
                 yield "index", item.index
-    yield from text_parts(pending, lang, english, mixed, detect_russian, spelling_language, explicit)
+    yield from text_parts(pending, lang, english, mixed, detect_russian, spelling_language, explicit,
+                          enabled_languages=enabled_languages, priorities=priorities)
 
 
-def initial_audio(items,minimum=28800):
-    """A fast language transition needs real ready audio, not inserted silence."""
+def initial_audio(items,minimum=0):
+    """Preserve item order, normally delivering the first ready PCM at once.
+
+    A minimum is retained for explicit callers, but normal playback must not
+    wait for 0.6-1.2 seconds of future speech before starting. Bounded producer
+    lookahead continues after playback starts.
+    """
     prefix=[];size=0;ready=False
     try:
         for kind,value in items:
             if ready:
                 yield kind,value
+                continue
+            if minimum <= 0:
+                ready = True
+                yield kind, value
                 continue
             prefix.append((kind,value))
             if kind=='pcm':size+=len(value)
@@ -279,6 +328,15 @@ def initial_audio(items,minimum=28800):
 
 def buffered_items(produce, cancelled, *, pending_count=12, short_reserve=False, cancelling_threads=None):
     """Keep upcoming audio and index markers ready in delivery order."""
+    if pending_count < 1:
+        raise ValueError("Speech lookahead queue must have positive capacity")
+    # Do not accumulate unlimited threads if a native backend refuses to
+    # acknowledge cancellation. Existing workers have their stop flag set;
+    # reject further synthesis until one exits rather than block NVDA forever.
+    if cancelling_threads is not None:
+        cancelling_threads[:] = [thread for thread in cancelling_threads if thread.is_alive()]
+        if len(cancelling_threads) >= 2:
+            raise RuntimeError("Previous speech workers have not acknowledged cancellation")
     pending = Queue(maxsize=pending_count)
     errors = []
     stopped = False
@@ -287,20 +345,29 @@ def buffered_items(produce, cancelled, *, pending_count=12, short_reserve=False,
         return stopped or cancelled()
 
     def fill():
+        source = None
         try:
-            with closing(produce(stop_requested)) as source:
-                for item in source:
-                    while not stop_requested():
-                        try:
-                            pending.put(item, timeout=.01)
-                            break
-                        except Full:
-                            continue
-                    else:
+            source = produce(stop_requested)
+            for item in source:
+                while not stop_requested():
+                    try:
+                        pending.put(item, timeout=.01)
                         break
+                    except Full:
+                        continue
+                else:
+                    break
         except Exception as error:
             if not stop_requested():
                 errors.append(error)
+        finally:
+            close = getattr(source, "close", None)
+            if close is not None:
+                try:
+                    close()
+                except Exception as error:
+                    if not stop_requested():
+                        errors.append(error)
 
     producer = Thread(target=fill, daemon=True, name="dordiai speech lookahead")
     producer.start()
@@ -310,14 +377,8 @@ def buffered_items(produce, cancelled, *, pending_count=12, short_reserve=False,
                 item = pending.get(timeout=.01)
             except Empty:
                 continue
-            if short_reserve and item[0] == "pcm":
-                deadline = monotonic() + .15
-                while producer.is_alive() and not stop_requested() and pending.qsize() < 3:
-                    remaining = deadline - monotonic()
-                    if remaining <= 0:
-                        break
-                    producer.join(min(.008, remaining))
-                short_reserve = False
+            # short_reserve is accepted for compatibility with older callers.
+            # Never delay the first ready symbol/word for speculative audio.
             if not stop_requested():
                 yield item
         if errors and not stop_requested():
@@ -326,11 +387,11 @@ def buffered_items(produce, cancelled, *, pending_count=12, short_reserve=False,
         stopped = True
         if cancelling_threads is not None:
             cancelling_threads[:] = [thread for thread in cancelling_threads if thread.is_alive()]
-        if (cancelling_threads is not None and cancelled() and producer.is_alive()
-                and len(cancelling_threads)<2):
+        # Generator close also happens for errors and newer speech, not only
+        # when cancelled() currently returns True. Cleanup must stay bounded.
+        producer.join(timeout=.01)
+        if cancelling_threads is not None and producer.is_alive():
             cancelling_threads.append(producer)
-        else:
-            producer.join()
 
 
 class SpeechWorker:
@@ -701,7 +762,6 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                              defaultVal=1, minVal=1, maxVal=5, normalStep=1, largeStep=1),
         BooleanDriverSetting("detectRussian", "Розпізнавати російський текст", defaultVal=True),
         BooleanDriverSetting("nativeEnglish", "Чітка англійська вимова", defaultVal=True, availableInSettingsRing=True),
-        BooleanDriverSetting("sameVoiceForMixed", "Один голос для всіх мов", defaultVal=True, availableInSettingsRing=True),
         BooleanDriverSetting("nativeProfiles", "Англійська й російська з профілю голосу",
                              defaultVal=True, availableInSettingsRing=True),
         DriverSetting("foreignPronunciation", "Вимова інших мов", availableInSettingsRing=True, defaultVal="auto"),
@@ -756,6 +816,12 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         if runtime is None:
             raise RuntimeError("Prepare the KX-47 runtime before selecting this synthesizer.")
         python, models, info = runtime
+        self._models = models
+        self._language_catalog = _runtime_module("language_catalog")
+        self._voice_assets = _runtime_module("voice_assets")
+        self._managedVoices = {}
+        self._compatibleVoiceCache = {}
+        self._installedLanguageCache = None
         self._voices = {} if info.get("referencesOnly") else dict(VOICES)
         self._warm = info.get("referenceEngine") in {"openvoice", "holos"}
         reference_config = None
@@ -763,13 +829,22 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             model, samples = Path(info["referenceModel"]), Path(info["referenceSamples"])
             if model.is_absolute() and samples.is_absolute() and model.is_dir() and samples.is_dir():
                 reference_config = model, samples, info.get("referenceEngine", "omnivoice")
+                self._voiceReferences = samples
+                self._referenceEngine = info.get("referenceEngine", "omnivoice")
                 if (samples / "catalog.json").is_file():
                     names = json.loads((samples / "catalog.json").read_text(encoding="utf-8"))
                     self._voices.update({
-                        key: (name, key, "reference", "en-US") for key, name in names.items()
+                        key: (name, key, "reference", "en-US")
+                        for key, name in _voice_policy.filter_voice_catalog(names).items()
                     })
                 else:
                     self._voices.update(REFERENCE_VOICES)
+                self._managedVoices = self._voice_assets.discover_voices(
+                    samples, engine_id=info.get("referenceEngine", "omnivoice"),
+                )
+                for key, document in self._managedVoices.items():
+                    self._voices[key] = (document["name"], key, "reference", "en-US")
+        self._voices = dict(_voice_policy.filter_voice_catalog(self._voices))
         if not self._voices:
             raise RuntimeError("No configured KX-47 voices are available.")
         self._voiceAliases = {}
@@ -778,14 +853,15 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             if alias_file.is_file():
                 aliases = json.loads(alias_file.read_text(encoding="utf-8"))
                 self._voiceAliases = {old: new for old, new in aliases.items()
-                                      if old not in self._voices and new in self._voices}
+                                      if old not in self._voices and new in self._voices
+                                      and _voice_policy.is_voice_allowed(old)}
         self._voice = next(iter(self._voices))
         self._rate = self._pitch = self._timbre = 50
         self._volume = 100
         self.rateMultiplier = 1
         self.detectRussian = True
         self.nativeEnglish = True
-        self.sameVoiceForMixed = True
+        self.sameVoiceForMixed = False
         self.nativeProfiles = True
         self.foreignPronunciation = "auto"
         self.numberLanguage = self.spellingLanguage = self.personalLanguage = "auto"
@@ -823,8 +899,32 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         return OrderedDict((key, value[0]) for key, value in self._voices.items())
 
     def _dordiai_all_languages(self):
-        _wide.refresh_personal(True)
-        return OrderedDict(sorted(dict(_prefs.CORE_NAMES, **_wide.NAMES).items(), key=lambda item: item[1].casefold()))
+        # Packs are activated on the next driver instance. An open worker must
+        # never observe half of a newly installed or removed resource group.
+        if self._installedLanguageCache is None:
+            self._installedLanguageCache = self._language_catalog.installed_languages(self._models)
+        return OrderedDict(self._installedLanguageCache)
+
+    def _dordiai_compatible_voices(self, language):
+        code = self._language_catalog.canonical_code(language)
+        if code not in self._compatibleVoiceCache:
+            built_in = self._language_catalog.compatible_voice_ids(
+                self._models, code, tuple(self._voices),
+            )
+            managed = set()
+            if code in self._dordiai_all_languages():
+                required_role = {"uk": "holos_profile", "en": "pocket_english_state",
+                                 "ru": "pocket_russian_prompt"}.get(code, "target_embedding")
+                for voice, document in self._managedVoices.items():
+                    languages = {self._language_catalog.canonical_code(c) for c in document["languages"]}
+                    roles = {entry["role"] for entry in document["files"].values()}
+                    if code in languages and required_role in roles:
+                        managed.add(voice)
+            self._compatibleVoiceCache[code] = tuple(
+                voice for voice in self._voices
+                if voice in managed or voice in built_in and voice not in self._managedVoices
+            )
+        return self._compatibleVoiceCache[code]
 
     def _getAvailableVoices(self):
         return self._dordiai_filter_voices(OrderedDict((key, VoiceInfo(key, value[0], "uk")) for key, value in self._voices.items()))
@@ -836,13 +936,15 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         return choices
 
     def _get_availableLanguages(self):
-        _wide.refresh_personal(True)
-        return self._dordiai_filter_languages({"uk", "en", "en_GB", "en_US", "ru", "ru_RU"} | set(_latin.EXTRA) | set(_wide.CODES))
+        installed = set(self._dordiai_all_languages())
+        variants = {"en_GB", "en_US"} if "en" in installed else set()
+        return self._dordiai_filter_languages(installed | variants)
 
     def _get_availableEnvoices(self):
         names = OrderedDict(main=VoiceInfo("main", "Основний голос", "en"))
-        names.update((key, VoiceInfo(key, value[0], "en")) for key, value in self._voices.items())
-        return names
+        compatible = self._dordiai_compatible_voices("en")
+        names.update((key, VoiceInfo(key, self._voices[key][0], "en")) for key in compatible)
+        return self._dordiai_filter_voices(names)
 
     def _get_availableForeignpronunciations(self):
         return OrderedDict(
@@ -867,22 +969,25 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
 
     def _get_availableRuvoices(self):
         names = OrderedDict(main=VoiceInfo("main", "Основний голос", "ru"))
-        names.update((key, VoiceInfo(key, value[0], "ru")) for key, value in self._voices.items())
-        return names
+        compatible = self._dordiai_compatible_voices("ru")
+        names.update((key, VoiceInfo(key, self._voices[key][0], "ru")) for key in compatible)
+        return self._dordiai_filter_voices(names)
 
     def _resolve_voice_id(self, value):
+        if not _voice_policy.is_voice_allowed(value):
+            return value
         return self._voiceAliases.get(value, value)
 
     def _set_envoice(self, value):
         key = self._resolve_voice_id(value)
-        self._envoice = key if key in self._voices and key != "anatolii" else "main"
+        self._envoice = key if key in self._voices and _voice_policy.is_voice_allowed(key) else "main"
 
     def _get_envoice(self):
         return self._envoice
 
     def _set_ruvoice(self, value):
         key = self._resolve_voice_id(value)
-        self._ruvoice = key if key in self._voices and key != "anatolii" else "main"
+        self._ruvoice = key if key in self._voices and _voice_policy.is_voice_allowed(key) else "main"
 
     def _get_ruvoice(self):
         return self._ruvoice
@@ -904,7 +1009,13 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
     def _planned_parts(self, sequence, profile, mode, english, rate, controls, roles, multiplier, russian,
                        native_english=False, same_voice_for_mixed=False, native_profiles=False, number_language="auto",
                        spelling_language="auto", foreign_pronunciation="auto"):
-        parts = speech_parts(sequence, "uk", english, detect_russian=russian, spelling_language=spelling_language)
+        default_language = self._dordiai_selection[2]
+        parts = speech_parts(
+            sequence, default_language, english, detect_russian=russian,
+            spelling_language=spelling_language,
+            enabled_languages=self._dordiai_enabled_languages,
+            priorities=(default_language,), forced=self._dordiai_mode == "forced",
+        )
         # A language profile or the same-voice mode must never use the generic
         # Piper speaker, even if an older configuration enabled that setting.
         native_english = native_english and not (same_voice_for_mixed or native_profiles)
@@ -929,8 +1040,10 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             role_profile, role_rate, role_controls = roles.get(language.split("-")[0], (profile, rate, None))
             if role_profile in self._dordiai_selection[0]:
                 role_profile, role_rate, role_controls = profile, rate, None
-            if kind == "character":
-                role_profile, role_rate, role_controls = profile, rate, None
+            chosen_profile = self._dordiai_voice_for_language(language, role_profile)
+            if chosen_profile != role_profile:
+                role_rate, role_controls = rate, None
+            role_profile = _voice_policy.require_voice_allowed(chosen_profile)
             if kind == "character" and role_profile == CLASSMATE_PROFILE and language in CLASSMATE_LOCALES:
                 text = _letter_names.letter_name(language, text) or text
             speed = self._tempo(role_rate if role_controls is not None else rate, multiplier)
@@ -953,7 +1066,6 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 request["danishCommands"] = True
             if wide_code:
                 request["wideLocale"] = True
-                request["profile"] = profile
                 request["nativeEnglish"] = request["nativeProfile"] = False
             if language in CLASSMATE_LOCALES:
                 if kind == "character":
@@ -1002,7 +1114,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
 
     def _set_voice(self, value):
         value = self._resolve_voice_id(value)
-        if value in self._voices:
+        if value in self._voices and _voice_policy.is_voice_allowed(value):
             self._voice = value
 
     def _get_rate(self):
@@ -1071,13 +1183,17 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
 
     def terminate(self):
         with self._state:
+            if self._closed:
+                return
             self.cancel()
             self._closed = True
             self._jobs.put(None)
-        release_shared_worker(self._worker_lease)
+        # _run owns the worker until outstanding streams have acknowledged
+        # cancellation. Releasing here lets a replacement driver reuse it
+        # while this driver's old stream is still issuing cancel/drop.
 
     def _play(self, pcm, generation):
-        frame_bytes = SAMPLE_RATE * 2 // 20
+        frame_bytes = SAMPLE_RATE * 2 // 100
         for offset in range(0, len(pcm), frame_bytes):
             with self._state:
                 self._state.wait_for(lambda: generation != self._generation or not self._paused)
@@ -1123,7 +1239,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         # Bound lookahead in milliseconds even when a worker returns a full
         # cached sentence. One queue lets synthesis prepare the next language
         # while Windows is still playing the previous part.
-        frame_bytes = SAMPLE_RATE * 2 // 20
+        frame_bytes = SAMPLE_RATE * 2 // 100
         for kind, value in parts:
             if cancelled():
                 return
@@ -1159,6 +1275,9 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             except Exception as error:
                 if not cancelled():
                     log.error("dordiai-voices: speech synthesis failed (%s).", error)
+                    # Continuing after a failed word silently loses text.
+                    # Propagate to the output loop, which stops this utterance.
+                    raise
 
     def _run(self):
         cancelling_threads = []
@@ -1194,10 +1313,6 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                         languages = {request["language"] for request in spoken}
                         if len(languages) > 1:
                             pcm = render_parts(parts, warm_threads, stop)
-                            if any(request.get("nativeLocale") for request in spoken):
-                                return initial_audio(pcm, minimum=57600)
-                            if max(request["speed"] for request in spoken) >= 3:
-                                return initial_audio(pcm)
                             return pcm
                     return render_parts(parts, warm_threads, stop)
                 short_reserve = False
@@ -1228,7 +1343,11 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                             else:
                                 self._play(value, generation)
                 except Exception as error:
-                    log.error("dordiai-voices: speech output failed (%s).", error)
+                    if generation == self._generation:
+                        log.error("dordiai-voices: speech output failed (%s).", error)
+                        report = getattr(self, "_dordiai_report_error", None)
+                        if report is not None:
+                            report(error)
                 if generation == self._generation and self._jobs.empty():
                     try:
                         self._player.idle()
@@ -1238,11 +1357,25 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                         if generation == self._generation and self._jobs.empty():
                             synthDoneSpeaking.notify(synth=self)
         finally:
-            for thread in cancelling_threads:
-                thread.join()
-            for thread in warm_threads.values():
-                thread.join(30)
-            if self._worker_lease is None:self._engine.close()
+            outstanding = [thread for thread in cancelling_threads + list(warm_threads.values())
+                           if thread.is_alive()]
+            for thread in outstanding:
+                thread.join(timeout=.05)
+            outstanding = [thread for thread in outstanding if thread.is_alive()]
+            if self._worker_lease is None or outstanding:
+                self._engine.close()
             if self._english_engine is not None:
                 self._english_engine.close()
+            if outstanding:
+                # Keep a busy shared lease out of circulation even when a
+                # defective native call does not terminate. Waiting happens
+                # only in this daemon, never in NVDA's terminate() call.
+                def release_when_quiet():
+                    for thread in outstanding:
+                        thread.join()
+                    release_shared_worker(self._worker_lease)
+                Thread(target=release_when_quiet, daemon=True,
+                       name="dordiai retired worker cleanup").start()
+            else:
+                release_shared_worker(self._worker_lease)
             self._player.close()
