@@ -827,6 +827,11 @@ def start_fatal_recovery_probe():
             RECOVERY_OUTPUTS.append(sink)
             return sink
         nvwave.WavePlayer = create_recording_output
+    # Normal smoke suppresses desktop speech, but recovery must be audible.
+    # Restore normal speech before observing the genuine fallback notice.
+    import speech
+    speech.setSpeechMode(speech.SpeechMode.talk)
+    RESULT["injected_fatal_recovery"]["notice_speech_mode_enabled"] = True
     DRIVER._dordiai_report_error(ImportError("Injected probe notification boundary", name="dordiai_probe_optional_component"))
     RESULT["injected_fatal_recovery"]["queued_before_switch"] = (
         bool(getattr(DRIVER, "_dordiai_fatal_recovery_scheduled", False)) and

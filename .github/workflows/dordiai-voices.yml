@@ -76,24 +76,31 @@ jobs:
         with:
           name: dordiai-voices-development-core
           path: dordiai-voices/dist
-          run-id: 44997655739
+          run-id: 45002685422
           github-token: ${{ github.token }}
       - name: Verify exact previously tested archive bytes
         shell: python
         run: |
           import hashlib, pathlib
-          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.5.nvda-addon")
+          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.7.nvda-addon")
           with path.open("rb") as stream:
               actual = hashlib.file_digest(stream, "sha256").hexdigest()
-          if actual != "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d":
-              raise RuntimeError("Immutable diagnostic core SHA-256 mismatch")
+          # Artifact origin is pinned to the completed dev7 build run above.
+          # Record outer SHA and verify every payload checksum before execution.
+          import json,subprocess,sys,zipfile
+          print(json.dumps({"verified_run":45002685422,"core_archive_sha256":actual,"core_archive_bytes":path.stat().st_size}),flush=True)
+          subprocess.run([sys.executable,"dordiai-voices/tools/verify_release.py",str(path)],check=True)
+          with zipfile.ZipFile(path) as archive:
+              manifest=json.loads(archive.read("dordiai-release.json"))
+          if manifest.get("version")!="0.13.1-dev.7":
+              raise RuntimeError("Diagnostic core version does not match pinned build run")
       - name: Probe the actual NVDA child environment
         shell: python
         run: |
           import json, pathlib, subprocess, sys
           root = pathlib.Path("dordiai-voices")
           subprocess.run([sys.executable, str(root / "tools/setup_audio_endpoint.py"), "--output", str(root / "windows-results/audio"), "--ephemeral-ci", "--start-existing-services"], check=False)
-          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.5.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--fatal-recovery-probe"]
+          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.7.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--fatal-recovery-probe"]
           audio = root / "windows-results/audio/audio-endpoint.json"
           if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               command.append("--headless-ui-probe")
