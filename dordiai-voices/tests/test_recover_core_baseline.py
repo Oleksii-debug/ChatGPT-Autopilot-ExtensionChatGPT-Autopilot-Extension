@@ -94,9 +94,22 @@ class RecoverCoreBaselineTests(unittest.TestCase):
     def test_strict_paths_reject_traversal_windows_aliases_and_raw_backslash(self):
         for index, name in enumerate(["../escape", "CON.txt", "con .txt", "bad./file", "folder\\evil.bin", "folder//evil.bin"]):
             with self.subTest(name=name):
-                changed = self.rewrite(f"unsafe-{index}.zip", extra=[(name, b"bad")])
-                with self.assertRaisesRegex(ValueError, "Unsafe"):
-                    recovery.recover(changed, self.root / f"recovered-{index}", expected_sha256=self.digest(changed))
+                # Windows ZipInfo normalizes backslashes before writing.
+                # Patch equal-length ASCII bytes in both ZIP headers so this
+                # fixture really contains the prohibited raw spelling.
+                written_name = name.replace("\\", "_")
+                changed = self.rewrite(f"unsafe-{index}.zip", extra=[(written_name, b"bad")])
+                if written_name != name:
+                    data = changed.read_bytes()
+                    old, raw = written_name.encode("ascii"), name.encode("ascii")
+                    self.assertEqual(len(old), len(raw))
+                    self.assertEqual(data.count(old), 2)  # local + central headers
+                    changed.write_bytes(data.replace(old, raw))
+                    with zipfile.ZipFile(changed) as fixture:
+                        self.assertEqual(fixture.infolist()[-1].orig_filename, name)
+                with patch.object(recovery.tempfile, "mkdtemp", side_effect=AssertionError("Extraction started for unsafe ZIP")):
+                    with self.assertRaisesRegex(ValueError, "Unsafe"):
+                        recovery.recover(changed, self.root / f"recovered-{index}", expected_sha256=self.digest(changed))
 
     def test_case_collision_and_symlink_are_rejected(self):
         link = zipfile.ZipInfo("link")
