@@ -18,34 +18,39 @@
     "Windows engine and actual NVDA probe tools plus GitHub Actions workflow implemented",
     "Actual Windows dev5 standalone PCM smoke: core3, extended21 and representative MMS Hausa",
     "Actual NVDA limited UI smoke:45profiles, default3languages, settings/hotkey binding/Tab/Space",
-    "Drive-independent core4 + source5 exact ZIP reproduction verified"
+    "Drive-independent core4 + source5 exact ZIP reproduction verified",
+    "Actual Windows dev8 core3 and all21 sampled extended engines pass, including legacy nb/cmn native data paths",
+    "Actual Windows default-on shared MMS native and converted Hausa passes alongside original sessions",
+    "Actual NVDA dev8 phrase/character PCM,176 first-use glyph requests,300 cached API samples and genuine built-in eSpeak recovery after notification-boundary import fault complete"
   ],
   "open_requirements": [
     "10 selected entries have no integrated resources; one selected group is explicitly partial",
     "Complete character naming and actual NVDA keyboard echo across selected languages; current standalone character checks establish structure only",
     "Five primary Omni language paths remain too slow for interactive NVDA; Bodo/Kashmiri alternatives are experimental and not pronunciation/NVDA accepted",
-    "Fix the actual NVDA-launched child marisa_trie ImportError; current dev5 cannot submit phrase PCM through NVDA",
-    "Native-speaker pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source"
+    "Native-speaker pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source",
+    "First-use character latency remains too high:176 requests p95 242.0168ms, p99 572.6739ms, maximum1066.98ms before physical output",
+    "Real keyboard echo still needs owned-edit-control scan-code testing; direct CharacterMode requests are not typing evidence",
+    "Actual required-resource worker failure must be exercised end to end; injected ImportError recovery has passed"
   ],
   "environment": {
     "os": "Linux",
-    "windows_nvda_available": false,
-    "windows_verification_route": "GitHub Actions remains available independently; current run45000863624",
+    "windows_nvda_available": "Actual portable NVDA2026.3.1 runs on Windows CI through controlled probe; local executor remains unavailable",
+    "windows_verification_route": "GitHub Actions dev8 full run45005894766 passed functional checks; no physical audio endpoint",
     "local_executor_status": "unavailable; exec-server transport disconnected during task, no local file access"
   },
   "verification": {
     "local_unit_tests": 531,
     "local_unit_tests_passed": true,
-    "resource_catalog_entries_present": 83,
-    "missing_selected_resource_entries": 52,
+    "resource_catalog_entries_present": 125,
+    "missing_selected_resource_entries": 10,
     "windows_audio_verified": false,
     "nvda_accessibility_verified": false,
     "latency_targets_verified": false,
     "first_remote_ci": "Initial missing NumPy and test fixture UTF-8 issues fixed; both host test suites now pass",
     "linux_remote_unit_tests_passed": true,
     "windows_remote_unit_tests_passed": true,
-    "current_windows_run": 45002685422,
-    "current_windows_stage": "Completed dev7: core3 and both original/shared MMS native+projected pass. 19/21 sampled extended engines pass; NB/CMN legacy C data path fails. Full300 NVDA API samples pass; genuine ImportError fallback+notice passed on matching-core rerun45003764603 after harness unmuted speech.",
+    "current_windows_run": 45005894766,
+    "current_windows_stage": "Completed dev8:568 tests, core3 and sampled extended21 pass, original/shared MMS pass, actual NVDA limited UI and headless PCM functional checks complete",
     "dev2_staged_resource_entries": 125,
     "dev2_staged_full_entries": 124,
     "dev2_staged_partial_entries": 1,
@@ -53,27 +58,27 @@
     "windows_core_engine_probe_passed": true,
     "windows_extra_engine_probe_passed": true,
     "windows_nvda_probe_passed": false,
-    "windows_nvda_failure": "Confirmed Windows filename/extension-too-long loader error for marisa_trie. Child-only extended namespace fix under implementation and exact-path validation.",
+    "windows_nvda_failure": null,
     "recovered_diagnostics_run": 44989248999,
     "recovered_artifact_bytes_read": 1954355,
     "recovered_artifact_total_bytes": 1941758431,
-    "next_nvda_check": "Resolve actual NVDA-launched child import, then repeat phrase/typing/cancellation/long-reading checks. Physical output and acoustic latency still need a real audio endpoint.",
+    "next_nvda_check": "Actual scan-code typing echo and actual missing RuAccent model failure in isolated portable NVDA, plus first-use glyph latency optimization",
     "previous_real_windows_language_count": 21,
     "nvda_helper_fix_commit": "ff7899fc695546458ac7a236aa57104d46dea6cc",
     "windows_new_mms_representative_passed": true,
     "nvda_settings_smoke_passed": true,
     "nvda_keyboard_tab_space_smoke_passed": true,
     "final_source_snapshot": "evidence/source_snapshot_0.13.1-dev.6.json.gz",
-    "worker_import_diagnostics": "Structured child traceback confirms marisa_trie ImportError after bootstrap status reset; inherited and post-reset DLL directories absent. SetDllDirectory reset has not resolved the actual NVDA failure.",
+    "worker_import_diagnostics": "Child extended namespace resolves marisa_trie Windows264-character loader failure; actual dev8 phrase and character PCM pass",
     "final_source_tree_sha256": "8e8fe6056698395a885030bcf7df4f957e8c62283af9c8558d54dce081210d8f",
-    "core_archive_bytes": 1767407702,
+    "core_archive_bytes": 1767411258,
     "core_installed_bytes": 2130470392,
-    "core_archive_sha256": "14481b1cc0f9d01ae30845647f8ef2c31a8d5bbbfcc97bc6e10e345fb20e473b",
-    "core_built_version": "0.13.1-dev.7",
+    "core_archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
+    "core_built_version": "0.13.1-dev.8",
     "drive_independent_core_resume_verified": true,
     "drive_independent_core_resume_evidence": "evidence/recovered_core4_to_dev5_rebuild.json",
-    "verified_main_suite_tests_per_platform": 485,
-    "verified_main_suite_checkpoint_version": "0.13.1-dev.5",
+    "verified_main_suite_tests_per_platform": 568,
+    "verified_main_suite_checkpoint_version": "0.13.1-dev.8",
     "windows_standalone_pcm_verified": true,
     "nvda_ui_smoke_verified": true,
     "nvda_hotkey_binding_smoke_passed": true,
@@ -109,7 +114,7 @@
     "windows_character_structure_cases_passed": 11,
     "windows_character_exploratory_unsupported": 1,
     "windows_character_required_failures": 0,
-    "nvda_phrase_pcm_submission_verified": false,
+    "nvda_phrase_pcm_submission_verified": true,
     "nvda_builtin_windows_fallback_selected": true,
     "nvda_fallback_audibility_verified": false,
     "physical_audio_endpoint_count": 0,
@@ -117,13 +122,13 @@
       "run": 44999586051,
       "evidence": "evidence/windows_dev5_loader_44999586051.json.gz",
       "cause": "Windows native loader rejects 264-character marisa_trie PYD path; identical SHA-256 module imports at84characters in both fixed import-only children spawned by actual NVDA.",
-      "extended_namespace_fix": "under actual Windows validation; no speech acceptance yet",
+      "extended_namespace_fix": "Actual dev8 NVDA-launched private worker phrase/character PCM passed.",
       "diagnostic_limitation": "TemporaryDirectory removal of loaded short-copy PYD raised recorded WinError5, so dictionary postcheck was not reached in this diagnostic; production install was not changed."
     },
     "local_optional_model_tests_skipped": 14,
     "core_installed_language_entries": 3,
     "windows_mapped_file_replacement_verified": true,
-    "mms_shared_default_enabled": false,
+    "mms_shared_default_enabled": true,
     "current_dev6_core_engine_passed": false,
     "current_dev6_shared_mms_passed": false,
     "current_dev6_nvda_passed": false,
@@ -142,7 +147,7 @@
       "vendor_resolver": "Pinned complete audited source with one-line separator normalization; offline behavior unchanged",
       "mms_identity": "Independent reviewed full FD/FD and path/path clocks, reopened identity and epoch guards",
       "shared_default_enabled": false,
-      "actual_windows_pending": true
+      "actual_windows_pending": false
     },
     "dev6_recording_sink_warm_letters": {
       "count": 100,
@@ -188,20 +193,69 @@
       "errors": [],
       "timeouts": []
     },
-    "linux_ci_cases": 531,
+    "linux_ci_cases": 568,
     "linux_ci_skipped": 26,
-    "windows_ci_cases": 531,
+    "windows_ci_cases": 568,
     "windows_ci_skipped": 27,
     "dev8_changes": {
-      "legacy_c_data_path": "Independently reviewed exact native-data layout, measured path bounds and same-object aliases; Windows pending",
+      "legacy_c_data_path": "Actual Windows nb/cmn passed after independently reviewed parent/data layout and same-object legacy path handling",
       "required_resource_recovery": "Narrow exact RuAccent worker provenance; 17 new cases; actual missing-model end-to-end pending",
       "mms_shared_default_enabled": true,
-      "distinct_glyph_probe": "176 alphabet/digit/common-symbol requests added before warm-repeat benchmark; Windows pending"
-    }
+      "distinct_glyph_probe": "176 first-pass requests complete; latency target NOT accepted"
+    },
+    "windows_nvda_functional_probe_passed": true,
+    "windows_mms_shared_ha_engine_smoke_passed": true,
+    "current_dev8_functional_passed": true,
+    "dev8_durable_windows_evidence": {
+      "path": "evidence/windows_dev8_run_45005894766.json.gz",
+      "sha256": "2c64d094abcca8446d120e8d09da404ee2d887aa108b3954f90ff61cd481fb75",
+      "run": 45005894766,
+      "source_commit": "e527c0e64666bf34f030e6a5b2dbff30d539ade8",
+      "scope": "Exact original reports stored as byte-preserving Base64 records inside gzip; headless recording-output functional checks only. Not physical output, pronunciation or full product acceptance."
+    },
+    "dev8_headless_api_measurements": {
+      "scope": "Direct driver requests captured at RecordingPCMSink; no audio endpoint. First-pass glyphs differ materially from repeated cached glyphs.",
+      "alphabet_first_pass": {
+        "count": 176,
+        "p50_ms": 130.38,
+        "p95_ms": 242.0168,
+        "p99_ms": 572.6739,
+        "minimum_ms": 2.7615,
+        "maximum_ms": 1066.98
+      },
+      "warm_letters": {
+        "count": 100,
+        "p50_ms": 2.365,
+        "p95_ms": 2.7522,
+        "p99_ms": 2.8256,
+        "minimum_ms": 2.2545,
+        "maximum_ms": 2.9408
+      },
+      "warm_switch_requests": {
+        "count": 100,
+        "p50_ms": 2.3553,
+        "p95_ms": 2.8227,
+        "p99_ms": 3.0404,
+        "minimum_ms": 2.2644,
+        "maximum_ms": 3.2239
+      },
+      "cancel_api": {
+        "count": 100,
+        "p50_ms": 0.0078,
+        "p95_ms": 0.0097,
+        "p99_ms": 0.0102,
+        "minimum_ms": 0.0075,
+        "maximum_ms": 0.0115
+      },
+      "errors": [],
+      "timeouts": []
+    },
+    "actual_keyboard_echo_verified": false,
+    "dev8_required_resource_end_to_end_verified": false
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Run full dev8 Windows validation, including actual legacy eSpeak nb/cmn, default-on shared MMS, distinct glyphs and genuine builtin recovery; investigate any real failures without relaxing physical/pronunciation gates.",
+  "next_work": "Prove actual NVDA typing locale and missing-resource worker recovery; optimize first-use character preparation using measured evidence; retain open135-language/native-pronunciation/physical gates. Automatic decisions authorized; no permission questions.",
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
     "omni_fixed_reference_sets": 10,
@@ -225,38 +279,12 @@
   },
   "intermediate_windows_build_version": "0.13.1-dev.2",
   "latest_windows_evidence": {
-    "run": 44997655739,
-    "run_url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
-    "core_version": "0.13.1-dev.5",
-    "core_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
-    "reports": {
-      "core": {
-        "artifact_member": "engine/report.json",
-        "sha256": "d39d4df04674e2d09fad3f4950680473cd804c25c58c6daa020d672c8fea50fe"
-      },
-      "extended": {
-        "artifact_member": "extra-engines/report.json",
-        "sha256": "27379334ac976f20b4b36c1d5bb845edb7f1e62b8c3a1ac6fd48ba1e034e02d6"
-      },
-      "mms_ha": {
-        "artifact_member": "mms-ha/report.json",
-        "sha256": "f63717782c1a2fd41f7993112c8fec69d0a5125ded873423f72a7d5817472b78"
-      },
-      "characters": {
-        "artifact_member": "characters/report.json",
-        "sha256": "0d004ccd1676944660f255ca05f1349c4b1c5585406e0deb04199ce3be755866"
-      },
-      "nvda": {
-        "artifact_member": "nvda/windows-nvda-probe.json",
-        "sha256": "ffe4767f0f89d6a1b2513572f44b0f969ed04161ef9d25dcbec70b87eacc751f"
-      },
-      "audio_endpoint": {
-        "artifact_member": "audio/audio-endpoint.json",
-        "sha256": "c5b773693325a1a37129638e668628650126c8b006251b6818f584c22fbeae70"
-      }
-    },
-    "scope": "Standalone PCM and limited real NVDA UI smoke; physical output, pronunciation and full typing acceptance remain unverified.",
-    "durable_reports": "evidence/windows_dev5_run_44997655739.json.gz",
-    "durable_reports_sha256": "58661f013fb10495a0c62b9180f83d14039bfcddc70c5d6e4dc50a67dc6935fd"
+    "path": "evidence/windows_dev8_run_45005894766.json.gz",
+    "sha256": "2c64d094abcca8446d120e8d09da404ee2d887aa108b3954f90ff61cd481fb75",
+    "run": 45005894766,
+    "source_commit": "e527c0e64666bf34f030e6a5b2dbff30d539ade8",
+    "scope": "Exact original reports stored as byte-preserving Base64 records inside gzip; headless recording-output functional checks only. Not physical output, pronunciation or full product acceptance.",
+    "core_version": "0.13.1-dev.8",
+    "core_archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6"
   }
 }

@@ -11,13 +11,12 @@
       "retained_profiles": 45
     },
     "core_size": {
-      "status": "local_build_passed",
-      "bytes": 1767225930,
+      "status": "windows_build_passed",
+      "bytes": 1767411258,
       "maximum_bytes": 3000000000,
-      "evidence": "evidence/release_build_0.13.1-dev.5.json",
-      "built_version": "0.13.1-dev.5",
-      "installed_bytes": 2129363570,
-      "archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d"
+      "built_version": "0.13.1-dev.8",
+      "archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
+      "evidence": "evidence/windows_dev8_run_45005894766.json.gz"
     },
     "selected_language_resources": {
       "status": "incomplete",
@@ -34,14 +33,25 @@
     },
     "interactive_speed": {
       "status": "not_accepted",
-      "evidence": "evidence/omnivoice_cpu_word_benchmark.json",
+      "evidence": [
+        "evidence/omnivoice_cpu_word_benchmark.json",
+        "evidence/windows_dev8_run_45005894766.json.gz"
+      ],
       "slow_model_language_count": 5,
-      "caveat": "Five primary Omni paths remain slow; native Bodo/Kashmiri alternatives do not establish typing, pronunciation or physical latency acceptance."
+      "caveat": "Five primary Omni paths remain slow; native Bodo/Kashmiri alternatives do not establish typing, pronunciation or physical latency acceptance. First-use direct glyph p95 242ms/p99 573ms and worst1067ms; repeated cached2.75ms is not first-use or physical acceptance.",
+      "first_use_glyph_predevice": {
+        "count": 176,
+        "p50_ms": 130.38,
+        "p95_ms": 242.0168,
+        "p99_ms": 572.6739,
+        "minimum_ms": 2.7615,
+        "maximum_ms": 1066.98
+      }
     },
     "windows_models": {
-      "status": "dev5_standalone_pcm_smoke_passed",
-      "current_run": 44997655739,
-      "core_version": "0.13.1-dev.5",
+      "status": "dev8_standalone_pcm_smoke_passed",
+      "current_run": 45005894766,
+      "core_version": "0.13.1-dev.8",
       "core_language_count": 3,
       "core_runs_per_language": 2,
       "extended_passed_language_count": 21,
@@ -71,20 +81,22 @@
       ],
       "new_mms_ha_representative": "passed-engine-smoke",
       "native_extension_preflight": "RecordTrie import, dictionary construction and nonoverride word passed in inherited and reset child modes",
-      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
       "report_members": [
         "engine/report.json",
         "extra-engines/report.json",
-        "mms-ha/report.json"
+        "mms-ha/report.json",
+        "mms-ha-shared/report.json"
       ],
-      "caveat": "Core languages overlap extended21. These are standalone worker PCM tests, not real NVDA output or all83 installed languages."
+      "caveat": "Core languages overlap extended21. These are standalone worker PCM tests, not real NVDA output or all83 installed languages.",
+      "new_mms_ha_shared_representative": "passed-native-and-converted-strict-shared-smoke"
     },
     "actual_nvda": {
-      "status": "ui_smoke_passed_phrase_pcm_failed",
-      "current_run": 44997655739,
+      "status": "headless_functional_checks_complete_physical_blocked",
+      "current_run": 45005894766,
       "nvda_version": "2026.3.1",
-      "core_version": "0.13.1-dev.5",
-      "core_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+      "core_version": "0.13.1-dev.8",
+      "core_archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
       "recording_sink_test_double": true,
       "driver_selection_with_recording_sink": true,
       "allowed_profiles": 45,
@@ -97,19 +109,21 @@
       "hotkey_binding_smoke": true,
       "keyboard_tab_and_space_smoke": true,
       "host_sonic_import_and_dll_smoke": true,
-      "audio_submission": "failed_marisa_trie_ImportError",
-      "confirmed_import_module": "marisa_trie",
+      "audio_submission": "phrase,character and176 first-pass glyphs produced nonzero real-model PCM at explicit recording-output test double",
+      "confirmed_import_module": null,
       "worker_bootstrap_reset_observed": true,
       "dll_search_reset_resolved_import_error": false,
-      "reason": "Actual NVDA child still fails in Ukrainian stress dictionary import despite passing standalone RecordTrie/dictionary checks. Separately, CI has zero audio endpoints.",
+      "reason": "Zero Windows audio endpoints; genuine keyboard echo and native pronunciation remain unverified. API and PCM tests cannot establish audible output.",
       "builtin_windows_fallback_selected": true,
       "fallback_notice_requested": true,
       "fallback_audibility_verified": false,
       "wave_player_verified": false,
       "physical_acoustic_latency_verified": false,
       "physical_audio_verified": false,
-      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
-      "report_member": "nvda/windows-nvda-probe.json"
+      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
+      "report_member": "nvda/windows-nvda-probe.json",
+      "actual_keyboard_echo_verified": false,
+      "import_notification_recovery_notice_pcm_verified": true
     },
     "native_pronunciation": {
       "status": "not_accepted",
@@ -124,14 +138,15 @@
     },
     "main_unit_suite": {
       "status": "passed",
-      "tests_per_platform": 485,
+      "tests_per_platform": 568,
       "platforms": [
-        "host Linux",
-        "Windows"
+        "Linux CI",
+        "Windows CI"
       ],
-      "checkpoint_version": "0.13.1-dev.5",
-      "run": 44997655739,
-      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739"
+      "windows_skipped": 27,
+      "checkpoint_version": "0.13.1-dev.8",
+      "run": 45005894766,
+      "evidence": "evidence/windows_dev8_run_45005894766.json.gz"
     },
     "windows_character_structure": {
       "status": "passed_limited_structural_smoke",
@@ -140,7 +155,7 @@
       "exploratory_raw_supplementary_case": "explicitly unsupported",
       "nvda_typing_verified": false,
       "pronunciation_verified": false,
-      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
       "report_member": "characters/report.json"
     },
     "physical_audio_output": {
@@ -149,61 +164,43 @@
       "wave_player_verified": false,
       "physical_audio_verified": false,
       "acoustic_latency_verified": false,
-      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
       "report_member": "audio/audio-endpoint.json"
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
-  "latest_windows_reports": {
-    "core": {
-      "artifact_member": "engine/report.json",
-      "sha256": "d39d4df04674e2d09fad3f4950680473cd804c25c58c6daa020d672c8fea50fe"
-    },
-    "extended": {
-      "artifact_member": "extra-engines/report.json",
-      "sha256": "27379334ac976f20b4b36c1d5bb845edb7f1e62b8c3a1ac6fd48ba1e034e02d6"
-    },
-    "mms_ha": {
-      "artifact_member": "mms-ha/report.json",
-      "sha256": "f63717782c1a2fd41f7993112c8fec69d0a5125ded873423f72a7d5817472b78"
-    },
-    "characters": {
-      "artifact_member": "characters/report.json",
-      "sha256": "0d004ccd1676944660f255ca05f1349c4b1c5585406e0deb04199ce3be755866"
-    },
-    "nvda": {
-      "artifact_member": "nvda/windows-nvda-probe.json",
-      "sha256": "ffe4767f0f89d6a1b2513572f44b0f969ed04161ef9d25dcbec70b87eacc751f"
-    },
-    "audio_endpoint": {
-      "artifact_member": "audio/audio-endpoint.json",
-      "sha256": "c5b773693325a1a37129638e668628650126c8b006251b6818f584c22fbeae70"
-    }
-  },
-  "latest_windows_run": 44997655739,
+  "latest_windows_run": 45005894766,
   "durable_windows_reports": {
-    "path": "evidence/windows_dev5_run_44997655739.json.gz",
-    "sha256": "58661f013fb10495a0c62b9180f83d14039bfcddc70c5d6e4dc50a67dc6935fd"
+    "path": "evidence/windows_dev8_run_45005894766.json.gz",
+    "sha256": "2c64d094abcca8446d120e8d09da404ee2d887aa108b3954f90ff61cd481fb75",
+    "run": 45005894766,
+    "source_commit": "e527c0e64666bf34f030e6a5b2dbff30d539ade8",
+    "scope": "Exact original reports stored as byte-preserving Base64 records inside gzip; headless recording-output functional checks only. Not physical output, pronunciation or full product acceptance."
   },
   "native_loader_diagnosis": {
     "run_id": 44999586051,
     "evidence": "evidence/windows_dev5_loader_44999586051.json.gz",
     "proven_cause": "Native module absolute path264characters fails with filename-too-long; identicalbytes at84characters import successfully.",
-    "production_fix_accepted": false
+    "production_fix_accepted": "Functional Windows NVDA private worker import and PCM verified in dev8; acoustic output unverified."
   },
   "current_frozen_core": {
-    "version": "0.13.1-dev.7",
-    "archive_sha256": "14481b1cc0f9d01ae30845647f8ef2c31a8d5bbbfcc97bc6e10e345fb20e473b",
-    "archive_bytes": 1767407702,
-    "windows_run": 45002685422,
-    "matching_core_nvda_rerun": 45003764603,
+    "version": "0.13.1-dev.8",
+    "archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
+    "archive_bytes": 1767411258,
+    "windows_run": 45005894766,
+    "source_commit": "e527c0e64666bf34f030e6a5b2dbff30d539ade8",
     "core_three_engines_passed": true,
-    "mms_original_and_shared_passed": true,
-    "nvda_three_100_sample_series_passed": true,
-    "genuine_builtin_import_recovery_passed": true,
+    "sampled_extended21_passed": true,
+    "mms_original_and_default_shared_passed": true,
+    "nvda_176_first_pass_glyphs_completed": true,
+    "nvda_three_100_sample_series_completed": true,
+    "genuine_builtin_import_notification_recovery_passed": true,
+    "actual_required_resource_failure_verified": false,
     "physical_audio_verified": false,
+    "actual_keyboard_echo_verified": false,
+    "first_use_glyph_latency_accepted": false,
     "new_word_latency_verified": false,
-    "source_snapshot_note": "Full source7 and exact build recipe are pinned in commitcd6ab9319ceefe2709b0b09968abff54342d3a5c; last separate gzip source snapshot is dev6."
+    "source_snapshot_note": "Exact source8 and recipe in Git; separate compressed source snapshot remains dev6."
   },
   "current_environment_blocker": "Local exec-server unavailable; frozen source6 and binary source snapshot6 already committed. GitHub Windows verification continues."
 }
