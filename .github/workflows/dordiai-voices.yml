@@ -71,30 +71,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Reuse the immutable development core for loader diagnostics
+      - name: Reuse the immutable tested development core for isolated NVDA probes
         uses: actions/download-artifact@v4
         with:
           name: dordiai-voices-development-core
           path: dordiai-voices/dist
-          run-id: 45002685422
+          run-id: 45005894766
           github-token: ${{ github.token }}
       - name: Verify exact previously tested archive bytes
         shell: python
         run: |
           import hashlib, pathlib
-          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.7.nvda-addon")
+          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.8.nvda-addon")
           with path.open("rb") as stream:
               actual = hashlib.file_digest(stream, "sha256").hexdigest()
-          # Artifact origin is pinned to the completed dev7 build run above.
+          # Artifact origin is pinned to the completed dev8 build run above.
           # Record outer SHA and verify every payload checksum before execution.
           import json,subprocess,sys,zipfile
-          if actual != "14481b1cc0f9d01ae30845647f8ef2c31a8d5bbbfcc97bc6e10e345fb20e473b":
-              raise RuntimeError("Pinned core7 archive checksum mismatch")
-          print(json.dumps({"verified_run":45002685422,"core_archive_sha256":actual,"core_archive_bytes":path.stat().st_size}),flush=True)
+          if actual != "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6":
+              raise RuntimeError("Pinned core8 archive checksum mismatch")
+          print(json.dumps({"verified_run":45005894766,"core_archive_sha256":actual,"core_archive_bytes":path.stat().st_size}),flush=True)
           subprocess.run([sys.executable,"dordiai-voices/tools/verify_release.py",str(path)],check=True)
           with zipfile.ZipFile(path) as archive:
               manifest=json.loads(archive.read("dordiai-release.json"))
-          if manifest.get("version")!="0.13.1-dev.7":
+          if manifest.get("version")!="0.13.1-dev.8":
               raise RuntimeError("Diagnostic core version does not match pinned build run")
       - name: Probe the actual NVDA child environment
         shell: python
@@ -102,7 +102,7 @@ jobs:
           import json, pathlib, subprocess, sys
           root = pathlib.Path("dordiai-voices")
           subprocess.run([sys.executable, str(root / "tools/setup_audio_endpoint.py"), "--output", str(root / "windows-results/audio"), "--ephemeral-ci", "--start-existing-services"], check=False)
-          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.7.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--fatal-recovery-probe"]
+          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.8.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--fatal-recovery-probe"]
           audio = root / "windows-results/audio/audio-endpoint.json"
           if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               command.append("--headless-ui-probe")
