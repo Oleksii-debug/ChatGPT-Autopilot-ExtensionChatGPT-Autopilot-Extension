@@ -40,7 +40,7 @@ jobs:
               raise RuntimeError("Immutable core8 checksum mismatch")
           print("Verified core8 "+actual,flush=True)
       - name: Audit actual bank keys and clip bounds without running models
-        run: python dordiai-voices/tools/inspect_character_banks.py --core dordiai-voices/dist/dordiai-voices-0.13.1-dev.8.nvda-addon --profiles all --output dordiai-voices/character-bank-audit.json
+        run: python dordiai-voices/tools/inspect_character_banks.py --core dordiai-voices/dist/dordiai-voices-0.13.1-dev.8.nvda-addon --profiles all --probe-source dordiai-voices/tools/windows_nvda_probe.py --output dordiai-voices/character-bank-audit.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
