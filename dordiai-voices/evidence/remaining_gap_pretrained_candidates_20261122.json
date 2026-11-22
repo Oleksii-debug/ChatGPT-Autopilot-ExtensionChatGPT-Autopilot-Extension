@@ -1,0 +1,254 @@
+{
+  "date": "2026-11-22",
+  "status": "primary-source-candidates-not-product-resource-registration",
+  "executor_available": false,
+  "live_runtime_modified": false,
+  "new_models_ready": false,
+  "candidates": [
+    {
+      "selected_code": "aa",
+      "language": "Afar",
+      "status": "actual-published-pretrained-weights-three-native-text-PCM-cases-executed-in-Linux-CI",
+      "repository": "michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+      "revision": "e3d25f78d2613dc0e659f12711f4cac1bf1b81a1",
+      "primary_url": "https://huggingface.co/michsethowusu/voxcpm-afrispeech-full-inference-20260606",
+      "publisher_claim": "Full VoxCPM-0.5B fine-tune on all 50 AfriSpeech language subsets; Afar explicitly included",
+      "runtime": {
+        "repository": "OpenBMB/VoxCPM",
+        "revision": "300e4260b509066151d623dc9c0aa922cf82232b",
+        "source_blob_model": "20fc15b6df0955b018c8329f84f0ceecec37da71",
+        "source_blob_utils": "f6d7463ca19ab6cc0ddcbd44563603aa8029b6a7",
+        "source_blob_audiovae": "38899180cfa8b2ffbcfc3aadc439310790efb03b",
+        "architecture": "VoxCPM v1 continuous diffusion autoregressive speech, not v2",
+        "conditioning": "Native Afar orthography; no explicit language-token API, no IPA substitution, no reference/clone",
+        "framework": "PyTorch CPU prototype; no ready ONNX export of this fine-tune verified",
+        "native_sample_rate_publisher": 16000,
+        "prototype_dtype": "float32 memory-only override",
+        "cache_horizon": 256,
+        "generation_max_patches": 96,
+        "strict_state_dict": true,
+        "weights_only_load": true,
+        "inference_network_guard": true
+      },
+      "files": [
+        {
+          "path": "pytorch_model.bin",
+          "approx_bytes": 2610000000,
+          "sha256": "0b25598a4e2f9b63273744e5863cb06733dada7cb445b531bc625d6e2a581bf6"
+        },
+        {
+          "path": "audiovae.pth",
+          "approx_bytes": 301000000,
+          "sha256": "5b93f34c771281679b0ff93be3d1c1681eb1f301c3892e701db8f10a725b20a9"
+        }
+      ],
+      "license": "Apache-2.0 according to publisher; original training-data/source terms separate",
+      "native_text_source": {
+        "repository": "AfriSpeech/youversion-african-speech",
+        "former_name": "AfriSpeech/africa-speech",
+        "subset": "Afar_aar",
+        "rows_seen_approximately": 1820,
+        "url": "https://huggingface.co/datasets/AfriSpeech/youversion-african-speech",
+        "sample_ids": [
+          "Afar_aar_00000002",
+          "Afar_aar_00000010",
+          "Afar_aar_00000009"
+        ],
+        "sample_revision_pinned": false,
+        "audio_downloaded": false
+      },
+      "compatibility_cautions": [
+        "Expected ~2.91GB downloaded weights plus CPU runtime; not for minimal initial core",
+        "CPU memory/speed and current-runtime compatibility need actual Actions execution",
+        "Successful finite native-text PCM would still not verify native pronunciation, characters, typing or selected-voice projection",
+        "Different AfriSpeech/vox-cpm-africa repository uses IPA and private filesystem paths; it is not silently substituted for this released orthographic checkpoint"
+      ],
+      "prototype_tool_git_blob": "302ebde32da66806aa72c25793b2033b86da0a18",
+      "prototype_workflow_git_blob": "049f759a45e381dbdee89b348175a1e8b5d682ef",
+      "actual_ci": {
+        "run_id": 45009987751,
+        "job_id": 137169971173,
+        "commit": "b8efd1baed341a112eb633197f6b9f93ac11bf48",
+        "conclusion": "success",
+        "native_text_cases": 3,
+        "strict_state_dict_and_offline_probe_passed": true,
+        "artifact_id": 14749562121,
+        "artifact_bytes": 231858,
+        "artifact_zip_sha256": "5625e5dd217615af9b0d785eee696da52979248382305f206cb46f164a985b2a",
+        "exact_report_metrics_retrieval": "pending artifact JSON reader; do not invent",
+        "native_listener_verified": false,
+        "product_integrated": false
+      },
+      "prototype_report_reader_git_blob": "b14e622c901bc26ee44f3e00985e6a84650aa0c9"
+    },
+    {
+      "selected_codes": [
+        "ss",
+        "ve"
+      ],
+      "languages": [
+        "Swati",
+        "Venda"
+      ],
+      "status": "actual-trained-compact-ONNX-candidate-handed-to-language-routing-agent",
+      "model_repository": "AfriSpeech/africa-tts",
+      "model_revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
+      "runtime_repository": "AfriSpeech/africa-tts",
+      "runtime_revision": "b4508ae979dd34eea2597d420d67176ef55a21a0",
+      "trained_languages_git_blob": "a2d547853bd1b3b8c6db110b42e23e0f76c43000",
+      "trained_hours": {
+        "ssw": 12.08,
+        "ven": 10.62
+      },
+      "architecture_publisher": "Six-layer 110M Pocket TTS student including codec, distilled from guided 24-layer base; IPA input",
+      "output_sample_rate": 24000,
+      "license": "Model and default voices CC-BY-NC-4.0; code MIT",
+      "frontend": "africa-g2p exact training pin 76b53a8, full commit to resolve before use; ordinary spelling is not direct acoustic input",
+      "settings": {
+        "temperature": 0.3,
+        "num_steps": 1,
+        "silence_scale": 1
+      },
+      "required_native_references": [
+        "sherpa-onnx/voices/ssw.wav",
+        "sherpa-onnx/voices/ven.wav"
+      ],
+      "files": [
+        {
+          "path": "sherpa-onnx/decoder.int8.onnx",
+          "approx_megabytes": 22.6,
+          "sha256": "f2083d75f2027179ee335ce3e27d4e7b5e0d21d8166ed22e4e845b3143669d50"
+        },
+        {
+          "path": "sherpa-onnx/encoder.onnx",
+          "approx_megabytes": 39.3,
+          "sha256": "9b80b76221ecb791e486dfb502a0279c86a6ad09d01546b1d18047d42c8024db"
+        },
+        {
+          "path": "sherpa-onnx/lm_flow.int8.onnx",
+          "approx_megabytes": 9.96,
+          "sha256": "19fa27ae28c3a322cf62f290f03013ee03222652a322d2d26553c77a3682037f"
+        },
+        {
+          "path": "sherpa-onnx/lm_main.int8.onnx",
+          "approx_megabytes": 304,
+          "sha256": "ce2dd37e2bb257cedd5a71ccdc7fcb0dc8a2955638d569a47833884104cde764"
+        },
+        {
+          "path": "sherpa-onnx/text_conditioner.onnx",
+          "approx_megabytes": 16.4,
+          "sha256": "7aa23a316ae43ce94f3d2c3be5c30b4910cba86a29362f7f4e365268035b8eeb"
+        }
+      ],
+      "compatibility_cautions": [
+        "Primary mobile README claims209MB bundle; observed current HF folder435MB. Inspect actual layer metadata and file sizes before reporting size or speed",
+        "Afar and Comorian are in separate657UNTRAINED nearest-language table, not these92 trained languages; do not claim those as native",
+        "No digits seen in training; spell-out grammar still required",
+        "Native G2P output and same-language references must be pinned; do not substitute nearby default voices",
+        "Published benchmark is publisher evidence, not our NVDA or CPU acceptance"
+      ],
+      "primary_urls": [
+        "https://github.com/AfriSpeech/africa-tts/blob/b4508ae979dd34eea2597d420d67176ef55a21a0/docs/MODEL.md",
+        "https://github.com/AfriSpeech/africa-tts/blob/b4508ae979dd34eea2597d420d67176ef55a21a0/mobile/README.md",
+        "https://huggingface.co/AfriSpeech/africa-tts/tree/main/sherpa-onnx"
+      ]
+    },
+    {
+      "selected_code": "comorian",
+      "status": "genuine-native-service-exists-no-free-downloadable-model-verified",
+      "candidate": "KomoriTTS v1",
+      "publisher": "Komor-IA",
+      "native_variant": "Shingazidja only (zdj); not all four Comorian varieties",
+      "architecture": "MMS/VITS fine-tuned from Swahili on about1.3h native single-speaker speech",
+      "native_model_claim_primary": true,
+      "public_access": "Bearer-key REST endpoint; no weight URL or model redistribution license verified",
+      "publisher_model_url": "https://www.komor-ia.com/models/komori-tts",
+      "native_dataset_url": "https://www.komor-ia.com/datasets/shingazidja-voice-v1-0-0-n17k",
+      "dataset_metadata": {
+        "examples": 1408,
+        "approx_megabytes": 237,
+        "license": "CC-BY-NC-4.0",
+        "access": "Login required; not downloaded"
+      },
+      "repository_public_status": "Publisher-linked github.com/komoria has no public repositories",
+      "related_candidate": "rifailabs/km-tts-v2 is gated and exposes copied OmniVoice card; specific native fine-tuning evidence/hash unavailable, so not treated as ready"
+    }
+  ],
+  "false_aliases_and_sources": [
+    {
+      "source": "k2-fsa/OmniVoice/docs/lang_id_name_map.tsv",
+      "git_blob": "fa8ffcbe7bcd62903a857f75dc1dd7e2337e8fc6",
+      "correct_mapping": "nhg = Tetelcingo Nahuatl",
+      "rejected_claim": "Mirrored README incorrectly calls nhg Ngazidja Comorian; never alias nhg to zdj/comorian"
+    },
+    {
+      "source": "facebook/mms-tts official1107TTS README",
+      "url": "https://huggingface.co/facebook/mms-tts/raw/main/README.md",
+      "tested_absent_codes": [
+        "tet",
+        "ssw",
+        "ven",
+        "nbl",
+        "aar",
+        "hmo",
+        "zdj",
+        "wni",
+        "wlc",
+        "swb",
+        "ton"
+      ],
+      "limitation": "Absence from this publisher list is not proof no independent checkpoint exists. MMS ASR/LID lists and broad ISO name tables must not be mistaken for TTS weight availability"
+    },
+    {
+      "source": "Phoonnx/vits-tn_za-google_nwu-low-espeak",
+      "rejected_claim": "Third-party autogenerated article calls tn Tshivenda. tn is Tswana, so it cannot close Venda without primary contradicting evidence."
+    }
+  ],
+  "remaining_unresolved": [
+    {
+      "code": "tet",
+      "result": "No accessible native checkpoint found; official O-COCOSDA2025 country report describes work in progress, not downloadable weights",
+      "primary_url": "https://ococosda2025.id/files/Full%20Program%20Book%20OCOCOSDA%202025%2014Nov2025.pdf"
+    },
+    {
+      "code": "nr",
+      "result": "No newly accessible native South Ndebele pretrained weights verified. Northern nde checkpoint is different; no renaming."
+    },
+    {
+      "code": "ho",
+      "result": "No usable Hiri Motu native TTS checkpoint verified. Motu/meu and language-name mapping tables are not Hiri Motu model evidence."
+    },
+    {
+      "code": "cnr",
+      "result": "Earlier47.9h genuine corpus remains a data candidate, no trained weights verified."
+    },
+    {
+      "code": "ito",
+      "result": "No trained native Itonama checkpoint verified."
+    },
+    {
+      "code": "to",
+      "result": "Earlier isolated Tongan phonemic prototype is not native trained weights; remains unregistered."
+    }
+  ],
+  "source_restrictions_recorded": [
+    {
+      "resource": "SADiLaR LwaziII Swati/Venda corpora",
+      "restriction": "CC-BY-NC-ND-3.0 South Africa. Official corpus listing is data, not compiled pretrained voices.",
+      "urls": [
+        "https://repo.sadilar.org/items/9a9b5d8c-a768-4265-b1bb-632bb284268a",
+        "https://repo.sadilar.org/items/1a3f2d2f-b2e5-47ac-8735-c0205746d935"
+      ]
+    },
+    {
+      "resource": "South African Next Voices / Swivuriso",
+      "restriction": "Primary dataset specifically excludes all TTS/voice-generation use, even though it contains nbl/ven ASR data; not adopted for this project.",
+      "url": "https://huggingface.co/datasets/dsfsi-anv/za-african-next-voices"
+    },
+    {
+      "resource": "Intron AfriSpeech200 accent metadata",
+      "restriction": "English accented ASR, not native Swati/Venda target-language recordings; accent names cannot establish native TTS support",
+      "url": "https://huggingface.co/datasets/intronhealth/afrispeech-200"
+    }
+  ]
+}

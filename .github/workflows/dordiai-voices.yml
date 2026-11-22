@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dordiai-voices-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[windows]') }}
+  group: dordiai-voices-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[windows]') }}-${{ contains(github.event.head_commit.message, '[probe-nvda]') }}-${{ contains(github.event.head_commit.message, '[diagnose-nvda]') }}
   cancel-in-progress: true
 
 jobs:

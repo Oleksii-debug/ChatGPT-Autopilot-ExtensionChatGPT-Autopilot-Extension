@@ -1,0 +1,47 @@
+name: Read isolated Afar research report
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths: [.github/workflows/dordiai-afar-report.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[read-afar-report]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Fetch only the completed own-repository research artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh run download 45009987751 --repo "$REPOSITORY" --name dordiai-afar-candidate-45009987751 --dir afar-evidence
+      - name: Print exact bounded report JSON and verify waveform hashes
+        run: |
+          python - <<'PY'
+          import base64, gzip, hashlib, json, pathlib, wave
+          root = pathlib.Path("afar-evidence")
+          original = (root/"afar-probe.json").read_bytes()
+          report = json.loads(original)
+          assert report["status"] == "real-native-text-pcm-candidate-unintegrated"
+          assert len(report["cases"]) == 3
+          assert report["state_keys_missing"] == report["state_keys_unexpected"] == []
+          assert report["registered_in_product"] is False
+          for item in report["cases"]:
+              path = root/item["wav_file"]
+              assert path.parent == root and path.is_file()
+              assert hashlib.sha256(path.read_bytes()).hexdigest() == item["wav_sha256"]
+              with wave.open(str(path)) as wav:
+                  assert wav.getframerate() == report["sample_rate"] == 16000
+                  assert wav.getnframes() == item["samples"]
+              item["artifact_wav_hash_and_header_verified"] = True
+          compressed = gzip.compress(original, mtime=0)
+          print("AFAR_ORIGINAL_GZIP_SHA256 " + hashlib.sha256(compressed).hexdigest())
+          print("AFAR_ORIGINAL_GZIP_B64 " + base64.b64encode(compressed).decode("ascii"))
+          print("AFAR_REPORT_JSON_BEGIN")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          print("AFAR_REPORT_JSON_END")
+          PY

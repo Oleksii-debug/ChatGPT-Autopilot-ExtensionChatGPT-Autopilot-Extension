@@ -1,0 +1,1210 @@
+{
+  "format": "dordiai-core-character-bank-summary",
+  "source_run": 45009758998,
+  "source_job": 137169259382,
+  "core_version": "0.13.1-dev.8",
+  "core_archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
+  "script_git_blob": "216c4d8de02af45cc8c8b1ba1e750a6a71f73102",
+  "observations": {
+    "format": "dordiai-character-bank-coverage-audit",
+    "profiles": [
+      {
+        "profile": "adam",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "agnieszka",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "alex",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "alice_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "astra_day2",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "bella",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "brian",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "brian_studio",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "brianna",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "callum_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "charlie_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "chris",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "claude_day2",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "daniel",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "daniel_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "david",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "elis",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "gemini_day2",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "george",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "george_unpacked",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "gpt_day2",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "grok_day2",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "harry",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "hazel",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "keeper",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "laura_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "laura_unpacked",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "lian",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "liza",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "liza_talk",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "mark",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "mykola",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "oksana",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "oleksii",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "oleksii_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "oleksii_day2",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "oleksii_unpacked",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "olena",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "sara",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "sara_archive",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "studio_day1",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "veren",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "viktoriia",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "will",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      },
+      {
+        "profile": "yevhen",
+        "summary": {
+          "uk": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "ru": {
+            "letters": 33,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 33,
+            "no_default_prepared_candidate": 0
+          },
+          "en-us": {
+            "letters": 26,
+            "native_spoken_name": 0,
+            "native_glyph_only": 0,
+            "navigation_spoken_name": 26,
+            "no_default_prepared_candidate": 0
+          }
+        }
+      }
+    ]
+  },
+  "aggregate": {
+    "uk": {
+      "profiles": 45,
+      "letters": 1485,
+      "native_spoken_name": 0,
+      "native_glyph_only": 0,
+      "navigation_spoken_name": 1485,
+      "no_default_prepared_candidate": 0
+    },
+    "ru": {
+      "profiles": 45,
+      "letters": 1485,
+      "native_spoken_name": 0,
+      "native_glyph_only": 0,
+      "navigation_spoken_name": 1485,
+      "no_default_prepared_candidate": 0
+    },
+    "en-us": {
+      "profiles": 45,
+      "letters": 1170,
+      "native_spoken_name": 0,
+      "native_glyph_only": 0,
+      "navigation_spoken_name": 1170,
+      "no_default_prepared_candidate": 0
+    }
+  },
+  "limits": "Immutable actual ZIP metadata only; matching names and PCM bounds, not live NVDA path access, WAV quality, pronunciation or acoustic output."
+}
