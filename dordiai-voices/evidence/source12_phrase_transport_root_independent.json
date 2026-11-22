@@ -1,0 +1,11 @@
+{
+  "format": "dordiai-root-independent-full-reference-ncc",
+  "run_id": 45042554326,
+  "reference_frames": 53041,
+  "capture_array_offset_frames": 2225,
+  "normalized_correlation": 0.9999301895373778,
+  "gain": 0.9972704687455559,
+  "mean_centered": true,
+  "full_reference_window_used": true,
+  "scope": "Exact software transport only; PCM index is not latency; physical/pronunciation/product readiness remain false"
+}

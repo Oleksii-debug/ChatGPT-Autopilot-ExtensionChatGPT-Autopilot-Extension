@@ -36,7 +36,8 @@
     "Actual installed source11 dictionary manager at266-character plain data path passes97 source/control cases; all memberships match source.",
     "Real unchanged WavePlayer on owned virtual render endpoint passed core10 control without recording sink; capture denied and physical audio remain unverified.",
     "Immutable source12 passes all five actual NVDA modes: unchanged100 words/102 pieces route with zero mismatches; seven plain/metadata/compound cases, nine actual typed cases and two genuine resource faults pass.",
-    "Exact source12 core and receipt durably stored in separate unpublished backup; both full readback hashes verified."
+    "Exact source12 core and receipt durably stored in separate unpublished backup; both full readback hashes verified.",
+    "Actual immutable12 unchanged WavePlayer complete53041-frame phrase captured from owned NVDA process; full-window NCC0.9999301895 independently reproduced. Own processes/device cleanup verified."
   ],
   "open_requirements": [
     "8 selected entries have no integrated resources; Tamazight remains partial. Combined older optionals plus actual11 Afri six resources cover127 entries,126 complete; this is resource presence, not native pronunciation.",
@@ -53,7 +54,7 @@
     "local_executor_status": "available: /bin/bash with explicit existing workdir; verified tracked snapshot restored locally",
     "windows_nvda_available": "Actual official NVDA2026.3.1 in isolated Windows CI",
     "physical_audio_endpoint_count": 0,
-    "virtual_render_endpoint": "signed vendor device created only within owned ephemeral CI and removal verified"
+    "virtual_render_endpoint": "Actual12 owned process loopback and full phrase waveform match verified; exact temporary device removed. Physical output unavailable."
   },
   "verification": {
     "current_frozen_core": {
@@ -90,7 +91,10 @@
       "actual_typing_cases": 9,
       "typing_scenario": "standard",
       "required_resource_recovery_verified": true,
-      "native_dictionary_recovery_verified": true
+      "native_dictionary_recovery_verified": true,
+      "wave_player_verified": true,
+      "virtual_waveform_transport_verified": true,
+      "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
     },
     "main_build_suite": {
       "status": "matching-source Windows suite passed",
@@ -777,7 +781,10 @@
       "actual_typing_cases": 9,
       "typing_scenario": "standard",
       "required_resource_recovery_verified": true,
-      "native_dictionary_recovery_verified": true
+      "native_dictionary_recovery_verified": true,
+      "wave_player_verified": true,
+      "virtual_waveform_transport_verified": true,
+      "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
     },
     "current_working_source_suite": {
       "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
@@ -1154,6 +1161,134 @@
           "artifact_bytes": 28389
         }
       ]
+    },
+    "source12_phrase_transport": {
+      "format": "dordiai-source12-actual-owned-nvda-phrase-transport-summary",
+      "format_version": 1,
+      "run_id": 45042554326,
+      "job_id": 137270010707,
+      "workflow_commit": "0c48e3f1d71f885450aa48f2e5a9b978c4d8e4e6",
+      "core_source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+      "version": "0.13.1-dev.12",
+      "core_bytes": 1992944744,
+      "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+      "artifact": {
+        "id": 14762765545,
+        "size_bytes": 230134,
+        "sha256": "e23189fcc671b3520b20161f962ca1400c7466ef90da4c5644b8466815f93ca0"
+      },
+      "windows_fixture_tests": 82,
+      "both_trusted_native_compiles_and_self_tests_passed": true,
+      "actual_core_input": {
+        "actual_bytes": 1992944744,
+        "actual_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+        "exists": true,
+        "expected_bytes": 1992944744,
+        "expected_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+        "expected_sha256_well_formed": true,
+        "is_symlink": false,
+        "path": "D:\\a\\_temp\\nvda-capture-core12\\dordiai-voices-0.13.1-dev.12.nvda-addon",
+        "regular_file": true,
+        "unchanged_during_read": true,
+        "verified": true
+      },
+      "actual_official_nvda_version": "2026.3.1",
+      "official_installer_sha256": "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052",
+      "official_nvda_image_sha256": "b3442f222cb677141138dab33a08f9baeae1b3b24b06e2cd9c1bf56083bd15a1",
+      "actual_nvda_pid": 8264,
+      "controller_pid": 1412,
+      "capture_helper_pid": 2384,
+      "native_ownership": {
+        "controller_pid": 1412,
+        "held_controller_creation_filetime": 134398376743643200,
+        "held_target_creation_filetime": 134398377226371280,
+        "helper_parent_pid": 1412,
+        "helper_pid": 2384,
+        "image_sha256": "b3442f222cb677141138dab33a08f9baeae1b3b24b06e2cd9c1bf56083bd15a1",
+        "owned_config": "D:\\a\\_temp\\dordiai-vb46-nvda-capture-45042554326\\nvda-04d3fef599cb4854be9c19bdb5becb41\\config",
+        "owned_run_root": "D:\\a\\_temp\\dordiai-vb46-nvda-capture-45042554326\\nvda-04d3fef599cb4854be9c19bdb5becb41",
+        "plugin_ready_sha256": "64431782d865dcfb83408f2118232ab566aedae378a6c66f9d7511a193a72127",
+        "same_controller_parent_verified": true,
+        "scope": "Only held official NVDA sibling launched by this exact controller; no arbitrary or system PID",
+        "target_parent_pid": 1412,
+        "target_pid": 8264
+      },
+      "requested_phrase": "Перевірка українського мовлення.",
+      "real_wave_player_type": "nvwave.WavePlayer",
+      "recording_pcm_sink_test_double": false,
+      "wave_player_verified": true,
+      "complete_reference_frames": 53041,
+      "captured_frames": 239520,
+      "reference_sha256": "5326637614300fe4a7cadb1edb57ead8e64f8885da4a23ddf18dc8880ab79ab4",
+      "captured_sha256": "6edd67b105cda3e4047def0c87b9b2525273879e43a0a0a5c5e8ce3a0fa5e7c4",
+      "normalized_correlation": 0.999930189537378,
+      "independent_stdlib_fsum_ncc": 0.9999301895373778,
+      "independent_stdlib_fsum_gain": 0.9972704687455559,
+      "positive_ncc_threshold": 0.98,
+      "matched_capture_array_offset_frames": 2225,
+      "offset_scope": "Index in retained software PCM, not calibrated acoustic or device latency",
+      "full_reference_window_used": true,
+      "requested_phrase_waveform_match_verified": true,
+      "virtual_audio_verified": true,
+      "physical_audio_verified": false,
+      "acoustic_latency_verified": false,
+      "native_pronunciation_verified": false,
+      "product_ready": false,
+      "actual_repeated_phrase_software_timing": {
+        "scope": "Actual repeated known-phrase Driver.speak request to passive real WavePlayer feed, same process perf_counter_ns; NOT captured/physical/acoustic timing",
+        "request_to_first_real_feed_ms": 2.7642,
+        "request_to_first_feed_return_ms": 3.0011,
+        "first_feed_call_ms": 0.2369,
+        "feed_calls": 222,
+        "total_reference_frames": 53041,
+        "reference_audio_seconds": 2.2100416666666667,
+        "feed_call_median_ms": 10.1739,
+        "feed_call_p95_ms": 11.2428,
+        "feed_call_max_ms": 21.047,
+        "first_to_last_feed_return_ms": 2020.1588,
+        "actual_capture_clock_latency_calibrated": false
+      },
+      "owned_processes_reaped": true,
+      "owned_pnp_cleanup": {
+        "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence",
+        "absence_verified": true,
+        "attempted": true,
+        "driver_store_purge_attempted": false,
+        "removal_requested": true,
+        "removed": true,
+        "scope": "Only this call's exact owned device instance"
+      },
+      "exact_reports": {
+        "path": "evidence/source12_phrase_transport_45042554326.json.gz",
+        "bytes": 23713,
+        "sha256": "55dcba844d3e8a3b5cd57de5bf3b440c6d5292a37bc402f997d046d3449e5ff9",
+        "original_json_files": 9,
+        "git_blob": "3afc134654fd628d746f2a7070881e7fb50f3cb2"
+      },
+      "exact_pcm": {
+        "path": "evidence/source12_phrase_transport_45042554326_pcm.json.gz",
+        "bytes": 242118,
+        "sha256": "84b8a42b7b424d29cf311d4a166a7e3616a64f13678fcb2321dd36a0f08a8b24",
+        "git_blob": "9fba76c03ed4509aeb9453766a0390f7705954d1"
+      },
+      "historical11_input_failure": "45041198640 remains an unresolved unobserved-input rejection; this successful exact12 input does not retroactively establish its cause.",
+      "derived_wav_files": [
+        {
+          "filename": "phrase-reference.wav",
+          "bytes": 106126,
+          "sha256": "30a7dbfde31e9ed46779ccc189176a51c64aed2b783bcccab0c3d0c8c3ede0a4",
+          "scope": "Derived WAV header around exact unchanged original PCM bytes",
+          "git_blob": "c79e19d948190e698ca602aad1752f41bb4d71c5"
+        },
+        {
+          "filename": "captured.wav",
+          "bytes": 479084,
+          "sha256": "3df55183949f8549e675470a62c8bbc3da629e4a4e57c7f35abe246a93feedee",
+          "scope": "Derived WAV header around exact unchanged original PCM bytes",
+          "git_blob": "5aea825406b5080993c6116f2eb755a3439b4bfb"
+        }
+      ],
+      "evidence": "evidence/source12_phrase_transport_45042554326.json"
     }
   },
   "pending_decisions": [],

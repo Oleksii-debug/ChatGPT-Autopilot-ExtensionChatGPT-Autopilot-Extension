@@ -215,7 +215,7 @@
       "builtin_windows_fallback_selected": true,
       "fallback_notice_requested": true,
       "fallback_audibility_verified": false,
-      "wave_player_verified": false,
+      "wave_player_verified": true,
       "physical_acoustic_latency_verified": false,
       "physical_audio_verified": false,
       "evidence": "evidence/source12_nvda_five_mode_result.json",
@@ -229,7 +229,8 @@
       "required_resource_recovery_evidence": "evidence/source12_nvda_five_mode_result.json",
       "actual_keyboard_evidence": "evidence/source12_nvda_five_mode_result.json",
       "actual_keyboard_probe_run": 45041853551,
-      "required_resource_probe_run": 45041853551
+      "required_resource_probe_run": 45041853551,
+      "wave_player_evidence": "evidence/source12_phrase_transport_45042554326.json"
     },
     "native_pronunciation": {
       "status": "not_accepted",
@@ -263,13 +264,14 @@
       "report_member": "characters/report.json"
     },
     "physical_audio_output": {
-      "status": "not_accepted; virtual_render_only_actual10_WavePlayer_passed; input_capture_access_denied; own_render_loopback_pending",
+      "status": "physical_not_accepted; matching12_virtual_phrase_transport_verified",
       "wave_out_devices": 0,
-      "wave_player_verified": false,
+      "wave_player_verified": true,
       "physical_audio_verified": false,
       "acoustic_latency_verified": false,
-      "evidence": "evidence/windows_dev10_run_45021069771.json.gz",
-      "report_member": "nvda/windows-nvda-probe.json"
+      "evidence": "evidence/source12_phrase_transport_45042554326.json",
+      "report_member": "nvda/windows-nvda-probe.json",
+      "virtual_audio_verified": true
     },
     "mms_shared_graph_numerical_parity": {
       "status": "all29_bit_exact_passed",
@@ -604,6 +606,21 @@
           "artifact_bytes": 28389
         }
       ]
+    },
+    "real_waveplayer_source12": {
+      "status": "passed_actual_complete_phrase_virtual_transport",
+      "run": 45042554326,
+      "recording_pcm_sink_test_double": false,
+      "full_reference_frames": 53041,
+      "normalized_correlation": 0.999930189537378,
+      "wave_player_verified": true,
+      "virtual_audio_verified": true,
+      "physical_audio_verified": false,
+      "acoustic_latency_verified": false,
+      "native_pronunciation_verified": false,
+      "product_ready": false,
+      "evidence": "evidence/source12_phrase_transport_45042554326.json",
+      "scope": "Repeated known phrase only; no unprepared continuous-read/cancel/audible quality acceptance."
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -657,9 +674,12 @@
     "actual_typing_cases": 9,
     "typing_scenario": "standard",
     "required_resource_recovery_verified": true,
-    "native_dictionary_recovery_verified": true
+    "native_dictionary_recovery_verified": true,
+    "wave_player_verified": true,
+    "virtual_waveform_transport_verified": true,
+    "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
   },
-  "current_environment_blocker": "Local executor available. Physical microphone/speaker acoustic validation unavailable in hosted CI; bounded own virtual render-loopback calibration in preparation.",
+  "current_environment_blocker": "Local executor available; actual12 owned virtual WavePlayer phrase capture verified. Physical speaker/microphone and acoustic latency validation unavailable in hosted CI.",
   "working_source_target_version": "Immutable12 sourcebe7f4e: actual Windows1330/1280pass/50skip, worker225, all5actualNVDAmodes pass; future production changes require13.",
   "host_namespace_failure": {
     "run": 45010564271,
@@ -815,7 +835,10 @@
     "actual_typing_cases": 9,
     "typing_scenario": "standard",
     "required_resource_recovery_verified": true,
-    "native_dictionary_recovery_verified": true
+    "native_dictionary_recovery_verified": true,
+    "wave_player_verified": true,
+    "virtual_waveform_transport_verified": true,
+    "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
   },
   "current_frozen_core_historical10": {
     "version": "0.13.1-dev.10",
