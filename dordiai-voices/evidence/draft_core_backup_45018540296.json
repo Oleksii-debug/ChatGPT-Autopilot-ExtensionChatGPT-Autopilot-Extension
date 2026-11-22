@@ -1,0 +1,68 @@
+{
+  "format": "dordiai-engineering-backup-observation",
+  "format_version": 1,
+  "product_ready": false,
+  "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+  "workflow": {
+    "run_id": 45018540296,
+    "head_sha": "f7febba49f8bb222e4dbcddf8e4c0d064675d30f",
+    "status": "completed",
+    "conclusion": "success",
+    "job_id": 137196076339,
+    "job_conclusion": "success",
+    "checks": [
+      {
+        "name": "Check ownership, corruption and no-overwrite regressions",
+        "conclusion": "success"
+      },
+      {
+        "name": "Download only the pinned existing engineering artifact",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify exact core and preserve it in an owned unpublished draft",
+        "conclusion": "success"
+      },
+      {
+        "name": "Retain the small receipt as a convenience copy",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "backup": {
+    "release_id": 454406176,
+    "tag": "dordiai-voices-dev9-engineering-backup",
+    "draft": true,
+    "published_at": null,
+    "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+    "binary_source_commit": "b364060750b4fda22eb7f06b5c52085c3f4e0bfc",
+    "source_run_id": 45014461174,
+    "source_run_conclusion": "failure",
+    "source_artifact_id": 14751826473,
+    "assets": [
+      {
+        "id": 778874302,
+        "name": "dordiai-core-dev9-backup-receipt.json",
+        "size_bytes": 1197,
+        "state": "uploaded",
+        "sha256": "16c9280ae6b15935f12d7bd6aa6d34e6b6a26286dc380922f7516c5c246d943d"
+      },
+      {
+        "id": 778871291,
+        "name": "dordiai-voices-0.13.1-dev.9.nvda-addon",
+        "size_bytes": 1767414839,
+        "state": "uploaded",
+        "sha256": "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a"
+      }
+    ]
+  },
+  "readback_verification": "The successful helper step downloaded and hashed both stored assets; it accepts neither size-only nor metadata-only verification.",
+  "limitations": [
+    "Engineering backup, no publication",
+    "Source workflow Windows probes failed",
+    "No physical audio acceptance",
+    "Supplemental generated bank overlay not included",
+    "Optional language-resource archives not included"
+  ],
+  "observed_at": "2026-11-22T11:43:04Z"
+}

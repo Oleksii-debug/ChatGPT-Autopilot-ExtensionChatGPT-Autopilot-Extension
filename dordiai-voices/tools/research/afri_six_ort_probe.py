@@ -100,12 +100,14 @@ def python_socket_guard():
 class SixLayerOrtCarrier:
     """Experimental unregistered 24kHz carrier using the existing PythonORT family."""
 
-    def __init__(self, graphs, tokenizer, *, threads=2):
+    def __init__(self, graphs, tokenizer, *, threads=2, expected_ort_version="1.27.0", package_python=None):
         import numpy as np
         import onnxruntime as ort
         ort.disable_telemetry_events()
-        if ort.__version__ != "1.27.0":
-            raise ValueError("This isolated proof requires official PythonORT1.27.0")
+        if ort.__version__ != expected_ort_version:
+            raise ValueError("Actual ONNX Runtime differs from the explicitly requested unchanged-runtime version")
+        if package_python is not None and not Path(ort.__file__).resolve().is_relative_to(Path(package_python).resolve()):
+            raise ValueError("ONNX Runtime was not imported from the actual private package")
         if "torch" in sys.modules or "sherpa_onnx" in sys.modules:
             raise RuntimeError("Mixed native inference families are forbidden")
         from tokenizers import Tokenizer
@@ -249,7 +251,7 @@ def probe(args):
         if policy.get("action") != "Block" or policy.get("direction") != "Outbound" or policy.get("enabled") is not True:
             raise ValueError("Missing effective outbound block policy")
         programs = {str(Path(value).resolve()).casefold() for value in policy.get("programs", [])}
-        required = {str(Path(value).resolve()).casefold() for value in (sys.executable, sys._base_executable)}
+        required = {str(Path(value).resolve()).casefold() for value in (sys.executable, getattr(sys, "_base_executable", None) or sys.executable)}
         if not required.issubset(programs) or policy.get("all_firewall_profiles_enabled") is not True:
             raise ValueError("Firewall scope must cover both venv launcher and base inference executable")
         report["network_policy"] = policy
@@ -257,12 +259,32 @@ def probe(args):
     else:
         report["network_policy"] = common.deny_native_network()
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", DO_NOT_TRACK="1", CUDA_VISIBLE_DEVICES="")
+    package_python = None
+    if args.packaged_runtime is not None:
+        runtime = args.packaged_runtime.resolve()
+        package_python = runtime / "python"
+        if not os.path.samefile(sys.executable, package_python / "python.exe") or not sys.version.startswith("3.14."):
+            raise ValueError("Probe must run with the actual unchanged core private Python3.14")
+        bootstrap_spec = importlib.util.spec_from_file_location("dordiai_private_bootstrap", runtime / "windows_runtime.py")
+        bootstrap = importlib.util.module_from_spec(bootstrap_spec)
+        bootstrap_spec.loader.exec_module(bootstrap)
+        report["private_bootstrap"] = bootstrap.reset_inherited_dll_directory()
+    elif args.expected_ort != "1.27.0":
+        raise ValueError("Existing ORT1.26 compatibility must use the actual private core package")
     sys.path.insert(0, str(args.g2p_source.resolve() / "src"))
     import numpy as np
     import soundfile as sf
     from africa_g2p import g2p
     started = perf_counter()
-    carrier = SixLayerOrtCarrier(args.graphs, root / "tokenizer.json")
+    carrier = SixLayerOrtCarrier(args.graphs, root / "tokenizer.json", expected_ort_version=args.expected_ort,
+                                 package_python=package_python)
+    report["runtime_imports"] = {name: {"file": str(getattr(sys.modules[name], "__file__", "")),
+                                      "version": str(getattr(sys.modules[name], "__version__", "unreported"))}
+                                 for name in ("numpy", "onnxruntime", "tokenizers", "soundfile")}
+    if package_python is not None and any(not Path(row["file"]).resolve().is_relative_to(package_python.resolve())
+                                          for row in report["runtime_imports"].values()):
+        raise ValueError("Native dependency escaped the unchanged private package")
+    report["packaged_runtime_verified"] = package_python is not None
     report["model_load_seconds"] = perf_counter() - started
     report["graph_provenance"] = carrier.provenance
     rows = common.select_cases((root / "parity_set.tsv").read_text(encoding="utf-8"), 3)
@@ -302,7 +324,7 @@ def probe(args):
     report.update(status="actual-six-layer-pythonort-cpu-unintegrated", all_six_cases_passed=True,
                   recurrent_state_reset_replay_passed=True, process_peak_rss_bytes=peak_rss(),
                   windows_verified=sys.platform == "win32", python_version=sys.version,
-                  ort_version=carrier.ort.__version__, provider="CPUExecutionProvider")
+                  ort_version=carrier.ort.__version__, provider="CPUExecutionProvider", executable=sys.executable)
     common.write_json(args.report, report)
     return report
 
@@ -315,6 +337,8 @@ def main():
     parser.add_argument("--graphs", type=Path)
     parser.add_argument("--g2p-source", type=Path)
     parser.add_argument("--network-policy", type=Path)
+    parser.add_argument("--packaged-runtime", type=Path)
+    parser.add_argument("--expected-ort", choices=("1.27.0", "1.26.0"), default="1.27.0")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
     if args.report.is_symlink() or args.report.exists() and not args.overwrite:
