@@ -1,0 +1,22 @@
+{
+  "format": "dordiai-static-word-switch-review",
+  "commit": "cd6ab9319ceefe2709b0b09968abff54342d3a5c",
+  "scope": "Read-only source review; not benchmark acceptance",
+  "findings": [
+    "Native word forecast covers7 native locales at speed>=3; wide/MMS has no word forecast",
+    "Wide/MMS generates the complete native carrier before voice conversion",
+    "Existing 256-entry/48MiB exact-word cache does not prove unseen-word latency",
+    "Adaptive MMS warm-model limit is7, reduced to2 for unknown/low memory; not a hard3"
+  ],
+  "next_experiment": [
+    "100 distinct words per language, cold versus resident-model cache misses versus exact PCM hits",
+    "Three-language cycling and four-language eviction pressure with real carrier/conversion/first-PCM/RTF/memory/cancel metrics"
+  ],
+  "constraint": "If each unseen word takes longer to synthesize than its spoken duration at the chosen rate, bounded lookahead cannot eliminate sustained gaps. 40ms target remains unchanged.",
+  "planned_forecast_safety": [
+    "one bounded forecast worker and one ready-result slot",
+    "separate per-request cancellation context; foreground priority",
+    "active-use model lease; epoch/voice/language/control-sensitive final PCM keys"
+  ],
+  "implemented": false
+}

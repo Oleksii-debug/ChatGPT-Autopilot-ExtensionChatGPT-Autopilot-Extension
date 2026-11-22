@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.6",
+  "target_version": "0.13.1-dev.8",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -192,14 +192,18 @@
     "production_fix_accepted": false
   },
   "current_frozen_core": {
-    "version": "0.13.1-dev.6",
-    "archive_bytes": 1767406268,
-    "archive_sha256": "ee60a000b3ea4387c2baf2afbbb252fd886b603d4e532220e62f29bf9dc465c8",
-    "source_tree_sha256": "8e8fe6056698395a885030bcf7df4f957e8c62283af9c8558d54dce081210d8f",
-    "windows_run_in_progress": 45000863624,
-    "production_speech_verified": false,
-    "shared_mms_default_enabled": false,
-    "actual_windows_mapped_file_replacement_passed": true
+    "version": "0.13.1-dev.7",
+    "archive_sha256": "14481b1cc0f9d01ae30845647f8ef2c31a8d5bbbfcc97bc6e10e345fb20e473b",
+    "archive_bytes": 1767407702,
+    "windows_run": 45002685422,
+    "matching_core_nvda_rerun": 45003764603,
+    "core_three_engines_passed": true,
+    "mms_original_and_shared_passed": true,
+    "nvda_three_100_sample_series_passed": true,
+    "genuine_builtin_import_recovery_passed": true,
+    "physical_audio_verified": false,
+    "new_word_latency_verified": false,
+    "source_snapshot_note": "Full source7 and exact build recipe are pinned in commitcd6ab9319ceefe2709b0b09968abff54342d3a5c; last separate gzip source snapshot is dev6."
   },
   "current_environment_blocker": "Local exec-server unavailable; frozen source6 and binary source snapshot6 already committed. GitHub Windows verification continues."
 }
