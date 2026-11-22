@@ -41,7 +41,12 @@ class RecentWordCacheTests(unittest.TestCase):
 
     def change(self):
         raw=self.path.read_bytes()
-        self.path.write_bytes(raw[:-1]+bytes([raw[-1]^1]))
+        # Never truncate/resize an actively mapped file: Windows correctly
+        # rejects that operation. Modify one existing byte without resizing.
+        with self.path.open("r+b") as stream:
+            stream.seek(-1,os.SEEK_END)
+            stream.write(bytes([raw[-1]^1]))
+            stream.flush()
         info=self.path.stat()
         os.utime(self.path,ns=(info.st_atime_ns,info.st_mtime_ns+10000000))
 

@@ -1,0 +1,96 @@
+name: Dordiai isolated Aymara32 ordinary names native and Viktoriia PCM
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-ay32-ordinary-names.yml'
+      - 'dordiai-voices/tools/research/probe_ay_ordinary_names.py'
+      - 'dordiai-voices/tools/research/ay_ordinary_name_candidate.json'
+      - 'dordiai-voices/tests/test_ay_ordinary_names.py'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-ay32-ordinary-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native32-candidate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ay32-ordinary]')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+    steps:
+      - name: Preserve exact source byte identities
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install host-only test NumPy
+        run: python -m pip install numpy==1.26.4
+      - name: Run source-fact and honest PCM-rate regressions
+        run: python -m unittest discover -s dordiai-voices/tests -p test_ay_ordinary_names.py -v
+      - name: Acquire exact immutable core11 private runtime and converter
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-source11-development-core-45029834209
+          run-id: 45029834209
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ay32-inputs/core11
+      - name: Acquire exact restored native AY optional package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-mms-ay-1.0.1+ci.45014461158.1
+          run-id: 45014461158
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ay32-inputs/ay-pack
+      - name: Stage disposable exact core11 plus native AY resources
+        shell: pwsh
+        run: |
+          python dordiai-voices/tools/research/probe_ay_ordinary_names.py stage --core "$env:RUNNER_TEMP/ay32-inputs/core11/dordiai-voices-0.13.1-dev.11.nvda-addon" --pack "$env:RUNNER_TEMP/ay32-inputs/ay-pack/dordiai-mms-ay-1.0.1+ci.45014461158.1.zip" --candidate dordiai-voices/tools/research/ay_ordinary_name_candidate.json --output "$env:RUNNER_TEMP/ay32-core11"
+          if ($LASTEXITCODE -ne 0) { throw "Exact isolated AY stage failed" }
+      - name: Render all32 ordinary names and selected-profile PCM using unchanged private runtime offline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $private=[IO.Path]::GetFullPath("$env:RUNNER_TEMP/ay32-core11/kx47Runtime/python/python.exe")
+          if (@(Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Count -ne 0) { throw "Firewall profiles must remain enabled" }
+          $rule='Dordiai-AY32-' + [guid]::NewGuid().ToString('N')
+          try {
+            New-NetFirewallRule -Name $rule -DisplayName $rule -Direction Outbound -Action Block -Enabled True -Profile Any -Program $private | Out-Null
+            New-Item -ItemType Directory -Path dordiai-voices/ay32-results -Force | Out-Null
+            @{scope='owned ephemeral CI VM and exact private Python only';network='outbound blocked before ML imports';physical_audio_verified=$false;production_registered=$false} | ConvertTo-Json | Set-Content -Encoding utf8 dordiai-voices/ay32-results/network-policy.json
+            & $private -B (Resolve-Path dordiai-voices/tools/research/probe_ay_ordinary_names.py).Path probe --runtime "$env:RUNNER_TEMP/ay32-core11/kx47Runtime" --candidate (Resolve-Path dordiai-voices/tools/research/ay_ordinary_name_candidate.json).Path --output dordiai-voices/ay32-results/pcm
+            if ($LASTEXITCODE -ne 0) { throw "Actual all32 native/projected ordinary-name PCM failed" }
+          } finally {
+            Remove-NetFirewallRule -Name $rule -ErrorAction Continue
+          }
+      - name: Print exact bounded JSON result without audio claims
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,pathlib
+          p=pathlib.Path('dordiai-voices/ay32-results/pcm/report.json')
+          if p.is_file():
+              raw=p.read_bytes()
+              if len(raw)>512*1024:raise ValueError('Unexpected AY32 report size')
+              packed=gzip.compress(raw,mtime=0)
+              print('AY32_EXACT_JSON_SHA256 '+hashlib.sha256(raw).hexdigest(),flush=True)
+              print('AY32_EXACT_GZIP_BASE64 '+base64.b64encode(packed).decode(),flush=True)
+          else:print('AY32_REPORT_NOT_CREATED',flush=True)
+      - name: Preserve ordinary-name candidate proof and all64 WAVs even after failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-ay32-ordinary-name-candidate-${{ github.run_id }}
+          path: dordiai-voices/ay32-results
+          if-no-files-found: warn
+          retention-days: 90
