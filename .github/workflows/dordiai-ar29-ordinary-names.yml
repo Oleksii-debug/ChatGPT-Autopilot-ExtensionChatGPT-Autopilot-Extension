@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 35
     env:
       PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: 'utf-8'
       HF_HUB_OFFLINE: '1'
       TRANSFORMERS_OFFLINE: '1'
       DO_NOT_TRACK: '1'

@@ -26,7 +26,7 @@ class ArabicOrdinaryNames(unittest.TestCase):
         self.assertTrue(d['readiness']['source_facts_verified'])
         self.assertTrue(all(v is False for k,v in d['readiness'].items() if k!='source_facts_verified'))
     def test_changed_fact_deleted_name_different_language_or_quality_rejected(self):
-        d=json.loads(CANDIDATE.read_text())
+        d=json.loads(CANDIDATE.read_text(encoding="utf-8"))
         for key in ['fact','deleted','language','quality']:
             v=json.loads(json.dumps(d))
             if key=='fact':v['letter_names']['ل']='a spelling example'
@@ -34,11 +34,11 @@ class ArabicOrdinaryNames(unittest.TestCase):
             elif key=='language':v['language']='fa'
             else:v['readiness']['typing_verified']=True
             with tempfile.TemporaryDirectory() as tmp:
-                bad=Path(tmp)/'bad.json';bad.write_text(json.dumps(v,ensure_ascii=False))
+                bad=Path(tmp)/'bad.json';bad.write_text(json.dumps(v,ensure_ascii=False),encoding='utf-8')
                 with self.subTest(key=key),self.assertRaises(ValueError):p.candidate(bad)
     def processor(self,indexer):
         import numpy as np,re
-        source=(ROOT/'source/0.12.2/kx47Runtime/wide_common_helpers.py').read_text()
+        source=(ROOT/'source/0.12.2/kx47Runtime/wide_common_helpers.py').read_text(encoding='utf-8')
         tree=ast.parse(source);nodes=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='UnicodeProcessor' or isinstance(n,ast.FunctionDef) and n.name=='length_to_mask']
         scope={'json':json,'np':np,'re':re,'normalize':unicodedata.normalize,'category':unicodedata.category,'AVAILABLE_LANGS':['ar'],'Optional':__import__('typing').Optional}
         exec(compile(ast.Module(body=nodes,type_ignores=[]),'<exact-original-UnicodeProcessor>', 'exec'),scope)

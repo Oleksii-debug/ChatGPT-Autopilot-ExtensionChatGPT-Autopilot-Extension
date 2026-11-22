@@ -1,0 +1,1274 @@
+{
+  "format": "dordiai-resource-path-cache-actual-dual-os-review",
+  "format_version": 1,
+  "run_id": 45045240483,
+  "head_sha": "85df7165087b797e3a99737a0743b6e6964f5238",
+  "baseline_manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+  "candidate_manager_git_blob": "960459711ee3af8976540fd4595489fb7f69aedb",
+  "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+  "test_git_blob": "f9bcd9f057b35598c95d7da3816e18c2fe77c220",
+  "runner_git_blob": "fe8c3a82d801888af2e3a35a16656387152df4f9",
+  "workflow_git_blob": "6cd8a4099547eaabdfadc07b7f5d8f32e47fc16d",
+  "cache_limits": {
+    "entries": 16,
+    "maximum_spelling_characters": 1024,
+    "maximum_parts": 64,
+    "overflow": "Original uncached tuple traversal; all live checks retained",
+    "keys": "Exact Path type and exact string spelling; no WindowsPath casefold equality keys"
+  },
+  "tests": {
+    "windows": {
+      "job_id": 137278305398,
+      "passed": 21
+    },
+    "linux": {
+      "job_id": 137278305488,
+      "passed": 19,
+      "windows_only_skipped": 2
+    }
+  },
+  "scope": "Actual normal Windows/Linux CPython3.13 Resource profiles, six Resource instances in one process per OS; no installed driver or frozen NVDA gate yet; same actual DMLX/V2 leaf in both variants; timings exclude separate cProfile phases.",
+  "production_changed": false,
+  "nvda_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false,
+  "results": [
+    {
+      "os": "windows",
+      "path": "evidence/native_resource_path_cache_windows_45045240483.json.gz",
+      "size_bytes": 15157,
+      "sha256": "96b680c0aee2df1579d1bd2538dd30b2ac7f15ee40d9681b13a1f95f413c0b9f",
+      "envelope_sha256": "3721936fa28394756793f89808f9c7cd73b5e9b024ff0b90f32c9c02dec7f485",
+      "file_sha256": "47be1d3ffcc3cfb5e365961a8b6c33f83167579a897a0b10c95c924d78802478",
+      "file_size_bytes": 126811,
+      "report": {
+        "format": "dordiai-resource-pure-path-cache-matched-profile",
+        "format_version": 1,
+        "status": "passed-matched-profile",
+        "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+        "platform": "win32",
+        "baseline_manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+        "candidate_manager_git_blob": "960459711ee3af8976540fd4595489fb7f69aedb",
+        "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+        "production_changed": false,
+        "nvda_verified": false,
+        "pronunciation_verified": false,
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "scope": "Three reverse-order rounds with new Resource objects in one normal CPython process. Both use the identical V2 leaf and authentic DMLX/descriptor. Timings exclude cProfile; separate profiles include instrumentation overhead. No OS cache eviction or installed-driver/audio acceptance.",
+        "comparisons": [
+          {
+            "round": 1,
+            "variant": "baseline",
+            "parent_counts": [
+              18,
+              18,
+              15
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.2108,
+              "p95_ms": 1.3328,
+              "p99_ms": 1.4196,
+              "total_ms": 118.5087
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.027,
+              "p95_ms": 0.032,
+              "p99_ms": 0.0439,
+              "total_ms": 27.8727
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.67995,
+              "p95_ms": 0.7439,
+              "p99_ms": 1.1257,
+              "total_ms": 698.7465
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.3413354,
+                "cumulative_seconds": 0.3594086
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.27194680000000004,
+                "cumulative_seconds": 0.2875761
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0310891,
+                "cumulative_seconds": 0.0310891
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.3413354,
+                "cumulative_seconds": 0.3594086
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.27194680000000004,
+                "cumulative_seconds": 0.2875761
+              },
+              {
+                "filename": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\dordiai-resource-path-profile-lknwe17w\\external-word-cache\\candidate-default\\native_membership_runtime.py",
+                "line": 52,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0404551,
+                "cumulative_seconds": 0.9816234
+              },
+              {
+                "filename": "C:\\hostedtoolcache\\windows\\Python\\3.13.17\\x64\\Lib\\pathlib\\_local.py",
+                "line": 44,
+                "function": "__getitem__",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.0376598,
+                "cumulative_seconds": 0.23884480000000002
+              }
+            ]
+          },
+          {
+            "round": 1,
+            "variant": "candidate",
+            "parent_counts": [
+              18,
+              18,
+              15
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.1267,
+              "p95_ms": 1.2462,
+              "p99_ms": 1.2675,
+              "total_ms": 110.3455
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0262,
+              "p95_ms": 0.0379,
+              "p99_ms": 0.0463,
+              "total_ms": 28.6142
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.61765,
+              "p95_ms": 0.7092,
+              "p99_ms": 1.0954,
+              "total_ms": 634.4491
+            },
+            "spelling_cache": {
+              "hits": 6294,
+              "misses": 3,
+              "maxsize": 16,
+              "currsize": 3
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.33366090000000004,
+                "cumulative_seconds": 0.3504282
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.26716460000000003,
+                "cumulative_seconds": 0.2820288
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0153252,
+                "cumulative_seconds": 0.0153252
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.33366090000000004,
+                "cumulative_seconds": 0.3504282
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.26716460000000003,
+                "cumulative_seconds": 0.2820288
+              },
+              {
+                "filename": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\dordiai-resource-path-profile-lknwe17w\\external-word-cache\\manager-path-cache\\native_membership_runtime.py",
+                "line": 62,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0317024,
+                "cumulative_seconds": 0.7048116000000001
+              },
+              {
+                "filename": "C:\\hostedtoolcache\\windows\\Python\\3.13.17\\x64\\Lib\\pathlib\\_local.py",
+                "line": 166,
+                "function": "__fspath__",
+                "primitive_calls": 108000,
+                "calls": 108000,
+                "self_seconds": 0.0250152,
+                "cumulative_seconds": 0.0316315
+              }
+            ]
+          },
+          {
+            "round": 2,
+            "variant": "candidate",
+            "parent_counts": [
+              18,
+              18,
+              15
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.1219,
+              "p95_ms": 1.2167,
+              "p99_ms": 1.2688,
+              "total_ms": 109.5763
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0261,
+              "p95_ms": 0.029,
+              "p99_ms": 0.0381,
+              "total_ms": 26.5752
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.6191,
+              "p95_ms": 0.6592,
+              "p99_ms": 1.2102,
+              "total_ms": 634.6635
+            },
+            "spelling_cache": {
+              "hits": 6294,
+              "misses": 3,
+              "maxsize": 16,
+              "currsize": 3
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.34672450000000005,
+                "cumulative_seconds": 0.36463890000000004
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.2779998,
+                "cumulative_seconds": 0.2934698
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0156967,
+                "cumulative_seconds": 0.0156967
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.34672450000000005,
+                "cumulative_seconds": 0.36463890000000004
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.2779998,
+                "cumulative_seconds": 0.2934698
+              },
+              {
+                "filename": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\dordiai-resource-path-profile-lknwe17w\\external-word-cache\\manager-path-cache\\native_membership_runtime.py",
+                "line": 62,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0328074,
+                "cumulative_seconds": 0.7334743
+              },
+              {
+                "filename": "C:\\hostedtoolcache\\windows\\Python\\3.13.17\\x64\\Lib\\pathlib\\_local.py",
+                "line": 166,
+                "function": "__fspath__",
+                "primitive_calls": 108000,
+                "calls": 108000,
+                "self_seconds": 0.026461600000000002,
+                "cumulative_seconds": 0.0333844
+              }
+            ]
+          },
+          {
+            "round": 2,
+            "variant": "baseline",
+            "parent_counts": [
+              18,
+              18,
+              15
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.2144,
+              "p95_ms": 1.3434,
+              "p99_ms": 1.4574,
+              "total_ms": 118.7012
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0268,
+              "p95_ms": 0.03,
+              "p99_ms": 0.0373,
+              "total_ms": 27.3944
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.66975,
+              "p95_ms": 0.6983,
+              "p99_ms": 0.791,
+              "total_ms": 675.3477
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.34245580000000003,
+                "cumulative_seconds": 0.36055570000000003
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.27251420000000004,
+                "cumulative_seconds": 0.2886514
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.016286500000000002,
+                "cumulative_seconds": 0.016286500000000002
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.34245580000000003,
+                "cumulative_seconds": 0.36055570000000003
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.27251420000000004,
+                "cumulative_seconds": 0.2886514
+              },
+              {
+                "filename": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\dordiai-resource-path-profile-lknwe17w\\external-word-cache\\candidate-default\\native_membership_runtime.py",
+                "line": 52,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0418448,
+                "cumulative_seconds": 0.9916671
+              },
+              {
+                "filename": "C:\\hostedtoolcache\\windows\\Python\\3.13.17\\x64\\Lib\\pathlib\\_local.py",
+                "line": 44,
+                "function": "__getitem__",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.034530000000000005,
+                "cumulative_seconds": 0.2431319
+              }
+            ]
+          },
+          {
+            "round": 3,
+            "variant": "baseline",
+            "parent_counts": [
+              18,
+              18,
+              15
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.2004,
+              "p95_ms": 1.3588,
+              "p99_ms": 1.4389,
+              "total_ms": 117.9629
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0262,
+              "p95_ms": 0.0298,
+              "p99_ms": 0.0367,
+              "total_ms": 26.6768
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.6739,
+              "p95_ms": 0.7286,
+              "p99_ms": 0.8257,
+              "total_ms": 681.4331
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.36194600000000005,
+                "cumulative_seconds": 0.3809071
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.2882731,
+                "cumulative_seconds": 0.30522350000000004
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0169024,
+                "cumulative_seconds": 0.0169024
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.36194600000000005,
+                "cumulative_seconds": 0.3809071
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.2882731,
+                "cumulative_seconds": 0.30522350000000004
+              },
+              {
+                "filename": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\dordiai-resource-path-profile-lknwe17w\\external-word-cache\\candidate-default\\native_membership_runtime.py",
+                "line": 52,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.0446399,
+                "cumulative_seconds": 1.0432369000000001
+              },
+              {
+                "filename": "C:\\hostedtoolcache\\windows\\Python\\3.13.17\\x64\\Lib\\pathlib\\_local.py",
+                "line": 44,
+                "function": "__getitem__",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.0353867,
+                "cumulative_seconds": 0.2527223
+              }
+            ]
+          },
+          {
+            "round": 3,
+            "variant": "candidate",
+            "parent_counts": [
+              18,
+              18,
+              15
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.125,
+              "p95_ms": 1.2146,
+              "p99_ms": 1.2624,
+              "total_ms": 109.7042
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0261,
+              "p95_ms": 0.0292,
+              "p99_ms": 0.036,
+              "total_ms": 26.5753
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.6195,
+              "p95_ms": 0.647,
+              "p99_ms": 0.8575,
+              "total_ms": 625.642
+            },
+            "spelling_cache": {
+              "hits": 6294,
+              "misses": 3,
+              "maxsize": 16,
+              "currsize": 3
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.33078420000000003,
+                "cumulative_seconds": 0.3475229
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.2651989,
+                "cumulative_seconds": 0.27996730000000003
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.015240100000000001,
+                "cumulative_seconds": 0.015240100000000001
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt.stat>",
+                "primitive_calls": 57000,
+                "calls": 57000,
+                "self_seconds": 0.33078420000000003,
+                "cumulative_seconds": 0.3475229
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method nt._path_isjunction>",
+                "primitive_calls": 51000,
+                "calls": 51000,
+                "self_seconds": 0.2651989,
+                "cumulative_seconds": 0.27996730000000003
+              },
+              {
+                "filename": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\dordiai-resource-path-profile-lknwe17w\\external-word-cache\\manager-path-cache\\native_membership_runtime.py",
+                "line": 62,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.031542400000000005,
+                "cumulative_seconds": 0.6996771
+              },
+              {
+                "filename": "C:\\hostedtoolcache\\windows\\Python\\3.13.17\\x64\\Lib\\pathlib\\_local.py",
+                "line": 166,
+                "function": "__fspath__",
+                "primitive_calls": 108000,
+                "calls": 108000,
+                "self_seconds": 0.024966000000000002,
+                "cumulative_seconds": 0.0315071
+              }
+            ]
+          }
+        ],
+        "data_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "plain_data_path_characters": 294,
+        "all_round_filesystem_check_counts_identical": true
+      },
+      "git_blob": "a5bd5d8a68c55b4a1fef24a693b62ac631a09080"
+    },
+    {
+      "os": "linux",
+      "path": "evidence/native_resource_path_cache_linux_45045240483.json.gz",
+      "size_bytes": 16435,
+      "sha256": "e02485f3817daaf96f6a602117a93d1234d23747478b18b92fa028538cd193e5",
+      "envelope_sha256": "55901579271110190af30fcaeaa671dfc4646c08efdd163132ba0752b4cadc15",
+      "file_sha256": "fa063eab28f7b7e7905bfc74463d9aec570a4fc7e8a4974ff9fdf5fca354d009",
+      "file_size_bytes": 121424,
+      "report": {
+        "format": "dordiai-resource-pure-path-cache-matched-profile",
+        "format_version": 1,
+        "status": "passed-matched-profile",
+        "python": "3.13.18 (main, Oct 26 2026, 14:19:33) [GCC 15.2.0]",
+        "platform": "linux",
+        "baseline_manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+        "candidate_manager_git_blob": "960459711ee3af8976540fd4595489fb7f69aedb",
+        "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+        "production_changed": false,
+        "nvda_verified": false,
+        "pronunciation_verified": false,
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "scope": "Three reverse-order rounds with new Resource objects in one normal CPython process. Both use the identical V2 leaf and authentic DMLX/descriptor. Timings exclude cProfile; separate profiles include instrumentation overhead. No OS cache eviction or installed-driver/audio acceptance.",
+        "comparisons": [
+          {
+            "round": 1,
+            "variant": "baseline",
+            "parent_counts": [
+              15,
+              15,
+              12
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.392218,
+              "p95_ms": 1.584096,
+              "p99_ms": 1.668694,
+              "total_ms": 136.653059
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.01606,
+              "p95_ms": 0.020318,
+              "p99_ms": 0.029355,
+              "total_ms": 16.76786
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.298632,
+              "p95_ms": 0.344333,
+              "p99_ms": 0.50958,
+              "total_ms": 310.067861
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.156322557,
+                "cumulative_seconds": 0.17790813200000002
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.004828278,
+                "cumulative_seconds": 0.004828278
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.156322557,
+                "cumulative_seconds": 0.17790813200000002
+              },
+              {
+                "filename": "/tmp/dordiai-resource-path-profile-ylupfc7c/external-word-cache/candidate-default/native_membership_runtime.py",
+                "line": 52,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.052385111000000005,
+                "cumulative_seconds": 0.674667099
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 44,
+                "function": "__getitem__",
+                "primitive_calls": 42000,
+                "calls": 42000,
+                "self_seconds": 0.044807451000000005,
+                "cumulative_seconds": 0.31117277000000004
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 117,
+                "function": "__init__",
+                "primitive_calls": 39000,
+                "calls": 39000,
+                "self_seconds": 0.038793417000000004,
+                "cumulative_seconds": 0.064684843
+              }
+            ]
+          },
+          {
+            "round": 1,
+            "variant": "candidate",
+            "parent_counts": [
+              15,
+              15,
+              12
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.2807,
+              "p95_ms": 1.464243,
+              "p99_ms": 1.5439,
+              "total_ms": 125.842356
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0160145,
+              "p95_ms": 0.023274,
+              "p99_ms": 0.030096,
+              "total_ms": 16.843483
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.2000535,
+              "p95_ms": 0.218598,
+              "p99_ms": 0.252932,
+              "total_ms": 204.316085
+            },
+            "spelling_cache": {
+              "hits": 6294,
+              "misses": 3,
+              "maxsize": 16,
+              "currsize": 3
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.152331136,
+                "cumulative_seconds": 0.172262146
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.004737016,
+                "cumulative_seconds": 0.004737016
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.152331136,
+                "cumulative_seconds": 0.172262146
+              },
+              {
+                "filename": "/tmp/dordiai-resource-path-profile-ylupfc7c/external-word-cache/manager-path-cache/native_membership_runtime.py",
+                "line": 62,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.042328772,
+                "cumulative_seconds": 0.326686005
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 166,
+                "function": "__fspath__",
+                "primitive_calls": 90000,
+                "calls": 90000,
+                "self_seconds": 0.029703958000000003,
+                "cumulative_seconds": 0.037570726000000006
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_abc.py",
+                "line": 513,
+                "function": "is_symlink",
+                "primitive_calls": 42000,
+                "calls": 42000,
+                "self_seconds": 0.026970063000000002,
+                "cumulative_seconds": 0.202365135
+              }
+            ]
+          },
+          {
+            "round": 2,
+            "variant": "candidate",
+            "parent_counts": [
+              15,
+              15,
+              12
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.271553,
+              "p95_ms": 1.442662,
+              "p99_ms": 1.567575,
+              "total_ms": 125.021758
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.015959,
+              "p95_ms": 0.019156,
+              "p99_ms": 0.029816,
+              "total_ms": 16.485363
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.200514,
+              "p95_ms": 0.216625,
+              "p99_ms": 0.238415,
+              "total_ms": 204.240883
+            },
+            "spelling_cache": {
+              "hits": 6294,
+              "misses": 3,
+              "maxsize": 16,
+              "currsize": 3
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.15272032800000002,
+                "cumulative_seconds": 0.173040556
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.004778119,
+                "cumulative_seconds": 0.004778119
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.15272032800000002,
+                "cumulative_seconds": 0.173040556
+              },
+              {
+                "filename": "/tmp/dordiai-resource-path-profile-ylupfc7c/external-word-cache/manager-path-cache/native_membership_runtime.py",
+                "line": 62,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.043875791000000004,
+                "cumulative_seconds": 0.329608772
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 166,
+                "function": "__fspath__",
+                "primitive_calls": 90000,
+                "calls": 90000,
+                "self_seconds": 0.030157489000000003,
+                "cumulative_seconds": 0.038285805
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_abc.py",
+                "line": 513,
+                "function": "is_symlink",
+                "primitive_calls": 42000,
+                "calls": 42000,
+                "self_seconds": 0.026827697,
+                "cumulative_seconds": 0.202580647
+              }
+            ]
+          },
+          {
+            "round": 2,
+            "variant": "baseline",
+            "parent_counts": [
+              15,
+              15,
+              12
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.389953,
+              "p95_ms": 1.673182,
+              "p99_ms": 1.858447,
+              "total_ms": 137.602344
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.016039,
+              "p95_ms": 0.018876,
+              "p99_ms": 0.029264,
+              "total_ms": 16.493829
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.299138,
+              "p95_ms": 0.322172,
+              "p99_ms": 0.34295,
+              "total_ms": 304.410617
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.157324126,
+                "cumulative_seconds": 0.179117733
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.004949385000000001,
+                "cumulative_seconds": 0.004949385000000001
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.157324126,
+                "cumulative_seconds": 0.179117733
+              },
+              {
+                "filename": "/tmp/dordiai-resource-path-profile-ylupfc7c/external-word-cache/candidate-default/native_membership_runtime.py",
+                "line": 52,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.054232135,
+                "cumulative_seconds": 0.686942956
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 44,
+                "function": "__getitem__",
+                "primitive_calls": 42000,
+                "calls": 42000,
+                "self_seconds": 0.046482683000000004,
+                "cumulative_seconds": 0.319111016
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 117,
+                "function": "__init__",
+                "primitive_calls": 39000,
+                "calls": 39000,
+                "self_seconds": 0.04048483,
+                "cumulative_seconds": 0.067337809
+              }
+            ]
+          },
+          {
+            "round": 3,
+            "variant": "baseline",
+            "parent_counts": [
+              15,
+              15,
+              12
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.354677,
+              "p95_ms": 1.599334,
+              "p99_ms": 2.713042,
+              "total_ms": 135.429352
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.0158545,
+              "p95_ms": 0.018755,
+              "p99_ms": 0.028353,
+              "total_ms": 16.315455
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.29929300000000003,
+              "p95_ms": 0.329575,
+              "p99_ms": 0.387934,
+              "total_ms": 306.255514
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.157598797,
+                "cumulative_seconds": 0.17961074800000001
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.005001753,
+                "cumulative_seconds": 0.005001753
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.157598797,
+                "cumulative_seconds": 0.17961074800000001
+              },
+              {
+                "filename": "/tmp/dordiai-resource-path-profile-ylupfc7c/external-word-cache/candidate-default/native_membership_runtime.py",
+                "line": 52,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.054550604,
+                "cumulative_seconds": 0.689686931
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 44,
+                "function": "__getitem__",
+                "primitive_calls": 42000,
+                "calls": 42000,
+                "self_seconds": 0.047026197000000006,
+                "cumulative_seconds": 0.318853892
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 117,
+                "function": "__init__",
+                "primitive_calls": 39000,
+                "calls": 39000,
+                "self_seconds": 0.040682234000000005,
+                "cumulative_seconds": 0.067733501
+              }
+            ]
+          },
+          {
+            "round": 3,
+            "variant": "candidate",
+            "parent_counts": [
+              15,
+              15,
+              12
+            ],
+            "first97": {
+              "count": 97,
+              "median_ms": 1.243119,
+              "p95_ms": 1.487175,
+              "p99_ms": 1.65054,
+              "total_ms": 122.994892
+            },
+            "reader1000": {
+              "count": 1000,
+              "median_ms": 0.01583,
+              "p95_ms": 0.018945,
+              "p99_ms": 0.028112,
+              "total_ms": 16.364488
+            },
+            "manager1000": {
+              "count": 1000,
+              "median_ms": 0.202097,
+              "p95_ms": 0.217416,
+              "p99_ms": 0.240469,
+              "total_ms": 206.063684
+            },
+            "spelling_cache": {
+              "hits": 6294,
+              "misses": 3,
+              "maxsize": 16,
+              "currsize": 3
+            },
+            "closed": true,
+            "profile_filesystem": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.153474193,
+                "cumulative_seconds": 0.173899423
+              },
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.fstat>",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.004839151,
+                "cumulative_seconds": 0.004839151
+              }
+            ],
+            "profile_top_self": [
+              {
+                "filename": "~",
+                "line": 0,
+                "function": "<built-in method posix.stat>",
+                "primitive_calls": 48000,
+                "calls": 48000,
+                "self_seconds": 0.153474193,
+                "cumulative_seconds": 0.173899423
+              },
+              {
+                "filename": "/tmp/dordiai-resource-path-profile-ylupfc7c/external-word-cache/manager-path-cache/native_membership_runtime.py",
+                "line": 62,
+                "function": "_signature",
+                "primitive_calls": 3000,
+                "calls": 3000,
+                "self_seconds": 0.043112277000000004,
+                "cumulative_seconds": 0.331048155
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_local.py",
+                "line": 166,
+                "function": "__fspath__",
+                "primitive_calls": 90000,
+                "calls": 90000,
+                "self_seconds": 0.030328819000000003,
+                "cumulative_seconds": 0.038587241
+              },
+              {
+                "filename": "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/pathlib/_abc.py",
+                "line": 513,
+                "function": "is_symlink",
+                "primitive_calls": 42000,
+                "calls": 42000,
+                "self_seconds": 0.027819992,
+                "cumulative_seconds": 0.20463324800000002
+              }
+            ]
+          }
+        ],
+        "data_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "plain_data_path_characters": 289,
+        "all_round_filesystem_check_counts_identical": true
+      },
+      "git_blob": "b6ef0dc77874dc5552484143fa85902da7873e33"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14762683387,
+      "name": "unpublished-resource-path-profile-ubuntu-latest",
+      "size_in_bytes": 9042,
+      "digest": "sha256:f522b225d28239e4d5d73b19733a1df9c598ae2c7c39efdd842ff17dcfc2de0c"
+    },
+    {
+      "id": 14762289342,
+      "name": "unpublished-resource-path-profile-windows-latest",
+      "size_in_bytes": 8391,
+      "digest": "sha256:0d209037dabf9a246476dfd1afc33a5484528f57101b5adca994d876174c2650"
+    }
+  ],
+  "interpretation": "Windows hot Resource medians roughly8–9% lower, first97 totals roughly7% lower; Linux hot Resource medians roughly33% lower. Actual selected filesystem syscall counts identical every round; no file-validation/cache freshness bypass."
+}

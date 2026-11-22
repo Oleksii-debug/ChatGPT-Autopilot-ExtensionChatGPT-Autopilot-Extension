@@ -29,11 +29,11 @@ class OrdinaryAudit(unittest.TestCase):
                 self.assertEqual(r['prepared_ordinary_bank_evidence'],'not-established-by-this-audit')
         self.assertEqual(sum(v['navigation_spoken_name'] for v in d['bank_evidence']['immutable_ancestor']['aggregate'].values()),4140)
     def test_arabic_candidate_all29_ordinary_names_dispatch_without_sound_or_phonetic_examples(self):
-        c=json.loads((PACKET/'tools/research/ar_ordinary_name_candidate.json').read_text())
+        c=json.loads((PACKET/'tools/research/ar_ordinary_name_candidate.json').read_text(encoding='utf-8'))
         self.assertEqual(set(c['letter_names']),set('ابتثجحخدذرزسشصضطظعغفقكلمنهويء'))
         names=load('_ar29_name_dispatch',ROOT/'source/0.12.2/kx47Runtime/character_names.py')
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp);(p/'ar.json').write_text(json.dumps({'format':'dordiai-character-name-sources','format_version':1,'language':'ar','letter_names':c['letter_names'],'phonetic_descriptions':{'ب':['an unrelated spelling example']},'symbol_names':{},'letter_names_ready':False}))
+            p=Path(tmp);(p/'ar.json').write_text(json.dumps({'format':'dordiai-character-name-sources','format_version':1,'language':'ar','letter_names':c['letter_names'],'phonetic_descriptions':{'ب':['an unrelated spelling example']},'symbol_names':{},'letter_names_ready':False}),encoding='utf-8')
             names.clear_cache()
             for glyph,expected in c['letter_names'].items():
                 with self.subTest(glyph=glyph):self.assertEqual(names.spoken_name('ar',glyph,directory=p),expected)
@@ -42,7 +42,7 @@ class OrdinaryAudit(unittest.TestCase):
                 with self.subTest(unsupported=glyph),self.assertRaises(LookupError):names.spoken_name('ar',glyph,directory=p)
             names.clear_cache()
     def test_arabic_facts_preserve_contrasts_and_source_scope(self):
-        c=json.loads((PACKET/'tools/research/ar_ordinary_name_candidate.json').read_text())
+        c=json.loads((PACKET/'tools/research/ar_ordinary_name_candidate.json').read_text(encoding='utf-8'))
         self.assertEqual(c['source']['sha256'],'940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385')
         self.assertEqual(c['source']['bytes'],5475624)
         self.assertEqual(c['letter_names']['ا'],'ألف');self.assertEqual(c['letter_names']['ء'],'همزة')

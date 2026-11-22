@@ -108,7 +108,8 @@ def probe(args):
     args.output.mkdir(parents=True)
     d=candidate(args.candidate);runtime=args.runtime.resolve(strict=True);private=(runtime/'python').resolve()
     if not Path(sys.executable).resolve().is_relative_to(private):raise RuntimeError('Must use unchanged core12 private interpreter')
-    report={'format':'dordiai-ar29-ordinary-name-actual-pcm-v1','status':'running','core_sha256':CORE_SHA,'wide_outer_sha256':WIDE_SHA,'source_pdf_sha256':SOURCE_SHA,'candidate_sha256':CANDIDATE_SHA,'scope':'Literal ordinary names through actual Arabic-conditioned shared neural carrier, original calibrated shared source and original Viktoriia OpenVoice graphs; not eSpeak, MMS, production raw-glyph dispatch, listening or NVDA typing proof','cases':[],**{k:False for k in FALSE_FLAGS}}
+    if sys.flags.utf8_mode!=1:raise RuntimeError('Private research subprocess must inherit PYTHONUTF8=1')
+    report={'format':'dordiai-ar29-ordinary-name-actual-pcm-v1','status':'running','core_sha256':CORE_SHA,'wide_outer_sha256':WIDE_SHA,'source_pdf_sha256':SOURCE_SHA,'candidate_sha256':CANDIDATE_SHA,'scope':'Literal ordinary names through actual Arabic-conditioned shared neural carrier, original calibrated shared source and original Viktoriia OpenVoice graphs; not eSpeak, MMS, production raw-glyph dispatch, listening or NVDA typing proof','cases':[],'utf8_mode':sys.flags.utf8_mode,'stdout_encoding':sys.stdout.encoding,**{k:False for k in FALSE_FLAGS}}
     write_json(args.output/'report.json',report)
     try:
         os.environ['PYTHONDONTWRITEBYTECODE']='1';sys.addaudithook(shared.deny_network_event)
@@ -126,7 +127,7 @@ def probe(args):
         models=runtime/'models';folder=models/'WideLanguages/SharedAcoustic'
         processor=UnicodeProcessor(str(folder/'onnx/unicode_indexer.json'),append_terminal_period=False)
         report['prepared_names']=validate_names(processor,d['letter_names']);report['ordinary_names_native_vocabulary_valid']=True
-        before=snapshot(runtime);staged=json.loads((runtime.parent/'ar29-stage.json').read_text())
+        before=snapshot(runtime);staged=json.loads((runtime.parent/'ar29-stage.json').read_text(encoding='utf-8'))
         if before!=staged['existing_payload_hashes']:raise ValueError('Original staged payload changed before inference')
         paths={'source':folder/'source.npy','flow':models/'OpenVoiceV2/encoder-flow.onnx','decoder':models/'OpenVoiceV2/decoder.onnx','target':models/'voices/classmate_locales/viktoriia.npy'}
         for key,pin in [('flow',FLOW_SHA),('decoder',DECODER_SHA),('target',TARGET_SHA)]:
