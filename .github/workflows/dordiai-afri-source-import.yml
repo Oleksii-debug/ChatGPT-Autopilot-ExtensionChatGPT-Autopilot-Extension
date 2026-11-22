@@ -1,0 +1,41 @@
+name: Dordiai audited Afri source import as unattached blobs
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-afri-source-import.yml'
+      - 'dordiai-voices/tools/research/import_afri_reviewed_source.py'
+      - 'dordiai-voices/tests/test_afri_source_import.py'
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: dordiai-afri-source-import-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  import-reviewed-source:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[afri-source-import]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify archive pin, path and no-partial-publication guards with synthetic fixtures
+        run: python -m unittest discover -s dordiai-voices/tests -p test_afri_source_import.py -v
+      - name: Verify own immutable source artifact and create unattached Git blobs only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python dordiai-voices/tools/research/import_afri_reviewed_source.py --report output/afri-source-import.json
+      - name: Preserve exact production-path to Git-blob mapping
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-afri-reviewed-source-blob-map-${{ github.run_id }}
+          path: output/afri-source-import.json
+          if-no-files-found: warn
+          retention-days: 30
