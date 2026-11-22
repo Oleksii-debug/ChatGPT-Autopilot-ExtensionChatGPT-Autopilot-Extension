@@ -1,0 +1,80 @@
+name: Dordiai native Manipuri FP32 CPU and ONNX proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-mni-native-proof.yml'
+      - 'dordiai-voices/tools/research/probe_mni_native.py'
+      - 'dordiai-voices/tools/research/mni_native_definitions.py'
+      - 'dordiai-voices/tests/test_mni_native_proof.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-mni-native-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-proof:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mni-native]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated official CPU Torch
+        run: >-
+          python -m pip install --only-binary=:all:
+          --index-url https://download.pytorch.org/whl/cpu torch==2.6.0+cpu
+      - name: Install pinned isolated export and native transliteration dependencies
+        run: >-
+          python -m pip install numpy==2.2.6 onnx==1.17.0 onnxruntime==1.27.0
+          safetensors==0.5.3 aksharamukha==1.9.7
+      - name: Restore only exact previously audited official source ZIP
+        id: raw-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/dordiai-mni-official-raw
+          key: mni-official-raw-f689abf7d7398b99b40e589350beae6ceee62bdde880eb8c217b2d076e6683e5
+      - name: Rehash cache and acquire pinned original inference source definitions
+        run: >-
+          python dordiai-voices/tools/research/probe_mni_native.py prepare
+          --archive "${{ runner.temp }}/dordiai-mni-official-raw/mni.zip"
+          --inputs "${{ runner.temp }}/dordiai-mni-native-inputs"
+      - name: Save verified immutable raw source cache on cold cache only
+        if: success() && steps.raw-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/dordiai-mni-official-raw
+          key: mni-official-raw-f689abf7d7398b99b40e589350beae6ceee62bdde880eb8c217b2d076e6683e5
+      - name: Prove AST isolation, exact native114 tokenizer and numerical guards
+        env:
+          MNI_PINNED_SOURCE_DIRECTORY: ${{ runner.temp }}/dordiai-mni-native-inputs/sources
+        run: python -m unittest discover -s dordiai-voices/tests -p test_mni_native_proof.py -v
+      - name: Actual native MNI both speakers then exact FP32 safe-state and ONNX parity
+        run: >-
+          python dordiai-voices/tools/research/probe_mni_native.py run
+          --archive "${{ runner.temp }}/dordiai-mni-official-raw/mni.zip"
+          --inputs "${{ runner.temp }}/dordiai-mni-native-inputs"
+          --output "${{ github.workspace }}/output/mni-native-proof"
+      - name: Preserve actual completed or partial proof, WAVs and lossless model-only exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mni-native-proof-${{ github.run_id }}
+          path: output/mni-native-proof/
+          if-no-files-found: warn
+          compression-level: 0
