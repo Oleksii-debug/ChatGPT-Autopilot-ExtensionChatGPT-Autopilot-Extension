@@ -1,0 +1,2 @@
+# Isolated CPU data acquisition only: no models, Torch, audio, or remote dataset code.
+pyarrow==22.0.0

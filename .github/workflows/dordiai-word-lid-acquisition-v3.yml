@@ -1,0 +1,61 @@
+name: Dordiai bounded native-word source acquisition v3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-word-lid-acquisition-v3.yml'
+      - 'dordiai-voices/tools/acquire_word_lid_v3.py'
+      - 'dordiai-voices/tools/data/word_lid_sources_v3_acquisition.json'
+      - 'dordiai-voices/tools/vendor/word_classifier_native_policy_5e532.py'
+      - 'dordiai-voices/tools/vendor/prepare_word_lid_sources_a6c01.py'
+      - 'dordiai-voices/tests/test_word_lid_acquisition_v3.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-word-lid-acquisition-v3-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  acquire:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-lid-v3]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: dordiai-voices/tools/requirements-word-lid-acquisition-v3.txt
+      - name: Install only the pinned Parquet reader
+        run: >-
+          python -m pip install --only-binary=:all:
+          -r dordiai-voices/tools/requirements-word-lid-acquisition-v3.txt
+      - name: Validate range, script-family and partition guards
+        run: python -m unittest discover -s dordiai-voices/tests -p test_word_lid_acquisition_v3.py -v
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/dordiai-word-lid-v3-sources
+          key: word-lid-v3-native-pilot-${{ hashFiles('dordiai-voices/tools/data/word_lid_sources_v3_acquisition.json') }}
+      - name: Acquire gn ht and four small Indic native TRAIN sources
+        run: >-
+          python dordiai-voices/tools/acquire_word_lid_v3.py
+          --manifest dordiai-voices/tools/data/word_lid_sources_v3_acquisition.json
+          --cache "${{ runner.temp }}/dordiai-word-lid-v3-sources"
+          --output "${{ github.workspace }}/output/word-lid-v3"
+      - name: Preserve partial or completed corpus and exact receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-word-lid-v3-acquisition-${{ github.run_id }}
+          path: output/word-lid-v3/
+          if-no-files-found: warn
+          compression-level: 0
