@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   prepare:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[banks-trial]'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[banks-trial]') || contains(github.event.head_commit.message, '[banks-full]')))
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -51,8 +51,8 @@ jobs:
       CORE_ARTIFACT_RUN: ${{ inputs.core_run_id || '45005894766' }}
       CORE_ARTIFACT_NAME: ${{ inputs.core_artifact_name || 'dordiai-voices-development-core' }}
       OVERLAY_VERSION: ${{ inputs.overlay_version || '0.13.1-banks.1' }}
-      MAX_NEW_CLIPS: ${{ github.event_name == 'push' && '2' || inputs.max_new_clips }}
-      RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+      MAX_NEW_CLIPS: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[banks-full]') && '0' || '2') || inputs.max_new_clips }}
+      RESUME_RUN_ID: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[banks-full]') && '45017654403' || inputs.resume_run_id }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -90,12 +90,36 @@ jobs:
           $overlay = Join-Path $env:GITHUB_WORKSPACE ('bank-overlay-output/dordiai-supplementary-banks-' + $env:OVERLAY_VERSION + '.zip')
           Add-Content -LiteralPath $env:GITHUB_ENV -Value ('BANK_OVERLAY_ARCHIVE_PATH=' + $overlay)
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        if: ${{ inputs.resume_run_id != '' }}
+        if: ${{ env.RESUME_RUN_ID != '' }}
         with:
-          name: ${{ inputs.resume_artifact_name }}
-          run-id: ${{ inputs.resume_run_id }}
+          name: ${{ inputs.resume_artifact_name || 'supplementary-bank-state' }}
+          run-id: ${{ env.RESUME_RUN_ID }}
           github-token: ${{ github.token }}
           path: ${{ env.BANK_WORK_ROOT }}/state
+      - name: Verify successful supervised trial before full push generation
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[banks-full]')
+        shell: pwsh
+        env:
+          TRIAL_API_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RESUME_RUN_ID -ne '45017654403' -or $env:MAX_NEW_CLIPS -ne '0') { throw 'Full push must resume the exact successful finite trial' }
+          $headers = @{ Authorization=('Bearer ' + $env:TRIAL_API_TOKEN); Accept='application/vnd.github+json' }
+          $uri = 'https://api.github.com/repos/' + $env:GITHUB_REPOSITORY + '/actions/runs/45017654403'
+          $trial = Invoke-RestMethod -Uri $uri -Headers $headers
+          if ($trial.status -ne 'completed' -or $trial.conclusion -ne 'success' -or
+              $trial.head_sha -ne '5f5ab6cf53e09f630c7c2726d730a317e07e29b7' -or
+              $trial.path -ne '.github/workflows/dordiai-supplementary-banks.yml' -or
+              $trial.event -ne 'push') { throw 'Pinned trial was not a successful genuine workflow run' }
+          $state = Join-Path $env:BANK_WORK_ROOT 'state'
+          $verdict = Get-Content -LiteralPath (Join-Path $state 'supervised-trial-verdict.json') -Raw | ConvertFrom-Json
+          $report = Get-Content -LiteralPath (Join-Path $state 'generation-report.json') -Raw | ConvertFrom-Json
+          if ($verdict.status -ne 'passed-supervised-pause' -or $verdict.actual_new_neural_clips -ne 2 -or
+              $verdict.full_overlay_published -ne $false -or
+              $report.status -ne 'paused-not-published' -or $report.source_core_sha256 -ne $env:CORE_EXPECTED_SHA256 -or
+              $report.overlay_version -ne $env:OVERLAY_VERSION -or $report.planned_clips -ne 3330 -or
+              $report.completed_clips -ne 2 -or $report.new_worker_clips -ne 2 -or
+              $null -eq $report.worker_shutdown.exit_code) { throw 'Downloaded trial checkpoint differs from its supervised proof' }
       - name: Render genuine misses and retain verified same-voice spaces
         working-directory: dordiai-voices
         shell: pwsh
@@ -147,6 +171,55 @@ jobs:
             exit 0
           }
           if ($code -ne 0) { exit $code }
+      - name: Print bounded checkpoint and overlay receipt without PCM
+        if: ${{ always() && env.BANK_WORK_ROOT != '' }}
+        shell: pwsh
+        run: |
+          @'
+          import base64, gzip, hashlib, json, os
+          from pathlib import Path
+          import zipfile
+          root=Path(os.environ["BANK_WORK_ROOT"])/"state"
+          def read(name,limit=65536):
+              path=root/name
+              if not path.is_file():return None
+              if path.stat().st_size>limit:raise ValueError("Oversized checkpoint metadata: "+name)
+              return json.loads(path.read_text(encoding="utf-8"))
+          plan=read("plan.json",16*1024*1024)
+          doc={"format":"dordiai-bank-workflow-receipt","format_version":1,
+               "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+               "generation":read("generation-report.json"),"owner":read("owner.json"),
+               "supervised_trial":read("supervised-trial-verdict.json"),
+               "physical_audio_verified":False}
+          if plan is not None:
+              doc["plan_receipt"]={"core_sha256":plan["core_sha256"],"catalogue_sha256":plan["catalogue_sha256"],
+                  "voice_ids":plan["voice_ids"],"job_counts":{key:len(value) for key,value in plan["jobs"].items()}}
+          output=Path(os.environ["BANK_OVERLAY_ARCHIVE_PATH"])
+          if output.is_file():
+              with zipfile.ZipFile(output) as archive:
+                  name="dordiai-prepared-bank-overlay.json"
+                  if archive.getinfo(name).file_size>32*1024*1024:raise ValueError("Oversized overlay manifest")
+                  raw=archive.read(name);manifest=json.loads(raw)
+              doc["overlay_manifest_receipt"]={key:manifest[key] for key in
+                  ("format","format_version","version","source_core","catalogue_sha256","voice_ids",
+                   "excluded_voice_ids","provenance","quality_validation","validation_scope")}
+              doc["overlay_manifest_receipt"]["files"]={key:{"old":value["old"],"new":value["new"],
+                  "added_key_count":len(value["added_keys"]),"added_keys_sha256":hashlib.sha256(json.dumps(value["added_keys"],separators=(",",":")).encode()).hexdigest()}
+                  for key,value in manifest["files"].items()}
+              doc["overlay_manifest_receipt"].update(
+                  manifest_sha256=hashlib.sha256(raw).hexdigest(),manifest_size_bytes=len(raw),
+                  identity_input_count=len(manifest["identity_inputs"]),
+                  identity_inputs_sha256=hashlib.sha256(json.dumps(manifest["identity_inputs"],sort_keys=True,separators=(",",":")).encode()).hexdigest(),
+                  clip_counts={key:len(value) for key,value in manifest["clips"].items()})
+          encoded=json.dumps(doc,sort_keys=True,ensure_ascii=True,separators=(",",":")).encode()
+          if len(encoded)>256*1024:raise ValueError("Receipt exceeds bounded metadata quota")
+          payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode("ascii")
+          if len(payload)>192*1024:raise ValueError("Compressed receipt exceeds metadata quota")
+          chunks=[payload[i:i+24000] for i in range(0,len(payload),24000)]
+          print("DORDIAI_BANK_RECEIPT_META="+json.dumps({"encoding":"gzip+base64","chunks":len(chunks),"json_sha256":hashlib.sha256(encoded).hexdigest(),"json_size_bytes":len(encoded)}))
+          for i,part in enumerate(chunks):print("DORDIAI_BANK_RECEIPT_GZIP_B64_%03d="%i+part)
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Persist compact resumable state, never model weights
         if: ${{ always() && env.BANK_WORK_ROOT != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

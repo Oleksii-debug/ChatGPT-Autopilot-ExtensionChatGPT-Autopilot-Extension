@@ -170,10 +170,12 @@
       "actual_keyboard_pipeline_verified": true,
       "actual_keyboard_language_routes_accepted": true,
       "required_resource_failure_recovery_verified": true,
-      "required_resource_recovery_evidence": "Original artifact14752207026 from45016446860; exact report extraction queued",
-      "actual_keyboard_evidence": "Original artifact14752316501 from45016446860; exact report extraction queued",
+      "required_resource_recovery_evidence": "evidence/windows_dev9_required_45016446860.json.gz",
+      "actual_keyboard_evidence": "evidence/windows_dev9_typing_45016446860.json.gz",
       "actual_keyboard_probe_run": 45016446860,
-      "required_resource_probe_run": 45016446860
+      "required_resource_probe_run": 45016446860,
+      "actual_keyboard_evidence_sha256": "5f85872b6c0b10c42b14440a23a0d0e24e87563a9a864ad788986a2f684083c6",
+      "required_resource_evidence_sha256": "279c9c4e981941514ca091537e31b3af4f16204c0deb97b41afbe3717ffe56bc"
     },
     "native_pronunciation": {
       "status": "not_accepted",
@@ -250,6 +252,14 @@
       "evidence": "evidence/mms_resource_packs_run_45014461158.json.gz",
       "artifact_receipts": "evidence/mms_resource_artifacts_45014461158.json",
       "caveat": "Exact original native FP32 resources; package integrity does not certify all language pronunciation."
+    },
+    "prepared_bank_expansion": {
+      "status": "supervised_two_clip_trial_passed_full_generation_pending",
+      "run": 45017654403,
+      "planned_clips": 3330,
+      "new_neural_clips_required": 3240,
+      "retained_same_profile_space_clips": 90,
+      "physical_audio_verified": false
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
