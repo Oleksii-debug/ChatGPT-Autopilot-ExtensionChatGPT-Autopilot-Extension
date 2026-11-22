@@ -1,0 +1,111 @@
+{
+  "format": "dordiai-afri-native-prefill-parity-v1",
+  "status": "pinned-five-native-inputs-acquired",
+  "revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
+  "source_revision": "b4508ae979dd34eea2597d420d67176ef55a21a0",
+  "g2p_revision": "76b53a8fa2a688812e369837d179d4710c111a7a",
+  "files": {
+    "tokenizer.json": {
+      "bytes": 247366,
+      "git_blob_sha1": "51d1c05a9d0bbc98cbba81978eb4f30f803c6356",
+      "relative": "tokenizer.json",
+      "raw_sha256": "4a3a30d989f7e18484af44aa87a9e1fd0bd37b1bf4de98401d6ef20e8543e7ac"
+    },
+    "config.yaml": {
+      "bytes": 1065,
+      "git_blob_sha1": "d61303e11d12422e5c56fcf72384d1e184ab115b",
+      "relative": "config.yaml",
+      "raw_sha256": "67ff8d1cf99e8ae8185fa2d5ece8b6cd3ff6fd924868abc4b446506e571514a5"
+    },
+    "voice_ssw": {
+      "bytes": 161804,
+      "sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94",
+      "pin_kind": "publisher-lfs-raw-sha256",
+      "relative": "voices/ssw.wav",
+      "raw_sha256": "2af659904452bbc23bb828c42ca1aebf45207f891f483df848ac8ddff24bef94"
+    },
+    "voice_ven": {
+      "bytes": 188204,
+      "sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0",
+      "pin_kind": "publisher-lfs-raw-sha256",
+      "relative": "voices/ven.wav",
+      "raw_sha256": "c443f552f961d7e05036e15d0dd77af2d5c734e4551429df16caa2708d9db0a0"
+    },
+    "voice_zul": {
+      "bytes": 223244,
+      "sha256": "7b546bfa415993122e51694d7ba2254ef564f6220a73643314f49ba7496bfede",
+      "pin_kind": "publisher-lfs-raw-sha256",
+      "relative": "voices/zul.wav",
+      "raw_sha256": "7b546bfa415993122e51694d7ba2254ef564f6220a73643314f49ba7496bfede"
+    },
+    "voice_nso": {
+      "bytes": 168524,
+      "sha256": "1b3886c9bef550cd26e656190ab03dc8a4c7e65889eee64fd121cfbbfb645ab4",
+      "pin_kind": "publisher-lfs-raw-sha256",
+      "relative": "voices/nso.wav",
+      "raw_sha256": "1b3886c9bef550cd26e656190ab03dc8a4c7e65889eee64fd121cfbbfb645ab4"
+    },
+    "voice_wol": {
+      "bytes": 140204,
+      "sha256": "b20601d70d20ca54a2d85cecfc388f4c9c6a57f6683426f9ece7ac459a592f27",
+      "pin_kind": "publisher-lfs-raw-sha256",
+      "relative": "voices/wol.wav",
+      "raw_sha256": "b20601d70d20ca54a2d85cecfc388f4c9c6a57f6683426f9ece7ac459a592f27"
+    },
+    "README.md": {
+      "bytes": 9087,
+      "git_blob_sha1": "4e3d3ee6cbeaa7521ddf14c21bb7e2ec10bc98e6",
+      "pin_kind": "publisher-git-blob-sha1",
+      "relative": "README.md",
+      "raw_sha256": "1b028b874d114e683cc1487d86f401d1177d61d21a5934114a581515d72f2648"
+    },
+    "languages.json": {
+      "bytes": 4749,
+      "git_blob_sha1": "a2d547853bd1b3b8c6db110b42e23e0f76c43000",
+      "relative": "languages.json",
+      "raw_sha256": "8783c5735502cf5a0d88bbbf3fbc05150cbe03bb0247844a2269c9ade7f4210b"
+    },
+    "parity_set.tsv": {
+      "bytes": 221529,
+      "git_blob_sha1": "7a24129c8f737143abffa5033de0661d312717d4",
+      "relative": "parity_set.tsv",
+      "raw_sha256": "05acd0163c46daf8c591a50a1a3458324bf08308be08308769f28109a4a5493a"
+    }
+  },
+  "languages": {
+    "ssw": {
+      "selected_code": "ss",
+      "name": "Swati",
+      "trained_hours": 12.08
+    },
+    "ven": {
+      "selected_code": "ve",
+      "name": "Venda",
+      "trained_hours": 10.62
+    },
+    "zul": {
+      "selected_code": "zu",
+      "name": "Zulu",
+      "trained_hours": 21.14
+    },
+    "nso": {
+      "selected_code": "nso",
+      "name": "Northern Sotho / Sepedi",
+      "trained_hours": 13.24
+    },
+    "wol": {
+      "selected_code": "wo",
+      "name": "Wolof",
+      "trained_hours": 0.56
+    }
+  },
+  "cautions": [
+    "Wolof has only0.56h in this checkpoint; publisher warns that languages below2h are weak.",
+    "Religious read-speech dominates training; spontaneous and technical pronunciation remains unaccepted.",
+    "Literal digits are unsupported by training; no number fallback is introduced here.",
+    "Native carrier timings are completed-wave CPU measurements, not streaming first PCM, NVDA or acoustic latency."
+  ],
+  "model_weights_downloaded": false,
+  "product_integrated": false,
+  "publisher_model_license": "cc-by-nc-4.0"
+}

@@ -322,6 +322,21 @@
       "reason": "Multiple per-predicted-language gates fail and paired core precision regresses.",
       "evidence": "evidence/word_lid_v4_actual_review.md",
       "production_old45_preserved": true
+    },
+    "native_membership": {
+      "full_source_equality_verified": true,
+      "frozen_nvda_leaf_compatibility_verified": true,
+      "actual_built_in_version": "0.13.1-dev.11",
+      "installed_manager_nvda_verified": false,
+      "evidence": "evidence/native_membership_all_source_equality_45029256575.json"
+    },
+    "afri_six_native_packages": {
+      "actual_installed_core11": true,
+      "profile_requests": 225,
+      "actual_run": 45029834209,
+      "nvda_verified": false,
+      "pronunciation_verified": false,
+      "physical_audio_verified": false
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -369,7 +384,7 @@
     "product_ready": false
   },
   "current_environment_blocker": "Local executor remains unavailable; real Linux/Windows execution and byte-preserving checkpoints continue through owned GitHub Actions.",
-  "working_source_target_version": "0.13.1-dev.11; unused native membership leaf only; no source11 archive built or accepted",
+  "working_source_target_version": "0.13.1-dev.11 built and immutable at84ca83e; actual worker225 passed; matching NVDA11 acceptance pending. Production changes next require12.",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,
@@ -450,5 +465,32 @@
       "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
       "evidence": "evidence/draft_core10_backup_45024623994.json"
     }
+  },
+  "latest_built_core": {
+    "version": "0.13.1-dev.11",
+    "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+    "run": 45029834209,
+    "job": 137230752726,
+    "archive_bytes": 1992938157,
+    "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+    "installed_bytes": 2408429678,
+    "files": 10257,
+    "core_artifact": 14757229220,
+    "evidence_artifact": 14757224120,
+    "windows_tests": 1058,
+    "windows_skipped": 36,
+    "old_bank_files_byte_identical": 180,
+    "old_private_python_files_byte_identical": 1596,
+    "actual_packaged_native_profile_requests": 225,
+    "default_three_engine_regression_passed": true,
+    "same_worker_source_removal_restoration_passed": true,
+    "eight_excluded_voices_rejected": true,
+    "worker_clean_exit": true,
+    "nvda_verified": false,
+    "typing_verified": false,
+    "physical_audio_verified": false,
+    "native_pronunciation_verified": false,
+    "product_ready": false,
+    "evidence": "evidence/source11_worker_45029834209.json"
   }
 }

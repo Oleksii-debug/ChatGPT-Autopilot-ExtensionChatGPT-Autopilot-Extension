@@ -1,0 +1,184 @@
+{
+  "archive": {
+    "sha256": "f689abf7d7398b99b40e589350beae6ceee62bdde880eb8c217b2d076e6683e5",
+    "size_bytes": 1518195233
+  },
+  "cases": [
+    {
+      "duration": [
+        [
+          38.0,
+          11.0,
+          22.0
+        ]
+      ],
+      "original_decoder_equals_full_inference_bits": true,
+      "original_expanded_stride": [
+        36352,
+        1,
+        512
+      ],
+      "original_mel_sha256": "1563d7c8bbdc6038b8895a3511029acc72da8a46ac7a97a2635b15db49c66dd9",
+      "speaker": "female",
+      "speaker_id": 0,
+      "text": "\u09ae\u09a5\u0982",
+      "token_ids": [
+        78,
+        70,
+        44
+      ],
+      "variants": {
+        "contiguous_repeat": {
+          "expanded_shape": [
+            1,
+            512,
+            71
+          ],
+          "expanded_stride": [
+            36352,
+            71,
+            1
+          ],
+          "expanded_values_bit_exact": true,
+          "mel": {
+            "bit_exact": false,
+            "float_atol": 1e-05,
+            "float_pass": true,
+            "max_abs": 3.814697265625e-06,
+            "shape": [
+              1,
+              71,
+              80
+            ],
+            "snr_db": 138.7566029600087
+          },
+          "mel_sha256": "6504bbf95d1d4ad471d1516c17f5e41968481132a05f3fd41ff12a5f93d09d58"
+        },
+        "original_layout_repeat": {
+          "expanded_shape": [
+            1,
+            512,
+            71
+          ],
+          "expanded_stride": [
+            36352,
+            1,
+            512
+          ],
+          "expanded_values_bit_exact": true,
+          "mel": {
+            "bit_exact": true,
+            "float_atol": 1e-05,
+            "float_pass": true,
+            "max_abs": 0.0,
+            "shape": [
+              1,
+              71,
+              80
+            ],
+            "snr_db": null
+          },
+          "mel_sha256": "1563d7c8bbdc6038b8895a3511029acc72da8a46ac7a97a2635b15db49c66dd9"
+        }
+      }
+    },
+    {
+      "duration": [
+        [
+          31.0,
+          13.0,
+          22.0
+        ]
+      ],
+      "original_decoder_equals_full_inference_bits": true,
+      "original_expanded_stride": [
+        33792,
+        1,
+        512
+      ],
+      "original_mel_sha256": "1286a808886f1f57d7b561aa3c984c9e3693ad86200812e58025abe8c415d3c4",
+      "speaker": "male",
+      "speaker_id": 1,
+      "text": "\u09ae\u09a5\u0982",
+      "token_ids": [
+        78,
+        70,
+        44
+      ],
+      "variants": {
+        "contiguous_repeat": {
+          "expanded_shape": [
+            1,
+            512,
+            66
+          ],
+          "expanded_stride": [
+            33792,
+            66,
+            1
+          ],
+          "expanded_values_bit_exact": true,
+          "mel": {
+            "bit_exact": false,
+            "float_atol": 1e-05,
+            "float_pass": true,
+            "max_abs": 3.814697265625e-06,
+            "shape": [
+              1,
+              66,
+              80
+            ],
+            "snr_db": 138.5503377344111
+          },
+          "mel_sha256": "b9c594d26daf57349ba6cb75de588572e453d215e4e39e13d7add6b569e625b4"
+        },
+        "original_layout_repeat": {
+          "expanded_shape": [
+            1,
+            512,
+            66
+          ],
+          "expanded_stride": [
+            33792,
+            1,
+            512
+          ],
+          "expanded_values_bit_exact": true,
+          "mel": {
+            "bit_exact": true,
+            "float_atol": 1e-05,
+            "float_pass": true,
+            "max_abs": 0.0,
+            "shape": [
+              1,
+              66,
+              80
+            ],
+            "snr_db": null
+          },
+          "mel_sha256": "1286a808886f1f57d7b561aa3c984c9e3693ad86200812e58025abe8c415d3c4"
+        }
+      }
+    }
+  ],
+  "format": "dordiai-native-mni-layout-diagnostic",
+  "format_version": 1,
+  "network_guard": {
+    "denied_syscalls": [
+      "socket",
+      "connect",
+      "sendto",
+      "sendmsg",
+      "sendmmsg"
+    ],
+    "installed_before_torch_import": true,
+    "kind": "linux-seccomp"
+  },
+  "onnx_exported": false,
+  "original_layout_preserves_original_mel_bits": true,
+  "production_integrated": false,
+  "source_revision": "42155940b5d0c4c78a554af04472925ddd326887",
+  "status": "actual-layout-diagnostic-complete",
+  "tool_sha256": "8f7e497d8df1286fe60832793b10193d123eadccfba1db659eb3df63eee4914a",
+  "vocoder_executed": false
+}

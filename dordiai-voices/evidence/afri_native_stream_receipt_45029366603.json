@@ -1,0 +1,288 @@
+{
+  "format": "dordiai-afri-native-causal-stream-actual-receipt-v1",
+  "run_id": 45029366603,
+  "job_id": 137229322361,
+  "source_commit": "4ed75070abe59512248d2c2612a99d6a5d5d599e",
+  "artifact": {
+    "id": 14757073491,
+    "name": "dordiai-afri-native-stream-ort-45029366603",
+    "size_bytes": 386720,
+    "sha256": "adc3b28597d42aa307d93965f02ca372e62c93b76e97bd5638a8c8deccbdb941"
+  },
+  "full_report": {
+    "gzip_sha256": "c052e2b06c1d57982163481fa43dcfa9b7b2d5710f86ced04b663a06f855bf07",
+    "relative_path": "evidence/afri_native_stream_20261122.json.gz"
+  },
+  "status": "actual-five-native-causal-stream-experiment-unintegrated",
+  "unit_tests": {
+    "host_ran": 10,
+    "private_numpy_ran": 10,
+    "scope": "Private tests exercise fake graph state/cancel flows; separate actual native proof follows"
+  },
+  "actual_native": {
+    "languages": [
+      "ssw",
+      "ven",
+      "zul",
+      "nso",
+      "wol"
+    ],
+    "golden_cases": 15,
+    "word_cases": 5,
+    "streamed_cases": 80,
+    "chunk_frame_policies": [
+      1,
+      3,
+      5,
+      15
+    ],
+    "all_latents_and_eos_bit_identical": true,
+    "full_float_and_pcm_bit_identical_cases": 20,
+    "chunk15_controls_bit_identical": true,
+    "smaller_partitions_bit_identical": false,
+    "max_absolute_float_error": 0.000003844499588012695,
+    "max_pcm16_lsb_error": 1,
+    "min_finite_snr_db": 118.53111374172695,
+    "all_within_preregistered_gate": true,
+    "chunk1_first_yields_before_ar_completion": true,
+    "cold_scope": "Model sessions are already loaded; native reference encoder and voice-prefill caches explicitly emptied",
+    "word_timings": [
+      {
+        "language": "ssw",
+        "text": "KUCOLELA",
+        "original_full_wave_seconds": 1.8941998999999896,
+        "cached_full_wave_seconds": 1.734251400000005,
+        "chunk1": {
+          "first_nonzero_native_pcm_seconds": 0.09154859999995324,
+          "completed_wave_seconds": 1.8313741999999706,
+          "first_yield": {
+            "closed": false,
+            "generation_complete": false,
+            "yield_count": 1,
+            "frames_at_yield": 1,
+            "chunk_frames": 1,
+            "stage_seconds": {
+              "prefill_clone": 0.006873299999995197,
+              "text_conditioner": 0.00008350000001655644,
+              "text_prefill": 0.04156580000000076,
+              "ar_lm": 0.026257299999997485,
+              "ar_flow": 0.0018426999999974214,
+              "decoder": 0.012209500000039952
+            },
+            "latent_hash_count": 1
+          }
+        },
+        "reference_cache_cold_first_nonzero_native_pcm_seconds": 0.41639650000001893
+      },
+      {
+        "language": "ven",
+        "text": "Tshivhi",
+        "original_full_wave_seconds": 1.018981800000006,
+        "cached_full_wave_seconds": 0.7315123000000199,
+        "chunk1": {
+          "first_nonzero_native_pcm_seconds": 0.09758620000002338,
+          "completed_wave_seconds": 0.7182437000000164,
+          "first_yield": {
+            "closed": false,
+            "generation_complete": false,
+            "yield_count": 1,
+            "frames_at_yield": 1,
+            "chunk_frames": 1,
+            "stage_seconds": {
+              "prefill_clone": 0.007969400000035876,
+              "text_conditioner": 0.00008119999995415128,
+              "text_prefill": 0.041307999999958156,
+              "ar_lm": 0.030560700000023644,
+              "ar_flow": 0.0020226999999977124,
+              "decoder": 0.012545299999999315
+            },
+            "latent_hash_count": 1
+          }
+        },
+        "reference_cache_cold_first_nonzero_native_pcm_seconds": 0.4344323999999915
+      },
+      {
+        "language": "zul",
+        "text": "Usizo",
+        "original_full_wave_seconds": 1.1756250999999907,
+        "cached_full_wave_seconds": 0.9193609000000151,
+        "chunk1": {
+          "first_nonzero_native_pcm_seconds": 0.10293840000002774,
+          "completed_wave_seconds": 0.8959121999999979,
+          "first_yield": {
+            "closed": false,
+            "generation_complete": false,
+            "yield_count": 1,
+            "frames_at_yield": 1,
+            "chunk_frames": 1,
+            "stage_seconds": {
+              "prefill_clone": 0.009938699999963774,
+              "text_conditioner": 0.00009310000001505614,
+              "text_prefill": 0.04173939999998311,
+              "ar_lm": 0.03288270000001603,
+              "ar_flow": 0.0021020000000362415,
+              "decoder": 0.012611499999991338
+            },
+            "latent_hash_count": 1
+          }
+        },
+        "reference_cache_cold_first_nonzero_native_pcm_seconds": 0.4794810999999868
+      },
+      {
+        "language": "nso",
+        "text": "Dilo",
+        "original_full_wave_seconds": 0.8632521999999767,
+        "cached_full_wave_seconds": 0.6127463999999918,
+        "chunk1": {
+          "first_nonzero_native_pcm_seconds": 0.08410099999997556,
+          "completed_wave_seconds": 0.592250799999988,
+          "first_yield": {
+            "closed": false,
+            "generation_complete": false,
+            "yield_count": 1,
+            "frames_at_yield": 1,
+            "chunk_frames": 1,
+            "stage_seconds": {
+              "prefill_clone": 0.007635499999992135,
+              "text_conditioner": 0.00008020000001351946,
+              "text_prefill": 0.033270200000004024,
+              "ar_lm": 0.025621299999954772,
+              "ar_flow": 0.0019144999999980428,
+              "decoder": 0.012346700000023247
+            },
+            "latent_hash_count": 1
+          }
+        },
+        "reference_cache_cold_first_nonzero_native_pcm_seconds": 0.39717490000003863
+      },
+      {
+        "language": "wol",
+        "text": "Bul",
+        "original_full_wave_seconds": 0.977526599999976,
+        "cached_full_wave_seconds": 0.7988081999999963,
+        "chunk1": {
+          "first_nonzero_native_pcm_seconds": 0.083577699999978,
+          "completed_wave_seconds": 0.844672600000024,
+          "first_yield": {
+            "closed": false,
+            "generation_complete": false,
+            "yield_count": 1,
+            "frames_at_yield": 1,
+            "chunk_frames": 1,
+            "stage_seconds": {
+              "prefill_clone": 0.008510300000011739,
+              "text_conditioner": 0.00009690000001683075,
+              "text_prefill": 0.02972970000001851,
+              "ar_lm": 0.027739399999973102,
+              "ar_flow": 0.002011600000003,
+              "decoder": 0.012199799999962124
+            },
+            "latent_hash_count": 1
+          }
+        },
+        "reference_cache_cold_first_nonzero_native_pcm_seconds": 0.3938011999999844
+      }
+    ],
+    "cancel_and_reset": [
+      {
+        "language": "ssw",
+        "cancel_check_seconds": 0.00008850000000393266,
+        "no_subsequent_graph_calls": true,
+        "explicit_generator_close_released_state": true,
+        "pre_cancel_invoked_no_graphs": true,
+        "fresh_replay_within_numeric_gate": true,
+        "in_flight_ort_interruption_verified": false
+      },
+      {
+        "language": "ven",
+        "cancel_check_seconds": 0.00006949999999505962,
+        "no_subsequent_graph_calls": true,
+        "explicit_generator_close_released_state": true,
+        "pre_cancel_invoked_no_graphs": true,
+        "fresh_replay_within_numeric_gate": true,
+        "in_flight_ort_interruption_verified": false
+      },
+      {
+        "language": "zul",
+        "cancel_check_seconds": 0.00005970000000843356,
+        "no_subsequent_graph_calls": true,
+        "explicit_generator_close_released_state": true,
+        "pre_cancel_invoked_no_graphs": true,
+        "fresh_replay_within_numeric_gate": true,
+        "in_flight_ort_interruption_verified": false
+      },
+      {
+        "language": "nso",
+        "cancel_check_seconds": 0.00006319999999959691,
+        "no_subsequent_graph_calls": true,
+        "explicit_generator_close_released_state": true,
+        "pre_cancel_invoked_no_graphs": true,
+        "fresh_replay_within_numeric_gate": true,
+        "in_flight_ort_interruption_verified": false
+      },
+      {
+        "language": "wol",
+        "cancel_check_seconds": 0.00006839999997509949,
+        "no_subsequent_graph_calls": true,
+        "explicit_generator_close_released_state": true,
+        "pre_cancel_invoked_no_graphs": true,
+        "fresh_replay_within_numeric_gate": true,
+        "in_flight_ort_interruption_verified": false
+      }
+    ],
+    "model_load_seconds": 1.6788554999999974,
+    "process_peak_rss_bytes": 1159700480
+  },
+  "runtime": {
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "ort_version": "1.26.0",
+    "graph_artifact": {
+      "id": 14752457496,
+      "run_id": 45017187461,
+      "zip_sha256": "1b7053f683714e6e5e734dac23e3c3e3dd1991b9f5eab52c12520e5e67e4fba3",
+      "zip_bytes": 367643455,
+      "source_commit": "fd4c68c255e045c41ee5f63073174a8e566f621c"
+    },
+    "all_original_input_bytes_unchanged": true,
+    "private_core_integrity": {
+      "all_original_private_files_unchanged": true,
+      "changed_files": [],
+      "checked_files": 1597,
+      "pip_or_dll_upgrade_performed": false,
+      "product_integrated": false
+    }
+  },
+  "limitations": {
+    "product_integrated": false,
+    "nvda_verified": false,
+    "physical_audio_verified": false,
+    "human_pronunciation_verified": false,
+    "selected_voice_projection_verified": false,
+    "downstream_converter_streaming_verified": false,
+    "smaller_chunk_waveforms_byte_identical": false,
+    "explanation": "Chunk1/3/5 preserve exact AR/RNG/EOS and FP32 graphs but alter partition-dependent floating arithmetic by at most1PCM16LSB; numerical parity is not human quality approval.",
+    "cooperative_cancellation_only": true,
+    "partial_audio_before_generation_cap_possible_in_research_generator": true,
+    "cold_process_first_audio_not_measured": true,
+    "retained_all_latents_for_parity_instrumentation": true
+  },
+  "source_contracts": {
+    "exporter": {
+      "revision": "b4508ae979dd34eea2597d420d67176ef55a21a0",
+      "path": "export/onnx/export_onnx.py",
+      "blob": "17017c14a7ebd7c26341b7f9f4bb13dfc6fbc4fa",
+      "contract": "Explicit recurrent decoder states; dynamic num_latents; output T*1920 samples"
+    },
+    "pocket_streaming": {
+      "revision": "a922b912dfa366975294afb568d815b305acde5d",
+      "path": "pocket_tts/models/tts_model.py",
+      "contract": "Fresh per-request Mimi state; first frame yields without waiting; configurable causal frame groups"
+    },
+    "original_sherpa": {
+      "sherpa_revision": "af2d8d81dbfa61c4cea4c568da78f3982edca005",
+      "sherpa_pocket_impl_blob": "c8e30a51272ac87bef0aa5ca56b4a98f6c011e04",
+      "publisher_parity_blob": "70271b1d5f69626650cca086fa735ec94722c683"
+    },
+    "baseline_difference_preserved": "Original ORT baseline has no initial fade; no upstream fade is introduced"
+  }
+}

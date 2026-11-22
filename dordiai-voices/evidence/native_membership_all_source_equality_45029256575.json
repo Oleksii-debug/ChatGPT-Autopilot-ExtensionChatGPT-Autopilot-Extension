@@ -1,0 +1,61 @@
+{
+  "format": "dordiai-native-membership-full-source-audit-evidence",
+  "format_version": 1,
+  "run_id": 45029256575,
+  "job_id": 137228975969,
+  "commit": "682ada703fe3c1e310c45d0c9891576a537f7824",
+  "artifact_id": 14756822418,
+  "exact_gzip_receipt_json_sha256": "15dce79f0e11fe7fbcab99d307d7a3a7eafeac0b7218ed55da92d2c1017b44c5",
+  "report": {
+    "format": "dordiai-complete-native-membership-source-equality",
+    "format_version": 1,
+    "status": "passed-full-source-membership-equality",
+    "artifact_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+    "acquisition_report_sha256": "d7c8157a3cfc44d3e6cce9daf45099fb34c4f5f1e80edfed70a50e6cde2d6199",
+    "normalization": "nfc-casefold-cyrillic-acute-apostrophes-v1",
+    "validated_blocks": 25948,
+    "validated_union_words": 6642550,
+    "shared_spellings": 196509,
+    "source_equality": {
+      "uk": {
+        "word_count": 3775231,
+        "expanded_bytes": 90823366,
+        "expanded_sha256": "689981746893c06f85fd0172be3a2e2b43fa588cca96e69f9fe9278eac1166e7",
+        "matches_authenticated_source": true
+      },
+      "ru": {
+        "word_count": 3063828,
+        "expanded_bytes": 72809018,
+        "expanded_sha256": "38ed933fc7c247fa17de02a153d6b93c0394e1d5b4da95da0ed2071b050e4ad0",
+        "matches_authenticated_source": true
+      }
+    },
+    "elapsed_seconds": 51.210669815,
+    "statistics": {
+      "closed": false,
+      "codes": [
+        "uk",
+        "ru"
+      ],
+      "word_count": 6642550,
+      "blocks": 25948,
+      "cached_blocks": 32,
+      "cache_bytes_charged": 1762266,
+      "cache_byte_limit": 4194304,
+      "cache_block_limit": 32,
+      "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+      "max_raw_block_bytes": 65536,
+      "max_block_words": 256,
+      "membership_mask_bytes": 1,
+      "language_table_limit": 1024,
+      "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+    },
+    "reference": "Exact per-language UTF-8 word+LF expanded SHA256/bytes/counts from authenticated actual primary acquisition",
+    "method": "Read/decode every compiled block once; hash each raw key into all recorded language streams; bounded reader cache only",
+    "builder_merge_used_as_reference": false,
+    "whole_dictionary_set_loaded": false,
+    "nvda_verified": false,
+    "pronunciation_verified": false,
+    "author_intent_infallible": false
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "format": "dordiai-frozen-nvda-native-dictionary-host-proof-index",
+  "format_version": 1,
+  "run_id": 45030474526,
+  "job_id": 137232736250,
+  "commit": "93e3f67b92c8a82807140573ff496cc676d260b3",
+  "artifact_id": 14757323497,
+  "proofs": [
+    {
+      "label": "CONTROLLER",
+      "blob_sha": "90a622cfbd2063acba44a358f879f521395f4abd",
+      "json_sha256": "faa87a457f91c6ee298460f5ec9699b8e213b917e63422b8d15a429e19048881"
+    },
+    {
+      "label": "HOST",
+      "blob_sha": "84533f896bdc70f84cee198f8aed54135be4bc87",
+      "json_sha256": "59d093fb82e2a61749e74d424e46bdd950e4c04e65766c423522ca2108c2a91e"
+    }
+  ],
+  "status": "passed-host-compatibility",
+  "host_python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+  "nvda_version": "2026.3.1",
+  "real_frozen_nvda": true,
+  "cases": 97,
+  "instance_open_ms": 49.7934,
+  "firstpass_median_ms": 1.3445,
+  "firstpass_p95_ms": 1.5493,
+  "firstpass_max_ms": 2.1175,
+  "checks": [
+    {
+      "name": "real_frozen_nvda",
+      "status": "passed",
+      "executable_basename": "nvda.exe"
+    },
+    {
+      "name": "private_abi_not_used",
+      "status": "passed"
+    },
+    {
+      "name": "external_module_hash",
+      "status": "passed"
+    },
+    {
+      "name": "external_dataset_hash",
+      "status": "passed"
+    },
+    {
+      "name": "builtin_silence_selected",
+      "status": "passed"
+    },
+    {
+      "name": "host_stdlib_imports",
+      "status": "passed",
+      "mmap_origin_basename": "builtin",
+      "zlib_origin_basename": "builtin"
+    },
+    {
+      "name": "host_sys_path_unchanged",
+      "status": "passed",
+      "private_python314_path_added": false
+    },
+    {
+      "name": "real_dataset_identity",
+      "status": "passed",
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 0,
+        "cache_bytes_charged": 0,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      }
+    },
+    {
+      "name": "actual_primary_source_lookups",
+      "status": "passed",
+      "case_count": 97,
+      "scope": "96 independent source samples plus invalid-token negative control"
+    },
+    {
+      "name": "actual_reader_closed",
+      "status": "passed"
+    },
+    {
+      "name": "closed_reader_does_not_return_stale_membership",
+      "status": "passed"
+    },
+    {
+      "name": "windows_mapping_handles_released",
+      "status": "passed",
+      "scope": "rename roundtrip of own external data copy after reader.close"
+    }
+  ],
+  "scope": "Actual host compatibility only; no product addon installed/modified",
+  "product_archive_used": false,
+  "production_routing_verified": false,
+  "installed_long_path_verified": false,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false
+}
