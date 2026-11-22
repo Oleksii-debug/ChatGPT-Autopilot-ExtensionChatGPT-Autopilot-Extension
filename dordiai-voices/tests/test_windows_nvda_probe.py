@@ -600,7 +600,10 @@ class RequiredResourceProbeScaffoldingTests(unittest.TestCase):
                                    "required_probe_canonical_directory", "required_resource_path_observations"})
         namespace["Path"] = Path
         with tempfile.TemporaryDirectory() as temporary:
-            plain = Path(temporary) / ("deep-a" * 12) / ("deep-b" * 12) / ("deep-c" * 12) / "model.onnx"
+            parent = Path(temporary)
+            while len(str(parent / "model.onnx")) <= 260:
+                parent = parent / ("deep-path" * 8)
+            plain = parent / "model.onnx"
             io_path = namespace["required_probe_io_path"](plain)
             self.assertGreater(len(str(plain)), 260)
             io_path.parent.mkdir(parents=True)

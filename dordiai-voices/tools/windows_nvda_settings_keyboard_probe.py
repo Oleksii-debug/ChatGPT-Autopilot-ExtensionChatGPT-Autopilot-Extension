@@ -349,18 +349,45 @@ def _ks_preferences_item_index(items,plugins):
     _ks_require(len(targets)==1,"Expected exact preferences menu ID absent/ambiguous")
     return targets[0]
 
+def _ks_menu_access_key(label):
+    index=0
+    while index<len(label):
+        if label[index]!="&":index+=1;continue
+        _ks_require(index+1<len(label),"Native menu mnemonic is incomplete")
+        char=label[index+1]
+        if char=="&":index+=2;continue
+        _ks_require(char.isascii() and char.isalpha(),"Pinned English menu needs an ASCII native mnemonic")
+        return ord(char.upper())
+    raise ValueError("Native Tools menu mnemonic is absent")
+
+def _ks_menu_highlight(event):
+    if _KS and not _KS.get("cleaned"):
+        _KS["menu_last_highlight"]=event.GetId()
+        _ks_record("native_menu_highlight",menu_item_id=event.GetId())
+    event.Skip()
+
 def _ks_menu():
     import gui,globalPluginHandler
     tray=gui.mainFrame.sysTrayIcon
     root_items=[x for x in tray.menu.GetMenuItems() if not x.IsSeparator() and x.IsEnabled()]
-    tools_index=next(i for i,x in enumerate(root_items) if x.GetSubMenu() is tray.toolsMenu)
+    tools_item=next(x for x in root_items if x.GetSubMenu() is tray.toolsMenu)
+    tools_key=_ks_menu_access_key(tools_item.GetItemLabel())
     items=[x for x in tray.toolsMenu.GetMenuItems() if not x.IsSeparator() and x.IsEnabled()]
     target_index=_ks_preferences_item_index(items,globalPluginHandler.runningPlugins)
+    target_id=items[target_index].GetId()
+    _KS["menu_observers"]=[tray.menu,tray.toolsMenu]
+    for menu in _KS["menu_observers"]:
+        menu.Bind(wx.EVT_MENU_HIGHLIGHT_ALL,_ks_menu_highlight)
     def root_open():
-        _ks_send([[(0x24,True)]]+[[(0x28,True)]]*tools_index+[[(0x27,True)]],"Navigate NVDA Tools submenu",tools_open)
+        _ks_key(tools_key,tools_open,"Navigate NVDA Tools submenu")
     def tools_open():
-        _ks_send([[(0x24,True)]]+[[(0x28,True)]]*target_index+[[(0x0d,False)]],"Activate dordiai Tools item",
-            lambda:_ks_wait(lambda:find_dialog() is not None,lambda:_ks_restore(find_dialog()),"Real NVDA menu did not open settings"))
+        _KS["menu_last_highlight"]=None
+        def selected():
+            _ks_key(0x0d,lambda:_ks_wait(lambda:find_dialog() is not None,
+                lambda:_ks_restore(find_dialog()),"Real NVDA menu did not open settings"),"Activate dordiai Tools item")
+        _ks_send([[(0x24,True)]]+[[(0x28,True)]]*target_index,"Select dordiai Tools item",
+            lambda:_ks_wait(lambda:_KS.get("menu_last_highlight")==target_id,selected,
+                "Native keyboard menu selection did not reach the exact preferences item"))
     _ks_send([[_KS["nvda_key"],(0x4e,False)]],"NVDA+n",root_open)
 
 def _ks_edit(dialog):
@@ -428,6 +455,8 @@ def _ks_cleanup():
     restore(lambda:inputCore.decide_executeGesture.unregister(_ks_gesture))
     restore(lambda:speech.pre_speechQueued.unregister(_ks_speech))
     restore(lambda:config.post_configSave.unregister(_ks_saved))
+    for menu in _KS.get("menu_observers",[]):
+        restore(lambda menu=menu:menu.Unbind(wx.EVT_MENU_HIGHLIGHT_ALL,handler=_ks_menu_highlight))
     restore(lambda:speech.setSpeechMode(_KS["saved_speech_mode"]))
     restore(lambda:_KS["frame"].Destroy())
     _KS["result"]["cleanup"]={"errors":errors,"observers_unregistered":not errors,"normal_user_profile_untouched":True}

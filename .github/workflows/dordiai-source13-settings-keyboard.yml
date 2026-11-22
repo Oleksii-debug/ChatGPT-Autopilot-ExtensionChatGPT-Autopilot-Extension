@@ -54,7 +54,7 @@ jobs:
               "tools/windows_process_loopback.cpp":"56f8ba819241ff020facf535d93d52600568b0a2",
               "tools/windows_nvda_probe.py":"ec3d93b5b6e3f92af70d0b989ca9e280db5a840f",
               "tools/validate_source13_integration_receipt.py":"1d785fb951625b424e4d620426640b5bfab3a73e",
-              "tools/windows_nvda_settings_keyboard_probe.py":"23f10a086a99a51e1f9494cbcbc788afa5a02f59"}
+              "tools/windows_nvda_settings_keyboard_probe.py":"82c39639883ba9a1b3925cc348872599b7ca56df"}
           for name,pin in expected.items():
               path=root/name
               if path.is_symlink() or not path.is_file() or path.stat().st_size>1024*1024:raise ValueError("Probe source is not bounded/regular")

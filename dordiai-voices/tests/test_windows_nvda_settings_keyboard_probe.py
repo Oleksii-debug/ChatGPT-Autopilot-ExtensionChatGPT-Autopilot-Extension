@@ -207,6 +207,28 @@ class InputBufferTests(unittest.TestCase):
             with self.subTest(items=len(items),plugins=len(plugins)),self.assertRaises(ValueError):
                 ns['_ks_preferences_item_index'](items,plugins)
 
+    def test_native_menu_mnemonic_preserves_escaped_ampersands_and_rejects_missing(self):
+        ns=self.namespace()
+        for label in ('&Tools','T&ools','Escaped && &Tools'):
+            expected=ord('O') if label=='T&ools' else ord('T')
+            self.assertEqual(ns['_ks_menu_access_key'](label),expected)
+        for label in ('Tools','Tools && more','Tools&','&Засоби'):
+            with self.subTest(label=label),self.assertRaises(ValueError):
+                ns['_ks_menu_access_key'](label)
+
+    def test_native_menu_highlight_observer_only_records_and_propagates(self):
+        ns=self.namespace();events=[];skipped=[]
+        ns.update(_KS={},_ks_record=lambda *a,**kw:events.append((a,kw)))
+        # An active probe always has a nonempty ownership/result object.
+        ns['_KS']['result']={}
+        event=SimpleNamespace(GetId=lambda:71,Skip=lambda:skipped.append(True))
+        ns['_ks_menu_highlight'](event)
+        self.assertEqual(ns['_KS']['menu_last_highlight'],71)
+        self.assertEqual(len(events),1);self.assertEqual(skipped,[True])
+        ns['_KS']['cleaned']=True
+        ns['_ks_menu_highlight'](event)
+        self.assertEqual(len(events),1);self.assertEqual(skipped,[True,True])
+
     def test_balanced_buffer_and_partial_send_modifier_release(self):
         for partial in [False,True]:
             ns=self.namespace();calls=[];events=[];later=[]
