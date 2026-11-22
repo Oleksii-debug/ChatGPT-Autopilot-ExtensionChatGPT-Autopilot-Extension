@@ -138,9 +138,12 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         factory = object()
         nvwave = SimpleNamespace(WavePlayer=factory)
         events, scheduled = [], []
+        speech = SimpleNamespace(SpeechMode=SimpleNamespace(talk="talk"), mode="off")
+        speech.setSpeechMode = lambda mode: setattr(speech, "mode", mode)
         driver = SimpleNamespace(_closed=True, _thread=SimpleNamespace(is_alive=lambda: False))
         def report(error):
             self.assertIsInstance(error, ImportError)
+            self.assertEqual(speech.mode, "talk", "Recovery notice must not remain muted by the smoke harness")
             driver._dordiai_fatal_recovery_scheduled = True
         driver._dordiai_report_error = report
         active = [driver]
@@ -152,7 +155,7 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
                      "finish": lambda: events.append("finish"),
                      "check": lambda name, status, **kw: events.append((name, status, kw))}
         exec(compile(ast.Module(body=definitions, type_ignores=[]), "injected-recovery-scaffolding", "exec"), namespace)
-        with patch.dict("sys.modules", {"config": config, "nvwave": nvwave}):
+        with patch.dict("sys.modules", {"config": config, "nvwave": nvwave, "speech": speech}):
             namespace["start_fatal_recovery_probe"]()
             self.assertTrue(namespace["RESULT"]["injected_fatal_recovery"]["queued_before_switch"])
             self.assertIsNot(nvwave.WavePlayer, factory)
