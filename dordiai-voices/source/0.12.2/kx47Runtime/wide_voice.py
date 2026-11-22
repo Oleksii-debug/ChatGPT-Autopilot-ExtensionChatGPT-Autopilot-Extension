@@ -44,6 +44,7 @@ class WideVoices:
         self._omni_used=False
         self._extra_used=False
         self._rasa_used=False
+        self._afri_used=False
         if mms_cache_budget_bytes is None:
             available=_headroom()
             # Unknown headroom retains the conservative original two-model
@@ -80,6 +81,10 @@ class WideVoices:
         # A single language can use two explicitly calibrated backends depending
         # on input support. Never reuse its preferred embedding for the fallback.
         selected=self._backend_info(code) if info is None else info
+        if selected.get("backend")=="afri-six-onnx":
+            # Source snapshots must track actual resource replacement, independently of language labels.
+            from wide_afri_six import source
+            return source(code,models=self.models)
         identity=json.dumps(selected,sort_keys=True,separators=(",",":"))
         return self._selected_source(code,identity)
 
@@ -231,7 +236,7 @@ class WideVoices:
         event=getattr(self.owner,"cancel_event",None)
         native_factor=1. if character else min(1.85,max(.8,float(speed)))
         backend=info.get("backend")
-        new_native=backend in {"mms-onnx", "mms-vits", "extra-onnx", "omni-onnx", "rasa-onnx"}
+        new_native=backend in {"mms-onnx", "mms-vits", "extra-onnx", "omni-onnx", "rasa-onnx", "afri-six-onnx"}
         shared=info.get("natural")=="shared" and not character and not new_native
         source_family='common' if shared else (code,backend,info.get('source')) if backend else 'espeak'
         if self.progress and source_family not in self._opened_sources:
@@ -276,6 +281,26 @@ class WideVoices:
             if self.progress and source_family not in self._opened_sources:self.progress('language-phonetics')
             self._extra_used=True
             produced,sample_rate=extra_audio(code,text,character,models=self.models,rate=native_factor,owner=self.owner)
+            audio=resample(produced,sample_rate,22050)
+        elif backend=="afri-six-onnx":
+            from wide_afri_six import audio as afri_audio,available
+            if code not in available(self.models):
+                raise ValueError("Required native language resources are not installed: "+code)
+            if self.progress and source_family not in self._opened_sources:self.progress('language-phonetics')
+            self._ensure_headroom(0 if self._afri_used else 1280*MIB)
+            started=perf_counter()
+            status="failed"
+            try:
+                produced,sample_rate=afri_audio(code,text,character,models=self.models,rate=1.,
+                                               owner=self.owner,session_factory=self.converter._session)
+                status="completed"
+            finally:
+                self._native_timings.append({"code":code,"backend":backend,
+                    "shared_engine_previously_used":self._afri_used,"status":status,
+                    "generation_ms":(perf_counter()-started)*1000})
+            self._afri_used=True
+            # This carrier preserves trained timing. Apply the complete user rate in the existing output tempo stage.
+            native_factor=1.
             audio=resample(produced,sample_rate,22050)
         elif backend=="omni-onnx":
             from wide_omnivoice_onnx import audio as omni_audio,available
@@ -367,4 +392,8 @@ class WideVoices:
             from wide_rasa import clear_engines
             clear_engines(owner=self.owner)
             self._rasa_used=False
+        if self._afri_used:
+            from wide_afri_six import clear_engines
+            clear_engines(owner=self.owner)
+            self._afri_used=False
         if self._engine is not None:self._engine.close()

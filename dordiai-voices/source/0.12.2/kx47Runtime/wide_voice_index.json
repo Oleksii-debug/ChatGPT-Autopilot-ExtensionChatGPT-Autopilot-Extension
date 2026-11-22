@@ -691,13 +691,36 @@
     "navigation_verified": false
   },
   "zu": {
-    "voice": "omni:zu",
+    "voice": "afri:zu",
     "name": "Зулу",
-    "backend": "omni-onnx",
-    "source": "SharedOmniONNX/references/zu/source.npy",
+    "backend": "afri-six-onnx",
+    "language": "zu",
+    "iso_code": "zul",
+    "source": "SharedAfriSixONNX/references/zu/source.npy",
+    "model_repository": "AfriSpeech/africa-tts",
+    "model_revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
     "native_pronunciation_verified": false,
     "navigation_verified": false,
-    "interactive_nvda_latency_verified": false
+    "interactive_nvda_latency_verified": false,
+    "fallbacks": [
+      {
+        "voice": "omni:zu",
+        "name": "Зулу",
+        "backend": "omni-onnx",
+        "source": "SharedOmniONNX/references/zu/source.npy",
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "interactive_nvda_latency_verified": false,
+        "language": "zu",
+        "model_repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+        "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+        "reference_hashes": {
+          "codes.npy": "e00c9ed213124bdb5a1874d65d3644f814e487aab421d6c10d5f518f23bd4b86",
+          "text.txt": "d3652677752eb7d99c66df48e6df3b464f12c9ec243675f05feb3736327a66b0",
+          "source.npy": "b9c3a301747b62d61b47402f144357dba04ebaf89e0d020a7ed01199dfc333f7"
+        }
+      }
+    ]
   },
   "xh": {
     "voice": "extra:xh",
@@ -709,22 +732,68 @@
     "navigation_verified": false
   },
   "wo": {
-    "voice": "omni:wo",
+    "voice": "afri:wo",
     "name": "Волоф",
-    "backend": "omni-onnx",
-    "source": "SharedOmniONNX/references/wo/source.npy",
+    "backend": "afri-six-onnx",
+    "language": "wo",
+    "iso_code": "wol",
+    "source": "SharedAfriSixONNX/references/wo/source.npy",
+    "model_repository": "AfriSpeech/africa-tts",
+    "model_revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
     "native_pronunciation_verified": false,
     "navigation_verified": false,
-    "interactive_nvda_latency_verified": false
+    "interactive_nvda_latency_verified": false,
+    "fallbacks": [
+      {
+        "voice": "omni:wo",
+        "name": "Волоф",
+        "backend": "omni-onnx",
+        "source": "SharedOmniONNX/references/wo/source.npy",
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "interactive_nvda_latency_verified": false,
+        "language": "wo",
+        "model_repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+        "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+        "reference_hashes": {
+          "codes.npy": "40993335e23a66d8d60e89996dd66ba68005604ae965c036db5db15202d4c8e8",
+          "text.txt": "bbc0d6c0a11c7ea67f1982abb5f23c86d0af5fd86c99ac277d25f86e53023aa2",
+          "source.npy": "bf4fa97c245e7667fe183b0d4e3e15253d7e55413b396dd6934209162c57280f"
+        }
+      }
+    ]
   },
   "nso": {
-    "voice": "omni:nso",
+    "voice": "afri:nso",
     "name": "Північна сото (сепеді)",
-    "backend": "omni-onnx",
-    "source": "SharedOmniONNX/references/nso/source.npy",
+    "backend": "afri-six-onnx",
+    "language": "nso",
+    "iso_code": "nso",
+    "source": "SharedAfriSixONNX/references/nso/source.npy",
+    "model_repository": "AfriSpeech/africa-tts",
+    "model_revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
     "native_pronunciation_verified": false,
     "navigation_verified": false,
-    "interactive_nvda_latency_verified": false
+    "interactive_nvda_latency_verified": false,
+    "fallbacks": [
+      {
+        "voice": "omni:nso",
+        "name": "Північна сото (сепеді)",
+        "backend": "omni-onnx",
+        "source": "SharedOmniONNX/references/nso/source.npy",
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "interactive_nvda_latency_verified": false,
+        "language": "nso",
+        "model_repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+        "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+        "reference_hashes": {
+          "codes.npy": "90bae08e3a04e6ab9856a395d7f70eb24c1adfd40a26698143c65363bba0f559",
+          "text.txt": "e0158bbaee59206ed26ac664389f6060d101d8a70786ded1235fd5a7c8970e88",
+          "source.npy": "3d20ccd616249751b6e72845c42cfe73b975149e8375fdf001786d2f3737d059"
+        }
+      }
+    ]
   },
   "ay": {
     "voice": "mms:ay",
@@ -1035,5 +1104,31 @@
     "iso_code": "nde",
     "native_pronunciation_verified": false,
     "navigation_verified": false
+  },
+  "ss": {
+    "voice": "afri:ss",
+    "name": "Свазі (сісваті)",
+    "backend": "afri-six-onnx",
+    "language": "ss",
+    "iso_code": "ssw",
+    "source": "SharedAfriSixONNX/references/ss/source.npy",
+    "model_repository": "AfriSpeech/africa-tts",
+    "model_revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
+  },
+  "ve": {
+    "voice": "afri:ve",
+    "name": "Венда",
+    "backend": "afri-six-onnx",
+    "language": "ve",
+    "iso_code": "ven",
+    "source": "SharedAfriSixONNX/references/ve/source.npy",
+    "model_repository": "AfriSpeech/africa-tts",
+    "model_revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
+    "native_pronunciation_verified": false,
+    "navigation_verified": false,
+    "interactive_nvda_latency_verified": false
   }
 }

@@ -1,0 +1,100 @@
+{
+  "format": "dordiai-owned-virtual-audio-trial-observation",
+  "format_version": 1,
+  "source_run_id": 45028044734,
+  "source_job_id": 137225263726,
+  "source_commit": "c4d7e9d09573612d0b5e540c4dd632fb3979c276",
+  "workflow_conclusion": "success",
+  "unit_tests": 14,
+  "actual_report": {
+    "format": "dordiai-owned-virtual-audio-endpoint-trial",
+    "format_version": 1,
+    "status": "blocked",
+    "virtual_audio_verified": false,
+    "physical_audio_verified": false,
+    "wave_player_verified": false,
+    "product_ready": false,
+    "vendor_installer_executed": false,
+    "certificates_imported": false,
+    "reboot_performed": false,
+    "test_signing_modified": false,
+    "signature_enforcement_modified": false,
+    "vendor_requires_finalization_reboot": true,
+    "scope": "One owned ephemeral PnP install/enumeration trial; not capture/NVDA/physical acceptance",
+    "verification": {
+      "format": "dordiai-vb46-catalogue-verification",
+      "package_sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
+      "catalogue_members": {
+        "vbMmeCable64_win10.inf": true,
+        "vbaudio_cable64_win10.sys": true,
+        "vbaudio_cable64arm_win10.sys": true
+      },
+      "authenticode_valid": true,
+      "signtool_authenticode_valid": true,
+      "signtool": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\signtool.exe",
+      "vendor_finalization_reboot_instruction": true,
+      "installer_executed": false,
+      "certificates_imported": false,
+      "physical_audio_verified": false,
+      "product_ready": false
+    },
+    "endpoints_before": {
+      "out": [],
+      "in": []
+    },
+    "owned_instance_id": "ROOT\\DORDIAI_VBCABLE_68BBFB35E03E4123BBB4CEF6575FEC98\\0000",
+    "driver_install_returned_success": true,
+    "windows_install_error": 0,
+    "windows_requires_reboot": false,
+    "device_status": {
+      "configret": 0,
+      "flags": 25174027,
+      "problem": 0
+    },
+    "endpoints_during": {
+      "out": [
+        {
+          "index": 0,
+          "error": 0,
+          "name": "Speakers (VB-Audio Virtual Cabl",
+          "channels": 2
+        },
+        {
+          "index": 1,
+          "error": 0,
+          "name": "CABLE In 16 Ch (VB-Audio Virtua",
+          "channels": 2
+        }
+      ],
+      "in": [
+        {
+          "index": 0,
+          "error": 0,
+          "name": "CABLE Output (VB-Audio Virtual ",
+          "channels": 2
+        }
+      ]
+    },
+    "cleanup": {
+      "attempted": true,
+      "scope": "Only this call's exact owned device instance",
+      "driver_store_purge_attempted": false,
+      "removal_requested": true,
+      "removed": true,
+      "absence_verified": true,
+      "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence"
+    },
+    "reason": "No usable render/capture endpoints appeared without a reboot"
+  },
+  "annotation": {
+    "status_is_preserved": "blocked",
+    "reason": "The render selector required legacy CABLE Input; actual trustedPack46 returned Speakers (VB-Audio Virtual Cabl instead.",
+    "observed_standard_install_succeeded": true,
+    "windows_requested_reboot": false,
+    "owned_node_absence_verified": true,
+    "render_endpoints_observed": 2,
+    "capture_endpoints_observed": 1,
+    "no_audio_capture_or_waveplayer_test_performed": true,
+    "physical_audio_verified": false
+  }
+}

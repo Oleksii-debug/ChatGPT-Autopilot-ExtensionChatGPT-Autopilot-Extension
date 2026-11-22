@@ -1,0 +1,187 @@
+{
+  "format": "dordiai-reviewed-afri-production-source-receipt-v1",
+  "run_id": 45028826847,
+  "job_id": 137227665481,
+  "source_commit": "164d7bbee3a7547e5cc84e81c5c4f58da973b4f7",
+  "artifact_id": 14755512807,
+  "artifact_sha256": "f073cbee60fe7eb1ac7984895d343c79dbe7a30f6ab129a3fa2324b0fb24a16d",
+  "refs_updated": false,
+  "all_files_verified_before_writes": true,
+  "vendor_source_bytes_transformed": false,
+  "own_python_crlf_to_exact_reviewed_lf_only": [
+    {
+      "crlf_pairs": 68,
+      "expected": {
+        "bytes": 2939,
+        "git_blob_sha1": "a6a765b5ffc28d6c825340a16df528a75d310120"
+      },
+      "lf_bytes": 2939,
+      "lf_git_blob": "a6a765b5ffc28d6c825340a16df528a75d310120",
+      "lf_matches_reviewed_pin": true,
+      "path": "wide_afri_frontend.py",
+      "raw_bytes": 3007,
+      "raw_git_blob": "9069bf05bc7d529d181f1b8d4b37fff2790f4679",
+      "raw_sha256": "8203cfaea3f0662da7edebce99137651c0625658aee1e30d71f1f6852988a625"
+    },
+    {
+      "crlf_pairs": 432,
+      "expected": {
+        "bytes": 20370,
+        "git_blob_sha1": "8b23c8a15fac1cc0f219115f4853907c85db2264"
+      },
+      "lf_bytes": 20370,
+      "lf_git_blob": "8b23c8a15fac1cc0f219115f4853907c85db2264",
+      "lf_matches_reviewed_pin": true,
+      "path": "wide_afri_six.py",
+      "raw_bytes": 20802,
+      "raw_git_blob": "ff66ed3f7c66a429f23798762acffff7d5a65422",
+      "raw_sha256": "6f8631c47e4df14397ae4a9b948b25f06475f2fca95d564f38d9c8b3ea2081b1"
+    }
+  ],
+  "files": [
+    {
+      "bytes": 1831,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/DATA_LICENSE.md",
+      "sha": "8bb79af373ed6eca88e51d82c5298d42648d3d07",
+      "sha256": "d5df0dc8c9cb391c27e606606263e62b33da4bcc11b2949a2961fbf214d3764d"
+    },
+    {
+      "bytes": 2181,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/UPSTREAM-PYPROJECT.toml",
+      "sha": "d42f9cf5e2744c882df7e6c3f540ae96dc47f2f6",
+      "sha256": "0fac49f70149a49d28cf29cb377a06d69949ea9889490cda54ba908b57fa13fa"
+    },
+    {
+      "bytes": 1390,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/__init__.py",
+      "sha": "a05b1f717c68e93f3fd526e405740442f49285e9",
+      "sha256": "5754d6c335710f06e6715a4fc581b075acc2c9ab93a77766585c49102886be72"
+    },
+    {
+      "bytes": 43529,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/convert.py",
+      "sha": "cf6e3c5c8911c8d5ef88e5c85ca797883fb3e274",
+      "sha256": "c85069083b556f6793661609fe0a2e0bbb151a6ed4f97db34982dd9757b96117"
+    },
+    {
+      "bytes": 429875,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/data/ipa_universal_graphemes.json",
+      "sha": "830093ea3ca53aea7b97dd1ea3fc749e766faf6d",
+      "sha256": "720c631b812f1f8de3b150ef01205a0c83cc77595cfef0577e1ec58c7284544f"
+    },
+    {
+      "bytes": 1074,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/data/plain_latin_languages.json",
+      "sha": "b63654c9542dc6bbd5c48b1c7858e83ad2ff5a04",
+      "sha256": "488ec9367249d4ba22e62399521f944c28e89a867722a7b385becef845d7345f"
+    },
+    {
+      "bytes": 20089,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/data/proxy_escapes.json",
+      "sha": "613e5f19321612c8a20466fde4822267d163773b",
+      "sha256": "a3d44fcc08a75fc108c896634edb7c294418885994f5546597b4be7a92cdae8a"
+    },
+    {
+      "bytes": 91354,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/data/proxy_fidelity.json",
+      "sha": "d5a522351f381cbcfe79ff1e9b200405f17470fd",
+      "sha256": "707d7395ba281585844fd4c1a3d6edf8aa88ae3185cc867b23160ee5acc4f252"
+    },
+    {
+      "bytes": 143399,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/data/registry.json",
+      "sha": "023158a6aa24426f88d7342209f8643546a2d652",
+      "sha256": "5a83dcc08b887308a0d782c9e9e5841f293c337620a8bece83c9ab43ee194e66"
+    },
+    {
+      "bytes": 48144,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/data/universal_fallback.json",
+      "sha": "c96a53c982675975d110d9768dd95cbe9e096e53",
+      "sha256": "dd50bf66ba479484cf4caacb2dfea8b7be1e19b71387752d3b0a0a9949383ac9"
+    },
+    {
+      "bytes": 5174,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/english.py",
+      "sha": "ce4ff3dedda61409855527ed9abceb568c97edaa",
+      "sha256": "d98e7b9382d07b976718b579720a0158bee637ee05439ad9160b4c63ed64b134"
+    },
+    {
+      "bytes": 4279,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/fallback.py",
+      "sha": "a6282d877053f48abc8ae64e59c50607ca83e25d",
+      "sha256": "f34b62cc80426b2c1051a1bd9fde80774f9744f8d02c4bed9ec297d1e1a05567"
+    },
+    {
+      "bytes": 14511,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/g2p.py",
+      "sha": "19ba1192446eba7b927163c8c2557bc2461771d1",
+      "sha256": "33bfbf1f20db8b7de5dca3aec918bdf1081167d481553650ac983486f4520ef2"
+    },
+    {
+      "bytes": 2090,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/languages/nso.json",
+      "sha": "9cd3bbc84d498b642e3f43c32b9e6423cc34546c",
+      "sha256": "297af9083116012c7a49cb1b5a9e8ab5e28e77a1817f139507eec93192650bfd"
+    },
+    {
+      "bytes": 2579,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/languages/ssw.json",
+      "sha": "a345d589d643f6c09508f9fa199e6717f46b4b17",
+      "sha256": "f47fbfad8384391b4b768c72a43dc3d803e2120a7ea4bbe833c999a4db645349"
+    },
+    {
+      "bytes": 2625,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/languages/ven.json",
+      "sha": "c7310a735f700bf80c97e9f5d3a2d5b5e5ba0b5f",
+      "sha256": "de7b4d42bafd59d43b51651c371bfdc783cd49be423eac5bc17bed0058de6faa"
+    },
+    {
+      "bytes": 2877,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/languages/wol.json",
+      "sha": "6743b3e5c6a57ddbd97001f45299599792c632ba",
+      "sha256": "fdfc01743e5554d2243d2e951b8d977b946dab1838493c39b6b6029efdd27956"
+    },
+    {
+      "bytes": 2456,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/languages/zul.json",
+      "sha": "4bdc6a9a9fae91915f8a1b2dc2eb398c7afe5dff",
+      "sha256": "826363fbd77710a62493cdd9a02c34893fb9ac3653cab958aaf6cf7fe15357e5"
+    },
+    {
+      "bytes": 1655,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/loader.py",
+      "sha": "614bd4ae262d5be5a2e3ba4c9cc622f7d7cbe10e",
+      "sha256": "b37fa01aaf77c2dd32196c30c15d8a2d6a20c7d9ce96c877787010af32478723"
+    },
+    {
+      "bytes": 6888,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/normalizer.py",
+      "sha": "d418da3e414f65c73c8a06c6afd4a05597130411",
+      "sha256": "b2417ca6e47c290bc618e4c0e71dbc091b55ab062fc5cbb8e6da11e96a70ce78"
+    },
+    {
+      "bytes": 2166,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/africa_g2p/pipeline.py",
+      "sha": "e9824c32dcece2c2e2842c906193d14ff5d6ec43",
+      "sha256": "363bbbacb56ebbbe4c82faed861f1f9ace9a44c859a65605d2f74b9da2271b98"
+    },
+    {
+      "bytes": 3229,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/vendor_afri_g2p/dordiai-vendor.json",
+      "sha": "b60f162214d8de469db013d516608f425c690663",
+      "sha256": "aa8942975d8957957bd245215bd2c79de3c30facb5d4013e2e93b5547ab4c624"
+    },
+    {
+      "bytes": 2939,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/wide_afri_frontend.py",
+      "sha": "a6a765b5ffc28d6c825340a16df528a75d310120",
+      "sha256": "7d12d940290380e997dd0f61f553bd08ece7b20d788af9eef4c0453cf54556d8"
+    },
+    {
+      "bytes": 20370,
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/wide_afri_six.py",
+      "sha": "8b23c8a15fac1cc0f219115f4853907c85db2264",
+      "sha256": "62faef83dd6428d3a9b30c098dc67a37ff1cb0e909253adfb901c3109ee9593a"
+    }
+  ]
+}

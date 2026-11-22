@@ -217,6 +217,15 @@ def _core_requirements(code, models):
 
 
 def _wide_requirements(code, info, models):
+    if info.get("backend") == "afri-six-onnx":
+        if code not in {"ss", "ve", "zu", "wo", "nso"}:
+            return "unsupported-adapter", ("afri-six-onnx-adapter:" + code,)
+        prefix = "SharedAfriSixONNX/"
+        return "native-shared-six-layer-fp32+voice-conversion", CONVERSION + tuple(prefix + name for name in (
+            "lm_main.onnx", "lm_flow.onnx", "encoder.onnx", "decoder.onnx", "text_conditioner.onnx",
+            "tokenizer.json", "config.json", "NOTICE.txt", "references/" + code + "/config.json",
+            "references/" + code + "/reference.wav", "references/" + code + "/source.npy",
+            "references/" + code + "/NOTICE.txt"))
     if info.get("backend") == "rasa-onnx":
         if code != "brx":
             return "unsupported-adapter", ("rasa-onnx-adapter:" + code,)
@@ -390,8 +399,23 @@ def _matcha_input_problem(models, text, character):
     return None
 
 
+
+def _afri_missing(models, code, info):
+    expected = {"ss": "ssw", "ve": "ven", "zu": "zul", "wo": "wol", "nso": "nso"}
+    if (code not in expected or info.get("language") != code or info.get("iso_code") != expected[code]
+            or info.get("source") != "SharedAfriSixONNX/references/" + code + "/source.npy"):
+        return ["afri-six-onnx:explicit-same-native-language-required"]
+    missing = _check(models, _wide_requirements(code, info, models)[1])
+    try:
+        if code not in _pure_helper("wide_afri_six").available(models):
+            missing.append("SharedAfriSixONNX/references/" + code + ":matching-native-resource-and-source-calibration")
+    except (OSError, ValueError, TypeError, KeyError, ImportError):
+        missing.append("afri-six-onnx:reviewed-runtime-adapter-required")
+    return list(dict.fromkeys(missing))
+
+
 def _omni_fallback_missing(models, code, info):
-    if (code not in {"brx", "ks"} or info.get("backend") != "omni-onnx" or info.get("language") != code
+    if (code not in {"brx", "ks", "zu", "wo", "nso"} or info.get("backend") != "omni-onnx" or info.get("language") != code
             or info.get("source") != "SharedOmniONNX/references/" + code + "/source.npy"):
         return ["fallback:explicit-same-language-Omni-reference-required"]
     missing = _check(models, _wide_requirements(code, info, models)[1])
@@ -423,10 +447,12 @@ def resolve_backend_info(models, code, info, text=None, character=False):
         return info
     preferred = info.get("backend")
     is_matcha = preferred == "extra-onnx" and info.get("family") == "matcha"
-    if preferred != "rasa-onnx" and not is_matcha:
+    is_afri = preferred == "afri-six-onnx"
+    if preferred != "rasa-onnx" and not is_matcha and not is_afri:
         return info
     models, code = _models(models), canonical_code(code)
-    missing = _matcha_missing(models, code, info) if is_matcha else _rasa_missing(models, code, info)
+    missing = (_afri_missing(models, code, info) if is_afri else
+               _matcha_missing(models, code, info) if is_matcha else _rasa_missing(models, code, info))
     unsupported = _matcha_input_problem(models, text, character) if is_matcha and text is not None and not missing else None
     if not missing and not unsupported:
         return {**info, "_backend_selection": "preferred", "_preferred_backend": preferred}
@@ -459,6 +485,11 @@ def _availability(entry, models, registry):
         backend, required, registered = "not-registered", (), False
     missing = _check(models, required)
     capabilities = None
+    if isinstance(info, dict) and info.get("backend") == "afri-six-onnx":
+        missing = _afri_missing(models, code, info)
+        capabilities = {"character_names": False, "number_normalization": False,
+                        "keyboard_echo_verified": False, "interactive_nvda_latency_verified": False,
+                        "native_pronunciation_verified": False}
     if isinstance(info, dict) and info.get("backend") == "rasa-onnx":
         missing = _rasa_missing(models, code, info)
         capabilities = {"character_names": False, "number_normalization": False,
@@ -531,7 +562,7 @@ def _availability(entry, models, registry):
     present = registered and not missing
     settings_label = entry.get("display_name_uk", entry["name_uk"])
     readiness = {}
-    if isinstance(info, dict) and info.get("backend") in {"mms-onnx", "mms-vits", "extra-onnx", "omni-onnx", "rasa-onnx"}:
+    if isinstance(info, dict) and info.get("backend") in {"mms-onnx", "mms-vits", "extra-onnx", "omni-onnx", "rasa-onnx", "afri-six-onnx"}:
         names_ready = bool(capabilities and capabilities.get("character_names"))
         readiness = {"character_names_ready": names_ready, "number_normalization_ready": bool(capabilities and capabilities.get("number_normalization"))}
         if info["backend"] == "omni-onnx":
@@ -539,6 +570,9 @@ def _availability(entry, models, registry):
             if info.get("_backend_selection") == "explicit-same-language-fallback":
                 settings_label += " (резервний рушій цієї мови)"
             readiness["interactive_reading_ready"] = False
+        elif info["backend"] == "afri-six-onnx":
+            settings_label += " (експериментально; назви символів і введення не перевірені)"
+            readiness.update(keyboard_echo_verified=False, interactive_reading_ready=False)
         elif info.get("family") == "matcha":
             settings_label += " (експериментально; для окремих літер потрібен резервний пакет)"
             readiness.update(native_orthography_partial=True, keyboard_echo_verified=False)
