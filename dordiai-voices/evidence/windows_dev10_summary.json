@@ -1,0 +1,372 @@
+{
+  "format": "dordiai-windows-build-observation",
+  "format_version": 1,
+  "version": "0.13.1-dev.10",
+  "source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
+  "product_ready": false,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false,
+  "build": {
+    "run_id": 45021069771,
+    "job_id": 137203875694,
+    "conclusion": "success",
+    "unit_tests": {
+      "ran": 812,
+      "skipped": 29,
+      "errors": 0,
+      "failures": 0
+    },
+    "core": {
+      "filename": "dordiai-voices-0.13.1-dev.10.nvda-addon",
+      "size_bytes": 1974796411,
+      "sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
+      "raw_payload_bytes_before_generated_manifest": 2388863320,
+      "payload_file_count_before_generated_manifest": 10228,
+      "artifact_id": 14753953381,
+      "artifact_wrapper_sha256": "8759b0924bc9412332960b06c6e0a1736e7841416c864dbfda98fcd64f34bbe1"
+    }
+  },
+  "prepared_banks": {
+    "voice_profiles": 45,
+    "requests_per_profile": 176,
+    "prepared_candidates": 7920,
+    "live_worker_candidates": 0,
+    "actual_output_bank_files_verified": 180,
+    "source_identity_inputs_verified": 9939,
+    "old_indices_and_pcm_prefix_preservation_verified_by_builder": true,
+    "scope": "Static source-bound exact request mapping; no independent pronunciation acceptance"
+  },
+  "other_engine_checks": {
+    "core_representative_languages": 3,
+    "additional_representative_languages": 21,
+    "unsampled_additional_languages_skipped": 62,
+    "mms_ha_native": "passed-engine-smoke",
+    "mms_ha_shared": "passed-engine-smoke",
+    "characters": {
+      "status": "passed-structural-smoke",
+      "cases": 12,
+      "unsupported_exploratory_case": {
+        "language": "nb",
+        "glyph": "😀",
+        "reason": "Speech engine error: ValueError"
+      }
+    },
+    "scope": "Actual packaged Windows worker/model PCM smoke, no physical audio or linguistic acceptance"
+  },
+  "nvda": {
+    "boundary": "Explicit recording PCM sink test double; no WavePlayer/device/acoustic acceptance",
+    "normal": {
+      "initial": {
+        "phrase_first_request_to_pcm_ms": 1319.0025,
+        "character_first_request_to_pcm_ms": 7.8036
+      },
+      "api": {
+        "alphabet_first_pass": {
+          "count": 176,
+          "p50_ms": 2.4562,
+          "p95_ms": 3.1896,
+          "p99_ms": 8.0365,
+          "minimum_ms": 1.7788,
+          "maximum_ms": 8.494
+        },
+        "warm_letters": {
+          "count": 100,
+          "p50_ms": 2.2599,
+          "p95_ms": 2.6944,
+          "p99_ms": 2.8937,
+          "minimum_ms": 1.7692,
+          "maximum_ms": 2.9882
+        },
+        "cancel_api": {
+          "count": 100,
+          "p50_ms": 0.0095,
+          "p95_ms": 0.0111,
+          "p99_ms": 0.0121,
+          "minimum_ms": 0.008,
+          "maximum_ms": 0.0126
+        },
+        "warm_switch_requests": {
+          "count": 100,
+          "p50_ms": 2.2509,
+          "p95_ms": 2.8033,
+          "p99_ms": 3.2191,
+          "minimum_ms": 1.7995,
+          "maximum_ms": 3.295
+        },
+        "languages": [
+          "uk",
+          "en",
+          "ru"
+        ]
+      },
+      "counts": {
+        "alphabet_first_pass_ms": 176,
+        "warm_letters_ms": 100,
+        "warm_switch_requests_ms": 100,
+        "cancel_api_ms": 100
+      },
+      "errors": [],
+      "timeouts": []
+    },
+    "typing": {
+      "count": 9,
+      "scenario": "standard",
+      "cleanup": {
+        "attempted": true,
+        "errors": [],
+        "keyboard_config_restored": true,
+        "keyboard_layout_restored": true,
+        "speech_mode_restored": true
+      },
+      "cases": [
+        {
+          "language": "uk",
+          "glyph": "а",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 24.4684,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 5.9432,
+              "pcm_bytes": 8882,
+              "text": [
+                "а"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "uk",
+          "glyph": "ї",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 20.6856,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 3.2639,
+              "pcm_bytes": 20882,
+              "text": [
+                "ї"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "glyph": "a",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 15.4732,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 3.2223,
+              "pcm_bytes": 19202,
+              "text": [
+                "ay"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "glyph": "b",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 20.0817,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 3.1948,
+              "pcm_bytes": 14162,
+              "text": [
+                "bee"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "glyph": "!",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 67.6759,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 54.0974,
+              "pcm_bytes": 13540,
+              "text": [
+                "ab"
+              ]
+            },
+            {
+              "driver_to_first_pcm_ms": 2.6056,
+              "pcm_bytes": 23582,
+              "text": [
+                "bang"
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "glyph": "а",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 82.962,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 3.578,
+              "pcm_bytes": 11762,
+              "text": [
+                "а"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "glyph": "б",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 37.0881,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 3.1091,
+              "pcm_bytes": 15122,
+              "text": [
+                "бэ"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "glyph": "ы",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 30.3609,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 3.1873,
+              "pcm_bytes": 14882,
+              "text": [
+                "ы"
+              ]
+            },
+            {
+              "pcm_bytes": 2,
+              "text": []
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "glyph": " ",
+          "status": "passed",
+          "routing": "passed",
+          "first_key_to_pcm_ms": 206.7492,
+          "symbol_label_matches": true,
+          "letter_name_matches": true,
+          "word_echo_matches": true,
+          "utterances": [
+            {
+              "driver_to_first_pcm_ms": 189.3776,
+              "pcm_bytes": 22898,
+              "text": [
+                "абы"
+              ]
+            },
+            {
+              "driver_to_first_pcm_ms": 2.3831,
+              "pcm_bytes": 28802,
+              "text": [
+                "пробел"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "required_resource": {
+      "cleanup": {
+        "restoration": {
+          "restored": true,
+          "sha256_identical": true,
+          "bytes": 90206963
+        },
+        "status": "passed"
+      },
+      "recovery": {
+        "active_synth": "espeak",
+        "synthetic_error_injected": false,
+        "configured_synth_preserved": true,
+        "old_driver_thread_stopped": true,
+        "notice_pcm_bytes": 317568,
+        "elapsed_ms": 5179.3161
+      }
+    }
+  },
+  "original_evidence": {
+    "reader_run_id": 45022418747,
+    "reader_job_id": 137208043110,
+    "evidence_artifact_id": 14754117799,
+    "exact_gzip_path": "evidence/windows_dev10_run_45021069771.json.gz",
+    "exact_gzip_size_bytes": 92769,
+    "exact_gzip_sha256": "8f6dc8a5154f94a57c5d3662e25a2e0a750a0acf6ff47f57d4fb9eb9a0e7735e",
+    "exact_json_files": 14,
+    "reader_generated_recovery_report_labelled": true
+  },
+  "limitations": [
+    "Internal API/predevice measurements do not certify physical audible latency",
+    "Actual typing includes genuine word echo and took15.4732–206.7492ms key-to-first-recorded-PCM across9 cases",
+    "Pronunciation, speaker likeness, broad language/key coverage and physical audio remain unverified",
+    "Optional additional typing scenarios are not claimed by this observation"
+  ]
+}

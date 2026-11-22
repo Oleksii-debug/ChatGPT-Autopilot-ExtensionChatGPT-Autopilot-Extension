@@ -1,0 +1,90 @@
+name: Dordiai vendor virtual audio metadata acquisition
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths: [".github/workflows/dordiai-virtual-audio-acquisition.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-vendor-package:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[audio-endpoint-acquire]')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Acquire official current package and inspect signatures without installation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_REPOSITORY -ne 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension') { throw 'Owned ephemeral Actions environment required' }
+          $owned = Join-Path $env:RUNNER_TEMP ('dordiai-vbcable-metadata-' + $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $owned) { throw 'Fresh owned metadata directory required' }
+          New-Item -ItemType Directory -Path $owned | Out-Null
+          $zip = Join-Path $owned 'VBCABLE_Driver_Pack46.zip'
+          $url = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip'
+          Invoke-WebRequest -Uri $url -OutFile $zip -MaximumRedirection 3
+          $size = (Get-Item -LiteralPath $zip).Length
+          if ($size -lt 1024 -or $size -gt 20971520) { throw 'Unexpected vendor archive size' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $expanded = 0
+            foreach ($entry in $archive.Entries) {
+              $name = $entry.FullName.Replace('\','/')
+              if ([System.IO.Path]::IsPathRooted($name) -or $name.Contains(':') -or $name.Split('/') -contains '..') { throw 'Unsafe archive entry' }
+              if (($entry.ExternalAttributes -shr 16 -band 61440) -eq 40960) { throw 'Linked vendor archive entry' }
+              $expanded += $entry.Length
+              if ($expanded -gt 67108864 -or $archive.Entries.Count -gt 256) { throw 'Vendor package exceeds bounded quota' }
+            }
+          } finally { $archive.Dispose() }
+          $extract = Join-Path $owned 'extracted'
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract
+          $rows = @()
+          foreach ($file in Get-ChildItem -LiteralPath $extract -File -Recurse) {
+            $relative = [System.IO.Path]::GetRelativePath($extract,$file.FullName)
+            $row = [ordered]@{ path=$relative; bytes=$file.Length; sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+            if ($file.Extension.ToLowerInvariant() -in @('.cat','.exe','.sys','.dll')) {
+              $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
+              $row.signature_status = $signature.Status.ToString()
+              $row.signature_message = $signature.StatusMessage
+              if ($null -ne $signature.SignerCertificate) {
+                $row.signer_subject = $signature.SignerCertificate.Subject
+                $row.signer_issuer = $signature.SignerCertificate.Issuer
+                $row.signer_thumbprint = $signature.SignerCertificate.Thumbprint
+              }
+              if ($null -ne $signature.TimeStamperCertificate) { $row.timestamp_signer_subject = $signature.TimeStamperCertificate.Subject }
+            }
+            if ($file.Extension.ToLowerInvariant() -eq '.inf' -and $file.Length -le 131072) {
+              $row.inf_text = Get-Content -LiteralPath $file.FullName -Raw
+            }
+            if ($file.Name -match '(?i)(readme|license|install).*\.txt' -and $file.Length -le 65536) {
+              $row.vendor_text = Get-Content -LiteralPath $file.FullName -Raw
+            }
+            $rows += $row
+          }
+          $report = [ordered]@{
+            format='dordiai-vendor-audio-package-metadata'; format_version=1
+            source_page='https://vb-audio.com/Cable/'; vendor_package_url=$url
+            package=[ordered]@{ filename='VBCABLE_Driver_Pack46.zip'; bytes=$size; sha256=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() }
+            scope='Read-only package and Authenticode observations on an owned ephemeral Windows runner'
+            installer_executed=$false; driver_installed=$false; certificates_imported=$false
+            virtual_audio_verified=$false; physical_audio_verified=$false; product_ready=$false
+            vendor_installation_reboot_instruction=$true
+            files=$rows
+          }
+          $out = Join-Path $env:GITHUB_WORKSPACE 'dordiai-voices/virtual-audio-acquisition'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $json = $report | ConvertTo-Json -Depth 10
+          if ($json.Length -gt 262144) { throw 'Unexpected vendor metadata size' }
+          [System.IO.File]::WriteAllText((Join-Path $out 'vendor-package-metadata.json'),$json,[System.Text.UTF8Encoding]::new($false))
+          Write-Output ('VIRTUAL_AUDIO_VENDOR_METADATA ' + ($report | ConvertTo-Json -Depth 10 -Compress))
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-vendor-audio-metadata-${{ github.run_id }}
+          path: dordiai-voices/virtual-audio-acquisition
+          if-no-files-found: warn
+          retention-days: 90

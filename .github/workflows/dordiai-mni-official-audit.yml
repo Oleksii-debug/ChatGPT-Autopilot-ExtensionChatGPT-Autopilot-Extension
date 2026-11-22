@@ -1,0 +1,46 @@
+name: Dordiai official Manipuri checkpoint acquisition audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-mni-official-audit.yml'
+      - 'dordiai-voices/tools/research/acquire_mni_official.py'
+      - 'dordiai-voices/tests/test_mni_official_acquisition.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-mni-official-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mni-audit]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prove data-only ZIP and output guards with synthetic fixtures
+        run: python -m unittest discover -s dordiai-voices/tests -p test_mni_official_acquisition.py -v
+      - name: Acquire pinned official1.5GB asset and hash opaque checkpoints
+        run: >-
+          python dordiai-voices/tools/research/acquire_mni_official.py
+          --archive "${{ runner.temp }}/dordiai-mni-${{ github.run_id }}/mni.zip"
+          --report "${{ github.workspace }}/output/mni-official-audit/inspection.json"
+      - name: Preserve complete or partial metadata only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-mni-official-audit-${{ github.run_id }}
+          path: output/mni-official-audit/
+          if-no-files-found: warn
+          compression-level: 0

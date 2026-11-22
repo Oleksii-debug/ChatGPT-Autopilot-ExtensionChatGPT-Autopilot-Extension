@@ -1,0 +1,112 @@
+name: Dordiai frozen v2 v3 word classifier candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  train-evaluate-uninstalled-v4:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-lid-v4-train]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      WORD_LID_V2_INPUT: ${{ github.workspace }}/word-lid-v4-input-v2
+      WORD_LID_V3_INPUT: ${{ github.workspace }}/word-lid-v4-input-v3
+      WORD_LID_RESULTS: ${{ github.workspace }}/word-lid-v4-results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test explicit v3 decoding global holdouts native families and class calibration
+        run: |
+          mkdir -p "$WORD_LID_RESULTS"
+          python -m unittest discover -s dordiai-voices/tests -p test_word_lid_v4.py -v 2>&1 | tee "$WORD_LID_RESULTS/unit-tests.log"
+      - name: Verify both frozen artifact identities before downloading
+        shell: python
+        env:
+          WORD_LID_ARTIFACT_TOKEN: ${{ github.token }}
+        run: |
+          import json,os,pathlib,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):
+                  return None
+          expected=[
+              (14753180217,45017654339,"5f5ab6cf53e09f630c7c2726d730a317e07e29b7",26003312,
+               "sha256:bbd53433999afa53146f9c5939b96f6fb93a1ab39b9745002d5322f4125631de"),
+              (14753916865,45021734219,"2047e48431a0269f848c78bf0e1581639667f14e",3056841,
+               "sha256:4e687cd1ebe8f5c1690bf3a76a8c5950a53b02f7bdfafee739a27d308aeea05e")]
+          for identity,run,commit,size,digest in expected:
+              url="https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/"+str(identity)
+              request=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["WORD_LID_ARTIFACT_TOKEN"],
+                  "Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"})
+              with urllib.request.build_opener(NoRedirect()).open(request,timeout=60) as response:
+                  raw=response.read(131073)
+              if len(raw)>131072:
+                  raise ValueError("Artifact metadata exceeds bound")
+              row=json.loads(raw)
+              if (row["id"]!=identity or row["expired"] or row["workflow_run"]["id"]!=run
+                  or row["workflow_run"]["head_sha"]!=commit or row["size_in_bytes"]!=size or row["digest"]!=digest):
+                  raise ValueError("Frozen source artifact identity differs")
+              (pathlib.Path(os.environ["WORD_LID_RESULTS"])/("input-artifact-"+str(identity)+".json")).write_text(
+                  json.dumps(row,indent=2)+"\n",encoding="utf-8")
+              print("WORD_LID_V4_ARTIFACT_VERIFIED "+str(identity),flush=True)
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: "14753180217"
+          github-token: ${{ github.token }}
+          run-id: "45017654339"
+          path: ${{ env.WORD_LID_V2_INPUT }}
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: "14753916865"
+          github-token: ${{ github.token }}
+          run-id: "45021734219"
+          path: ${{ env.WORD_LID_V3_INPUT }}
+          merge-multiple: true
+      - name: Merge all publisher holdouts train validation-only policy and evaluate frozen final test
+        run: |
+          python dordiai-voices/tools/train_word_lid_v4.py \
+            --v2-corpus "$WORD_LID_V2_INPUT/full/extra-corpus.jsonl.gz" \
+            --v3-corpus "$WORD_LID_V3_INPUT/pilot-corpus.jsonl.gz" \
+            --v3-report "$WORD_LID_V3_INPUT/acquisition-report.json" \
+            --output "$WORD_LID_RESULTS/candidate" \
+            2>&1 | tee "$WORD_LID_RESULTS/train-evaluation.log"
+      - name: Preserve exact report and bounded independently readable sections
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path(os.environ["WORD_LID_RESULTS"])/"candidate/evaluation.json"
+          if path.is_file():
+              raw=path.read_bytes()
+              if len(raw)>4194304:
+                  raise ValueError("Unexpected candidate report size")
+              document=json.loads(raw)
+              for key,value in document.items():
+                  rendered=json.dumps(value,ensure_ascii=True,separators=(",",":"))
+                  if len(rendered)<=32000:
+                      print("WORD_LID_V4_SECTION "+key+" "+rendered,flush=True)
+              packed=gzip.compress(raw,mtime=0)
+              print("WORD_LID_V4_GZIP_SHA256 "+hashlib.sha256(packed).hexdigest(),flush=True)
+              encoded=base64.b64encode(packed).decode()
+              parts=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              for i,part in enumerate(parts,1):
+                  print("WORD_LID_V4_GZIP_B64 "+str(i)+"/"+str(len(parts))+" "+part,flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-word-lid-v4-candidate-${{ github.run_id }}
+          path: ${{ env.WORD_LID_RESULTS }}
+          if-no-files-found: warn
+          retention-days: 7
