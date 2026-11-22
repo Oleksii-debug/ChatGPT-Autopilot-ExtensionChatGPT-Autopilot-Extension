@@ -1,0 +1,365 @@
+{
+  "format": "dordiai-tongan-phonemic-p1-actual-receipt",
+  "run_id": 45035136469,
+  "job_id": 137247093223,
+  "source_commit": "1a1ead8b634595f0502e405f71c3c606229261dd",
+  "artifact": {
+    "id": 14759865910,
+    "name": "dordiai-tongan-phonemic-p1-45035136469",
+    "size_in_bytes": 1173502,
+    "url": "https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/14759865910",
+    "archive_download_url": "https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/14759865910/zip",
+    "expired": false,
+    "created_at": "2026-11-22T14:54:43Z",
+    "expires_at": "2026-12-22T14:54:41Z",
+    "updated_at": "2026-11-22T14:54:43Z",
+    "digest": "sha256:34b53f3835b5b5c6503ff9fbab3b1462e93193e2ff163a782dd064a81bff8263",
+    "workflow_run": {
+      "id": 45035136469,
+      "repository_id": 1350542041,
+      "head_repository_id": 1350542041,
+      "head_branch": "dordiai-voices/audit-20261122",
+      "head_sha": "1a1ead8b634595f0502e405f71c3c606229261dd"
+    }
+  },
+  "report_gzip_sha256": "10a2c4bbb0f983b2e36e95b321b5f079423e099163dec4889a970cf6d1a28516",
+  "status": "actual-windows-strict-tongan-phonemic-contrast-projection-unregistered",
+  "actual_cases": 40,
+  "strictly_renderable_original27": 24,
+  "original27_research_hypothesis_count": 3,
+  "structural_contrasts": [
+    {
+      "vowel": "a",
+      "long_text": "kā",
+      "double_text": "kaa",
+      "one_long_vs_two_vowel_events": true,
+      "long_vowel_events": [
+        {
+          "ipa": "ˈa",
+          "audio_position_ms": 91,
+          "sample": 2017
+        }
+      ],
+      "double_vowel_events": [
+        {
+          "ipa": "ˈa",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 210,
+          "sample": 4641
+        }
+      ],
+      "distinct_encoded_carrier_and_projected_waves": true,
+      "scope": "Actual native-character phonemic unit contrast; these five synthetic units are not asserted lexical vocabulary"
+    },
+    {
+      "vowel": "e",
+      "long_text": "kē",
+      "double_text": "kee",
+      "one_long_vs_two_vowel_events": true,
+      "long_vowel_events": [
+        {
+          "ipa": "ˈe",
+          "audio_position_ms": 91,
+          "sample": 2017
+        }
+      ],
+      "double_vowel_events": [
+        {
+          "ipa": "ˈe",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "e",
+          "audio_position_ms": 210,
+          "sample": 4641
+        }
+      ],
+      "distinct_encoded_carrier_and_projected_waves": true,
+      "scope": "Actual native-character phonemic unit contrast; these five synthetic units are not asserted lexical vocabulary"
+    },
+    {
+      "vowel": "i",
+      "long_text": "kī",
+      "double_text": "kii",
+      "one_long_vs_two_vowel_events": true,
+      "long_vowel_events": [
+        {
+          "ipa": "ˈi",
+          "audio_position_ms": 100,
+          "sample": 2211
+        }
+      ],
+      "double_vowel_events": [
+        {
+          "ipa": "ˈi",
+          "audio_position_ms": 100,
+          "sample": 2211
+        },
+        {
+          "ipa": "i",
+          "audio_position_ms": 248,
+          "sample": 5475
+        }
+      ],
+      "distinct_encoded_carrier_and_projected_waves": true,
+      "scope": "Actual native-character phonemic unit contrast; these five synthetic units are not asserted lexical vocabulary"
+    },
+    {
+      "vowel": "o",
+      "long_text": "kō",
+      "double_text": "koo",
+      "one_long_vs_two_vowel_events": true,
+      "long_vowel_events": [
+        {
+          "ipa": "ˈo",
+          "audio_position_ms": 91,
+          "sample": 2017
+        }
+      ],
+      "double_vowel_events": [
+        {
+          "ipa": "ˈo",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "o",
+          "audio_position_ms": 213,
+          "sample": 4705
+        }
+      ],
+      "distinct_encoded_carrier_and_projected_waves": true,
+      "scope": "Actual native-character phonemic unit contrast; these five synthetic units are not asserted lexical vocabulary"
+    },
+    {
+      "vowel": "u",
+      "long_text": "kū",
+      "double_text": "kuu",
+      "one_long_vs_two_vowel_events": true,
+      "long_vowel_events": [
+        {
+          "ipa": "ˈu",
+          "audio_position_ms": 91,
+          "sample": 2017
+        }
+      ],
+      "double_vowel_events": [
+        {
+          "ipa": "ˈu",
+          "audio_position_ms": 91,
+          "sample": 2017
+        },
+        {
+          "ipa": "u",
+          "audio_position_ms": 216,
+          "sample": 4769
+        }
+      ],
+      "distinct_encoded_carrier_and_projected_waves": true,
+      "scope": "Actual native-character phonemic unit contrast; these five synthetic units are not asserted lexical vocabulary"
+    }
+  ],
+  "unchanged": {
+    "all_original_input_bytes_unchanged": true,
+    "changed": [],
+    "checked_core_files": 1681,
+    "checked_carrier_files": 384,
+    "production_integrated": false
+  },
+  "same_carrier_calibration": {
+    "text": "Mālō. ʻUma. Tangata. Mālō.",
+    "native_character_strict": true,
+    "facts": {
+      "encoded": "[[m|a|:|'l|o|:]]. [['?|u|m|a]]. [[t|a|'N|a|t|a]]. [[m|a|:|'l|o|:]].",
+      "seconds": 0.0040222000000085245,
+      "samples": 54556,
+      "audio_seconds": 2.4741950113378683,
+      "phoneme_events": [
+        {
+          "ipa": "m",
+          "audio_position_ms": 0,
+          "sample": 0
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 81,
+          "sample": 1792
+        },
+        {
+          "ipa": "l",
+          "audio_position_ms": 145,
+          "sample": 3200
+        },
+        {
+          "ipa": "ˈo",
+          "audio_position_ms": 240,
+          "sample": 5312
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 419,
+          "sample": 9251
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 700,
+          "sample": 15447
+        },
+        {
+          "ipa": "ʔ",
+          "audio_position_ms": 747,
+          "sample": 16483
+        },
+        {
+          "ipa": "ˈu",
+          "audio_position_ms": 767,
+          "sample": 16933
+        },
+        {
+          "ipa": "m",
+          "audio_position_ms": 889,
+          "sample": 19621
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 956,
+          "sample": 21093
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 1021,
+          "sample": 22516
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 1302,
+          "sample": 28712
+        },
+        {
+          "ipa": "t",
+          "audio_position_ms": 1340,
+          "sample": 29549
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 1361,
+          "sample": 30021
+        },
+        {
+          "ipa": "ŋ",
+          "audio_position_ms": 1425,
+          "sample": 31429
+        },
+        {
+          "ipa": "ˈa",
+          "audio_position_ms": 1524,
+          "sample": 33605
+        },
+        {
+          "ipa": "t",
+          "audio_position_ms": 1654,
+          "sample": 36489
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 1676,
+          "sample": 36961
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 1766,
+          "sample": 38961
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 2047,
+          "sample": 45157
+        },
+        {
+          "ipa": "m",
+          "audio_position_ms": 2047,
+          "sample": 45157
+        },
+        {
+          "ipa": "a",
+          "audio_position_ms": 2129,
+          "sample": 46949
+        },
+        {
+          "ipa": "l",
+          "audio_position_ms": 2193,
+          "sample": 48357
+        },
+        {
+          "ipa": "ˈo",
+          "audio_position_ms": 2288,
+          "sample": 50469
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 2467,
+          "sample": 54402
+        },
+        {
+          "ipa": "",
+          "audio_position_ms": 2474,
+          "sample": 54556
+        }
+      ],
+      "vowel_event_count": 9,
+      "research_hypothesis_requested": false
+    },
+    "wav_sha256": "74e5d55eb185965f469466acff2dae4e58915809fc4a5f9f9fe31634dc38c894",
+    "source_sha256": "08afab51e5fc1c802c3508d13cd5c4689f71e97fcc0de95277dd9538cb764990",
+    "source_norm": 12.922069549560547,
+    "source_shape": [
+      1,
+      256,
+      1
+    ],
+    "reused_neighbouring_source": false,
+    "unit_normalized": false
+  },
+  "runtime": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "onnxruntime": "1.26.0",
+    "dependencies": {
+      "numpy": "D:\\a\\_temp\\dordiai-to-p1-45035136469\\core\\kx47Runtime\\python\\Lib\\site-packages\\numpy\\__init__.py",
+      "onnxruntime": "D:\\a\\_temp\\dordiai-to-p1-45035136469\\core\\kx47Runtime\\python\\Lib\\site-packages\\onnxruntime\\__init__.py"
+    }
+  },
+  "reference_encoder": {
+    "repository": "TigreGotico/voiceclonnx-openvoice-v2",
+    "revision": "34d010c192c97f763207f488f6057fd07fee42ad",
+    "record": {
+      "filename": "tone_ref_encoder.onnx",
+      "size_bytes": 3259275,
+      "sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7"
+    },
+    "actual_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+    "graph_regenerated": false
+  },
+  "projected_wav_sample_rates": [
+    22050
+  ],
+  "all_five_short_vs_long_controls_verified": false,
+  "limits": [
+    "Shared acoustic table remains experimental, not a native Tongan voice.",
+    "Finite nonzero projection is technical execution, not native pronunciation approval.",
+    "Unmarked heterovowel grouping, connected one-mora stress domains and acute-on-already-long are rejected by default.",
+    "Explicit research hypotheses are separated from strictly renderable native input.",
+    "Documented long/double orthography is represented distinctly; native perceptual realization still requires validation."
+  ],
+  "registered": false,
+  "product_integrated": false,
+  "native_tongan_nn_weights": false,
+  "native_phonetic_fidelity_verified": false,
+  "native_listener_verified": false,
+  "windows_nvda_verified": false,
+  "physical_audio_verified": false
+}

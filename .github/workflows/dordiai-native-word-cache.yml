@@ -1,0 +1,85 @@
+name: Unpublished exact-word cache matched experiment
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  matched-cache:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-cache-benchmark]')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - name: Preserve exact reviewed source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Safety tests and temporary candidate compatibility overlay
+        shell: python
+        run: |
+          import pathlib,shutil,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          subprocess.run([sys.executable,"-m","unittest","discover","-s",str(root/"tests"),"-p","test_native_word_cache*.py","-v"],check=True)
+          overlay=root/"word-cache-candidate-compat"
+          copies={
+              "source/0.12.2/kx47Runtime/native_word_membership.py":root/"experiments/native-word-cache/native_word_membership.py",
+              "tools/build_native_word_membership.py":root/"tools/build_native_word_membership.py",
+              "tools/probe_native_membership.py":root/"tools/probe_native_membership.py",
+              "tests/test_native_word_membership.py":root/"tests/test_native_word_membership.py"}
+          for relative,source in copies.items():
+              target=overlay/relative
+              target.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,target)
+          subprocess.run([sys.executable,"-m","unittest","discover","-s",str(overlay/"tests"),"-p","test_native_word_membership.py","-v"],check=True)
+          print("Only disposable candidate overlay modified; source11 product files untouched.",flush=True)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-compact-native-word-membership
+          run-id: 45027190211
+          github-token: ${{ github.token }}
+          path: dordiai-voices/native-membership-build
+      - name: Actual same-data original versus cache0 versus bounded-cache comparison
+        run: >-
+          python dordiai-voices/tools/probe_native_word_cache.py
+          --lexicon dordiai-voices/native-membership-build/native-word-membership.bin
+          --acquisition-report dordiai-voices/native-membership-build/acquisition-report.json
+          --baseline-module dordiai-voices/experiments/native-word-cache/baseline_source11.py
+          --candidate-module dordiai-voices/experiments/native-word-cache/native_word_membership.py
+          --candidate-git-blob 1738de70c9a81fab54eddde9f1e3442b9d962813
+          --rounds 3 --iterations 1000
+          --output dordiai-voices/native-word-cache-matched.json
+      - name: Preserve exact matched comparison JSON
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path("dordiai-voices/native-word-cache-matched.json")
+          if not path.is_file():print("Matched word-cache measurement UNVERIFIED: no report.",flush=True);raise SystemExit(0)
+          raw=path.read_bytes()
+          doc={"format":"dordiai-exact-unpublished-word-cache-benchmark-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "runner_os":os.environ["RUNNER_OS"],
+              "file":{"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}}
+          encoded=json.dumps(doc,sort_keys=True,separators=(",",":")).encode()
+          if len(encoded)>2*1024*1024:raise ValueError("Unexpected comparison receipt size")
+          compressed=gzip.compress(encoded,mtime=0)
+          payload=base64.b64encode(compressed).decode("ascii")
+          print("DORDIAI_WORD_CACHE_JSON_SHA256 "+hashlib.sha256(encoded).hexdigest(),flush=True)
+          for i in range(0,len(payload),24000):print("DORDIAI_WORD_CACHE_GZIP_B64_%03d "%(i//24000)+payload[i:i+24000],flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: unpublished-word-cache-${{ matrix.os }}
+          path: dordiai-voices/native-word-cache-matched.json
+          if-no-files-found: warn
+          retention-days: 30

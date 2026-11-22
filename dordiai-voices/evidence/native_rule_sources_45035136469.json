@@ -1,0 +1,128 @@
+{
+  "format": "dordiai-primary-native-rule-source-acquisition",
+  "format_version": 1,
+  "sources": [
+    {
+      "id": "tongan-2024-orthography",
+      "language": "to",
+      "max_bytes": 2097152,
+      "kind": "pdf",
+      "rights": "Ministry website default CC-BY4 except third-party excerpts/images; source and exceptions retained.",
+      "rights_url": "https://mpia.govt.nz/about-us/about-this-site/",
+      "attempts": [
+        {
+          "url": "https://mpia.govt.nz/assets/Resources/Orthography-guidelines/lea-faka-tonga-orthography-guidelines.pdf",
+          "status": "acquired"
+        }
+      ],
+      "acquired": true,
+      "url": "https://mpia.govt.nz/assets/Resources/Orthography-guidelines/lea-faka-tonga-orthography-guidelines.pdf",
+      "size_bytes": 433464,
+      "sha256": "95147ffe4d1e0719cf81cfcf844f172c49706bae591eaa6602815ad7623f607b",
+      "prior_sha256_pin_verified": false,
+      "hash_provenance": "first observed primary download; not claimed as a prior pin"
+    },
+    {
+      "id": "hiri-motu-1974",
+      "language": "ho",
+      "max_bytes": 26214400,
+      "kind": "pdf",
+      "doi": "10.15144/PL-D24",
+      "rights": "PDF footer explicitly online edition CC-BY-SA4; landing metadata also says BY4, preserve conflict and apply conservative SA4 for copied material.",
+      "attempts": [
+        {
+          "url": "https://openresearch-repository.anu.edu.au/bitstreams/94168cbc-c9e2-4fd0-8541-c764c9385444/download",
+          "status": "acquired"
+        }
+      ],
+      "acquired": true,
+      "url": "https://openresearch-repository.anu.edu.au/bitstreams/94168cbc-c9e2-4fd0-8541-c764c9385444/download",
+      "size_bytes": 17914983,
+      "sha256": "b97373c996d6a09ddcd24ce0b1ff2f1c94c51945e24d653604e74c5aa8e0917c",
+      "prior_sha256_pin_verified": false,
+      "hash_provenance": "first observed primary download; not claimed as a prior pin"
+    },
+    {
+      "id": "tetun-official-standard",
+      "language": "tet",
+      "max_bytes": 2097152,
+      "kind": "pdf",
+      "rights": "Official standard identification; no raw-document redistribution licence asserted.",
+      "attempts": [
+        {
+          "url": "https://www.mj.gov.tl/jornal/lawsTL/RDTL-Law/RDTL-Gov-Decrees/Gov-Decree-2004-01.pdf",
+          "status": "acquired"
+        }
+      ],
+      "acquired": true,
+      "url": "https://www.mj.gov.tl/jornal/lawsTL/RDTL-Law/RDTL-Gov-Decrees/Gov-Decree-2004-01.pdf",
+      "size_bytes": 71751,
+      "sha256": "13fd67841065b92b4e348b2a63443bb60dd40d2198eefd9469e11f10a5aee372",
+      "prior_sha256_pin_verified": false,
+      "hash_provenance": "first observed primary download; not claimed as a prior pin"
+    },
+    {
+      "id": "tetun-native-letter-name-reference",
+      "language": "tet",
+      "max_bytes": 15728640,
+      "kind": "pdf",
+      "rights": "CARE magazine expressly restricts copying publication without permission. Keep raw PDF private; independently curate linguistic letter-name facts with attribution, never bulk redistribute the book/song/artwork.",
+      "attempts": [
+        {
+          "url": "https://www.lafaek.tl/wp-content/uploads/2023/03/LBM-Ed_1_2017.pdf",
+          "status": "acquired"
+        }
+      ],
+      "acquired": true,
+      "url": "https://www.lafaek.tl/wp-content/uploads/2023/03/LBM-Ed_1_2017.pdf",
+      "size_bytes": 4712979,
+      "sha256": "d2f4b190f317e1adba6beafee169088ee6fc638d847a2964e964e104d956a215",
+      "prior_sha256_pin_verified": false,
+      "hash_provenance": "first observed primary download; not claimed as a prior pin"
+    },
+    {
+      "id": "afar-epitran-map",
+      "language": "aa",
+      "max_bytes": 4096,
+      "kind": "csv",
+      "expected_bytes": 166,
+      "expected_sha256": "b7b6d723ad421d3e3eb85700fb90befeb2cbbecad424d5730bcd2d2f00d0b09e",
+      "rights": "MIT implementation; known b→d defect remains unadopted; no complete-prosody claim.",
+      "attempts": [
+        {
+          "url": "https://raw.githubusercontent.com/dmort27/epitran/2387d95820d6d9b8f459c35141e6239f4de5dbfb/epitran/data/map/aar-Latn.csv",
+          "status": "acquired"
+        }
+      ],
+      "acquired": true,
+      "url": "https://raw.githubusercontent.com/dmort27/epitran/2387d95820d6d9b8f459c35141e6239f4de5dbfb/epitran/data/map/aar-Latn.csv",
+      "size_bytes": 166,
+      "sha256": "b7b6d723ad421d3e3eb85700fb90befeb2cbbecad424d5730bcd2d2f00d0b09e",
+      "prior_sha256_pin_verified": true,
+      "hash_provenance": "prior reviewed pin"
+    },
+    {
+      "id": "afar-epitran-license",
+      "language": "aa",
+      "max_bytes": 65536,
+      "kind": "txt",
+      "rights": "Pinned repository implementation licence; does not license unrelated books/recordings.",
+      "attempts": [
+        {
+          "url": "https://raw.githubusercontent.com/dmort27/epitran/2387d95820d6d9b8f459c35141e6239f4de5dbfb/LICENSE.txt",
+          "status": "acquired"
+        }
+      ],
+      "acquired": true,
+      "url": "https://raw.githubusercontent.com/dmort27/epitran/2387d95820d6d9b8f459c35141e6239f4de5dbfb/LICENSE.txt",
+      "size_bytes": 1082,
+      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
+      "prior_sha256_pin_verified": false,
+      "hash_provenance": "first observed primary download; not claimed as a prior pin"
+    }
+  ],
+  "raw_documents_redistributed": false,
+  "language_registered": false,
+  "native_pronunciation_verified": false,
+  "status": "all-primary-sources-acquired"
+}

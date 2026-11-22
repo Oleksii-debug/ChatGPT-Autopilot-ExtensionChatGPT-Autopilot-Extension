@@ -388,6 +388,34 @@
       "physical_audio_verified": false,
       "virtual_capture_verified": false,
       "evidence": "evidence/virtual_audio_io_45032356299_summary.json"
+    },
+    "plain_file_word_routing": {
+      "status": "failed_actual_source11; production12_fix_in_progress",
+      "run": 45034918498,
+      "job": 137246417004,
+      "core_version": "0.13.1-dev.11",
+      "genuine_TextInfo_complete": true,
+      "input_characters": 1137,
+      "source_words": 100,
+      "lexical_pieces": 102,
+      "all_words_preserved": true,
+      "unmarked_TextInfo_language_fields": [],
+      "original_language_commands": [
+        null
+      ],
+      "synth_language_commands": [
+        "uk"
+      ],
+      "all_planned_languages": [
+        "uk"
+      ],
+      "wrong_lexical_piece_routes": 71,
+      "wrong_source_word_routes": 69,
+      "all30_RU_exclusive_occurrences_misrouted": true,
+      "forced_uk_and_disabled_ru_plain_controls_passed": true,
+      "authored_rich_metadata_cases_blocked": "Probe isolated detectFormatAfterCursor was false; genuine nativefontLCIDs alternate but TextInfo only initially exposesru_RU. Tool-only setting/restore correction prepared.",
+      "cleanup_restored": true,
+      "evidence": "evidence/source11_plain_text_provenance_failure.md"
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",

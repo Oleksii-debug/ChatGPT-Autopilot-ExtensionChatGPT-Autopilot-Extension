@@ -1,0 +1,150 @@
+{
+  "format": "dordiai-owned-loopback-readback-assessment",
+  "format_version": 1,
+  "run_id": 45035066605,
+  "job_id": 137246875515,
+  "source_commit": "c44f8bb9e01b3717bfdb04fd565398635430f102",
+  "actual_windows_tests": {
+    "native_backend": 15,
+    "correlation_and_lease": 18,
+    "device_guards": 16,
+    "result": "pass"
+  },
+  "status": "actual-negative-calibration-not-correlated",
+  "physical_audio_verified": false,
+  "virtual_audio_verified": false,
+  "requested_phrase_waveform_match_verified": false,
+  "product_ready": false,
+  "cleanup": {
+    "exact_owned_instance_absence_verified": true,
+    "driver_store_purged": false,
+    "reboot": false
+  },
+  "exact_evidence": {
+    "path": "evidence/loopback_readback_45035066605.json.gz",
+    "git_blob": "898b60b5239c1b78c472783e4724a6a7ea7f8588",
+    "size_bytes": 28865,
+    "sha256": "f3744500948455a7d8d49ce53857f7bcadffca0d04b1c6f5e2b806065a37fdf4"
+  },
+  "artifact": {
+    "id": 14759341917,
+    "size_bytes": 354405,
+    "sha256": "4d7e298bdd3ae0639e73a98a9941dbc33c11a94a4fe0bd266511ef0d4d289be3"
+  },
+  "facts": {
+    "volume_before": {
+      "read_only": true,
+      "setters_called": false,
+      "endpoint": {
+        "interface_hresult": "0x00000000",
+        "get_master_volume_hresult": "0x00000000",
+        "master_volume_scalar": 0.9999989867210388,
+        "get_mute_hresult": "0x00000000",
+        "muted": false,
+        "status": "queried"
+      },
+      "render_session": {
+        "interface_hresult": "0x00000000",
+        "get_master_volume_hresult": "0x00000000",
+        "master_volume_scalar": 1,
+        "get_mute_hresult": "0x00000000",
+        "muted": false,
+        "status": "queried"
+      }
+    },
+    "volume_after": {
+      "read_only": true,
+      "setters_called": false,
+      "endpoint": {
+        "interface_hresult": "0x00000000",
+        "get_master_volume_hresult": "0x00000000",
+        "master_volume_scalar": 0.9999989867210388,
+        "get_mute_hresult": "0x00000000",
+        "muted": false,
+        "status": "queried"
+      },
+      "render_session": {
+        "interface_hresult": "0x00000000",
+        "get_master_volume_hresult": "0x00000000",
+        "master_volume_scalar": 1,
+        "get_mute_hresult": "0x00000000",
+        "muted": false,
+        "status": "queried"
+      }
+    },
+    "native_render_pointer_readback": {
+      "size_bytes": 384000,
+      "sha256": "4e0acf5ef564f75ce5be75fb98ba24cb05126b76f2e2174c28c9bb0334c752e3",
+      "nonzero_samples": 95996,
+      "channel_rms": [
+        0.08456839583836924,
+        0.06342629685838194
+      ],
+      "exact_reference_bytes": true
+    },
+    "actual_captured_pcm": {
+      "size_bytes": 1144320,
+      "sha256": "aa8e5d29f4c74400e4417e742ff1c98689a8c4ceabca838ab76213fdc904cda2",
+      "nonzero_samples": 0,
+      "channel_rms": [
+        0,
+        0
+      ]
+    },
+    "padding": {
+      "count": 1180,
+      "minimum_frames": 576,
+      "maximum_frames": 1056
+    },
+    "capture_packets": 298,
+    "packet_flag_counts": {
+      "0": 297,
+      "1": 1
+    }
+  },
+  "established": [
+    "Exact one-second reference bytes were present in acquired native render buffers before ReleaseBuffer; full marker SHA matches reference.",
+    "Endpoint and own session master volumes are approximately 1 and unmuted before/after capture.",
+    "Render padding decreases by 480 frames and refills. Successful API calls/consumption do not establish nonzero endpoint mix.",
+    "143040 captured stereo frames are all zero; two-channel complete-marker NCC is zero. No physical or NVDA capture verified."
+  ],
+  "unattributed_hypotheses": [
+    {
+      "hypothesis": "Driver-provided loopback pin may supply zero despite nonzero renderer buffer.",
+      "support": "Microsoft documents driver loopback pin precedence. Vendor revision3 manual describes driver-managed loopback, enabled by default.",
+      "not_proven": "No pin identity/provider or driver internal loopback state measured."
+    },
+    {
+      "hypothesis": "Vendor post-install initialization may require reboot.",
+      "support": "Vendor manual explicitly instructs reboot after installation.",
+      "not_proven": "Windows standard install returned NeedReboot=false; actual causal reboot experiment prohibited and not performed."
+    },
+    {
+      "hypothesis": "Two vendor render inputs or per-channel/session state may affect routing.",
+      "support": "Vendor manual warns Speakers and Line Out inputs cannot be used simultaneously.",
+      "not_proven": "Our process opened only the exact Speakers endpoint. Other active sessions, endpoint channel volumes, and driver routing state were not inspected."
+    }
+  ],
+  "primary_sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording",
+      "scope": "Loopback driver pin versus engine-copy contract."
+    },
+    {
+      "url": "https://vb-audio.com/Cable/VBCABLE_ReferenceManual.pdf",
+      "scope": "Revision3 October2024: printed pages4,7,13. Historical manual; not evidence that Pack46 requires any particular unmeasured control state."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/",
+      "scope": "Documented separate process-only capture path; a possible bounded own-PID hypothesis, not yet executed."
+    }
+  ],
+  "changes_performed": {
+    "privacy": false,
+    "security": false,
+    "default_device_setter": false,
+    "volume_setter": false,
+    "vendor_installer_exe": false
+  },
+  "next_scope": "No further blind endpoint-loopback retry. Parent separately authorized own-PID ApplicationLoopback calibration only; still no NVDA capture while marker remains uncorrelated."
+}

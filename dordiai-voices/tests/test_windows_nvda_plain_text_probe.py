@@ -200,6 +200,29 @@ class GenuineHandlerAndCompositionTests(unittest.TestCase):
         self.assertIs(observed_line,line)
         self.assertEqual(unit,"line")
 
+    def test_native_metadata_uses_real_after_cursor_setting_and_restores_exact_previous_value(self):
+        tree=ast.parse(helper.PLUGIN_CODE)
+        apply=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=="_plain_apply")
+        calls=[]
+        section={"detectFormatAfterCursor":False}
+        config=types.SimpleNamespace(conf={"documentFormatting":section})
+        driver=types.SimpleNamespace(_dordiai_apply=lambda *args,**kwargs:calls.append(kwargs),rate=50)
+        namespace={"_PLAIN":{"preferences":{"voices":["voice"],"voice":"voice","voice_map":{}},
+                              "saved_detect_format_after_cursor":False},"DRIVER":driver}
+        import sys
+        from unittest.mock import patch
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[apply],type_ignores=[])),
+                     "actual-probe-format-setting","exec"),namespace)
+        with patch.dict(sys.modules,{"config":config}):
+            namespace["_plain_apply"]({"native_metadata":True,"enabled":["uk","ru"],"mode":"auto"})
+            self.assertTrue(section["detectFormatAfterCursor"])
+            namespace["_plain_apply"]({"native_metadata":False,"enabled":["uk","ru"],"mode":"auto"})
+            self.assertFalse(section["detectFormatAfterCursor"])
+            namespace["_PLAIN"]["saved_detect_format_after_cursor"]=True
+            namespace["_plain_apply"]({"native_metadata":False,"enabled":["uk","ru"],"mode":"auto"})
+            self.assertTrue(section["detectFormatAfterCursor"])
+        self.assertIn('"detectFormatAfterCursor", state["saved_detect_format_after_cursor"]',helper.PLUGIN_CODE)
+
     def test_stale_base_is_rejected_before_any_execution(self):
         with self.assertRaises(ValueError):
             helper.install_plain_text_probe(types.SimpleNamespace(PROBE_PLUGIN="changed source"))

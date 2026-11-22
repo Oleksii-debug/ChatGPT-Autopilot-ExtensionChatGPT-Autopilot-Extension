@@ -1,0 +1,5692 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "status": "failed",
+  "run_id": "515e121618cf4a69875027d6c2f8ea72",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "nvda_version_expected": "2026.3.1",
+  "checks": [
+    {
+      "name": "physical_audio_output",
+      "status": "blocked",
+      "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+    },
+    {
+      "name": "select_dordiai",
+      "status": "passed",
+      "driver_name": "kx47Preview"
+    },
+    {
+      "name": "native_membership_singleton",
+      "status": "passed"
+    },
+    {
+      "name": "native_membership_active_owned_lease",
+      "status": "passed",
+      "active_leases": 1
+    },
+    {
+      "name": "native_membership_actual_installed_long_namespace",
+      "status": "passed",
+      "dataset_path": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\config-native-host\\addons\\kx47Voices\\kx47Runtime\\models\\WordLanguage\\native-word-membership.bin",
+      "path_characters": 270,
+      "external_candidate_used": false
+    },
+    {
+      "name": "native_membership_trusted_dataset",
+      "status": "passed",
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 0,
+        "cache_bytes_charged": 0,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      }
+    },
+    {
+      "name": "native_membership_unknown_finite_membership",
+      "status": "passed",
+      "scope": "Finite dictionary abstention only; downstream legacy routing remains separate"
+    },
+    {
+      "name": "native_membership_source_membership_and_wrappers",
+      "status": "passed",
+      "case_count": 96
+    },
+    {
+      "name": "native_membership_readonly_probe_completed",
+      "status": "passed",
+      "resource_or_driver_closed_by_probe": false
+    },
+    {
+      "name": "host_sonic_import_and_dll",
+      "status": "passed",
+      "module": "synthDrivers._sonic"
+    },
+    {
+      "name": "allowed_voice_catalog",
+      "status": "passed",
+      "count": 45,
+      "voices": [
+        "adam",
+        "agnieszka",
+        "alex",
+        "alice_day1",
+        "astra_day2",
+        "bella",
+        "brian",
+        "brian_studio",
+        "brianna",
+        "callum_day1",
+        "charlie_day1",
+        "chris",
+        "claude_day2",
+        "daniel",
+        "daniel_day1",
+        "david",
+        "elis",
+        "gemini_day2",
+        "george",
+        "george_unpacked",
+        "gpt_day2",
+        "grok_day2",
+        "harry",
+        "hazel",
+        "keeper",
+        "laura_day1",
+        "laura_unpacked",
+        "lian",
+        "liza",
+        "liza_talk",
+        "mark",
+        "mykola",
+        "oksana",
+        "oleksii",
+        "oleksii_day1",
+        "oleksii_day2",
+        "oleksii_unpacked",
+        "olena",
+        "sara",
+        "sara_archive",
+        "studio_day1",
+        "veren",
+        "viktoriia",
+        "will",
+        "yevhen"
+      ],
+      "excluded_present": []
+    },
+    {
+      "name": "fresh_default_languages",
+      "status": "passed",
+      "enabled": [
+        "en",
+        "ru",
+        "uk"
+      ]
+    },
+    {
+      "name": "settings_dialog",
+      "status": "passed",
+      "title": "dordiai-voices — налаштування",
+      "visible": true,
+      "pages": [
+        "Мовлення",
+        "Голоси",
+        "Мови",
+        "Пакети"
+      ],
+      "labels": [
+        "dordiai-voices — налаштування",
+        "panel",
+        "Основний голос",
+        "Визначення мови",
+        "Швидкість, відсотків",
+        "Множник швидкості",
+        "Гучність, відсотків",
+        "Висота, відсотків",
+        "Тембр, відсотків",
+        "Мова чисел",
+        "Мова кириличних літер",
+        "panel",
+        "Доступні голоси",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "panel",
+        "Мови для перемикання",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "Основна мова",
+        "Мова для призначення голосу",
+        "Голос для цієї мови",
+        "Показано встановлені мови. Галочка вмикає мову, але не видаляє її файли. Нові мови\nпотрібно вмикати окремо. Текст вимкненою мовою читається основною мовою.\nВиберіть мову й сумісний голос. У примусовому режимі весь текст читається основною\nмовою.",
+        "panel",
+        "Установлені додаткові пакети",
+        "Установити пакет із ZIP-файла…",
+        "Видалити вибраний пакет…",
+        "Вибрати попередню версію голосу…",
+        "Основний комплект не видаляється тут. Під час роботи з пакетом навігацію озвучує\nвбудований eSpeak. Потім dordiai-voices автоматично перезавантажиться, і можна буде\nввімкнути нові мови на вкладці «Мови».",
+        "OK",
+        "Cancel",
+        "&Apply"
+      ],
+      "checked_languages": [
+        "en",
+        "ru",
+        "uk"
+      ],
+      "voice_rows": 45,
+      "missing_controls": []
+    },
+    {
+      "name": "settings_hotkey_binding",
+      "status": "passed",
+      "scripts": [
+        "script_preferences"
+      ]
+    },
+    {
+      "name": "keyboard_tab",
+      "status": "passed",
+      "events_emitted": true,
+      "changed_focus": true,
+      "focused_type": "WxCtrlWithEnableEvnt",
+      "reason": null
+    },
+    {
+      "name": "keyboard_checkbox_space",
+      "status": "passed",
+      "changed": true,
+      "reason": null
+    },
+    {
+      "name": "actual_plain_native_metadata",
+      "status": "blocked",
+      "case": "native_rich_metadata_6",
+      "observed_languages": [
+        "ru"
+      ]
+    },
+    {
+      "name": "actual_plain_native_metadata",
+      "status": "blocked",
+      "case": "forced_uk_native_metadata_6",
+      "observed_languages": [
+        "ru"
+      ]
+    },
+    {
+      "name": "actual_plain_native_metadata",
+      "status": "blocked",
+      "case": "disabled_ru_native_metadata_6",
+      "observed_languages": [
+        "ru"
+      ]
+    },
+    {
+      "name": "actual_plain_text_pipeline",
+      "status": "failed",
+      "cases": 6,
+      "expected_cases": 6,
+      "physical_audio_verified": false
+    },
+    {
+      "name": "actual_plain_text_word_routes",
+      "status": "failed",
+      "cases": 6,
+      "scope": "Same authenticated memberships/configuration applied to real TextInfo output"
+    },
+    {
+      "name": "actual_plain_text_cleanup",
+      "status": "passed",
+      "errors": [],
+      "normal_user_nvda_untouched": true
+    }
+  ],
+  "limitations": [
+    "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+    "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+    "One keyboard smoke check is not a complete accessibility assessment.",
+    "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "nvda_version_actual": "2026.3.1",
+  "native_membership": {
+    "scope": "Actual installed manager and both candidate wrappers; not pronunciation or intended-language proof",
+    "source_cases": [
+      {
+        "word": "ольсену",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "галапагосе",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "витівкових",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "доктрину",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "мегакрутими",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "утеплювавсь",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "рушникосушки",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "яснесенькою",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "вигибатимеш",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "курятинами",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "висловлень",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "малопривабливій",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "детектуй",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "погамував",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зализуватимусь",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "проголених",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "попідливано",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "найпискливіш",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "розплішіться",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "оберстдорфові",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "без'ядерності",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "озимій",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "променітимем",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "дідуню",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "плагіоклазі",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "непальцем",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "бережечками",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "драйвували",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "кріогідратів",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "діагенезом",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "одкочено",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "незім'яте",
+        "expected": [
+          "uk"
+        ],
+        "manager": [
+          "uk"
+        ],
+        "reader": [
+          "uk"
+        ],
+        "speech_candidates": [
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "присмирённая",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "списались",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "аминбаевны",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "прорубишься",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "ковыляниями",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "припоминаньи",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "оплёвывающуюся",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "ильменским",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "донецки",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "пожалевши",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "простерёгшего",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "воспринимала",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зарумянивших",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "лилиянн",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "переволочило",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "картофелесортировальных",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "низлагаемы",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "питиримах",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "безмельницыны",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "иносказательно",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "петрунелями",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "антитеатру",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "синевато-сером",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "посахаренную",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "истолковываемое",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "тяготимому",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "отсасываемых",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "саживаешь",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "поточенной",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зашлифовывала",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "кудесниками",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "взаимопроникающего",
+        "expected": [
+          "ru"
+        ],
+        "manager": [
+          "ru"
+        ],
+        "reader": [
+          "ru"
+        ],
+        "speech_candidates": [
+          "ru"
+        ],
+        "wide_core_candidates": [
+          "ru"
+        ],
+        "passed": true
+      },
+      {
+        "word": "небесно-голубому",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "нордах",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "затекли",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "спохватитесь",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "кольчуги",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "скверна",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "шапочками",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "питого",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "зашушукайтесь",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "камуфляже",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "уколупнули",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "полонянка",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "тумаком",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "контрпропагандою",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "маликам",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "червоточиною",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "тугрику",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "дискомфортах",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "конденсорами",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "секуляризуй",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "поморочило",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "блефуй",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "скрипни",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "плющена",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "термосифонною",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "обагритесь",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "лонам",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "черпав",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "неоген",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "перешитому",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "фталазолом",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      },
+      {
+        "word": "латникам",
+        "expected": [
+          "ru",
+          "uk"
+        ],
+        "manager": [
+          "ru",
+          "uk"
+        ],
+        "reader": [
+          "ru",
+          "uk"
+        ],
+        "speech_candidates": [
+          "ru",
+          "uk"
+        ],
+        "wide_core_candidates": [
+          "ru",
+          "uk"
+        ],
+        "passed": true
+      }
+    ],
+    "archive_modified": false,
+    "dataset_modified": false,
+    "production_word_route_verified": false,
+    "physical_audio_verified": false,
+    "lookup_timings": {
+      "reader_100": {
+        "count": 100,
+        "median_ms": 1.5131000000000001,
+        "p95_ms": 1.8051,
+        "max_ms": 1.9324,
+        "total_ms": 154.025,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      },
+      "manager_100": {
+        "count": 100,
+        "median_ms": 2.1928,
+        "p95_ms": 3.7313,
+        "max_ms": 4.8204,
+        "total_ms": 252.673,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      },
+      "reader_1000": {
+        "count": 1000,
+        "median_ms": 1.56575,
+        "p95_ms": 2.8559,
+        "max_ms": 5.3504,
+        "total_ms": 1783.3772,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      },
+      "manager_1000": {
+        "count": 1000,
+        "median_ms": 2.1369,
+        "p95_ms": 3.5673,
+        "max_ms": 4.979,
+        "total_ms": 2310.1588,
+        "workload": "mixed96 source-selected forms, repeated; warm source resource, no storage-cache eviction"
+      }
+    },
+    "statistics_after": {
+      "closed": false,
+      "codes": [
+        "uk",
+        "ru"
+      ],
+      "word_count": 6642550,
+      "blocks": 25948,
+      "cached_blocks": 32,
+      "cache_bytes_charged": 1823488,
+      "cache_byte_limit": 4194304,
+      "cache_block_limit": 32,
+      "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+      "max_raw_block_bytes": 65536,
+      "max_block_words": 256,
+      "membership_mask_bytes": 1,
+      "language_table_limit": 1024,
+      "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+    }
+  },
+  "actual_plain_text": {
+    "scope": "Real owned plain UTF8 file to genuine native Edit TextInfo and public NVDA speech APIs",
+    "no_manual_language_commands": true,
+    "driver_speak_not_called_by_probe": true,
+    "read_command": "Genuine POSITION_ALL speakTextInfo for100 words; unchanged global current-line ScriptHandler for smaller cases",
+    "source_fixture": "actual authenticated96 finite primary dictionary samples;29UK-only29RU-only38shared",
+    "actual_reading_speed_setting": 80,
+    "physical_audio_verified": false,
+    "recording_pcm_sink_test_double": true,
+    "cases": [
+      {
+        "case": "auto_unmarked_100",
+        "input_file": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\plain-read-0.txt",
+        "input_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе",
+        "configured_mode": "auto",
+        "enabled_languages": [
+          "en",
+          "ru",
+          "uk"
+        ],
+        "default_language": "uk",
+        "metadata_case": false,
+        "source_words": [
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "доктрину",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "аминбаевны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "курятинами",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "витівкових",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "прорубишься",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "непальцем",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "мегакрутими",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "ковыляниями",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "списались",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "утеплювавсь",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "припоминаньи",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "переволочило",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "рушникосушки",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "оплёвывающуюся",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "антитеатру",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "яснесенькою",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "ильменским",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "небесно-голубому",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "вигибатимеш",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "донецки",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "нордах",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "висловлень",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "пожалевши",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "затекли",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "малопривабливій",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "простерёгшего",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "спохватитесь",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "детектуй",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "воспринимала",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "кольчуги",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "погамував",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "зарумянивших",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "скверна",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "зализуватимусь",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "лилиянн",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "шапочками",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "проголених",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "картофелесортировальных",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "питого",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "попідливано",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "низлагаемы",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "зашушукайтесь",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "найпискливіш",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "питиримах",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "камуфляже",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "розплішіться",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "безмельницыны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "уколупнули",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "оберстдорфові",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "иносказательно",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "полонянка",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "без'ядерності",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "петрунелями",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "тумаком",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "озимій",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "синевато-сером",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "контрпропагандою",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "променітимем",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "посахаренную",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "маликам",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "дідуню",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "истолковываемое",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "червоточиною",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "плагіоклазі",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "тяготимому",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "тугрику",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "бережечками",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "отсасываемых",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "дискомфортах",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "драйвували",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "саживаешь",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "конденсорами",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "кріогідратів",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "поточенной",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "секуляризуй",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "діагенезом",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "зашлифовывала",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "поморочило",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "одкочено",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "кудесниками",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "блефуй",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "незім'яте",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "взаимопроникающего",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "скрипни",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "плющена",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "термосифонною",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "обагритесь",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "лонам",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "черпав",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "неоген",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "перешитому",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "фталазолом",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "латникам",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "доктрину",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "ru"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          }
+        ],
+        "high_level_speech_inputs": [
+          {
+            "speech_sequence": [
+              {
+                "command": "LangChangeCommand",
+                "lang": null
+              },
+              {
+                "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе"
+              }
+            ],
+            "original_speech_sequence": [
+              {
+                "command": "LangChangeCommand",
+                "lang": null
+              },
+              {
+                "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе"
+              }
+            ]
+          }
+        ],
+        "queued_sequences": [
+          [
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе  "
+            }
+          ]
+        ],
+        "driver_sequences": [
+          [
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе  "
+            },
+            {
+              "command": "IndexCommand",
+              "index": 5
+            }
+          ]
+        ],
+        "planned_routes": [
+          {
+            "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          },
+          {
+            "text": "галапагосе",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          }
+        ],
+        "stage": "plain-auto_unmarked_100",
+        "focus": {
+          "type": "Dynamic_IAccessibleEditWindowNVDAObject",
+          "module": "NVDAObjects",
+          "window_class": "Edit",
+          "hwnd_owned_verified": true
+        },
+        "current_line_textinfo_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена тер",
+        "current_line_textinfo_length": 1024,
+        "complete_range_api": "POSITION_ALL",
+        "read_api": "speech.speakTextInfo(real POSITION_ALL TextInfo)",
+        "textinfo_type": "EditTextInfo",
+        "textinfo_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе",
+        "textinfo_fields": [
+          {
+            "field_command": "formatChange",
+            "language": null
+          },
+          {
+            "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе"
+          }
+        ],
+        "textinfo_full_input_match": true,
+        "observed_language_fields": [],
+        "read_started_ns": 207154343600,
+        "driver_request_ns": 207168223200,
+        "pcm_after_read_bytes": 2573516,
+        "first_pcm_after_read_ns": 207517648600,
+        "nonzero_after_read_bytes": 2374354,
+        "finished_ns": 224010868200,
+        "driver_error": null,
+        "pcm_metrics": {
+          "pcm_bytes": 2605784,
+          "nonzero_bytes": 2402771,
+          "play_calls": 5482,
+          "first_nonzero_feed_ns": 206900665000,
+          "first_play_return_ns": 206900723200
+        },
+        "functional_passed": true,
+        "route_audit": {
+          "input_word_count": 100,
+          "input_lexical_piece_count": 102,
+          "observed_word_count": 102,
+          "observed_lexical_piece_count": 102,
+          "input_words_preserved_in_order": true,
+          "lexical_content_preserved_in_order": true,
+          "raw_nonwhitespace_text_preserved": true,
+          "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+          "hyphenated_source_forms": [
+            "небесно-голубому",
+            "синевато-сером"
+          ],
+          "routing_passed": false,
+          "mismatches": [
+            {
+              "input_index": 1,
+              "piece_index": 0,
+              "source_word": "присмирённая",
+              "lexical_piece": "присмирённая",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 2,
+              "piece_index": 0,
+              "source_word": "доктрину",
+              "lexical_piece": "доктрину",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 4,
+              "piece_index": 0,
+              "source_word": "аминбаевны",
+              "lexical_piece": "аминбаевны",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 5,
+              "piece_index": 0,
+              "source_word": "курятинами",
+              "lexical_piece": "курятинами",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 7,
+              "piece_index": 0,
+              "source_word": "прорубишься",
+              "lexical_piece": "прорубишься",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 8,
+              "piece_index": 0,
+              "source_word": "непальцем",
+              "lexical_piece": "непальцем",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 10,
+              "piece_index": 0,
+              "source_word": "ковыляниями",
+              "lexical_piece": "ковыляниями",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 11,
+              "piece_index": 0,
+              "source_word": "списались",
+              "lexical_piece": "списались",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 13,
+              "piece_index": 0,
+              "source_word": "припоминаньи",
+              "lexical_piece": "припоминаньи",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 14,
+              "piece_index": 0,
+              "source_word": "переволочило",
+              "lexical_piece": "переволочило",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 16,
+              "piece_index": 0,
+              "source_word": "оплёвывающуюся",
+              "lexical_piece": "оплёвывающуюся",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 17,
+              "piece_index": 0,
+              "source_word": "антитеатру",
+              "lexical_piece": "антитеатру",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 19,
+              "piece_index": 0,
+              "source_word": "ильменским",
+              "lexical_piece": "ильменским",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 20,
+              "piece_index": 0,
+              "source_word": "небесно-голубому",
+              "lexical_piece": "небесно",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 20,
+              "piece_index": 1,
+              "source_word": "небесно-голубому",
+              "lexical_piece": "голубому",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 22,
+              "piece_index": 0,
+              "source_word": "донецки",
+              "lexical_piece": "донецки",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 23,
+              "piece_index": 0,
+              "source_word": "нордах",
+              "lexical_piece": "нордах",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 25,
+              "piece_index": 0,
+              "source_word": "пожалевши",
+              "lexical_piece": "пожалевши",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 26,
+              "piece_index": 0,
+              "source_word": "затекли",
+              "lexical_piece": "затекли",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 28,
+              "piece_index": 0,
+              "source_word": "простерёгшего",
+              "lexical_piece": "простерёгшего",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 29,
+              "piece_index": 0,
+              "source_word": "спохватитесь",
+              "lexical_piece": "спохватитесь",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 31,
+              "piece_index": 0,
+              "source_word": "воспринимала",
+              "lexical_piece": "воспринимала",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 32,
+              "piece_index": 0,
+              "source_word": "кольчуги",
+              "lexical_piece": "кольчуги",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 34,
+              "piece_index": 0,
+              "source_word": "зарумянивших",
+              "lexical_piece": "зарумянивших",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 35,
+              "piece_index": 0,
+              "source_word": "скверна",
+              "lexical_piece": "скверна",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 37,
+              "piece_index": 0,
+              "source_word": "лилиянн",
+              "lexical_piece": "лилиянн",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 38,
+              "piece_index": 0,
+              "source_word": "шапочками",
+              "lexical_piece": "шапочками",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 40,
+              "piece_index": 0,
+              "source_word": "картофелесортировальных",
+              "lexical_piece": "картофелесортировальных",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 41,
+              "piece_index": 0,
+              "source_word": "питого",
+              "lexical_piece": "питого",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 43,
+              "piece_index": 0,
+              "source_word": "низлагаемы",
+              "lexical_piece": "низлагаемы",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 44,
+              "piece_index": 0,
+              "source_word": "зашушукайтесь",
+              "lexical_piece": "зашушукайтесь",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 46,
+              "piece_index": 0,
+              "source_word": "питиримах",
+              "lexical_piece": "питиримах",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 47,
+              "piece_index": 0,
+              "source_word": "камуфляже",
+              "lexical_piece": "камуфляже",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 49,
+              "piece_index": 0,
+              "source_word": "безмельницыны",
+              "lexical_piece": "безмельницыны",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 50,
+              "piece_index": 0,
+              "source_word": "уколупнули",
+              "lexical_piece": "уколупнули",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 52,
+              "piece_index": 0,
+              "source_word": "иносказательно",
+              "lexical_piece": "иносказательно",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 53,
+              "piece_index": 0,
+              "source_word": "полонянка",
+              "lexical_piece": "полонянка",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 55,
+              "piece_index": 0,
+              "source_word": "петрунелями",
+              "lexical_piece": "петрунелями",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 56,
+              "piece_index": 0,
+              "source_word": "тумаком",
+              "lexical_piece": "тумаком",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 58,
+              "piece_index": 0,
+              "source_word": "синевато-сером",
+              "lexical_piece": "синевато",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 58,
+              "piece_index": 1,
+              "source_word": "синевато-сером",
+              "lexical_piece": "сером",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 59,
+              "piece_index": 0,
+              "source_word": "контрпропагандою",
+              "lexical_piece": "контрпропагандою",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 61,
+              "piece_index": 0,
+              "source_word": "посахаренную",
+              "lexical_piece": "посахаренную",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 62,
+              "piece_index": 0,
+              "source_word": "маликам",
+              "lexical_piece": "маликам",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 64,
+              "piece_index": 0,
+              "source_word": "истолковываемое",
+              "lexical_piece": "истолковываемое",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 65,
+              "piece_index": 0,
+              "source_word": "червоточиною",
+              "lexical_piece": "червоточиною",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 67,
+              "piece_index": 0,
+              "source_word": "тяготимому",
+              "lexical_piece": "тяготимому",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 68,
+              "piece_index": 0,
+              "source_word": "тугрику",
+              "lexical_piece": "тугрику",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 70,
+              "piece_index": 0,
+              "source_word": "отсасываемых",
+              "lexical_piece": "отсасываемых",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 71,
+              "piece_index": 0,
+              "source_word": "дискомфортах",
+              "lexical_piece": "дискомфортах",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 73,
+              "piece_index": 0,
+              "source_word": "саживаешь",
+              "lexical_piece": "саживаешь",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 74,
+              "piece_index": 0,
+              "source_word": "конденсорами",
+              "lexical_piece": "конденсорами",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 76,
+              "piece_index": 0,
+              "source_word": "поточенной",
+              "lexical_piece": "поточенной",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 77,
+              "piece_index": 0,
+              "source_word": "секуляризуй",
+              "lexical_piece": "секуляризуй",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 79,
+              "piece_index": 0,
+              "source_word": "зашлифовывала",
+              "lexical_piece": "зашлифовывала",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 80,
+              "piece_index": 0,
+              "source_word": "поморочило",
+              "lexical_piece": "поморочило",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 82,
+              "piece_index": 0,
+              "source_word": "кудесниками",
+              "lexical_piece": "кудесниками",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 83,
+              "piece_index": 0,
+              "source_word": "блефуй",
+              "lexical_piece": "блефуй",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 85,
+              "piece_index": 0,
+              "source_word": "взаимопроникающего",
+              "lexical_piece": "взаимопроникающего",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 86,
+              "piece_index": 0,
+              "source_word": "скрипни",
+              "lexical_piece": "скрипни",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 87,
+              "piece_index": 0,
+              "source_word": "плющена",
+              "lexical_piece": "плющена",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 88,
+              "piece_index": 0,
+              "source_word": "термосифонною",
+              "lexical_piece": "термосифонною",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 89,
+              "piece_index": 0,
+              "source_word": "обагритесь",
+              "lexical_piece": "обагритесь",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 90,
+              "piece_index": 0,
+              "source_word": "лонам",
+              "lexical_piece": "лонам",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 91,
+              "piece_index": 0,
+              "source_word": "черпав",
+              "lexical_piece": "черпав",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 92,
+              "piece_index": 0,
+              "source_word": "неоген",
+              "lexical_piece": "неоген",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 93,
+              "piece_index": 0,
+              "source_word": "перешитому",
+              "lexical_piece": "перешитому",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 94,
+              "piece_index": 0,
+              "source_word": "фталазолом",
+              "lexical_piece": "фталазолом",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 95,
+              "piece_index": 0,
+              "source_word": "латникам",
+              "lexical_piece": "латникам",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 97,
+              "piece_index": 0,
+              "source_word": "присмирённая",
+              "lexical_piece": "присмирённая",
+              "memberships": [
+                "ru"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            },
+            {
+              "input_index": 98,
+              "piece_index": 0,
+              "source_word": "доктрину",
+              "lexical_piece": "доктрину",
+              "memberships": [
+                "ru",
+                "uk"
+              ],
+              "expected_language": "ru",
+              "actual_language": "uk",
+              "authored_locale": null
+            }
+          ],
+          "observed_word_routes": [
+            {
+              "word": "ольсену",
+              "language": "uk"
+            },
+            {
+              "word": "присмирённая",
+              "language": "uk"
+            },
+            {
+              "word": "доктрину",
+              "language": "uk"
+            },
+            {
+              "word": "галапагосе",
+              "language": "uk"
+            },
+            {
+              "word": "аминбаевны",
+              "language": "uk"
+            },
+            {
+              "word": "курятинами",
+              "language": "uk"
+            },
+            {
+              "word": "витівкових",
+              "language": "uk"
+            },
+            {
+              "word": "прорубишься",
+              "language": "uk"
+            },
+            {
+              "word": "непальцем",
+              "language": "uk"
+            },
+            {
+              "word": "мегакрутими",
+              "language": "uk"
+            },
+            {
+              "word": "ковыляниями",
+              "language": "uk"
+            },
+            {
+              "word": "списались",
+              "language": "uk"
+            },
+            {
+              "word": "утеплювавсь",
+              "language": "uk"
+            },
+            {
+              "word": "припоминаньи",
+              "language": "uk"
+            },
+            {
+              "word": "переволочило",
+              "language": "uk"
+            },
+            {
+              "word": "рушникосушки",
+              "language": "uk"
+            },
+            {
+              "word": "оплёвывающуюся",
+              "language": "uk"
+            },
+            {
+              "word": "антитеатру",
+              "language": "uk"
+            },
+            {
+              "word": "яснесенькою",
+              "language": "uk"
+            },
+            {
+              "word": "ильменским",
+              "language": "uk"
+            },
+            {
+              "word": "небесно",
+              "language": "uk"
+            },
+            {
+              "word": "голубому",
+              "language": "uk"
+            },
+            {
+              "word": "вигибатимеш",
+              "language": "uk"
+            },
+            {
+              "word": "донецки",
+              "language": "uk"
+            },
+            {
+              "word": "нордах",
+              "language": "uk"
+            },
+            {
+              "word": "висловлень",
+              "language": "uk"
+            },
+            {
+              "word": "пожалевши",
+              "language": "uk"
+            },
+            {
+              "word": "затекли",
+              "language": "uk"
+            },
+            {
+              "word": "малопривабливій",
+              "language": "uk"
+            },
+            {
+              "word": "простерёгшего",
+              "language": "uk"
+            },
+            {
+              "word": "спохватитесь",
+              "language": "uk"
+            },
+            {
+              "word": "детектуй",
+              "language": "uk"
+            },
+            {
+              "word": "воспринимала",
+              "language": "uk"
+            },
+            {
+              "word": "кольчуги",
+              "language": "uk"
+            },
+            {
+              "word": "погамував",
+              "language": "uk"
+            },
+            {
+              "word": "зарумянивших",
+              "language": "uk"
+            },
+            {
+              "word": "скверна",
+              "language": "uk"
+            },
+            {
+              "word": "зализуватимусь",
+              "language": "uk"
+            },
+            {
+              "word": "лилиянн",
+              "language": "uk"
+            },
+            {
+              "word": "шапочками",
+              "language": "uk"
+            },
+            {
+              "word": "проголених",
+              "language": "uk"
+            },
+            {
+              "word": "картофелесортировальных",
+              "language": "uk"
+            },
+            {
+              "word": "питого",
+              "language": "uk"
+            },
+            {
+              "word": "попідливано",
+              "language": "uk"
+            },
+            {
+              "word": "низлагаемы",
+              "language": "uk"
+            },
+            {
+              "word": "зашушукайтесь",
+              "language": "uk"
+            },
+            {
+              "word": "найпискливіш",
+              "language": "uk"
+            },
+            {
+              "word": "питиримах",
+              "language": "uk"
+            },
+            {
+              "word": "камуфляже",
+              "language": "uk"
+            },
+            {
+              "word": "розплішіться",
+              "language": "uk"
+            },
+            {
+              "word": "безмельницыны",
+              "language": "uk"
+            },
+            {
+              "word": "уколупнули",
+              "language": "uk"
+            },
+            {
+              "word": "оберстдорфові",
+              "language": "uk"
+            },
+            {
+              "word": "иносказательно",
+              "language": "uk"
+            },
+            {
+              "word": "полонянка",
+              "language": "uk"
+            },
+            {
+              "word": "без'ядерності",
+              "language": "uk"
+            },
+            {
+              "word": "петрунелями",
+              "language": "uk"
+            },
+            {
+              "word": "тумаком",
+              "language": "uk"
+            },
+            {
+              "word": "озимій",
+              "language": "uk"
+            },
+            {
+              "word": "синевато",
+              "language": "uk"
+            },
+            {
+              "word": "сером",
+              "language": "uk"
+            },
+            {
+              "word": "контрпропагандою",
+              "language": "uk"
+            },
+            {
+              "word": "променітимем",
+              "language": "uk"
+            },
+            {
+              "word": "посахаренную",
+              "language": "uk"
+            },
+            {
+              "word": "маликам",
+              "language": "uk"
+            },
+            {
+              "word": "дідуню",
+              "language": "uk"
+            },
+            {
+              "word": "истолковываемое",
+              "language": "uk"
+            },
+            {
+              "word": "червоточиною",
+              "language": "uk"
+            },
+            {
+              "word": "плагіоклазі",
+              "language": "uk"
+            },
+            {
+              "word": "тяготимому",
+              "language": "uk"
+            },
+            {
+              "word": "тугрику",
+              "language": "uk"
+            },
+            {
+              "word": "бережечками",
+              "language": "uk"
+            },
+            {
+              "word": "отсасываемых",
+              "language": "uk"
+            },
+            {
+              "word": "дискомфортах",
+              "language": "uk"
+            },
+            {
+              "word": "драйвували",
+              "language": "uk"
+            },
+            {
+              "word": "саживаешь",
+              "language": "uk"
+            },
+            {
+              "word": "конденсорами",
+              "language": "uk"
+            },
+            {
+              "word": "кріогідратів",
+              "language": "uk"
+            },
+            {
+              "word": "поточенной",
+              "language": "uk"
+            },
+            {
+              "word": "секуляризуй",
+              "language": "uk"
+            },
+            {
+              "word": "діагенезом",
+              "language": "uk"
+            },
+            {
+              "word": "зашлифовывала",
+              "language": "uk"
+            },
+            {
+              "word": "поморочило",
+              "language": "uk"
+            },
+            {
+              "word": "одкочено",
+              "language": "uk"
+            },
+            {
+              "word": "кудесниками",
+              "language": "uk"
+            },
+            {
+              "word": "блефуй",
+              "language": "uk"
+            },
+            {
+              "word": "незім'яте",
+              "language": "uk"
+            },
+            {
+              "word": "взаимопроникающего",
+              "language": "uk"
+            },
+            {
+              "word": "скрипни",
+              "language": "uk"
+            },
+            {
+              "word": "плющена",
+              "language": "uk"
+            },
+            {
+              "word": "термосифонною",
+              "language": "uk"
+            },
+            {
+              "word": "обагритесь",
+              "language": "uk"
+            },
+            {
+              "word": "лонам",
+              "language": "uk"
+            },
+            {
+              "word": "черпав",
+              "language": "uk"
+            },
+            {
+              "word": "неоген",
+              "language": "uk"
+            },
+            {
+              "word": "перешитому",
+              "language": "uk"
+            },
+            {
+              "word": "фталазолом",
+              "language": "uk"
+            },
+            {
+              "word": "латникам",
+              "language": "uk"
+            },
+            {
+              "word": "ольсену",
+              "language": "uk"
+            },
+            {
+              "word": "присмирённая",
+              "language": "uk"
+            },
+            {
+              "word": "доктрину",
+              "language": "uk"
+            },
+            {
+              "word": "галапагосе",
+              "language": "uk"
+            }
+          ],
+          "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+        },
+        "nvda_driver_input_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньи переволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливій простерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питого попідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерності петрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрику бережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесниками блефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктрину галапагосе  ",
+        "planned_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались утеплювавсь припоминаньипереволочило рушникосушки оплёвывающуюся антитеатру яснесенькою ильменским небесно-голубому вигибатимеш донецки нордах висловлень пожалевши затекли малопривабливійпростерёгшего спохватитесь детектуй воспринимала кольчуги погамував зарумянивших скверна зализуватимусь лилиянн шапочками проголених картофелесортировальных питогопопідливано низлагаемы зашушукайтесь найпискливіш питиримах камуфляже розплішіться безмельницыны уколупнули оберстдорфові иносказательно полонянка без'ядерностіпетрунелями тумаком озимій синевато-сером контрпропагандою променітимем посахаренную маликам дідуню истолковываемое червоточиною плагіоклазі тяготимому тугрикубережечками отсасываемых дискомфортах драйвували саживаешь конденсорами кріогідратів поточенной секуляризуй діагенезом зашлифовывала поморочило одкочено кудесникамиблефуй незім'яте взаимопроникающего скрипни плющена термосифонною обагритесь лонам черпав неоген перешитому фталазолом латникам ольсену присмирённая доктринугалапагосе",
+        "driver_to_planner_nonwhitespace_text_preserved": true,
+        "original_high_level_locale_commands": [
+          null
+        ],
+        "nvda_emitted_locale_commands": [
+          "uk"
+        ],
+        "plain_file_had_no_authored_language_ranges": true,
+        "default_locale_pinning_observation": {
+          "source_contains_uk_and_ru_exclusive_words": true,
+          "textinfo_language_fields": [],
+          "effective_route_languages": [
+            "uk"
+          ],
+          "unmarked_mixed_file_route_failed": true,
+          "causality_not_claimed_from_observation_alone": true
+        }
+      },
+      {
+        "case": "forced_uk_unmarked_12",
+        "input_file": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\plain-read-1.txt",
+        "input_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "configured_mode": "forced",
+        "enabled_languages": [
+          "en",
+          "ru",
+          "uk"
+        ],
+        "default_language": "uk",
+        "metadata_case": false,
+        "source_words": [
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "доктрину",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "аминбаевны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "курятинами",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "витівкових",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "прорубишься",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "непальцем",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "мегакрутими",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "ковыляниями",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "списались",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          }
+        ],
+        "high_level_speech_inputs": [
+          {
+            "speech_sequence": [
+              {
+                "command": "LangChangeCommand",
+                "lang": null
+              },
+              {
+                "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались"
+              }
+            ],
+            "original_speech_sequence": [
+              {
+                "command": "LangChangeCommand",
+                "lang": null
+              },
+              {
+                "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались"
+              }
+            ]
+          }
+        ],
+        "queued_sequences": [
+          [
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались  "
+            }
+          ]
+        ],
+        "driver_sequences": [
+          [
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались  "
+            },
+            {
+              "command": "IndexCommand",
+              "index": 6
+            }
+          ]
+        ],
+        "planned_routes": [
+          {
+            "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          }
+        ],
+        "stage": "plain-forced_uk_unmarked_12",
+        "focus": {
+          "type": "Dynamic_IAccessibleEditWindowNVDAObject",
+          "module": "NVDAObjects",
+          "window_class": "Edit",
+          "hwnd_owned_verified": true
+        },
+        "current_line_textinfo_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "current_line_textinfo_length": 129,
+        "complete_range_api": "POSITION_CARET expanded UNIT_LINE",
+        "read_api": "globalCommands.script_reportCurrentLine via ScriptHandler",
+        "textinfo_type": "EditTextInfo",
+        "textinfo_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "textinfo_fields": [
+          {
+            "field_command": "formatChange",
+            "language": null
+          },
+          {
+            "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались"
+          }
+        ],
+        "textinfo_full_input_match": true,
+        "observed_language_fields": [],
+        "read_started_ns": 225023595700,
+        "driver_request_ns": 225025956000,
+        "pcm_after_read_bytes": 295160,
+        "first_pcm_after_read_ns": 225333835400,
+        "nonzero_after_read_bytes": 274162,
+        "finished_ns": 226990206700,
+        "driver_error": null,
+        "pcm_metrics": {
+          "pcm_bytes": 295158,
+          "nonzero_bytes": 274162,
+          "play_calls": 619,
+          "first_nonzero_feed_ns": 225333840100,
+          "first_play_return_ns": 225333913600
+        },
+        "functional_passed": true,
+        "route_audit": {
+          "input_word_count": 12,
+          "input_lexical_piece_count": 12,
+          "observed_word_count": 12,
+          "observed_lexical_piece_count": 12,
+          "input_words_preserved_in_order": true,
+          "lexical_content_preserved_in_order": true,
+          "raw_nonwhitespace_text_preserved": true,
+          "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+          "hyphenated_source_forms": [],
+          "routing_passed": true,
+          "mismatches": [],
+          "observed_word_routes": [
+            {
+              "word": "ольсену",
+              "language": "uk"
+            },
+            {
+              "word": "присмирённая",
+              "language": "uk"
+            },
+            {
+              "word": "доктрину",
+              "language": "uk"
+            },
+            {
+              "word": "галапагосе",
+              "language": "uk"
+            },
+            {
+              "word": "аминбаевны",
+              "language": "uk"
+            },
+            {
+              "word": "курятинами",
+              "language": "uk"
+            },
+            {
+              "word": "витівкових",
+              "language": "uk"
+            },
+            {
+              "word": "прорубишься",
+              "language": "uk"
+            },
+            {
+              "word": "непальцем",
+              "language": "uk"
+            },
+            {
+              "word": "мегакрутими",
+              "language": "uk"
+            },
+            {
+              "word": "ковыляниями",
+              "language": "uk"
+            },
+            {
+              "word": "списались",
+              "language": "uk"
+            }
+          ],
+          "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+        },
+        "nvda_driver_input_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались  ",
+        "planned_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "driver_to_planner_nonwhitespace_text_preserved": true,
+        "original_high_level_locale_commands": [
+          null
+        ],
+        "nvda_emitted_locale_commands": [
+          "uk"
+        ],
+        "plain_file_had_no_authored_language_ranges": true,
+        "default_locale_pinning_observation": {
+          "source_contains_uk_and_ru_exclusive_words": true,
+          "textinfo_language_fields": [],
+          "effective_route_languages": [
+            "uk"
+          ],
+          "unmarked_mixed_file_route_failed": false,
+          "causality_not_claimed_from_observation_alone": true
+        }
+      },
+      {
+        "case": "disabled_ru_unmarked_12",
+        "input_file": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\plain-read-2.txt",
+        "input_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "configured_mode": "auto",
+        "enabled_languages": [
+          "en",
+          "uk"
+        ],
+        "default_language": "uk",
+        "metadata_case": false,
+        "source_words": [
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "доктрину",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "аминбаевны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "курятинами",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "витівкових",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "прорубишься",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "непальцем",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "мегакрутими",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "ковыляниями",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          },
+          {
+            "word": "списались",
+            "memberships": [
+              "ru",
+              "uk"
+            ],
+            "authored_locale": null,
+            "expected_language": "uk"
+          }
+        ],
+        "high_level_speech_inputs": [
+          {
+            "speech_sequence": [
+              {
+                "command": "LangChangeCommand",
+                "lang": null
+              },
+              {
+                "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались"
+              }
+            ],
+            "original_speech_sequence": [
+              {
+                "command": "LangChangeCommand",
+                "lang": null
+              },
+              {
+                "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались"
+              }
+            ]
+          }
+        ],
+        "queued_sequences": [
+          [
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались  "
+            }
+          ]
+        ],
+        "driver_sequences": [
+          [
+            {
+              "command": "LangChangeCommand",
+              "lang": "uk"
+            },
+            {
+              "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались  "
+            },
+            {
+              "command": "IndexCommand",
+              "index": 7
+            }
+          ]
+        ],
+        "planned_routes": [
+          {
+            "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+            "language": "uk",
+            "profile": "adam",
+            "character": false
+          }
+        ],
+        "stage": "plain-disabled_ru_unmarked_12",
+        "focus": {
+          "type": "Dynamic_IAccessibleEditWindowNVDAObject",
+          "module": "NVDAObjects",
+          "window_class": "Edit",
+          "hwnd_owned_verified": true
+        },
+        "current_line_textinfo_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "current_line_textinfo_length": 129,
+        "complete_range_api": "POSITION_CARET expanded UNIT_LINE",
+        "read_api": "globalCommands.script_reportCurrentLine via ScriptHandler",
+        "textinfo_type": "EditTextInfo",
+        "textinfo_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "textinfo_fields": [
+          {
+            "field_command": "formatChange",
+            "language": null
+          },
+          {
+            "text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались"
+          }
+        ],
+        "textinfo_full_input_match": true,
+        "observed_language_fields": [],
+        "read_started_ns": 228006223500,
+        "driver_request_ns": 228008475400,
+        "pcm_after_read_bytes": 295160,
+        "first_pcm_after_read_ns": 228010873700,
+        "nonzero_after_read_bytes": 274162,
+        "finished_ns": 228099468600,
+        "driver_error": null,
+        "pcm_metrics": {
+          "pcm_bytes": 295158,
+          "nonzero_bytes": 274162,
+          "play_calls": 615,
+          "first_nonzero_feed_ns": 228010876200,
+          "first_play_return_ns": 228010946300
+        },
+        "functional_passed": true,
+        "route_audit": {
+          "input_word_count": 12,
+          "input_lexical_piece_count": 12,
+          "observed_word_count": 12,
+          "observed_lexical_piece_count": 12,
+          "input_words_preserved_in_order": true,
+          "lexical_content_preserved_in_order": true,
+          "raw_nonwhitespace_text_preserved": true,
+          "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+          "hyphenated_source_forms": [],
+          "routing_passed": true,
+          "mismatches": [],
+          "observed_word_routes": [
+            {
+              "word": "ольсену",
+              "language": "uk"
+            },
+            {
+              "word": "присмирённая",
+              "language": "uk"
+            },
+            {
+              "word": "доктрину",
+              "language": "uk"
+            },
+            {
+              "word": "галапагосе",
+              "language": "uk"
+            },
+            {
+              "word": "аминбаевны",
+              "language": "uk"
+            },
+            {
+              "word": "курятинами",
+              "language": "uk"
+            },
+            {
+              "word": "витівкових",
+              "language": "uk"
+            },
+            {
+              "word": "прорубишься",
+              "language": "uk"
+            },
+            {
+              "word": "непальцем",
+              "language": "uk"
+            },
+            {
+              "word": "мегакрутими",
+              "language": "uk"
+            },
+            {
+              "word": "ковыляниями",
+              "language": "uk"
+            },
+            {
+              "word": "списались",
+              "language": "uk"
+            }
+          ],
+          "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+        },
+        "nvda_driver_input_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались  ",
+        "planned_text": "ольсену присмирённая доктрину галапагосе аминбаевны курятинами витівкових прорубишься непальцем мегакрутими ковыляниями списались",
+        "driver_to_planner_nonwhitespace_text_preserved": true,
+        "original_high_level_locale_commands": [
+          null
+        ],
+        "nvda_emitted_locale_commands": [
+          "uk"
+        ],
+        "plain_file_had_no_authored_language_ranges": true,
+        "default_locale_pinning_observation": {
+          "source_contains_uk_and_ru_exclusive_words": true,
+          "textinfo_language_fields": [],
+          "effective_route_languages": [
+            "uk"
+          ],
+          "unmarked_mixed_file_route_failed": false,
+          "causality_not_claimed_from_observation_alone": true
+        }
+      },
+      {
+        "case": "native_rich_metadata_6",
+        "input_file": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\plain-read-3.txt",
+        "input_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься",
+        "configured_mode": "auto",
+        "enabled_languages": [
+          "en",
+          "ru",
+          "uk"
+        ],
+        "default_language": "uk",
+        "metadata_case": true,
+        "source_words": [
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "ru"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "ru"
+          },
+          {
+            "word": "аминбаевны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          },
+          {
+            "word": "витівкових",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "ru"
+          },
+          {
+            "word": "прорубишься",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          }
+        ],
+        "high_level_speech_inputs": [],
+        "queued_sequences": [],
+        "driver_sequences": [],
+        "planned_routes": [],
+        "stage": "plain-native_rich_metadata_6",
+        "focus": {
+          "type": "Dynamic_IAccessibleRichEdit50WindowNVDAObject",
+          "module": "NVDAObjects",
+          "window_class": "RICHEDIT50W",
+          "hwnd_owned_verified": true
+        },
+        "metadata_authored_via": "Real native RichEdit ITextFont.languageID; no TextInfo/speech monkeypatch",
+        "native_metadata_ranges": [
+          {
+            "word": "ольсену",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "присмирённая",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "аминбаевны",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          },
+          {
+            "word": "витівкових",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "прорубишься",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          }
+        ],
+        "current_line_textinfo_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r",
+        "current_line_textinfo_length": 66,
+        "complete_range_api": "POSITION_CARET expanded UNIT_LINE",
+        "read_api": "globalCommands.script_reportCurrentLine via ScriptHandler",
+        "textinfo_type": "ITextDocumentTextInfo",
+        "textinfo_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r",
+        "textinfo_fields": [
+          {
+            "field_command": "formatChange",
+            "language": "ru_RU"
+          },
+          {
+            "text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r"
+          }
+        ],
+        "textinfo_full_input_match": true,
+        "observed_language_fields": [
+          "ru_RU"
+        ],
+        "functional_passed": false,
+        "blocked_reason": "Native authored LCIDs did not surface through genuine TextInfo"
+      },
+      {
+        "case": "forced_uk_native_metadata_6",
+        "input_file": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\plain-read-4.txt",
+        "input_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься",
+        "configured_mode": "forced",
+        "enabled_languages": [
+          "en",
+          "ru",
+          "uk"
+        ],
+        "default_language": "uk",
+        "metadata_case": true,
+        "source_words": [
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "uk"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "uk"
+          },
+          {
+            "word": "аминбаевны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          },
+          {
+            "word": "витівкових",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "uk"
+          },
+          {
+            "word": "прорубишься",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          }
+        ],
+        "high_level_speech_inputs": [],
+        "queued_sequences": [],
+        "driver_sequences": [],
+        "planned_routes": [],
+        "stage": "plain-forced_uk_native_metadata_6",
+        "focus": {
+          "type": "Dynamic_IAccessibleRichEdit50WindowNVDAObject",
+          "module": "NVDAObjects",
+          "window_class": "RICHEDIT50W",
+          "hwnd_owned_verified": true
+        },
+        "metadata_authored_via": "Real native RichEdit ITextFont.languageID; no TextInfo/speech monkeypatch",
+        "native_metadata_ranges": [
+          {
+            "word": "ольсену",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "присмирённая",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "аминбаевны",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          },
+          {
+            "word": "витівкових",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "прорубишься",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          }
+        ],
+        "current_line_textinfo_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r",
+        "current_line_textinfo_length": 66,
+        "complete_range_api": "POSITION_CARET expanded UNIT_LINE",
+        "read_api": "globalCommands.script_reportCurrentLine via ScriptHandler",
+        "textinfo_type": "ITextDocumentTextInfo",
+        "textinfo_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r",
+        "textinfo_fields": [
+          {
+            "field_command": "formatChange",
+            "language": "ru_RU"
+          },
+          {
+            "text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r"
+          }
+        ],
+        "textinfo_full_input_match": true,
+        "observed_language_fields": [
+          "ru_RU"
+        ],
+        "functional_passed": false,
+        "blocked_reason": "Native authored LCIDs did not surface through genuine TextInfo"
+      },
+      {
+        "case": "disabled_ru_native_metadata_6",
+        "input_file": "\\\\?\\D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-ryxhxr2o\\plain-read-5.txt",
+        "input_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься",
+        "configured_mode": "auto",
+        "enabled_languages": [
+          "en",
+          "uk"
+        ],
+        "default_language": "uk",
+        "metadata_case": true,
+        "source_words": [
+          {
+            "word": "ольсену",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "uk"
+          },
+          {
+            "word": "присмирённая",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "uk"
+          },
+          {
+            "word": "аминбаевны",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          },
+          {
+            "word": "витівкових",
+            "memberships": [
+              "uk"
+            ],
+            "authored_locale": "ru",
+            "expected_language": "uk"
+          },
+          {
+            "word": "прорубишься",
+            "memberships": [
+              "ru"
+            ],
+            "authored_locale": "uk",
+            "expected_language": "uk"
+          }
+        ],
+        "high_level_speech_inputs": [],
+        "queued_sequences": [],
+        "driver_sequences": [],
+        "planned_routes": [],
+        "stage": "plain-disabled_ru_native_metadata_6",
+        "focus": {
+          "type": "Dynamic_IAccessibleRichEdit50WindowNVDAObject",
+          "module": "NVDAObjects",
+          "window_class": "RICHEDIT50W",
+          "hwnd_owned_verified": true
+        },
+        "metadata_authored_via": "Real native RichEdit ITextFont.languageID; no TextInfo/speech monkeypatch",
+        "native_metadata_ranges": [
+          {
+            "word": "ольсену",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "присмирённая",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          },
+          {
+            "word": "галапагосе",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "аминбаевны",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          },
+          {
+            "word": "витівкових",
+            "native_font_language_id": 1049,
+            "authored_locale": "ru"
+          },
+          {
+            "word": "прорубишься",
+            "native_font_language_id": 1058,
+            "authored_locale": "uk"
+          }
+        ],
+        "current_line_textinfo_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r",
+        "current_line_textinfo_length": 66,
+        "complete_range_api": "POSITION_CARET expanded UNIT_LINE",
+        "read_api": "globalCommands.script_reportCurrentLine via ScriptHandler",
+        "textinfo_type": "ITextDocumentTextInfo",
+        "textinfo_text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r",
+        "textinfo_fields": [
+          {
+            "field_command": "formatChange",
+            "language": "ru_RU"
+          },
+          {
+            "text": "ольсену присмирённая галапагосе аминбаевны витівкових прорубишься\r"
+          }
+        ],
+        "textinfo_full_input_match": true,
+        "observed_language_fields": [
+          "ru_RU"
+        ],
+        "functional_passed": false,
+        "blocked_reason": "Native authored LCIDs did not surface through genuine TextInfo"
+      }
+    ],
+    "high_level_origin_observer_available": true,
+    "cleanup": {
+      "errors": [],
+      "private_config_restored": true
+    }
+  },
+  "pcm_metrics": {
+    "plain-auto_unmarked_100": {
+      "pcm_bytes": 2605784,
+      "nonzero_bytes": 2402771,
+      "play_calls": 5482,
+      "first_nonzero_feed_ns": 206900665000,
+      "first_play_return_ns": 206900723200
+    },
+    "plain-forced_uk_unmarked_12": {
+      "pcm_bytes": 295158,
+      "nonzero_bytes": 274162,
+      "play_calls": 619,
+      "first_nonzero_feed_ns": 225333840100,
+      "first_play_return_ns": 225333913600
+    },
+    "plain-disabled_ru_unmarked_12": {
+      "pcm_bytes": 295158,
+      "nonzero_bytes": 274162,
+      "play_calls": 615,
+      "first_nonzero_feed_ns": 228010876200,
+      "first_play_return_ns": 228010946300
+    },
+    "plain-native_rich_metadata_6": {
+      "pcm_bytes": 45680,
+      "nonzero_bytes": 40849,
+      "play_calls": 97,
+      "first_nonzero_feed_ns": 228663428200,
+      "first_play_return_ns": 228663479000
+    }
+  },
+  "finished_at_ns": 1795359111509514700
+}
