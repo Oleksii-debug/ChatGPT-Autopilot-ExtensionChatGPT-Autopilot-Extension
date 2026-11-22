@@ -1,0 +1,105 @@
+name: Dordiai frozen word classifier posthoc audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  evaluate-frozen-word-candidate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-lid-evaluate]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WORD_LID_INPUT: ${{ github.workspace }}/word-lid-frozen-input
+      WORD_LID_AUDIT: ${{ github.workspace }}/dordiai-voices/word-lid-posthoc-results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test evaluation accounting and original-runtime pin
+        run: |
+          mkdir -p "$WORD_LID_AUDIT"
+          python -m unittest discover -s dordiai-voices/tests -p test_word_classifier_posthoc.py -v 2>&1 | tee "$WORD_LID_AUDIT/unit-tests.log"
+      - name: Attest the exact previously produced training artifact
+        shell: python
+        env:
+          WORD_LID_ARTIFACT_TOKEN: ${{ github.token }}
+        run: |
+          import json,os,pathlib,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):
+                  return None
+          url="https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/14753180217"
+          request=urllib.request.Request(url,headers={
+              "Authorization":"Bearer "+os.environ["WORD_LID_ARTIFACT_TOKEN"],
+              "Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"})
+          with urllib.request.build_opener(NoRedirect()).open(request,timeout=60) as response:
+              raw=response.read(131073)
+          if len(raw)>131072:
+              raise ValueError("Artifact metadata exceeds bound")
+          metadata=json.loads(raw)
+          if (metadata["id"]!=14753180217 or metadata["expired"]
+              or metadata["workflow_run"]["id"]!=45017654339
+              or metadata["workflow_run"]["head_sha"]!="5f5ab6cf53e09f630c7c2726d730a317e07e29b7"
+              or metadata["size_in_bytes"]!=26003312
+              or metadata["digest"]!="sha256:bbd53433999afa53146f9c5939b96f6fb93a1ab39b9745002d5322f4125631de"):
+              raise ValueError("Frozen word training artifact identity differs")
+          output=pathlib.Path(os.environ["WORD_LID_AUDIT"])
+          output.mkdir(parents=True,exist_ok=True)
+          (output/"input-artifact-identity.json").write_text(json.dumps(metadata,indent=2)+"\n",encoding="utf-8")
+          print("WORD_LID_INPUT_ARTIFACT_VERIFIED "+str(metadata["id"]),flush=True)
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: "14753180217"
+          github-token: ${{ github.token }}
+          run-id: "45017654339"
+          path: ${{ env.WORD_LID_INPUT }}
+          merge-multiple: true
+      - name: Evaluate frozen candidate without retraining or installing
+        run: |
+          python dordiai-voices/tools/evaluate_word_classifier_candidate.py \
+            --model "$WORD_LID_INPUT/full/word-lid.candidate.json.gz" \
+            --training-report "$WORD_LID_INPUT/full/evaluation.json" \
+            --corpus "$WORD_LID_INPUT/full/extra-corpus.jsonl.gz" \
+            --expected-corpus-sha256 69372e3b5f5e76e4b5ab2dd568eea14575ea6586ae8f02ccbcdcccb92ac37859 \
+            --input-artifact-id 14753180217 \
+            --output "$WORD_LID_AUDIT/posthoc-evaluation.json" \
+            2>&1 | tee "$WORD_LID_AUDIT/evaluation.log"
+      - name: Preserve bounded exact posthoc report and independently readable sections
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path(os.environ["WORD_LID_AUDIT"])/"posthoc-evaluation.json"
+          if path.is_file():
+              raw=path.read_bytes()
+              if len(raw)>1048576:
+                  raise ValueError("Unexpected posthoc metadata size")
+              document=json.loads(raw)
+              for key,value in document.items():
+                  rendered=json.dumps(value,ensure_ascii=True,separators=(",",":"))
+                  if len(rendered)<=32000:
+                      print("WORD_LID_POSTHOC_SECTION "+key+" "+rendered,flush=True)
+              packed=gzip.compress(raw,mtime=0)
+              print("WORD_LID_POSTHOC_GZIP_SHA256 "+hashlib.sha256(packed).hexdigest(),flush=True)
+              encoded=base64.b64encode(packed).decode()
+              parts=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              for i,part in enumerate(parts,1):
+                  print("WORD_LID_POSTHOC_GZIP_B64 "+str(i)+"/"+str(len(parts))+" "+part,flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-word-lid-posthoc-${{ github.run_id }}
+          path: ${{ env.WORD_LID_AUDIT }}
+          if-no-files-found: warn
+          retention-days: 7
