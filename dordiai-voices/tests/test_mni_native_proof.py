@@ -136,6 +136,18 @@ class NumericalUnits(unittest.TestCase):
 
 @unittest.skipIf(torch is None or np is None,"Tiny tensor fixtures require isolated CPU Torch/NumPy")
 class TinyTensorUnits(unittest.TestCase):
+    def test_host_repeat_preserves_original_matmul_transposed_layout(self):
+        encoded=torch.tensor([[[1.,2.,3.],[4.,5.,6.]]],dtype=torch.float32)
+        duration=np.array([[2,1,3]],dtype=np.float32)
+        # Reference is original expanded alignment @ encoded^T, then transpose.
+        alignment=torch.tensor([[[1.,0.,0.],[1.,0.,0.],[0.,1.,0.],
+                                 [0.,0.,1.],[0.,0.,1.],[0.,0.,1.]]])
+        reference=torch.matmul(alignment,encoded.transpose(1,2)).transpose(1,2)
+        actual=torch.from_numpy(p.expand_numpy(encoded.numpy(),duration,np))
+        self.assertTrue(p.tensor_bits_equal(torch,reference,actual))
+        self.assertEqual(reference.stride(),actual.stride())
+        self.assertFalse(actual.is_contiguous())
+
     def test_identity_is_exact_fp32_raw_bytes(self):
         value=torch.tensor([[.25,-.5]],dtype=torch.float32)
         record=n.tensor_identity(value)
@@ -165,6 +177,37 @@ class TinyTensorUnits(unittest.TestCase):
         self.assertEqual(tokenizer.decode(ids),"মথং")
         self.assertNotIn("train_step",namespace["ForwardTTS"].__dict__)
         self.assertNotIn("load_checkpoint",namespace["HifiganGenerator"].__dict__)
+
+try:
+    import onnx
+    from onnx import numpy_helper
+except ImportError:
+    onnx=None
+
+@unittest.skipIf(np is None or onnx is None,"Actual ONNX initializer fixtures require isolated dependencies")
+class InitializerIdentityUnits(unittest.TestCase):
+    def test_actual_initializer_payload_shape_dtype_and_mutation(self):
+        array=np.array([[.25,-.5]],dtype=np.float32)
+        key="fastpitch.emb.weight"
+        original={"shape":[1,2],"dtype":"torch.float32","numel":2,"size_bytes":8,
+            "sha256":sha256(array.tobytes()).hexdigest()}
+        initializer=numpy_helper.from_array(array,name="model.emb.weight")
+        verified=p.verify_onnx_weight(initializer,onnx,{key:original},np)
+        self.assertEqual(verified["source_tensor"],key)
+        self.assertEqual(verified["sha256"],original["sha256"])
+        changed=numpy_helper.from_array(array+np.float32(.125),name="model.emb.weight")
+        with self.assertRaises(ValueError):
+            p.verify_onnx_weight(changed,onnx,{key:original},np)
+        reshaped=numpy_helper.from_array(array.reshape(2,1),name="model.emb.weight")
+        with self.assertRaises(ValueError):
+            p.verify_onnx_weight(reshaped,onnx,{key:original},np)
+        half=numpy_helper.from_array(array.astype(np.float16),name="model.emb.weight")
+        with self.assertRaises(ValueError):
+            p.verify_onnx_weight(half,onnx,{key:original},np)
+        foreign=numpy_helper.from_array(array,name="foreign.emb.weight")
+        with self.assertRaises(ValueError):
+            p.verify_onnx_weight(foreign,onnx,{key:original},np)
+
 
 if __name__=="__main__":
     unittest.main()

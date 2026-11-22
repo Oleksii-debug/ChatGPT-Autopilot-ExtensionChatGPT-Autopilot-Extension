@@ -190,6 +190,30 @@ def export_models(torch, wrappers, samples, output):
     return records
 
 
+def verify_onnx_weight(item,onnx,identities,np):
+    """Bind each exported learned FP32 payload to the original checkpoint bytes."""
+    from onnx import numpy_helper
+    if item.data_type!=onnx.TensorProto.FLOAT:
+        raise ValueError("Native learned ONNX initializer is not original FP32")
+    if item.name.startswith("model."):
+        source="fastpitch."+item.name[len("model."):]
+    elif item.name.startswith("generator."):
+        source="hifigan."+item.name[len("generator."):]
+    else:
+        raise ValueError("Unexpected learned ONNX initializer namespace")
+    if source not in identities:
+        raise ValueError("Exported ONNX tensor has no original checkpoint identity")
+    array=np.ascontiguousarray(numpy_helper.to_array(item))
+    if array.dtype!=np.dtype("float32"):
+        raise ValueError("ONNX tensor payload dtype disagrees with FLOAT descriptor")
+    actual={"shape":list(array.shape),"dtype":"torch.float32","numel":int(array.size),
+        "size_bytes":int(array.nbytes),"sha256":sha256(memoryview(array).cast("B")).hexdigest()}
+    if actual!=identities[source]:
+        raise ValueError("ONNX initializer changed original native tensor bytes: "+source)
+    return dict(actual,name=item.name,source_tensor=source,onnx_dtype=item.data_type)
+
+
+
 def sessions(ort, output):
     if ort.__version__!="1.27.0":
         raise ValueError("This isolated CPU proof pins telemetry-free official ORT1.27.0")
@@ -211,7 +235,11 @@ def expand_numpy(encoded,durations,np):
     rounded=np.rint(duration).astype(np.int64)
     if not np.array_equal(rounded,duration) or np.min(rounded)<1 or int(np.sum(rounded))>MAX_FRAMES:
         raise ValueError("Native predicted duration outside bounded probe")
-    return np.repeat(encoded,rounded[0],axis=2)
+    repeated=np.repeat(encoded,rounded[0],axis=2)
+    # Original expand_encoder_outputs returns matmul(B,T,C).transpose(1,2).
+    # Preserve its dense transposed layout as well as every FP32 value; layout
+    # otherwise changes the CPU decoder arithmetic path (actual diagnostic).
+    return np.ascontiguousarray(repeated.transpose(0,2,1)).transpose(0,2,1)
 
 
 def native_samples(config, transliterate):
@@ -377,6 +405,7 @@ def run(args):
             with torch.no_grad():
                 report["onnx_exports"]=export_models(torch,wrappers,export_samples,output)
             import onnx
+            exported_source_tensors=set()
             for name in report["onnx_exports"]:
                 graph=onnx.load(str(output/name),load_external_data=False)
                 onnx.checker.check_model(graph)
@@ -385,8 +414,18 @@ def run(args):
                     raise ValueError("Export introduced lower precision or quantized initializers")
                 if any(item.data_location==onnx.TensorProto.EXTERNAL for item in graph.graph.initializer):
                     raise ValueError("Unexpected unpinned external ONNX tensors")
-                report["onnx_exports"][name]["initializers"]=[
-                    {"name":item.name,"dtype":item.data_type,"shape":list(item.dims)} for item in graph.graph.initializer]
+                verified=[]
+                for item in graph.graph.initializer:
+                    identity=verify_onnx_weight(item,onnx,identities,np)
+                    if identity["source_tensor"] in exported_source_tensors:
+                        raise ValueError("Original native tensor duplicated across ONNX graphs")
+                    exported_source_tensors.add(identity["source_tensor"])
+                    verified.append(identity)
+                report["onnx_exports"][name]["initializers"]=verified
+            if exported_source_tensors!=set(identities):
+                raise ValueError("An original retained native tensor is missing from ONNX")
+            report["onnx_all_original_tensor_identities_equal"]=True
+            report["onnx_verified_original_tensor_count"]=len(exported_source_tensors)
             started=time.perf_counter()
             encoder_session,decoder_session,vocoder_session=sessions(ort,output)
             report["onnx_session_open_seconds"]=time.perf_counter()-started
@@ -493,7 +532,7 @@ def layout_diagnose(args):
                     ylengths=duration.sum(1)
                     ymask=namespace["sequence_mask"](ylengths,None).unsqueeze(1).to(encoded.dtype)
                     original_expanded,_=model.expand_encoder_outputs(encoded,duration,xmask,ymask)
-                    contiguous=expand_numpy(encoded.numpy(),duration.numpy(),np)
+                    contiguous=np.ascontiguousarray(expand_numpy(encoded.numpy(),duration.numpy(),np))
                     original_layout=np.ascontiguousarray(contiguous.transpose(0,2,1)).transpose(0,2,1)
                     native_output=model.inference(ids,{"speaker_ids":sid,"d_vectors":None})["model_outputs"]
                     direct_original=decoder(original_expanded)
