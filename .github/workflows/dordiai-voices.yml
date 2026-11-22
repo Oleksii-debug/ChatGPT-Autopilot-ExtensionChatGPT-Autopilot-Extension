@@ -14,6 +14,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resource-diagnostics:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[diagnose-resources]')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Preserve exact source bytes
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: dordiai-voices-development-core
+          path: dordiai-voices/dist
+          run-id: 45000863624
+          github-token: ${{ github.token }}
+      - name: Verify immutable core6 before fixed diagnostics
+        shell: python
+        run: |
+          import hashlib,pathlib
+          path=pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.6.nvda-addon")
+          with path.open("rb") as stream:
+              digest=hashlib.file_digest(stream,"sha256").hexdigest()
+          if digest!="ee60a000b3ea4387c2baf2afbbb252fd886b603d4e532220e62f29bf9dc465c8":
+              raise RuntimeError("Immutable diagnostic core6 mismatch")
+      - name: Inspect exact private runtime resource failures
+        run: python dordiai-voices/tools/windows_resource_diagnostics.py --addon dordiai-voices/dist/dordiai-voices-0.13.1-dev.6.nvda-addon --output dordiai-voices/resource-diagnostics
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-voices-fixed-resource-diagnostics
+          path: |
+            dordiai-voices/resource-diagnostics/report.json
+            dordiai-voices/resource-diagnostics/child-stderr.log
+          if-no-files-found: warn
+          retention-days: 7
+
   nvda-diagnostics:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[probe-nvda]')
     runs-on: windows-latest
