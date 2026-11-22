@@ -20,7 +20,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.13.1-dev.9"
+VERSION = "0.13.1-dev.10"
 RELEASE_MANIFEST = "dordiai-release.json"
 PACK_MANIFEST = "dordiai-resource-pack.json"
 EXCLUDED = frozenset({"kostia", "inna", "dina", "vira", "innesa", "veronika_classmate", "anatolii", "veronika"})

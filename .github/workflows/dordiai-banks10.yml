@@ -1,0 +1,320 @@
+name: Dordiai version10 prepared banks build and Windows probes
+
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-banks10.yml"
+      - "dordiai-voices/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-voices-windows-banks10
+  cancel-in-progress: false
+
+jobs:
+  windows-banks10:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-banks10]')
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Preserve exact source bytes during Windows checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Windows runtime regression tests
+        run: python -m pip install -r dordiai-voices/tests/requirements.txt
+      - name: Run Windows runtime regression tests
+        run: python -m unittest discover -s dordiai-voices/tests -v
+      - uses: actions/cache/restore@v4
+        id: audited_baseline
+        with:
+          path: dordiai-voices/packages/0.12.2
+          key: dordiai-main-107ed71bf25569c770506acd605ae042d9cae767e0088508b2d5eb03ef3f658c
+      - name: Restore audited main baseline
+        if: steps.audited_baseline.outputs.cache-hit != 'true'
+        run: python dordiai-voices/tools/restore_main.py --cache "${{ runner.temp }}/dordiai-download" --discard-downloads
+      - uses: actions/cache/save@v4
+        if: steps.audited_baseline.outputs.cache-hit != 'true'
+        with:
+          path: dordiai-voices/packages/0.12.2
+          key: dordiai-main-107ed71bf25569c770506acd605ae042d9cae767e0088508b2d5eb03ef3f658c
+      - name: Download the immutable complete supplemental banks
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 14752868030
+          run-id: 45018169807
+          repository: Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+          github-token: ${{ github.token }}
+          path: dordiai-voices/prepared-bank-input
+          merge-multiple: true
+      - name: Verify exact overlay ZIP and generation manifest before use
+        shell: python
+        run: |
+          import hashlib,json,pathlib,sys,zipfile
+          root=pathlib.Path("dordiai-voices")
+          sys.path.insert(0,str(root/"tools"))
+          import prepared_bank_overlay as banks
+          path=root/"prepared-bank-input/dordiai-supplementary-banks-0.13.1-banks.1.zip"
+          with path.open("rb") as stream:
+              actual=hashlib.file_digest(stream,"sha256").hexdigest()
+          if path.stat().st_size!=415348067 or actual!="055d57d619ed0925b19199799ff08a24690ff8a34f1a3652674cb8c7b38e6ccb":
+              raise RuntimeError("Pinned complete bank overlay archive mismatch")
+          with zipfile.ZipFile(path) as archive:
+              infos=banks._zip_files(archive)
+              raw=banks._read(archive,infos,banks.MANIFEST,banks.MAX_MANIFEST)
+              if len(raw)!=9681415 or hashlib.sha256(raw).hexdigest()!="bed7d5018b23595c9ff2c0dfb3f84f4e54a981c57a9712f0cec935579503db14":
+                  raise RuntimeError("Pinned complete overlay manifest mismatch")
+              manifest=banks._json(raw)
+              profiles=banks._profiles(manifest["voice_ids"])
+              if (set(infos)!=banks._bank_paths(profiles)|{banks.MANIFEST}
+                      or manifest["source_core"]["sha256"]!="568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6"
+                      or manifest["source_core"]["size_bytes"]!=1767411258
+                      or manifest["catalogue_sha256"]!="d60359f722b521b30faaac5cc1beff07861efbe1a1cd521d986bf002446fd4a6"
+                      or len(manifest["identity_inputs"])!=9939
+                      or manifest["quality_validation"]!=banks.PENDING_QUALITY):
+                  raise RuntimeError("Overlay source/catalogue/quality identity mismatch")
+          output=root/"windows-results/banks"
+          output.mkdir(parents=True,exist_ok=True)
+          record={"source_run":45018169807,"generator_commit":"7b08ce448d5b888e6c75a503f72bf1d3dd8e8368",
+                  "artifact_id":14752868030,"archive_sha256":actual,"archive_size_bytes":path.stat().st_size,
+                  "manifest_sha256":hashlib.sha256(raw).hexdigest(),"manifest_size_bytes":len(raw),
+                  "voice_count":len(profiles),"bank_file_count":len(manifest["files"]),
+                  "identity_input_count":len(manifest["identity_inputs"]),"product_ready":False}
+          (output/"overlay-input.json").write_text(json.dumps(record,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(record),flush=True)
+      - name: Build version10 using the source-bound full bank overlay
+        run: python dordiai-voices/tools/build_release.py --version 0.13.1-dev.10 --prepared-bank-overlay dordiai-voices/prepared-bank-input/dordiai-supplementary-banks-0.13.1-banks.1.zip
+      - name: Verify archives and prepare engine probe
+        shell: python
+        run: |
+          import pathlib, subprocess, sys, zipfile
+          root = pathlib.Path("dordiai-voices")
+          files = sorted(root.joinpath("dist").glob("*.zip")) + sorted(root.joinpath("dist").glob("*.nvda-addon"))
+          if not files:
+              raise RuntimeError("No release archives were built")
+          subprocess.run([sys.executable, str(root / "tools/verify_release.py"), *map(str, files)], check=True)
+          addon = next(root.joinpath("dist").glob("*.nvda-addon"))
+          with zipfile.ZipFile(addon) as archive:
+              archive.extractall(root / "probe-package")
+      - name: Verify all45 profiles and all176 mapped prepared requests
+        shell: python
+        run: |
+          import hashlib,json,pathlib,sys,zipfile
+          root=pathlib.Path("dordiai-voices")
+          sys.path.insert(0,str(root/"tools"))
+          import inspect_character_banks as audit
+          import prepared_bank_overlay as banks
+          core=root/"dist/dordiai-voices-0.13.1-dev.10.nvda-addon"
+          overlay=root/"prepared-bank-input/dordiai-supplementary-banks-0.13.1-banks.1.zip"
+          with zipfile.ZipFile(overlay) as archive:
+              manifest=banks._json(archive.read(banks.MANIFEST))
+          with zipfile.ZipFile(core) as archive:
+              release=json.loads(archive.read("dordiai-release.json"))
+              summary=release.get("prepared_bank_overlay",{})
+              if (release.get("version")!="0.13.1-dev.10" or len(release["voice_ids"])!=45
+                      or release.get("initial_languages")!=["uk","en","ru"]
+                      or summary.get("append_only_verified") is not True
+                      or summary.get("identity_inputs_verified")!=9939
+                      or summary.get("archive",{}).get("sha256")!="055d57d619ed0925b19199799ff08a24690ff8a34f1a3652674cb8c7b38e6ccb"
+                      or summary.get("bank_file_count")!=180):
+                  raise RuntimeError("Built release lost append-only/source identity proof")
+              for name,entry in manifest["files"].items():
+                  if release["files"].get(name)!=entry["new"]:
+                      raise RuntimeError("Built bank inventory differs from overlay: "+name)
+                  with archive.open(name) as stream:
+                      actual=hashlib.file_digest(stream,"sha256").hexdigest()
+                  if actual!=entry["new"]["sha256"] or archive.getinfo(name).file_size!=entry["new"]["size_bytes"]:
+                      raise RuntimeError("Actual built bank bytes differ: "+name)
+          coverage=audit.inspect(core,["all"],probe_source=root/"tools/windows_nvda_probe.py")
+          aggregate=coverage["aggregate"]
+          if (len(coverage["profiles"])!=45 or aggregate["requests"]!=45*176
+                  or aggregate["prepared_candidates"]!=45*176 or aggregate["live_worker_candidates"]!=0):
+              raise RuntimeError("Prepared all-profile176 request coverage still has misses: "+json.dumps(aggregate))
+          output=root/"windows-results/banks"
+          (output/"prepared-coverage-all45.json").write_text(json.dumps(coverage,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          proof={"profiles":45,"requests_per_profile":176,"requests":aggregate["requests"],
+                 "prepared_candidates":aggregate["prepared_candidates"],"live_worker_candidates":aggregate["live_worker_candidates"],
+                 "exact180_output_payloads_verified":True,"old_indices_pcm_prefixes_preserved_by_builder":True,
+                 "identity_inputs_verified":9939,"scope":"Static exact request/bank mapping; actual NVDA timings are separate",
+                 "product_ready":False}
+          (output/"prepared-coverage-summary.json").write_text(json.dumps(proof,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(proof),flush=True)
+      - name: Actual Windows speech engine probe
+        run: python dordiai-voices/tools/windows_engine_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/engine
+      - name: Install optional resources for Windows engine checks
+        shell: python
+        run: |
+          import pathlib, sys
+          root = pathlib.Path("dordiai-voices").resolve()
+          package = root / "probe-package"
+          sys.path.insert(0, str(package / "kx47Runtime"))
+          import package_manager
+          for archive in sorted(root.joinpath("dist").glob("*.zip")):
+              package_manager.install_pack(archive, addon_root=package)
+      - name: Actual additional-language engine probe
+        run: python dordiai-voices/tools/windows_engine_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/extra-engines --all-installed --repetitions 1
+      - name: Actual letter and symbol worker audio structure
+        if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/nvda_worker.py') != ''
+        run: python dordiai-voices/tools/windows_character_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/characters
+      - name: Actual pinned new MMS representative on the embedded Windows runtime
+        if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/nvda_worker.py') != ''
+        run: python dordiai-voices/tools/windows_mms_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/mms-ha --timeout 120
+      - name: Actual explicitly enabled shared MMS graph on the embedded Windows runtime
+        if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/mms_family_sessions.py') != ''
+        run: python dordiai-voices/tools/windows_mms_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/mms-ha-shared --timeout 120 --shared-family
+      - name: Reclaim isolated engine probe files
+        if: always()
+        shell: python
+        run: |
+          import pathlib, shutil
+          package = pathlib.Path("dordiai-voices/probe-package").resolve()
+          if package.is_dir():
+              shutil.rmtree(package)
+      - name: Actual NVDA integration probe
+        if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
+        shell: python
+        run: |
+          import json, pathlib, subprocess, sys
+          addon = next(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
+          subprocess.run([sys.executable, "dordiai-voices/tools/setup_audio_endpoint.py", "--output", "dordiai-voices/windows-results/audio", "--ephemeral-ci", "--start-existing-services"], check=False)
+          command = [sys.executable, "dordiai-voices/tools/windows_nvda_probe.py", "--addon", str(addon), "--output", "dordiai-voices/windows-results/nvda", "--fatal-recovery-probe"]
+          audio_report = pathlib.Path("dordiai-voices/windows-results/audio/audio-endpoint.json")
+          if audio_report.is_file() and json.loads(audio_report.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
+              print("No actual audio endpoint: explicitly opting into recording PCM sink TEST DOUBLE for NVDA/GUI checks. WavePlayer and acoustic acceptance remain blocked.", flush=True)
+              command.append("--headless-ui-probe")
+          completed = subprocess.run(command, check=False)
+          if completed.returncode == 2 and "--headless-ui-probe" in command:
+              report = json.loads(pathlib.Path("dordiai-voices/windows-results/nvda/windows-nvda-probe.json").read_text(encoding="utf-8"))
+              allowed = {"windows_audio_output_enumeration", "physical_audio_output", "warm_letter_predevice_target", "cancel_api_target"}
+              unexpected = [row for doc in (report, report.get("probe", {})) for row in doc.get("checks", [])
+                            if row.get("status") != "passed" and not (row.get("status") == "blocked" and row.get("name") in allowed)]
+              if (report.get("status") != "partial" or unexpected
+                      or report.get("recording_pcm_sink_test_double") is not True
+                      or report.get("physical_audio_verified") is not False
+                      or report.get("product_ready") is not False):
+                  raise RuntimeError("Headless probe has unaccepted failures or inconsistent acceptance flags")
+              print("Functional NVDA checks completed; physical/device and full-product acceptance remain BLOCKED.", flush=True)
+          elif completed.returncode != 0:
+              raise subprocess.CalledProcessError(completed.returncode, command)
+      - name: Verify real keyboard echo and genuine resource recovery in the same built core
+        if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
+        shell: python
+        run: |
+          import json,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          audio=root/"windows-results/audio/audio-endpoint.json"
+          headless=audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after")==0
+          failures=[]
+          for mode,flag in (("typing","--typing-probe"),("required","--required-resource-recovery-probe")):
+              output=root/("windows-results/"+{"typing":"nt","required":"nr"}[mode])
+              command=[sys.executable,str(root/"tools/windows_nvda_probe.py"),"--addon",str(root/"dist/dordiai-voices-0.13.1-dev.10.nvda-addon"),"--output",str(output),flag,"--timeout","300"]
+              if headless:
+                  command.append("--headless-ui-probe")
+              completed=subprocess.run(command,check=False)
+              if completed.returncode==2 and headless:
+                  report=json.loads((output/"windows-nvda-probe.json").read_text(encoding="utf-8"))
+                  allowed={"windows_audio_output_enumeration","physical_audio_output","warm_letter_predevice_target","cancel_api_target"}
+                  unexpected=[row for document in (report,report.get("probe",{})) for row in document.get("checks",[])
+                              if row.get("status")!="passed" and not(row.get("status")=="blocked" and row.get("name") in allowed)]
+                  valid=(report.get("status")=="partial" and not unexpected
+                         and report.get("recording_pcm_sink_test_double") is True
+                         and report.get("physical_audio_verified") is False
+                         and report.get("product_ready") is False)
+                  if not valid:
+                      failures.append({"mode":mode,"returncode":completed.returncode,"unexpected":unexpected})
+              elif completed.returncode!=0:
+                  failures.append({"mode":mode,"returncode":completed.returncode})
+          if failures:
+              raise RuntimeError("Actual NVDA functional failures: "+json.dumps(failures))
+          print("Real typing and resource-recovery functional checks complete; physical audio and product acceptance remain separate.",flush=True)
+      - name: Print probe failures and collect bounded Windows diagnostics
+        if: always()
+        run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
+      - uses: actions/upload-artifact@v4
+        id: windows_evidence
+        if: always()
+        with:
+          name: dordiai-voices-banks10-windows-evidence
+          path: dordiai-voices/windows-evidence
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: core_build
+        if: always() && hashFiles('dordiai-voices/dist/*.nvda-addon') != ''
+        with:
+          name: dordiai-voices-banks10-development-core
+          path: |
+            dordiai-voices/dist/*.nvda-addon
+            dordiai-voices/dist/release-build.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: piper_pack
+        if: always() && hashFiles('dordiai-voices/dist/dordiai-european-piper-*.zip') != ''
+        with:
+          name: dordiai-voices-banks10-development-european-piper
+          path: dordiai-voices/dist/dordiai-european-piper-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: slovak_pack
+        if: always() && hashFiles('dordiai-voices/dist/dordiai-slovak-rhvoice-*.zip') != ''
+        with:
+          name: dordiai-voices-banks10-development-slovak-rhvoice
+          path: dordiai-voices/dist/dordiai-slovak-rhvoice-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        id: wide_pack
+        if: always() && hashFiles('dordiai-voices/dist/dordiai-wide-languages-*.zip') != ''
+        with:
+          name: dordiai-voices-banks10-development-wide-languages
+          path: dordiai-voices/dist/dordiai-wide-languages-*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Development artifact download links
+        if: always()
+        shell: python
+        env:
+          DORDIAI_CORE_URL: ${{ steps.core_build.outputs.artifact-url }}
+          DORDIAI_PIPER_URL: ${{ steps.piper_pack.outputs.artifact-url }}
+          DORDIAI_SLOVAK_URL: ${{ steps.slovak_pack.outputs.artifact-url }}
+          DORDIAI_WIDE_URL: ${{ steps.wide_pack.outputs.artifact-url }}
+          DORDIAI_EVIDENCE_URL: ${{ steps.windows_evidence.outputs.artifact-url }}
+        run: |
+          import json, os, pathlib
+          lines = ["## Збірки dordiai-voices для перевірки", "",
+                   "Це розробницькі артефакти, а не підтверджений публічний випуск. "
+                   "Результати реальних перевірок містяться в окремому артефакті доказів.", "",
+                   "Ядро та додаткові пакети завантажуються окремо. "
+                   "Для завантаження потрібен вхід у GitHub. Артефакти зберігаються 7 днів.", ""]
+          for label, key in [("Основний додаток NVDA", "DORDIAI_CORE_URL"),
+                             ("Додаткові моделі Piper", "DORDIAI_PIPER_URL"),
+                             ("Словацький рушій RHVoice", "DORDIAI_SLOVAK_URL"),
+                             ("Додаткові мовні ресурси", "DORDIAI_WIDE_URL"),
+                             ("Протоколи Windows і NVDA", "DORDIAI_EVIDENCE_URL")]:
+              if os.environ.get(key):
+                  lines.append(f"- [{label}]({os.environ[key]})")
+          report = pathlib.Path("dordiai-voices/dist/release-build.json")
+          if report.is_file():
+              lines += ["", "Фактичні розміри архівів:", ""]
+              for artifact in json.loads(report.read_text(encoding="utf-8"))["artifacts"]:
+                  lines.append(f"- {artifact['filename']}: {artifact['size_bytes']:,} байтів.")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
