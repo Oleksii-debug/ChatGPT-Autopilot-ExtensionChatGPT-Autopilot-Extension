@@ -159,17 +159,9 @@ jobs:
 
   artifact-diagnostics:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[diagnose-nvda]')
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - proof: required-resource
-            artifact: 14749362748
-          - proof: typing
-            artifact: 14749732405
     runs-on: ubuntu-latest
     env:
-      DORDIAI_DIAGNOSTIC_ARTIFACT: ${{ matrix.artifact }}
+      DORDIAI_DIAGNOSTIC_ARTIFACT: "14752285091"
     timeout-minutes: 10
     permissions:
       contents: read
@@ -182,7 +174,7 @@ jobs:
       - name: Recover only small diagnostics from the previous Windows artifact
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id "${{ matrix.artifact }}" --output dordiai-voices/diagnosed-windows-evidence
+        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id "14752285091" --output dordiai-voices/diagnosed-windows-evidence
       - name: Print bounded fixed-input worker diagnostics
         if: always()
         shell: python
@@ -193,6 +185,11 @@ jobs:
               text = path.read_bytes()[-65536:].decode("utf-8", errors="replace")
               print("FIXED ENGINE STDERR " + path.relative_to(root).as_posix(), flush=True)
               print(text.encode("ascii", errors="backslashreplace").decode("ascii"), flush=True)
+          for path in sorted(root.rglob("*.log")):
+              relative=path.relative_to(root)
+              if relative.parts[0] in {"nvda-typing","nvda-required"}:
+                  print("DEV9 EXTRA BOOTSTRAP LOG "+relative.as_posix(),flush=True)
+                  print(path.read_bytes()[-65536:].decode("utf-8",errors="replace").encode("ascii",errors="backslashreplace").decode("ascii"),flush=True)
           for path in root.rglob("nvda-probe.json"):
               report = json.loads(path.read_text(encoding="utf-8"))
               print("NVDA SUMMARY " + json.dumps({key: report.get(key) for key in ("status", "worker_bootstrap", "native_import_diagnostics", "initial_smoke_predevice_latency", "api_latency", "injected_fatal_recovery", "required_resource_recovery", "required_resource_path_diagnostics", "actual_typing", "required_resource_quarantine", "required_resource_cleanup", "pcm_metrics")}, ensure_ascii=True), flush=True)
@@ -209,14 +206,14 @@ jobs:
           for path in sorted(root.rglob("*.json")):
               raw=path.read_bytes()
               files[path.relative_to(root).as_posix()]={"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}
-          document={"format":"dordiai-exact-windows-json-evidence","format_version":1,"run_id":45010564271,"artifact_id":int(os.environ["DORDIAI_DIAGNOSTIC_ARTIFACT"]),"scope":"Exact engineering reports; recording sink never certifies physical audio or pronunciation","files":files}
+          document={"format":"dordiai-exact-windows-json-evidence","format_version":1,"run_id":45014461174,"artifact_id":int(os.environ["DORDIAI_DIAGNOSTIC_ARTIFACT"]),"scope":"Exact engineering reports; recording sink never certifies physical audio or pronunciation","files":files}
           compressed=gzip.compress(json.dumps(document,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode("utf-8"),mtime=0)
-          print("DORDIAI_MATRIX8_BUNDLE_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
-          print("DORDIAI_MATRIX8_BUNDLE_B64 "+base64.b64encode(compressed).decode("ascii"),flush=True)
+          print("DORDIAI_DEV9_FIRST_BUNDLE_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
+          print("DORDIAI_DEV9_FIRST_BUNDLE_B64 "+base64.b64encode(compressed).decode("ascii"),flush=True)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dordiai-voices-recovered-${{ matrix.proof }}-windows-diagnostics
+          name: dordiai-voices-recovered-dev9-windows-diagnostics
           path: dordiai-voices/diagnosed-windows-evidence
           if-no-files-found: warn
           retention-days: 7
