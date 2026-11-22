@@ -50,6 +50,17 @@ class SourceImportTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     m.validated_payload(raw,pins,vendor)
 
+    def test_only_own_crlf_can_return_to_exact_reviewed_pin(self):
+        raw = b"pass\n"
+        pin = {"bytes":len(raw),"git_blob_sha1":m.git_blob(raw)}
+        self.assertEqual(m.reviewed_bytes("wide_afri_six.py",b"pass\r\n",pin),raw)
+        for name,changed in (("wide_afri_six.py",b"evil\r\n"),
+                             ("wide_afri_six.py",b"pass\r"),
+                             ("vendor_afri_g2p/africa_g2p/__init__.py",b"pass\r\n")):
+            with self.subTest(name=name,changed=changed):
+                with self.assertRaises(ValueError):
+                    m.reviewed_bytes(name,changed,pin)
+
     def test_manifest_cannot_silently_add_related_language(self):
         raw,pins,vendor = fixture(manifest_languages={**m.LANGUAGES,"nr":"nde"})
         with self.assertRaises(ValueError):

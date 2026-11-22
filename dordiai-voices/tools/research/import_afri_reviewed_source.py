@@ -136,6 +136,17 @@ def unique_pairs(items):
     return result
 
 
+
+def reviewed_bytes(name, data, expected):
+    """Only own two Python files may undo Windows CRLF; vendor bytes never change."""
+    if name in ("wide_afri_six.py","wide_afri_frontend.py"):
+        if b"\r" in data.replace(b"\r\n",b""):
+            raise ValueError("Bare CR is not an approved source transformation")
+        data = data.replace(b"\r\n",b"\n")
+    if len(data) != expected["bytes"] or git_blob(data) != expected["git_blob_sha1"]:
+        raise ValueError("Reviewed source Git SHA/size differs: " + name)
+    return data
+
 def validated_payload(raw, files=FILES, vendor=VENDOR):
     """Validate the entire archive before publishing ANY Git object."""
     expected = set(files) | {MANIFEST}
@@ -161,17 +172,16 @@ def validated_payload(raw, files=FILES, vendor=VENDOR):
                 continue
             if name not in expected or kind not in (0, stat.S_IFREG) or entry.flag_bits & 1:
                 raise ValueError("Unexpected or linked artifact member")
-            limit = files[name]["bytes"] if name in files else 16384
-            if entry.file_size > limit or name in files and entry.file_size != limit:
+            own_python = name in ("wide_afri_six.py","wide_afri_frontend.py")
+            limit = files[name]["bytes"] * (2 if own_python else 1) if name in files else 16384
+            if entry.file_size > limit or name in files and not own_python and entry.file_size != limit:
                 raise ValueError("Artifact member size differs: " + name + " actual=" + str(entry.file_size) + " expected=" + str(limit))
             with archive.open(entry) as source:
                 data = source.read(limit + 1)
             if len(data) != entry.file_size:
                 raise ValueError("Expanded member size differs")
             data.decode("utf-8")  # Every reviewed core source asset must remain text.
-            if name in files and git_blob(data) != files[name]["git_blob_sha1"]:
-                raise ValueError("Reviewed source Git SHA differs: " + name)
-            result[name] = data
+            result[name] = reviewed_bytes(name,data,files[name]) if name in files else data
     if set(result) != expected:
         raise ValueError("Missing reviewed artifact member")
     manifest = json.loads(result[MANIFEST], object_pairs_hook=unique_pairs)
@@ -255,7 +265,7 @@ def inspect_owned(raw):
                                and git_blob(canonical)==FILES[name]["git_blob_sha1"]))
             rows.append(row)
             print("AFRI_SOURCE_RAW_MEMBER "+json.dumps(row,sort_keys=True),flush=True)
-    if seen != set(FILES)|{MANIFEST}:
+    if seen != {name.casefold() for name in set(FILES)|{MANIFEST}}:
         raise ValueError("Missing source artifact member")
     return rows
 
@@ -281,10 +291,14 @@ def main():
         args.report.parent.mkdir(parents=True,exist_ok=True)
         args.report.write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
         return 0
+    raw_members = inspect_owned(raw)
     payload = validated_payload(raw)
     report = {"format":"dordiai-reviewed-afri-source-import-v1",
               "artifact_id":ARTIFACT,"artifact_sha256":ARTIFACT_SHA256,"source_run":SOURCE_RUN,
               "all_files_verified_before_writes":True,"source_executed":False,
+              "source_byte_normalisations":[row for row in raw_members
+                  if row["path"] in ("wide_afri_six.py","wide_afri_frontend.py")],
+              "vendor_source_bytes_transformed":False,
               "refs_updated":False,"trees_or_commits_created":False,
               "mode":"verify-only" if args.verify_only else "unattached-git-blobs-only","files":[]}
     args.report.parent.mkdir(parents=True, exist_ok=True)
