@@ -1,0 +1,14 @@
+numpy==2.2.6
+scipy==1.15.3
+soundfile==0.13.1
+einops==0.8.1
+pydantic==2.11.7
+PyYAML==6.0.2
+tokenizers==0.21.4
+huggingface-hub==0.34.4
+safetensors==0.5.3
+sentencepiece==0.2.1
+requests==2.32.4
+typing_extensions==4.14.1
+onnx==1.17.0
+onnxruntime==1.27.0

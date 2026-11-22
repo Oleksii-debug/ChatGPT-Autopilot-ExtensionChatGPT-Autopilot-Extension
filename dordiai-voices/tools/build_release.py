@@ -7,6 +7,7 @@ resource pack never needs to replace core files. This does not certify speech.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from dataclasses import dataclass
 import hashlib
 import io
@@ -218,53 +219,64 @@ def build_archive(path, files, metadata, manifest_name):
             "payload_files": len(records), "installed_bytes": sum(x["size_bytes"] for x in records.values())}
 
 
-def build_release(baseline, source, output, version=VERSION, only=None, max_core_bytes=3_000_000_000):
+def build_release(baseline, source, output, version=VERSION, only=None, max_core_bytes=3_000_000_000,
+                  prepared_bank_overlay=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     files, excluded = collect_inputs(baseline, source, version)
-    groups = {name: [item for item in files if item.group == name] for name in ["core", *PACKS]}
-    catalogue_path = "kx47Runtime/models/voices/catalog.json"
-    catalogue = next((item for item in files if item.path == catalogue_path), None)
-    voice_ids = []
-    if catalogue is not None:
-        voice_ids = sorted(json.loads(catalogue.transformed or catalogue.source.read_bytes()))
-        if set(voice_ids) & EXCLUDED:
-            raise ValueError("Excluded voice in release catalogue")
-    vendor_patches = [{"path": item.path,
-                       "input_sha256": hashlib.sha256(item.source.read_bytes()).hexdigest(),
-                       "output_sha256": hashlib.sha256(item.transformed).hexdigest(),
-                       "reason": "Normalize Windows extended-path separators; retain offline model lookup"}
-                      for item in files if item.path == STRESS_VENDOR_PATH and item.transformed is not None]
-    report = {"format": "dordiai-release-build", "format_version": 1, "version": version,
-              "baseline": "0.12.2", "voice_ids": voice_ids, "voice_count": len(voice_ids),
-              "excluded_voice_ids": sorted(EXCLUDED), "excluded_input_files": excluded,
-              "windows_nvda_validation": "not_performed_by_builder", "compatibility_patches": vendor_patches, "artifacts": []}
-    for group, payload in groups.items():
-        if only and group not in only:
-            continue
-        if not payload:
-            continue
-        if group == "core":
-            filename = f"dordiai-voices-{version}.nvda-addon"
-            metadata = {"format": "dordiai-core-release", "format_version": 1, "version": version,
-                        "voice_ids": voice_ids, "excluded_voice_ids": sorted(EXCLUDED),
-                        "initial_languages": ["uk", "en", "ru"], "compatibility_patches": vendor_patches,
-                        "windows_nvda_validation": "not_performed_by_builder"}
-            manifest = RELEASE_MANIFEST
-        else:
-            filename = f"dordiai-{group}-{version}.zip"
-            metadata = dict(PACKS[group], format="dordiai-resource-pack", format_version=1,
-                            id=group, version=version, minimum_core_version=version)
-            manifest = PACK_MANIFEST
-        print(f"Building {group}: {len(payload)} files, {sum(len(x.transformed) if x.transformed is not None else x.source.stat().st_size for x in payload):,} bytes", flush=True)
-        record = build_archive(output / filename, payload, metadata, manifest)
-        record["group"] = group
-        report["artifacts"].append(record)
-        if group == "core" and record["size_bytes"] > max_core_bytes:
-            raise ValueError(f"Core archive exceeds {max_core_bytes:,} bytes; do not claim ready")
-        print(f"Built {filename}: {record['size_bytes']:,} bytes", flush=True)
-    (output / "release-build.json").write_bytes(json_bytes(report))
-    return report
+    if prepared_bank_overlay is None:
+        overlay_context = nullcontext((files, None))
+    else:
+        from prepared_bank_overlay import apply_to_inputs
+        overlay_context = apply_to_inputs(files, Path(prepared_bank_overlay), InputFile)
+    with overlay_context as (files, overlay_summary):
+        groups = {name: [item for item in files if item.group == name] for name in ["core", *PACKS]}
+        catalogue_path = "kx47Runtime/models/voices/catalog.json"
+        catalogue = next((item for item in files if item.path == catalogue_path), None)
+        voice_ids = []
+        if catalogue is not None:
+            voice_ids = sorted(json.loads(catalogue.transformed or catalogue.source.read_bytes()))
+            if set(voice_ids) & EXCLUDED:
+                raise ValueError("Excluded voice in release catalogue")
+        vendor_patches = [{"path": item.path,
+                           "input_sha256": hashlib.sha256(item.source.read_bytes()).hexdigest(),
+                           "output_sha256": hashlib.sha256(item.transformed).hexdigest(),
+                           "reason": "Normalize Windows extended-path separators; retain offline model lookup"}
+                          for item in files if item.path == STRESS_VENDOR_PATH and item.transformed is not None]
+        report = {"format": "dordiai-release-build", "format_version": 1, "version": version,
+                  "baseline": "0.12.2", "voice_ids": voice_ids, "voice_count": len(voice_ids),
+                  "excluded_voice_ids": sorted(EXCLUDED), "excluded_input_files": excluded,
+                  "windows_nvda_validation": "not_performed_by_builder", "compatibility_patches": vendor_patches, "artifacts": []}
+        if overlay_summary is not None:
+            report["prepared_bank_overlay"] = overlay_summary
+        for group, payload in groups.items():
+            if only and group not in only:
+                continue
+            if not payload:
+                continue
+            if group == "core":
+                filename = f"dordiai-voices-{version}.nvda-addon"
+                metadata = {"format": "dordiai-core-release", "format_version": 1, "version": version,
+                            "voice_ids": voice_ids, "excluded_voice_ids": sorted(EXCLUDED),
+                            "initial_languages": ["uk", "en", "ru"], "compatibility_patches": vendor_patches,
+                            "windows_nvda_validation": "not_performed_by_builder"}
+                if overlay_summary is not None:
+                    metadata["prepared_bank_overlay"] = overlay_summary
+                manifest = RELEASE_MANIFEST
+            else:
+                filename = f"dordiai-{group}-{version}.zip"
+                metadata = dict(PACKS[group], format="dordiai-resource-pack", format_version=1,
+                                id=group, version=version, minimum_core_version=version)
+                manifest = PACK_MANIFEST
+            print(f"Building {group}: {len(payload)} files, {sum(len(x.transformed) if x.transformed is not None else x.source.stat().st_size for x in payload):,} bytes", flush=True)
+            record = build_archive(output / filename, payload, metadata, manifest)
+            record["group"] = group
+            report["artifacts"].append(record)
+            if group == "core" and record["size_bytes"] > max_core_bytes:
+                raise ValueError(f"Core archive exceeds {max_core_bytes:,} bytes; do not claim ready")
+            print(f"Built {filename}: {record['size_bytes']:,} bytes", flush=True)
+        (output / "release-build.json").write_bytes(json_bytes(report))
+        return report
 
 
 def main():
@@ -274,8 +286,11 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
     parser.add_argument("--version", default=VERSION)
     parser.add_argument("--only", choices=["core", *PACKS], action="append")
+    parser.add_argument("--prepared-bank-overlay", type=Path,
+                        help="Optional validated append-only prepared letter/command bank ZIP")
     args = parser.parse_args()
-    build_release(args.baseline, args.source, args.output, args.version, args.only)
+    build_release(args.baseline, args.source, args.output, args.version, args.only,
+                  prepared_bank_overlay=args.prepared_bank_overlay)
 
 
 if __name__ == "__main__":

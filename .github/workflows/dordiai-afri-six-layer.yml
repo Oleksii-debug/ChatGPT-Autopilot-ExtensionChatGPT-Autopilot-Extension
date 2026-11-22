@@ -1,0 +1,139 @@
+name: Dordiai exact six-layer FP32 Swati Venda export proof
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-afri-six-layer.yml"
+      - "dordiai-voices/tools/research/afri_six_layer_probe.py"
+      - "dordiai-voices/tools/research/requirements-afri-six-layer.txt"
+      - "dordiai-voices/tests/test_afri_six_layer_probe.py"
+permissions:
+  contents: read
+concurrency:
+  group: dordiai-afri-six-layer-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native-six-layer:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[afri-six-layer]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      SIX_CACHE: ${{ github.workspace }}/ci-afri-six-checkpoint
+      SIX_OUTPUT: ${{ github.workspace }}/ci-afri-six-derived
+      SIX_REPORTS: ${{ github.workspace }}/dordiai-voices/afri-six-results
+      AFRI_SOURCE: ${{ github.workspace }}/ci-afri-exporter-source
+      POCKET_SOURCE: ${{ github.workspace }}/ci-pocket-source
+      G2P_SOURCE: ${{ github.workspace }}/ci-africa-g2p
+      PYTHONUNBUFFERED: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      DO_NOT_TRACK: "1"
+      CUDA_VISIBLE_DEVICES: ""
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: AfriSpeech/africa-tts
+          ref: b4508ae979dd34eea2597d420d67176ef55a21a0
+          path: ci-afri-exporter-source
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: kyutai-labs/pocket-tts
+          ref: a922b912dfa366975294afb568d815b305acde5d
+          path: ci-pocket-source
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: AfriSpeech/africa-g2p
+          ref: 76b53a8fa2a688812e369837d179d4710c111a7a
+          path: ci-africa-g2p
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Prepare isolated export and native inference environments
+        run: |
+          mkdir -p "$SIX_REPORTS"
+          python -m venv ci-six-export-venv
+          ci-six-export-venv/bin/python -m pip install --only-binary=:all: torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          ci-six-export-venv/bin/python -m pip install --only-binary=:all: --index-url https://pypi.org/simple -r dordiai-voices/tools/research/requirements-afri-six-layer.txt
+          python -m venv ci-six-native-venv
+          ci-six-native-venv/bin/python -m pip install --only-binary=:all: --index-url https://pypi.org/simple -r dordiai-voices/tools/research/requirements-afri-sherpa.txt
+          ci-six-export-venv/bin/python -m pip freeze > "$SIX_REPORTS/export-packages.txt"
+          ci-six-native-venv/bin/python -m pip freeze > "$SIX_REPORTS/native-packages.txt"
+      - name: Verify pure structural rejection of stale and reduced-precision checkpoints
+        run: python -m unittest discover -s dordiai-voices/tests -p test_afri_six_layer_probe.py -v
+      - name: Import entire pinned Pocket exporter dependency chain offline before model acquisition
+        timeout-minutes: 2
+        run: |
+          ci-six-export-venv/bin/python dordiai-voices/tools/research/afri_six_layer_probe.py preflight \
+            --cache "$SIX_CACHE" --source "$AFRI_SOURCE" --pocket-source "$POCKET_SOURCE" --g2p-source "$G2P_SOURCE" \
+            --report "$SIX_REPORTS/import-preflight.json"
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ env.SIX_CACHE }}
+          key: dordiai-afri-six-f32-d47667a3-b4cdf2cb-v1
+      - name: Acquire and fully hash exact published six-layer F32 weights
+        timeout-minutes: 7
+        run: |
+          python dordiai-voices/tools/research/afri_six_layer_probe.py acquire \
+            --cache "$SIX_CACHE" --report "$SIX_REPORTS/acquisition.json"
+      - name: Export unmodified official five-graph CPU recipe without quantization
+        timeout-minutes: 10
+        run: |
+          ci-six-export-venv/bin/python dordiai-voices/tools/research/afri_six_layer_probe.py export \
+            --cache "$SIX_CACHE" --output "$SIX_OUTPUT" \
+            --source "$AFRI_SOURCE" --pocket-source "$POCKET_SOURCE" \
+            --report "$SIX_REPORTS/export.json"
+      - name: Measure official deterministic Torch versus ONNX numerical parity
+        timeout-minutes: 7
+        run: |
+          ci-six-export-venv/bin/python dordiai-voices/tools/research/afri_six_layer_probe.py parity \
+            --cache "$SIX_CACHE" --output "$SIX_OUTPUT" \
+            --source "$AFRI_SOURCE" --pocket-source "$POCKET_SOURCE" --g2p-source "$G2P_SOURCE" \
+            --report "$SIX_REPORTS/parity.json"
+      - name: Generate six actual Swati Venda cases in separate official native Sherpa process
+        timeout-minutes: 7
+        run: |
+          ci-six-native-venv/bin/python dordiai-voices/tools/research/afri_six_layer_probe.py native \
+            --cache "$SIX_CACHE" --output "$SIX_OUTPUT" --g2p-source "$G2P_SOURCE" \
+            --report "$SIX_REPORTS/native.json"
+      - name: Print exact bounded research reports without rerunning models
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ["SIX_REPORTS"])
+          for name in ("import-preflight.json","acquisition.json","export.json","parity.json","native.json"):
+              p=root/name
+              if not p.is_file():
+                  continue
+              raw=p.read_bytes()
+              value=json.loads(raw)
+              print("AFRI_SIX_SUMMARY "+name+" "+json.dumps({k:value.get(k) for k in ("status","all_cases_passed","conservative_numeric_acceptance","engine_load_seconds","process_peak_rss_bytes","derived_graph_bytes","product_integrated")}),flush=True)
+              packed=gzip.compress(raw,mtime=0)
+              if len(packed)>524288:
+                  raise RuntimeError("Research report unexpectedly large")
+              data=base64.b64encode(packed).decode()
+              parts=[data[i:i+12000] for i in range(0,len(data),12000)]
+              print("AFRI_SIX_GZIP_SHA256 "+name+" "+hashlib.sha256(packed).hexdigest(),flush=True)
+              for i,part in enumerate(parts,1):
+                  print("AFRI_SIX_GZIP_B64 "+name+" "+str(i)+"/"+str(len(parts))+" "+part,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-afri-six-layer-evidence-${{ github.run_id }}
+          path: ${{ env.SIX_REPORTS }}
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: success()
+        with:
+          name: dordiai-afri-six-layer-derived-graphs-${{ github.run_id }}
+          path: ${{ env.SIX_OUTPUT }}
+          if-no-files-found: error
+          retention-days: 7
