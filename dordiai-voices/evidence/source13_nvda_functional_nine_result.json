@@ -1,0 +1,68 @@
+{
+  "format": "dordiai-source13-functional-nine-scenario-receipt",
+  "format_version": 1,
+  "core": {
+    "version": "0.13.1-dev.13",
+    "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "bytes": 1992990314,
+    "source_run_id": 45049806570,
+    "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a"
+  },
+  "status": "passed-functional-only-across-two-owned-runs",
+  "first_matrix": {
+    "run_id": 45051688055,
+    "workflow_conclusion": "failure",
+    "passed_scenarios": 8,
+    "strict_plain_failure_retained": true,
+    "evidence_index_blob": "dc916f6858380a89db6f441d6763f6cfb7f52f0d"
+  },
+  "plain_retry": {
+    "run_id": 45053477023,
+    "job_id": 137303511592,
+    "commit": "c1d38170c29cb2258eeab35f27832b81ff4de1bc",
+    "workflow_conclusion": "success",
+    "gzip_blob": "d5f73496897b0d1d64e67ad5f013212288a7155a",
+    "encoding": "gzip+base64",
+    "chunks": 5,
+    "json_sha256": "84273c589791271873c7159d9b60275778c93f5a28f4935b6c0dd1eb22a726a7",
+    "gzip_sha256": "e9b0fe84a44de7d180f49d4a424b237164a322a175d0c87bc3b41cd06756c386",
+    "json_size_bytes": 663102,
+    "summary_blob": "fb0f81e96677c54776b0daff3950197f7ff3c622",
+    "tool_blob": "5d85c22fc4c12cc530e39e73df36ff2c120a748d",
+    "historical_helper_blob": "3db4eadd4b1b9bc029d33a3272b8f083dcfcbb79",
+    "original_input_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+    "case_count": 7,
+    "original_source_words": 100,
+    "expected_and_observed_lexical_pieces": 102,
+    "language_mismatches": 0,
+    "raw_nonwhitespace_preserved": true,
+    "all_authored_forced_disabled_compound_cases_passed": true,
+    "cleanup_errors": [],
+    "pre_read_isolation": {
+      "old_planner_initially_observed": true,
+      "first_case_public_cancels": 2,
+      "all_case_pre_read_boundary_passed": true,
+      "observation_active_before_read": false,
+      "content_filtering": false,
+      "dummy_audio_warmup": false,
+      "production_changes": false
+    }
+  },
+  "independent_local_revalidation": {
+    "exact_actual_pin": true,
+    "all_nine_old_strict_validators_pass": true,
+    "result_blob": "7a36cbac578f85a558ca2053a67a11452f60494e"
+  },
+  "acceptance_limits": {
+    "product_ready": false,
+    "recording_pcm_sink_test_double": true,
+    "physical_audio_verified": false,
+    "wave_player_verified": false,
+    "acoustic_latency_verified": false,
+    "native_pronunciation_verified": false,
+    "full_keyboard_settings_acceptance": false,
+    "optional_language_acceptance": false,
+    "all135_language_quality": false
+  },
+  "scope": "Eight original successful scenarios plus separately successful unchanged100/102 plain-content retry on the exact SAME immutable core. The original first matrix remains failed; no expected label, auditor or runtime changed."
+}

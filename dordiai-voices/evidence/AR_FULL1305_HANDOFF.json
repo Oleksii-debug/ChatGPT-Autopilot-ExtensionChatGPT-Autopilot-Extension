@@ -1,0 +1,126 @@
+{
+  "format": "dordiai-ar-full1305-durable-handoff",
+  "format_version": 1,
+  "work_state": "STOPPED on explicit user handoff request; no further rendering, DSP experiments, activation or ref changes",
+  "actual_raw_preparation": {
+    "run": 45053476903,
+    "job": 137303511614,
+    "source_commit": "c1d38170c29cb2258eeab35f27832b81ff4de1bc",
+    "status": "passed-noninstallable-optional-bank-feasibility",
+    "profiles": 45,
+    "ordinary_source_names": 29,
+    "clips": 1305,
+    "native_generation_calls": 29,
+    "projection_calls": 1305,
+    "PCM_total_bytes": 83860830,
+    "index_total_bytes": 82755,
+    "warm_actual_checked_reads": 130500,
+    "warm_lookup_ms": {
+      "minimum": 0.5795,
+      "median": 0.6399,
+      "p95": 0.7106,
+      "maximum": 2.1943
+    },
+    "timing_scope": "Prepared software PCM lookup only, NOT audible or NVDA onset. Exact immutable driver AST methods and actual NativeLetterBank; not real NVDA runtime.",
+    "original_payloads_unchanged": 10230,
+    "original180_banks_untouched": true,
+    "old3330_not_regenerated": true,
+    "model_training_performed": false
+  },
+  "saved_git_objects": [
+    {
+      "path": "evidence/ar_full_banks_windows_45053476903.exact-crlf.json",
+      "blob": "9ba99898aa5cf15e025efd21af425ef026f5c57f",
+      "size_bytes": 1624331,
+      "sha256": "5a46e99b41c87e7970cd8c000c0ddd3b5668622fffc12e08e957cb0065dac91c",
+      "note": "EXACT original raw bytes, CRLF preserved via base64 upload."
+    },
+    {
+      "path": "evidence/ar_full_banks_windows_45053476903.json.gz.b64",
+      "blob": "acc6f365f38efdfe23c5a45fb2244943cc6767f8",
+      "size_bytes": 366324,
+      "sha256": "c9eeadf42fa79eb9f4db2d7d4ef2bf192090f79d415fc4f1e95536593bc172c6",
+      "decode": "base64.b64decode + gzip.decompress -> byte-exact original reportSHA5a46e99b...; no read_text newline translation."
+    },
+    {
+      "path": "evidence/ar_full_banks_archive_index_45053476903.json",
+      "blob": "39d30492994784af5c67696868ddd0b3f1cf4838",
+      "size_bytes": 246522,
+      "sha256": "4f85288544604cd59d6a524b7cf8c8917ea23d19165f29a4e6e847844650a92f"
+    },
+    {
+      "path": "evidence/AR_ORDINARY_BANK_ACTIVATION14_UK.md",
+      "blob": "3578d35aafe5a7c901a246354c6570b9154d310d",
+      "note": "Design only; NOT implemented production hook."
+    }
+  ],
+  "large_raw_archive": {
+    "artifact": 14766971451,
+    "run": 45053476903,
+    "name": "dordiai-ar-bank-mini-name-candidate-45053476903",
+    "scope": "Name retains mini for historical workflow; actual report scope is FULL and all1305 verified.",
+    "size_bytes": 101748675,
+    "sha256": "14b6838daff3621a67f71d443610787467cc5e9f007930d7aa244f3d9bc6a6f4",
+    "expires_at": "2027-02-20T18:09:48Z",
+    "independently_downloaded_and_whole_sha_verified": true,
+    "safe_members": 1430,
+    "wav_files": 1334,
+    "PCM_banks": 45,
+    "all1305_clip_offsets_and_sha_independently_verified": true,
+    "all45_index_audio_sha_independently_verified": true,
+    "local_copy": "/workspace/scratch/eb1194a9e557/ar-bank-mini/actual-45053476903/ar-bank-full-raw.zip",
+    "git_or_owned_draft_binary_backup_completed": false,
+    "remaining_preservation_action": "Move exact raw artifact to an owned DRAFT backup before retention expiry; source small report/index Git objects are already saved. Do not call Actions retention or scratch a permanent binary backup."
+  },
+  "immutable_inputs": {
+    "core12_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "core12_source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+    "core12_run": 45040668513,
+    "core12_artifact": 14761553443,
+    "core12_bytes": 1992944744,
+    "wide_run": 45021069771,
+    "wide_artifact": 14754247478,
+    "wide_outer_bytes": 552777798,
+    "wide_outer_sha256": "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262",
+    "shared_source_sha256": "643fd8c683786aa4af6619ac59f2227588034b214db05ef94137e5743b598447",
+    "private_runtime": "Original Python3.14.5 / ORT1.26.0, no new model/library/DLL installed"
+  },
+  "derived_delivery_comparison_state": {
+    "implementation_written": false,
+    "experiment_run": false,
+    "new_derived_audio_or_bank_files_created": false,
+    "existing_policy_verified_source_git_blob": "52b22c243783eaf15867d0741acd9a8d053b98f7",
+    "existing_policy_sha256": "2d5a1877622f6d7e95babc12685f88f69999263fa0a6fd32748f2093cda2ea93",
+    "existing_policy_path": "source/0.12.2/kx47Runtime/voice_delivery.py",
+    "known_mini_measurement": {
+      "method": "10ms RMS bins at2percent of sameclip maxRMS; heuristic activity ONLY, NOT groundtruth silence/phoneme-onset/crop threshold",
+      "leading_low_energy_ms": {
+        "oksana_alif": 430,
+        "oksana_hamza": 370,
+        "viktoriia_alif": 430,
+        "viktoriia_hamza": 410
+      },
+      "trailing_low_energy_ms": {
+        "oksana_alif": 436.7916666666665,
+        "oksana_hamza": 326.7916666666665,
+        "viktoriia_alif": 516.7916666666665,
+        "viktoriia_hamza": 406.7916666666665
+      }
+    },
+    "critical_limit": "DO NOT activate raw1305 clips with roughly400ms low-energy heads. Offline derived source-bound comparison using original prepare_letter plus quiet-fricative/natural-tail safety tests is still required; preserve raw originals and do not rerender1305 or modify old3330."
+  },
+  "production_state": {
+    "source13_unchanged": true,
+    "raw_bank_installed_or_activated": false,
+    "default_switch": false,
+    "listener_pronunciation_verified": false,
+    "real_NVDA_typing_or_onset_verified": false,
+    "physical_audio_verified": false,
+    "product_ready": false
+  },
+  "next_authorized_work_after_new_chat_resumes": [
+    "Preserve full raw archive durably in owned DRAFT, retaining exact SHA and original bytes.",
+    "Only after resuming development: compare4mini clips and quiet Arabic fricatives/tails with original source-bound delivery policy, retaining raw data and explicit safety gates. No silent amplitude-threshold cropping.",
+    "Only after safe derived data proof: minimal future14 installed-pack/namefacts/target/index/audio identity gate and actual NVDA onset validation; no old-source overlay reapplication."
+  ]
+}

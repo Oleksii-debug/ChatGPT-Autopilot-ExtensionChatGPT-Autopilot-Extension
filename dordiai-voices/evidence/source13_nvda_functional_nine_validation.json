@@ -1,0 +1,125 @@
+[
+  {
+    "format": "dordiai-source13-typing-scenario-validation",
+    "format_version": 1,
+    "scenario": "characters-only",
+    "status": "passed-functional-only",
+    "typed_key_count": 9,
+    "navigation_key_count": 0,
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Real owned NVDA key handlers and receipt integrity; not pronunciation or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-integration-validation",
+    "format_version": 1,
+    "mode": "normal",
+    "status": "passed-functional-only",
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "counts": {
+      "first_pass_glyphs": 176,
+      "warm_letters": 100,
+      "switches": 100,
+      "cancel_calls": 100
+    },
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Exact actual source13 core and unchanged probes/workloads; not optional-model or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-typing-scenario-validation",
+    "format_version": 1,
+    "scenario": "forced-uk",
+    "status": "passed-functional-only",
+    "typed_key_count": 1,
+    "navigation_key_count": 0,
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Real owned NVDA key handlers and receipt integrity; not pronunciation or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-integration-validation",
+    "format_version": 1,
+    "mode": "ru-missing",
+    "status": "passed-functional-only",
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "counts": {},
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Exact actual source13 core and unchanged probes/workloads; not optional-model or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-integration-validation",
+    "format_version": 1,
+    "mode": "typing",
+    "status": "passed-functional-only",
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "counts": {
+      "standard_typed_keys": 9
+    },
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Exact actual source13 core and unchanged probes/workloads; not optional-model or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-typing-scenario-validation",
+    "format_version": 1,
+    "scenario": "navigation",
+    "status": "passed-functional-only",
+    "typed_key_count": 2,
+    "navigation_key_count": 2,
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Real owned NVDA key handlers and receipt integrity; not pronunciation or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-integration-validation",
+    "format_version": 1,
+    "mode": "descriptor-corruption",
+    "status": "passed-functional-only",
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "counts": {},
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Exact actual source13 core and unchanged probes/workloads; not optional-model or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-typing-scenario-validation",
+    "format_version": 1,
+    "scenario": "disabled-ru",
+    "status": "passed-functional-only",
+    "typed_key_count": 1,
+    "navigation_key_count": 0,
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Real owned NVDA key handlers and receipt integrity; not pronunciation or acoustic acceptance"
+  },
+  {
+    "format": "dordiai-source13-integration-validation",
+    "format_version": 1,
+    "mode": "plain-text",
+    "status": "passed-functional-only",
+    "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "counts": {
+      "plain_cases": 7,
+      "original_source_words": 100,
+      "original_lexical_pieces": 102
+    },
+    "headless": true,
+    "product_ready": false,
+    "physical_audio_verified": false,
+    "scope": "Exact actual source13 core and unchanged probes/workloads; not optional-model or acoustic acceptance"
+  }
+]

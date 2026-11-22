@@ -1,0 +1,65 @@
+{
+  "format": "dordiai-source13-keyboard-settings-supplement-candidate",
+  "format_version": 1,
+  "status": "source-reviewed-awaiting-actual-core-and-Windows-execution",
+  "launch_tag": "[settings-keyboard13]",
+  "files": {
+    "dordiai-voices/tools/windows_nvda_settings_keyboard_probe.py": "456f85da5d705cf432b6906cc2b0972ea6c4274c",
+    "dordiai-voices/tests/test_windows_nvda_settings_keyboard_probe.py": "6f2e9adf640bf412836c219a6574444320ca7dec",
+    ".github/workflows/dordiai-source13-settings-keyboard.yml": "2453a775e33b252de3f28e322632b88705b33cd1"
+  },
+  "production_source_changed": false,
+  "historical_nine_source13_modes_changed": false,
+  "existing_smoke": {
+    "source_git_blob": "ec3d93b5b6e3f92af70d0b989ca9e280db5a840f",
+    "gap": "Direct driver dialog opener, binding inspection, wx API page/focus/row selection, one Space toggle restored then Cancel; not full keyboard settings/save/restart proof."
+  },
+  "planned_actual_flow": [
+    "Fresh isolated official NVDA2026.3.1 plus exact verified source13 addon.",
+    "Actual SendInput preferences hotkey; read-only public NVDA gesture observation.",
+    "Native Tab/CtrlTab/Home/Down/Space voice checkbox off/on, RU+UK off with English retained; compatible English->viktoriia choice.",
+    "Keyboard OK, real-hotkey reopen, keyboard Escape; NVDA+Ctrl+C with actual script/public post_configSave and owned nvda.ini checks.",
+    "Genuine second NVDA process with SAME owned base profile. Automatic saved-synth startup observed before any late recording factory/manual reselection and rechecked by weak identity before begin.",
+    "Keyboard NVDA+n Tools path, restore original core-language/default/mapping choices via real controls, keyboard save; unchanged installed runtime/model/private-Python manifest bytes verified."
+  ],
+  "startup_scope": "Optional owned-virtual route is the default workflow path and rejects any RecordingSink. Exact owned MMDeviceID is configured only in the disposable NVDA profile and saved by the real keyboard command. The second process must load actual Dordiai, original instance/settings and genuine native WavePlayer before any begin/reselection; checks repeat at begin with the same instance and endpoint ID. Existing/headless diagnostics retain explicit UNVERIFIED autostart when blocked.",
+  "not_proved": {
+    "actual_Windows_execution": false,
+    "physical_keyboard": false,
+    "physical_audio": false,
+    "native_pronunciation": false,
+    "named_profile_switching": false,
+    "file_chooser_keyboard": false,
+    "full_accessibility": false,
+    "product_ready": false
+  },
+  "verification": {
+    "local_synthetic_unit_tests": 33,
+    "passed": 33,
+    "workflow_python_blocks_AST_compile": 6,
+    "workflow_YAML_parsed": true,
+    "independent_source_review": "Native endpoint lifecycle and startup delta sent to independent peers; actual Windows execution pending."
+  },
+  "primary_NVDA_sources": {
+    "repository": "nvaccess/nvda",
+    "ref": "release-2026.3.1",
+    "files": {
+      "source/core.py": "4aada9508e2fc1f202d510a788fdb6e75a49f650",
+      "source/speech/__init__.py": "d82fc5ca844315db47dc0732f243f00a5b3a557a",
+      "source/config/__init__.py": "c83a6eacca79658ed7da572f3b07ce09ee99200d",
+      "source/globalCommands.py": "e3bb3088a95fd6501dc26f569fd996b1a0ae6a04",
+      "source/inputCore.py": "f1f857adde4669866af8e28be1b2fb1128b7f2ef",
+      "source/synthDriverHandler.py": "2834808f401b38fee3a3b489f5b82edcc7f4ab74",
+      "source/nvwave.py": "9234b0fa6a12ea01e22d1988a2331ae7610560a5"
+    }
+  },
+  "owned_virtual_route": {
+    "device_helper_git_blob": "6539e4f770d93300fa96c272c9e281f767026e3f",
+    "process_guard_git_blob": "d1d11c230e0feb3e1725383aa433b6d7a1528693",
+    "marker_cpp_git_blob": "56f8ba819241ff020facf535d93d52600568b0a2",
+    "reviewed_workflow_reference": "fd44e577d58455d973bac028fcc254b93d787236",
+    "scope": "Reuse unchanged trusted-vendor verification, WindowsPnP exact owned-device context and describe-only child. No waveform capture/playback, microphone, default-device/format/privacy/signature-policy change, certificate import, installer execution or reboot. Keep lease across both exact NVDA processes; stop/wait/poll every exact Popen before cleanup. Require owned-device removal and absence verification; any stop/cleanup failure rejects.",
+    "physical_audio_verified": false,
+    "actual_Windows_execution": false
+  }
+}

@@ -1,3 +1,5 @@
+> Актуальна точка продовження після зупинки для передачі: [CODEX_HANDOFF_UK.md](CODEX_HANDOFF_UK.md), [HANDOFF_TECHNICAL_STATE.json](HANDOFF_TECHNICAL_STATE.json), [PROMPT_2_RESUME_CODEX_UK.md](PROMPT_2_RESUME_CODEX_UK.md). Незмінний core13 уже пройшов9функціональнихNVDAсценаріїв і10реальнихwxоперацій. Наведений далі текст збережено як попередній стан, без підміни історичних результатів.
+
 # Продовження dordiai-voices
 
 Працювати автономно до FINAL_PRODUCT_SPEC_UK.md, без додаткових запитів. Лише dordiai-voices і його спеціальні workflow; гілка dordiai-voices/audit-20261122. Корінь комітить і пересуває ref. Поширений0.12.1, unified0.3.10 та Autopilot не змінювати. Вісім виключених ідентичностей залишаються заблокованими.

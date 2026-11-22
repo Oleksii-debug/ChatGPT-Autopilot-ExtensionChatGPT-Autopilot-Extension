@@ -1,0 +1,159 @@
+{
+  "format": "dordiai-source13-actual-package-maintenance-gui-proof",
+  "format_version": 1,
+  "run_id": 45053476915,
+  "job_id": 137303511251,
+  "workflow_commit": "c1d38170c29cb2258eeab35f27832b81ff4de1bc",
+  "workflow_path": ".github/workflows/dordiai-source13-package-gui.yml",
+  "status": "passed-functional-pipeline-only",
+  "actual_run_conclusion": "success",
+  "immutable_binary_source": "2d70515a4c49413efcb23198491bbc675a55db0a",
+  "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "core_bytes": 1992990314,
+  "actual_frozen_NVDA": "2026.3.1",
+  "probe_git_blob": "a942b244281f1db94fd2f434dd2c570922c83583",
+  "strict_gate_git_blob": "9d79c8c91ff437c0345ebfa364a983a363226305",
+  "independent_local_strict_gate_revalidation": "passed",
+  "artifact": {
+    "id": 14765409867,
+    "bytes": 21500,
+    "sha256": "9b0c2befa0c8718d995f57a18040936d36eadb9e5191626d5e197f4185e493ef",
+    "download_outer_SHA_verified": true
+  },
+  "process_id": 4768,
+  "profile": "agnieszka",
+  "core_profile_sha256": "a8add57f93746a72e1adefc9ba0e03b5d7f37ba0a47f18a08ad32ea7185faf56",
+  "operations": [
+    {
+      "name": "install-v1",
+      "active_version": "1.0.0",
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "install-v2",
+      "active_version": "2.0.0",
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "rollback-v1",
+      "active_version": "1.0.0",
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "corrupt-rejected",
+      "active_version": "1.0.0",
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "locked-remove",
+      "active_version": null,
+      "inactive_version": "1.0.0",
+      "index_format": 2,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "retry-remove",
+      "active_version": null,
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "install-again",
+      "active_version": "1.0.0",
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "retain-files",
+      "active_version": null,
+      "inactive_version": "1.0.0",
+      "index_format": 2,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "activate-retained",
+      "active_version": "1.0.0",
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    },
+    {
+      "name": "final-remove",
+      "active_version": null,
+      "inactive_version": null,
+      "index_format": 1,
+      "fresh_driver": true,
+      "old_thread_stopped": true,
+      "core_profile_unchanged": true
+    }
+  ],
+  "all_ten_old_driver_threads_stopped": true,
+  "all_ten_maintenance_releases_and_espeak_selections_passed": true,
+  "all_ten_fresh_drivers_and_reopened_dialogs_passed": true,
+  "genuine_modern_NVDA_MessageDialog_checks_passed": true,
+  "real_locked_file_error": "WinError32 on owned mapped holos.npy; inactive ownership retained and retry succeeded",
+  "corrupt_package_rejected_before_activation": true,
+  "final_package_list_empty_and_index_v1": true,
+  "clean_NVDA_exit_observed": true,
+  "original_files": [
+    {
+      "path": "dordiai-voices/evidence/source13-package-gui-45053476915.zip",
+      "bytes": 21500,
+      "sha256": "9b0c2befa0c8718d995f57a18040936d36eadb9e5191626d5e197f4185e493ef",
+      "git_sha": "10807aae959e281739798d93bfce9eef3cf7e52f"
+    },
+    {
+      "path": "dordiai-voices/evidence/source13-package-gui-45053476915/controller.json.gz",
+      "bytes": 3955,
+      "sha256": "ea9d03e4ef1e4a1bc3f85eacdf0afb96967a8eb39b0fe0ad72bb1d970f3d725c",
+      "git_sha": "c461e79697f7e541c6a0bc7055e8e7c2930db227",
+      "decoded_bytes": 56755,
+      "decoded_sha256": "f156f46c07621f2f0b32aa7add283b4dba3efee5b80b16188e48c9817b95bdb2"
+    },
+    {
+      "path": "dordiai-voices/evidence/source13-package-gui-45053476915/host.json.gz",
+      "bytes": 3188,
+      "sha256": "2fdd315b73b3dd9f251871d7c75d2fe9f261e9538bcc9144456768dc7f381dec",
+      "git_sha": "15feb9761a8fbf9ca2bc5d5c052a0ed37c74292a",
+      "decoded_bytes": 50196,
+      "decoded_sha256": "3e2ee5b341437e3c776e9f3c70a41b2e7f304087d4a344243fd77ba693428b6f"
+    }
+  ],
+  "api_dispatched_operations": true,
+  "native_file_chooser_interaction_verified": false,
+  "full_keyboard_accessibility_verified": false,
+  "actual_restart_upgrade_verified": false,
+  "imported_profile_model_pcm_verified": false,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false,
+  "scope": "Real owned Windows/NVDA/wx package-maintenance pipeline and actual MessageDialog events; headless recording sink. No chooser/keyboard/restart/PCM/pronunciation/device acceptance."
+}
