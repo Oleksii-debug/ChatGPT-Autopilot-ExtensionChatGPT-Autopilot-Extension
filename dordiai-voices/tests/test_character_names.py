@@ -129,13 +129,15 @@ class CharacterNameTests(unittest.TestCase):
         for glyph in ("sh", "Sh", "SH"):
             self.assertEqual(names.spoken_name("ha", glyph, directory=directory), "sha")
 
-    def test_ambiguous_primary_source_row_stays_open(self):
+    def test_aymara_aspirate_name_resolved_by_independent_primary_table(self):
         directory = ROOT / "source/0.12.2/kx47Runtime/models/CharacterNames"
         record = names.data("ay", directory)
-        self.assertFalse(record["ordinary_alphabet_source_complete"])
-        self.assertIn("qh", record["curation_exclusions"])
-        with self.assertRaises(LookupError):
-            names.spoken_name("ay", "qh", directory=directory)
+        self.assertTrue(record["ordinary_alphabet_source_complete"])
+        self.assertEqual(len(record["ordinary_alphabet_source_repertoire"]), 32)
+        self.assertNotIn("qh", record.get("curation_exclusions", {}))
+        self.assertEqual(names.spoken_name("ay", "qh", directory=directory), "qha")
+        self.assertEqual(names.spoken_name("ay", "q", directory=directory), "qa")
+        self.assertFalse(names.letter_names_ready("ay", directory))
 
     def test_ordinary_names_are_native_for_new_european_scripts(self):
         directory = ROOT / "source/0.12.2/kx47Runtime/models/CharacterNames"

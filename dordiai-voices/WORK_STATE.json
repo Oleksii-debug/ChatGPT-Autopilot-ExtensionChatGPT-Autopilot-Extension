@@ -4,7 +4,7 @@
   "status": "implementation_in_progress",
   "product_ready": false,
   "base_version": "0.12.2",
-  "target_version": "0.13.1-dev.11",
+  "target_version": "0.13.1-dev.12",
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
@@ -45,7 +45,8 @@
     "Exact final release reconstruction must retain newly generated bank bytes and matching source/package evidence.",
     "Repeat extended keyboard policy/navigation checks and dictionary reads on matching final source11 archive; immutable core10's five scenarios passed.",
     "Real source11 unmarked plain-file mixed-word routing and authored TextInfo metadata verification in run45034220666; no default-locale pinning may suppress auto mode.",
-    "Confirmed source11 original LangChange(None)→NVDA normalizedUK loses provenance and pins100 unmarked words; fix in12 with documented speech hook and preserve real author/typing/forced/enabled priority."
+    "Confirmed source11 original LangChange(None)→NVDA normalizedUK loses provenance and pins100 unmarked words; fix in12 with documented speech hook and preserve real author/typing/forced/enabled priority.",
+    "Pre-existing personalLanguage normalization semantics need separate reviewed correction after main12 actual acceptance."
   ],
   "environment": {
     "windows_verification_route": "GitHub Actions isolated Windows runners",
@@ -714,6 +715,17 @@
           "sha256": "e514b24bd19cad36e8b3dc581e7415f3e949d803b3380c6c5432529290c579bd",
           "git_blob": "485ab76e5b7590f7a4d0f597cec643a79a7e2e7e"
         }
+      },
+      "process_loopback": {
+        "run": 45036525050,
+        "job": 137251394799,
+        "actual_own_marker_waveform_correlated": true,
+        "channels": 2,
+        "normalized_correlation_min": 0.9966245233,
+        "target": "own current PID INCLUDE only",
+        "physical_audio_verified": false,
+        "actual_nvda_waveform_capture_verified": false,
+        "evidence": "evidence/process_loopback_45036525050_summary.json"
       }
     },
     "latest_built_core": {
@@ -891,12 +903,70 @@
       "authored_rich_metadata_cases_blocked": "Probe isolated detectFormatAfterCursor was false; genuine nativefontLCIDs alternate but TextInfo only initially exposesru_RU. Tool-only setting/restore correction prepared.",
       "cleanup_restored": true,
       "evidence": "evidence/source11_plain_text_provenance_failure.md"
+    },
+    "source12_candidate": {
+      "status": "reviewed_awaiting_actual_build",
+      "local_suite": {
+        "base_snapshot": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+        "tests_total": 1304,
+        "passed": 1252,
+        "skipped": 52,
+        "seconds": 7.555,
+        "scope": "Linux isolated source12 candidate overlay; final manifestversion bump only after suite"
+      },
+      "origin_actual_private_queue_run": 45039893824,
+      "origin_invariants": 9,
+      "word_cache_actual_external_manager_run": 45039894049,
+      "word_cache_controls": 9,
+      "prepared_banks_regenerated": false,
+      "private_runtime_changes": false,
+      "actual_source12_archive_exists": false
+    },
+    "character_names_ay_fil": {
+      "actual_windows_runs": [
+        45038768977,
+        45038769182
+      ],
+      "source_names": 60,
+      "native_waves": 60,
+      "selected_profile_waves": 60,
+      "old_runtime_payloads_unchanged_each": 10223,
+      "evidence": "evidence/ay_fil_ordinary_name_actual_windows.json",
+      "actual_nvda_typing_verified": false,
+      "native_listener_verified": false,
+      "source12_data_only_adoption_pending": true
+    },
+    "language_origin_transport": {
+      "run": 45039893824,
+      "job": 137261765553,
+      "actual_generic_parameter_invariants": 9,
+      "status": "passed_private_host_queue_only",
+      "evidence": "evidence/language_origin_transport_45039893824.json",
+      "actual_source12_driver_pipeline_verified": false
+    },
+    "word_cache_candidate": {
+      "candidate_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+      "actual_windows_run": 45036190641,
+      "actual_linux_run": 45035639189,
+      "actual_frozen_nvda_run": 45039894049,
+      "status": "mechanical_host_and_lifecycle_verified_for12",
+      "frozen_wrapper_median_ms_range": [
+        0.767,
+        0.808
+      ],
+      "baseline_wrapper_median_ms_range": [
+        1.752,
+        1.876
+      ],
+      "first_use_unique_speedup_claimed": false,
+      "typing_audio_acceptance": false,
+      "evidence": "evidence/native_word_cache_nvda_45039894049.json"
     }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
   "next_work": [
-    "Fix confirmed actual source11 None→defaultUK provenance loss in production12; actual100words/102pieces had71 wrongroutes. Retain original failure and verify genuine authoredmetadata with isolated detectFormatAfterCursor restore.",
+    "Build reviewed source12 from exact immutable11 resources, then real matchingNVDA mixed100/TextInfo authoredmetadata/forced/disabled/typing/recovery and actualsoftwarePCM.",
     "Calibrate own exact render-loopback PCM without microphone/privacy/default changes, then measure matching-core real output.",
     "Complete genuine missing-language frontends/resources and ordinary character names; retain truthful missing/partial counts.",
     "Measure downstream voice conversion/streaming and full typing, optimize only with unchanged quality and bounded lifecycle evidence."
@@ -1047,5 +1117,5 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Immutable11 source84ca83e built; installed NVDA dictionary/normal/typing/recovery verified. Plain TextInfo actual run45034220666 active. All production changes next require12."
+  "working_source_target_version": "Production12 candidate reviewed and staged: locale provenance/typed-context bridge, bounded exact-word cache, exact whole-compound membership and source-backed AY/FIL ordinary-name data. Local1304total/1252pass/52skip. ActualWindowsbuild and fullmatchingNVDA12 pending; immutable11 retained."
 }

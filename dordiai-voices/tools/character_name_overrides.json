@@ -139,19 +139,50 @@
         "title": "Ciberaymara — Contexto — El alfabeto aymara",
         "author": "Instituto de Lengua y Cultura Aymara (ILCA); course register based on INEL/SENALEP and Juan de Dios Yapita",
         "location": "Escritura, §3 El alfabeto aymara, NOMBRE DE LA LETRA table",
-        "role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+        "role": "Explicit original ILCA ordinary-name column, with Ministry2021 corroboration resolving qh and specifying aa/ii/uu names; source table completeness does not establish acoustic acceptance",
         "short_quote": "NOMBRE DE LA LETRA",
         "license_note": "Individual factual names transcribed with attribution; original page/teaching prose not redistributed; no license of whole source asserted",
-        "native_pronunciation_verified": false
+        "native_pronunciation_verified": false,
+        "previous_unresolved_role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+        "primary_corroboration": {
+          "url": "https://cdn.www.gob.pe/uploads/document/file/4973488/item_55_vocabulario_aymara.pdf?v=1692022988",
+          "bytes": 5927811,
+          "sha256": "227ed343f0d68d460159bfb7f9a2a785085f82629a50fdd0d2498e3a2260b072",
+          "sha256_scope": "original PDF bytes actually downloaded and inspected",
+          "title": "Yatichaña aru pirwa — Vocabulario pedagógico aimara",
+          "author": "Ministerio de Educación del Perú; Felipe Huayhua Pari",
+          "edition": 2021,
+          "location": "Printed page12, PDF page14 (zero-based13), §1 El alfabeto oficial, Grafía / Nomenclatura table",
+          "rights": "All rights reserved in original PDF; factual name mappings independently transcribed. No PDF/images/prose redistributed.",
+          "changes_supported": {
+            "qh": "qha",
+            "ä": "aa",
+            "ï": "ii",
+            "ü": "uu"
+          },
+          "caution": "PDF font text layer represents glottal mark as superscript1. Existing reviewed ILCA apostrophe spellings retained unchanged, not corrected from OCR. Names aa/ii/uu are explicit nomenclature spellings, not inferred phonetic examples."
+        },
+        "technical_name_pcm_proof": {
+          "run_id": 45038768977,
+          "raw_report_git_blob": "d1303f4f9989943347d30615bf6e416f113f93c2",
+          "source_names_rendered": 32,
+          "native_and_viktoriia_finite_pcm": true,
+          "scope": "Isolated names explicitly supplied as ordinary text, unchanged core11/private ORT1.26; not production raw-glyph or NVDA/typing acceptance",
+          "native_pronunciation_verified": false,
+          "listener_pronunciation_verified": false,
+          "windows_nvda_verified": false,
+          "typing_verified": false,
+          "physical_audio_verified": false
+        }
       },
       "letter_names": {
         "a": "a",
-        "ä": "ä",
+        "ä": "aa",
         "ch": "cha",
         "chh": "chha",
         "ch'": "ch'a",
         "i": "i",
-        "ï": "ï",
+        "ï": "ii",
         "j": "ja",
         "k": "ka",
         "kh": "kha",
@@ -172,15 +203,20 @@
         "th": "tha",
         "t'": "t'a",
         "u": "u",
-        "ü": "ü",
+        "ü": "uu",
         "w": "wa",
         "x": "xa",
-        "y": "ya"
+        "y": "ya",
+        "qh": "qha"
       },
-      "ordinary_alphabet_complete": false,
+      "ordinary_alphabet_complete": true,
       "semantic_role": "ordinary_letter_name",
-      "exclusions": {
-        "qh": "ILCA table currently says qa for both q and qh; do not silently correct an ambiguous source"
+      "resolved_source_exclusions": {
+        "qh": {
+          "previous_reason": "ILCA table currently says qa for both q and qh; do not silently correct an ambiguous source",
+          "resolution": "Explicit qh → qha in Ministry2021 printedpage12/PDFpage14",
+          "source_sha256": "227ed343f0d68d460159bfb7f9a2a785085f82629a50fdd0d2498e3a2260b072"
+        }
       }
     },
     "es": {
@@ -632,6 +668,79 @@
       "semantic_role": "ordinary_letter_name",
       "exclusions": {
         "q": "Onlysourcevariantkü usesnon-Romanian/phonetic notation; no ordinarywrittenname inferred"
+      }
+    },
+    "fil": {
+      "source": {
+        "url": "https://kwfwikaatkultura.ph/wp-content/uploads/2024/03/Manwal-sa-Masinop-na-Pagsulat.pdf",
+        "bytes": 2042405,
+        "sha256": "5f20b7eb93ef53af129822bede538121b8967fbc0e7fd93c64bef646d740f66f",
+        "sha256_scope": "original PDF bytes actually downloaded and inspected",
+        "title": "KWF Manwal sa Masinop na Pagsulat",
+        "author": "Virgilio S. Almario, editor; Komisyon sa Wikang Filipino",
+        "edition": 2014,
+        "location": "Printed page9, PDF page19 (zero-based18), §1.1 Titik, all28-letter ordinary-name table; printed page5 corroborating prose list",
+        "caution": "These are explicitly prescribed Filipino ordinary names (English-derived except Spanish ñ), not unreviewed English fallback. NG is ONE Filipino alphabet letter, supplied literal spaced table name en dyi. Page5 gives joined endyi as alternative. The unchanged native MMS acoustic checkpoint is Central Tagalog tgl, used by existing selected Filipino catalog entry; this does not establish pronunciation acceptance.",
+        "license_note": "All rights reserved in original PDF; factual name mappings independently transcribed. No PDF/images/prose redistributed.",
+        "role": "Explicit complete Filipino ordinary letter-name table, not historical Abakada names or unreviewed English voice fallback",
+        "native_pronunciation_verified": false,
+        "publisher_identity": {
+          "url": "https://kwfdiksiyonaryo.ph/",
+          "evidence": "Official KWF dictionary homepage copyright Komisyon sa Wikang Filipino links both kwf.gov.ph and Repositoryo ng mga Wika ng Pilipinas kwfwikaatkultura.ph",
+          "repertoire_corroboration_url": "https://kwfdiksiyonaryo.ph/css/files/gabay_op.pdf",
+          "repertoire_only_pdf_bytes": 596291,
+          "repertoire_only_pdf_sha256": "2350faee606990c795a3699df706ad9d2cafaa1ee15c16f6de9ce54a3366771f",
+          "repertoire_only_location": "PDF page2 alphabet chart; not cited as ordinary-name table"
+        },
+        "technical_name_pcm_proof": {
+          "run_id": 45038769182,
+          "raw_report_git_blob": "56d5ee58ff05b377d6480fe7d7492521a0f23532",
+          "source_names_rendered": 28,
+          "native_and_viktoriia_finite_pcm": true,
+          "scope": "Isolated names explicitly supplied as ordinary text, unchanged core11/private ORT1.26; not production raw-glyph or NVDA/typing acceptance",
+          "native_pronunciation_verified": false,
+          "listener_pronunciation_verified": false,
+          "windows_nvda_verified": false,
+          "typing_verified": false,
+          "physical_audio_verified": false
+        }
+      },
+      "letter_names": {
+        "a": "ey",
+        "b": "bi",
+        "c": "si",
+        "d": "di",
+        "e": "i",
+        "f": "ef",
+        "g": "dyi",
+        "h": "eyts",
+        "i": "ay",
+        "j": "dyey",
+        "k": "key",
+        "l": "el",
+        "m": "em",
+        "n": "en",
+        "ñ": "enye",
+        "ng": "en dyi",
+        "o": "o",
+        "p": "pi",
+        "q": "kyu",
+        "r": "ar",
+        "s": "es",
+        "t": "ti",
+        "u": "yu",
+        "v": "vi",
+        "w": "dobolyu",
+        "x": "eks",
+        "y": "way",
+        "z": "zi"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "alternatives": {
+        "ng": [
+          "endyi"
+        ]
       }
     }
   }

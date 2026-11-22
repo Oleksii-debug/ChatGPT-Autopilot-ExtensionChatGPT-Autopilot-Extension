@@ -1,0 +1,616 @@
+{
+  "format": "dordiai-real-frozen-nvda-word-cache-actual-review",
+  "format_version": 1,
+  "run": 45039894049,
+  "job": 137261765993,
+  "commit": "ddaf0d8b96e641d48d4d75cb0e7be641d802980c",
+  "conclusion": "success",
+  "fixture_tests_passed": 16,
+  "baseline_git_blob": "0eec65f898977bbd1c1de6561ddbff2014c0eea2",
+  "candidate_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+  "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+  "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+  "descriptor_sha256": "2de5611c384e933e19d1cdf5fda37f17bd5c4b7602d09964f53fdb7280877459",
+  "nvda": "2026.3.1",
+  "python": "3.13.17",
+  "scope": "Real frozen host, own external exact unchanged Resource wrapper and source11 manager/host modules. No product addon, voice, speech or audio test. This does not include global installed-driver lease dispatch.",
+  "plain_data_path_characters": 300,
+  "namespace_data_path_characters": 304,
+  "rounds": 3,
+  "fresh_resource_instances": 9,
+  "case_count_each": 97,
+  "all_source_and_valid_unknown_memberships_match": true,
+  "all_cancellations_rejected_before_cached_return": true,
+  "all_copied_descriptor_mutations_rejected": true,
+  "all_word_and_block_caches_empty_after_close": true,
+  "descriptor_exactly_restored": true,
+  "all_windows_mapping_handles_released": true,
+  "sys_path_unchanged": true,
+  "private_python_added": false,
+  "comparisons": [
+    {
+      "round": 1,
+      "variant": "original",
+      "resource_open_ms": 47.4487,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.7903,
+        "p95_ms": 1.9728,
+        "p99_ms": 2.1457,
+        "max_ms": 2.1457,
+        "total_ms": 174.2269
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.9636,
+        "p95_ms": 1.2553,
+        "p99_ms": 2.3408,
+        "max_ms": 5.2917,
+        "total_ms": 1013.0857
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 1.7523499999999999,
+        "p95_ms": 2.8124,
+        "p99_ms": 4.1417,
+        "max_ms": 8.2192,
+        "total_ms": 1865.9913999999999
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1823306,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 1,
+      "variant": "candidate-cache0",
+      "resource_open_ms": 41.2731,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.799,
+        "p95_ms": 3.7172,
+        "p99_ms": 6.7531,
+        "max_ms": 6.7531,
+        "total_ms": 205.065
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.9678,
+        "p95_ms": 1.2299,
+        "p99_ms": 2.2646,
+        "max_ms": 5.8657,
+        "total_ms": 1023.7779
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 1.8097500000000002,
+        "p95_ms": 2.8749,
+        "p99_ms": 4.5851,
+        "max_ms": 12.7218,
+        "total_ms": 1956.7529
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1823306,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 0,
+        "word_cache_bytes_charged": 0,
+        "word_cache_entry_limit": 0,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 0,
+        "word_cache_misses": 2297,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 1,
+      "variant": "candidate-default",
+      "resource_open_ms": 93.9522,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.7586,
+        "p95_ms": 1.9715,
+        "p99_ms": 2.6674,
+        "max_ms": 2.6674,
+        "total_ms": 173.1627
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.0299,
+        "p95_ms": 0.0318,
+        "p99_ms": 0.0563,
+        "max_ms": 0.0767,
+        "total_ms": 30.6515
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 0.7671,
+        "p95_ms": 0.8883,
+        "p99_ms": 1.3983,
+        "max_ms": 5.7089,
+        "total_ms": 801.2748
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1817811,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 97,
+        "word_cache_bytes_charged": 56607,
+        "word_cache_entry_limit": 1024,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 2200,
+        "word_cache_misses": 97,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 2,
+      "variant": "candidate-default",
+      "resource_open_ms": 39.4575,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.7619,
+        "p95_ms": 2.6457,
+        "p99_ms": 5.9044,
+        "max_ms": 5.9044,
+        "total_ms": 182.4435
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.0294,
+        "p95_ms": 0.0312,
+        "p99_ms": 0.047,
+        "max_ms": 0.0594,
+        "total_ms": 29.994
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 0.7835,
+        "p95_ms": 0.9498,
+        "p99_ms": 1.7672,
+        "max_ms": 4.3971,
+        "total_ms": 822.2762
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1817811,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 97,
+        "word_cache_bytes_charged": 56607,
+        "word_cache_entry_limit": 1024,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 2200,
+        "word_cache_misses": 97,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 2,
+      "variant": "candidate-cache0",
+      "resource_open_ms": 40.4059,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.7912,
+        "p95_ms": 2.244,
+        "p99_ms": 3.7476,
+        "max_ms": 3.7476,
+        "total_ms": 179.9437
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.98745,
+        "p95_ms": 1.847,
+        "p99_ms": 3.1574,
+        "max_ms": 7.7879,
+        "total_ms": 1090.6685
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 1.8091499999999998,
+        "p95_ms": 2.4315,
+        "p99_ms": 4.8482,
+        "max_ms": 9.9404,
+        "total_ms": 1915.675
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1823306,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 0,
+        "word_cache_bytes_charged": 0,
+        "word_cache_entry_limit": 0,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 0,
+        "word_cache_misses": 2297,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 2,
+      "variant": "original",
+      "resource_open_ms": 40.8152,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.7653,
+        "p95_ms": 4.0944,
+        "p99_ms": 5.4523,
+        "max_ms": 5.4523,
+        "total_ms": 198.8832
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.98755,
+        "p95_ms": 1.9073,
+        "p99_ms": 3.6531,
+        "max_ms": 5.075,
+        "total_ms": 1111.5029
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 1.87635,
+        "p95_ms": 4.0258,
+        "p99_ms": 6.3033,
+        "max_ms": 13.9376,
+        "total_ms": 2164.7481
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1823306,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 3,
+      "variant": "original",
+      "resource_open_ms": 41.4944,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.8452,
+        "p95_ms": 4.283,
+        "p99_ms": 13.8598,
+        "max_ms": 13.8598,
+        "total_ms": 213.3781
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.98425,
+        "p95_ms": 1.476,
+        "p99_ms": 3.2744,
+        "max_ms": 8.4807,
+        "total_ms": 1082.7801
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 1.8167,
+        "p95_ms": 3.5474,
+        "p99_ms": 5.6169,
+        "max_ms": 6.8836,
+        "total_ms": 2013.9098999999999
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1823306,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 3,
+      "variant": "candidate-cache0",
+      "resource_open_ms": 45.3074,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.8046,
+        "p95_ms": 2.6992,
+        "p99_ms": 4.9577,
+        "max_ms": 4.9577,
+        "total_ms": 187.3164
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.9894499999999999,
+        "p95_ms": 1.7631,
+        "p99_ms": 3.8328,
+        "max_ms": 7.2146,
+        "total_ms": 1115.2355
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 1.8110499999999998,
+        "p95_ms": 3.2011,
+        "p99_ms": 6.488,
+        "max_ms": 10.9762,
+        "total_ms": 2008.3956
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1823306,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 0,
+        "word_cache_bytes_charged": 0,
+        "word_cache_entry_limit": 0,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 0,
+        "word_cache_misses": 2297,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    },
+    {
+      "round": 3,
+      "variant": "candidate-default",
+      "resource_open_ms": 44.0504,
+      "first_pass_manager97": {
+        "count": 97,
+        "median_ms": 1.8429,
+        "p95_ms": 2.4031,
+        "p99_ms": 9.9405,
+        "max_ms": 9.9405,
+        "total_ms": 194.3319
+      },
+      "reader1000": {
+        "count": 1000,
+        "median_ms": 0.0312,
+        "p95_ms": 0.0351,
+        "p99_ms": 0.0555,
+        "max_ms": 0.2233,
+        "total_ms": 32.4531
+      },
+      "manager1000": {
+        "count": 1000,
+        "median_ms": 0.80765,
+        "p95_ms": 1.3464,
+        "p99_ms": 3.3565,
+        "max_ms": 5.333,
+        "total_ms": 906.7571
+      },
+      "statistics": {
+        "closed": false,
+        "codes": [
+          "uk",
+          "ru"
+        ],
+        "word_count": 6642550,
+        "blocks": 25948,
+        "cached_blocks": 32,
+        "cache_bytes_charged": 1817811,
+        "cache_byte_limit": 4194304,
+        "cache_block_limit": 32,
+        "dataset_sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "max_raw_block_bytes": 65536,
+        "max_block_words": 256,
+        "membership_mask_bytes": 1,
+        "language_table_limit": 1024,
+        "cached_words": 97,
+        "word_cache_bytes_charged": 56607,
+        "word_cache_entry_limit": 1024,
+        "word_cache_byte_limit": 524288,
+        "word_cache_hits": 2200,
+        "word_cache_misses": 97,
+        "word_cache_evictions": 0,
+        "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"
+      },
+      "cancellation_checked_before_cached_return": true,
+      "descriptor_change_rejected_even_after_cache_hit": true
+    }
+  ],
+  "exact_evidence": [
+    {
+      "label": "CONTROLLER",
+      "git_blob": "005c8b75955005bb40f39088d707b886f3b0d166",
+      "gzip_bytes": 7183,
+      "gzip_sha256": "2905d3f49f832bb09565979a7c44736398c2a7680a76999e282fcc4202bda20b",
+      "raw_bytes": 36573,
+      "raw_sha256": "5ef9523bba1dfdbaf102b054177c7c458475c2d4c5329eb25c94d8898c6371d8",
+      "status": "passed-host-compatibility",
+      "checks": null,
+      "nvda": "2026.3.1",
+      "python": null,
+      "path": "evidence/native_word_cache_nvda_controller_45039894049.json.gz"
+    },
+    {
+      "label": "HOST",
+      "git_blob": "f9a796ce84fde39acd5cbccbc8d0cb0c30f64141",
+      "gzip_bytes": 6007,
+      "gzip_sha256": "b61f557fc257c4054c4614bf9a2744bae98eb90a62ed4801ae35a82841564236",
+      "raw_bytes": 30657,
+      "raw_sha256": "0f38e63e749e2820c8262018d844c63c43e009f5ac7cf19ab95c384fe361c0c9",
+      "status": "passed-host-compatibility",
+      "checks": [
+        {
+          "name": "real_frozen_nvda_313",
+          "status": "passed"
+        },
+        {
+          "name": "builtin_silence",
+          "status": "passed"
+        },
+        {
+          "name": "long_external_data_path",
+          "status": "passed",
+          "plain_characters": 300,
+          "namespace_characters": 304,
+          "installed_product_long_path_verified": false
+        },
+        {
+          "name": "nine_real_manager_comparisons",
+          "status": "passed"
+        },
+        {
+          "name": "host_sys_path_unchanged",
+          "status": "passed",
+          "private_python_path_added": false
+        },
+        {
+          "name": "all_external_windows_mapping_handles_released",
+          "status": "passed"
+        },
+        {
+          "name": "data_unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "descriptor_exact_restoration",
+          "status": "passed"
+        }
+      ],
+      "nvda": "2026.3.1",
+      "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+      "path": "evidence/native_word_cache_nvda_host_45039894049.json.gz"
+    }
+  ],
+  "artifact": {
+    "id": 14760638196,
+    "name": "dordiai-real-nvda-word-cache",
+    "size_in_bytes": 16398,
+    "url": "https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/14760638196",
+    "archive_download_url": "https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/14760638196/zip",
+    "expired": false,
+    "created_at": "2026-11-22T15:44:58Z",
+    "expires_at": "2026-12-22T15:44:57Z",
+    "updated_at": "2026-11-22T15:44:58Z",
+    "digest": "sha256:15797c19461f426a3fe4677f8546a9b156261205aab32c8cec8bc79cc5cfbc8e",
+    "workflow_run": {
+      "id": 45039894049,
+      "repository_id": 1350542041,
+      "head_repository_id": 1350542041,
+      "head_branch": "dordiai-voices/audit-20261122",
+      "head_sha": "ddaf0d8b96e641d48d4d75cb0e7be641d802980c"
+    }
+  },
+  "first_use_unique_improvement_claimed": false,
+  "nvda_external_resource_verified": true,
+  "installed_product_verified": false,
+  "production_integrated": false,
+  "typing_verified": false,
+  "pronunciation_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

@@ -1,0 +1,141 @@
+name: Dordiai source12 immutable11 build and actual native worker225
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-source12-integration-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build-and-native-worker:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[source12-integration]')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - name: Preserve original reviewed UTF8 and vendor byte identities
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install only host regression-test requirements
+        run: python -m pip install -r dordiai-voices/tests/requirements.txt
+      - name: Run the full Windows source12 regression suite including morphology and native file replacement
+        run: python -m unittest discover -s dordiai-voices/tests -v
+      - name: Define owned short staging paths
+        shell: pwsh
+        run: |
+          "SOURCE12_INPUTS=$env:RUNNER_TEMP/dordiai-source12-inputs-$env:GITHUB_RUN_ID" >> $env:GITHUB_ENV
+          "SOURCE12_BUILD=$env:RUNNER_TEMP/dordiai-source12-build-$env:GITHUB_RUN_ID" >> $env:GITHUB_ENV
+          "SOURCE12_PROBE=$env:RUNNER_TEMP/dordiai-source12-probe-$env:GITHUB_RUN_ID" >> $env:GITHUB_ENV
+      - name: Verify only the exact reviewed Aymara and Filipino character-name payloads before downloading models
+        shell: python
+        run: |
+          import importlib.util,pathlib
+          root=pathlib.Path("dordiai-voices")
+          spec=importlib.util.spec_from_file_location("source12_preflight",root/"tools/research/source12_integration.py")
+          helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
+          verified=helper.character_name_review(root/"source/0.12.2",root/"tools/data/source12_character_name_pins.json")
+          print({"exact_reviewed_character_name_paths":sorted(verified),
+                 "source_repertoire_counts":{code:row[0] for code,row in helper.CHARACTER_NAME_SOURCES.items()},
+                 "native_pronunciation_verified":False,"product_ready":False},flush=True)
+      - name: Acquire immutable completed core11 resource baseline
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-source11-development-core-45029834209
+          run-id: 45029834209
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dordiai-source12-inputs-${{ github.run_id }}/core11
+      - name: Acquire exactly six own native source packages from successful225 preparation
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-afri-six-optional-packs-45024624013
+          run-id: 45024624013
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dordiai-source12-inputs-${{ github.run_id }}/afri-packs
+      - name: Build actual source12 with exact core11 embedded banks and private runtime
+        shell: pwsh
+        run: |
+          python dordiai-voices/tools/research/source12_integration.py build --baseline-addon "$env:SOURCE12_INPUTS/core11/dordiai-voices-0.13.1-dev.11.nvda-addon" --source dordiai-voices/source/0.12.2 --character-name-pins dordiai-voices/tools/data/source12_character_name_pins.json --packs "$env:SOURCE12_INPUTS/afri-packs" --work "$env:SOURCE12_BUILD" --output dordiai-voices/dist/source12 --report dordiai-voices/source12-results/build.json
+          if ($LASTEXITCODE -ne 0) { throw "Source12 assembly failed; no acceptance inferred" }
+          Remove-Item -LiteralPath "$env:SOURCE12_INPUTS/core11/dordiai-voices-0.13.1-dev.11.nvda-addon" -Force
+      - name: Actual packaged source12 native worker225 with outbound traffic blocked
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $programs = @(python -c "import json,sys;print(json.dumps(sorted(set((sys.executable,sys._base_executable)))))" | ConvertFrom-Json)
+          $private = [IO.Path]::GetFullPath("$env:SOURCE12_PROBE/assembled-source12/kx47Runtime/python/python.exe")
+          $programs += $private
+          $programs = @($programs | Sort-Object -Unique)
+          if (@(Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Count -ne 0) { throw "Existing firewall profiles must be enabled" }
+          $rules = @()
+          try {
+            foreach ($program in $programs) {
+              $name = 'Dordiai-source12-' + [guid]::NewGuid().ToString('N')
+              New-NetFirewallRule -Name $name -DisplayName $name -Direction Outbound -Action Block -Enabled True -Profile Any -Program $program | Out-Null
+              $rules += $name
+            }
+            $policy = @{ scope='owned-ephemeral-CI-VM-only'; programs=$programs; direction='Outbound'; action='Block'; physical_audio_verified=$false }
+            New-Item -ItemType Directory -Path dordiai-voices/source12-results -Force | Out-Null
+            $policy | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 dordiai-voices/source12-results/network-policy.json
+            python dordiai-voices/tools/research/source12_integration.py probe --addon dordiai-voices/dist/source12/dordiai-voices-0.13.1-dev.12.nvda-addon --build-report dordiai-voices/source12-results/build.json --packs "$env:SOURCE12_INPUTS/afri-packs" --work "$env:SOURCE12_PROBE" --report dordiai-voices/source12-results/worker225.json --timeout 120
+            if ($LASTEXITCODE -ne 0) { throw "Actual source12 native worker integration failed" }
+          } finally {
+            foreach ($name in $rules) { Remove-NetFirewallRule -Name $name -ErrorAction Continue }
+          }
+      - name: Actual three default language regressions on the same newly assembled source12
+        shell: pwsh
+        run: |
+          python dordiai-voices/tools/windows_engine_probe.py --package-root "$env:SOURCE12_PROBE/assembled-source12" --output dordiai-voices/source12-results/default-engines --languages uk,en,ru --repetitions 1 --timeout 120
+          if ($LASTEXITCODE -ne 0) { throw "Actual default-language worker regression" }
+      - name: Preserve exact source12 proof flags and bounded report bytes
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,pathlib
+          root=pathlib.Path("dordiai-voices/source12-results")
+          for path in sorted(root.rglob("*.json")):
+              name=path.relative_to(root).as_posix()
+              if not path.is_file():
+                  print("SOURCE12_MISSING_REPORT "+name,flush=True);continue
+              raw=path.read_bytes()
+              value=json.loads(raw)
+              if not isinstance(value,dict):value={"summary_scope":"original JSON array/scalar; exact bytes preserved below"}
+              print("SOURCE12_ACTUAL_SUMMARY "+name+" "+json.dumps({key:value.get(key) for key in ("status","version","actual_selected_profile_cases","existing_prepared_bank_files_byte_identical","existing_private_files_byte_identical","nvda_verified","physical_audio_verified","typing_verified","product_ready")}),flush=True)
+              packed=gzip.compress(raw,mtime=0)
+              if len(packed)>512*1024:raise ValueError("Unexpected proof size")
+              text=base64.b64encode(packed).decode()
+              print("SOURCE12_EXACT_GZIP_SHA256 "+name+" "+hashlib.sha256(packed).hexdigest(),flush=True)
+              chunks=[text[i:i+20000] for i in range(0,len(text),20000)]
+              for i,chunk in enumerate(chunks,1):print("SOURCE12_EXACT_GZIP_B64 "+name+" "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+      - name: Preserve exact source12 assembly
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-source12-development-core-${{ github.run_id }}
+          path: |
+            dordiai-voices/dist/source12/*.nvda-addon
+            dordiai-voices/dist/source12/release-build.json
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 90
+      - name: Preserve225 actual packaged-worker WAVs and all partial diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-source12-integration-evidence-${{ github.run_id }}
+          path: dordiai-voices/source12-results/
+          if-no-files-found: warn
+          retention-days: 30

@@ -10,10 +10,41 @@
       "title": "Ciberaymara — Contexto — El alfabeto aymara",
       "author": "Instituto de Lengua y Cultura Aymara (ILCA); course register based on INEL/SENALEP and Juan de Dios Yapita",
       "location": "Escritura, §3 El alfabeto aymara, NOMBRE DE LA LETRA table",
-      "role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+      "role": "Explicit original ILCA ordinary-name column, with Ministry2021 corroboration resolving qh and specifying aa/ii/uu names; source table completeness does not establish acoustic acceptance",
       "short_quote": "NOMBRE DE LA LETRA",
       "license_note": "Individual factual names transcribed with attribution; original page/teaching prose not redistributed; no license of whole source asserted",
-      "native_pronunciation_verified": false
+      "native_pronunciation_verified": false,
+      "previous_unresolved_role": "Explicit ordinary letter-name column; source qh row excluded because it repeats qa and needs another primary-source check",
+      "primary_corroboration": {
+        "url": "https://cdn.www.gob.pe/uploads/document/file/4973488/item_55_vocabulario_aymara.pdf?v=1692022988",
+        "bytes": 5927811,
+        "sha256": "227ed343f0d68d460159bfb7f9a2a785085f82629a50fdd0d2498e3a2260b072",
+        "sha256_scope": "original PDF bytes actually downloaded and inspected",
+        "title": "Yatichaña aru pirwa — Vocabulario pedagógico aimara",
+        "author": "Ministerio de Educación del Perú; Felipe Huayhua Pari",
+        "edition": 2021,
+        "location": "Printed page12, PDF page14 (zero-based13), §1 El alfabeto oficial, Grafía / Nomenclatura table",
+        "rights": "All rights reserved in original PDF; factual name mappings independently transcribed. No PDF/images/prose redistributed.",
+        "changes_supported": {
+          "qh": "qha",
+          "ä": "aa",
+          "ï": "ii",
+          "ü": "uu"
+        },
+        "caution": "PDF font text layer represents glottal mark as superscript1. Existing reviewed ILCA apostrophe spellings retained unchanged, not corrected from OCR. Names aa/ii/uu are explicit nomenclature spellings, not inferred phonetic examples."
+      },
+      "technical_name_pcm_proof": {
+        "run_id": 45038768977,
+        "raw_report_git_blob": "d1303f4f9989943347d30615bf6e416f113f93c2",
+        "source_names_rendered": 32,
+        "native_and_viktoriia_finite_pcm": true,
+        "scope": "Isolated names explicitly supplied as ordinary text, unchanged core11/private ORT1.26; not production raw-glyph or NVDA/typing acceptance",
+        "native_pronunciation_verified": false,
+        "listener_pronunciation_verified": false,
+        "windows_nvda_verified": false,
+        "typing_verified": false,
+        "physical_audio_verified": false
+      }
     }
   },
   "missing_sources": [
@@ -25,8 +56,8 @@
   "letter_names": {
     "a": "a",
     "A": "a",
-    "ä": "ä",
-    "Ä": "ä",
+    "ä": "aa",
+    "Ä": "aa",
     "ch": "cha",
     "CH": "cha",
     "Ch": "cha",
@@ -38,8 +69,8 @@
     "Ch'": "ch'a",
     "i": "i",
     "I": "i",
-    "ï": "ï",
-    "Ï": "ï",
+    "ï": "ii",
+    "Ï": "ii",
     "j": "ja",
     "J": "ja",
     "k": "ka",
@@ -84,14 +115,17 @@
     "T'": "t'a",
     "u": "u",
     "U": "u",
-    "ü": "ü",
-    "Ü": "ü",
+    "ü": "uu",
+    "Ü": "uu",
     "w": "wa",
     "W": "wa",
     "x": "xa",
     "X": "xa",
     "y": "ya",
-    "Y": "ya"
+    "Y": "ya",
+    "qh": "qha",
+    "QH": "qha",
+    "Qh": "qha"
   },
   "symbol_names": {},
   "phonetic_descriptions": {},
@@ -127,8 +161,10 @@
       "kind": "letter",
       "language": "ay",
       "lookup_text": "ä",
-      "aliases": [],
-      "text": "ä",
+      "aliases": [
+        "aa"
+      ],
+      "text": "aa",
       "semantic_kind": "spoken_name",
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
@@ -139,9 +175,9 @@
       "language": "ay",
       "lookup_text": "Ä",
       "aliases": [
-        "ä"
+        "aa"
       ],
-      "text": "ä",
+      "text": "aa",
       "semantic_kind": "spoken_name",
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
@@ -292,8 +328,10 @@
       "kind": "letter",
       "language": "ay",
       "lookup_text": "ï",
-      "aliases": [],
-      "text": "ï",
+      "aliases": [
+        "ii"
+      ],
+      "text": "ii",
       "semantic_kind": "spoken_name",
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
@@ -304,9 +342,9 @@
       "language": "ay",
       "lookup_text": "Ï",
       "aliases": [
-        "ï"
+        "ii"
       ],
-      "text": "ï",
+      "text": "ii",
       "semantic_kind": "spoken_name",
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
@@ -886,8 +924,10 @@
       "kind": "letter",
       "language": "ay",
       "lookup_text": "ü",
-      "aliases": [],
-      "text": "ü",
+      "aliases": [
+        "uu"
+      ],
+      "text": "uu",
       "semantic_kind": "spoken_name",
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
@@ -898,9 +938,9 @@
       "language": "ay",
       "lookup_text": "Ü",
       "aliases": [
-        "ü"
+        "uu"
       ],
-      "text": "ü",
+      "text": "uu",
       "semantic_kind": "spoken_name",
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
@@ -983,13 +1023,52 @@
       "source_kind": "letter_name",
       "source_id": "curated_primary_alphabet_names",
       "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "qh",
+      "aliases": [
+        "qha"
+      ],
+      "text": "qha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "QH",
+      "aliases": [
+        "qha"
+      ],
+      "text": "qha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "ay",
+      "lookup_text": "Qh",
+      "aliases": [
+        "qha"
+      ],
+      "text": "qha",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
     }
   ],
   "semantics": {
     "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
     "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
     "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
-    "ordinary_letter_names_status": "source-partial-acoustic-acceptance-pending",
+    "ordinary_letter_names_status": "source-complete-acoustic-acceptance-pending",
     "runtime_enabled": false,
     "native_pronunciation_verified": false,
     "symbol_keys": "Pinned explicit CLDR/NVDA native names; supplementary symbols and bounded emoji sequences stay symbol_names, never ordinary alphabet names",
@@ -997,7 +1076,7 @@
   },
   "curated_modifier_names": [],
   "unreviewed_symbol_candidates": {},
-  "ordinary_alphabet_source_complete": false,
+  "ordinary_alphabet_source_complete": true,
   "ordinary_alphabet_source_repertoire": [
     "a",
     "ä",
@@ -1029,11 +1108,9 @@
     "ü",
     "w",
     "x",
-    "y"
+    "y",
+    "qh"
   ],
-  "curation_exclusions": {
-    "qh": "ILCA table currently says qa for both q and qh; do not silently correct an ambiguous source"
-  },
   "letter_names_ready": false,
   "symbol_bank_preparation": {
     "default_symbol_budget": 512,

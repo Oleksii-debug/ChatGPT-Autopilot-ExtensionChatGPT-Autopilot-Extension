@@ -22,8 +22,10 @@ from weakref import WeakSet
 from autoSettingsUtils.driverSetting import BooleanDriverSetting, DriverSetting, NumericDriverSetting
 import config
 import nvwave
+import speech as _nvda_speech
+import synthDriverHandler as _nvda_synth_handler
 from logHandler import log
-from speech.commands import BreakCommand, CharacterModeCommand, IndexCommand, LangChangeCommand, PitchCommand, RateCommand, VolumeCommand
+from speech.commands import BreakCommand, CharacterModeCommand, EndUtteranceCommand, IndexCommand, LangChangeCommand, PitchCommand, RateCommand, SynthParamCommand, VolumeCommand
 from synthDriverHandler import SynthDriver as BaseDriver, VoiceInfo, synthDoneSpeaking, synthIndexReached
 
 
@@ -58,6 +60,8 @@ def _runtime_module(name):
 _host_paths = _runtime_module("host_paths")
 RUNTIME = _host_paths.filesystem_path(RUNTIME)
 _typing_locale = _runtime_module("typing_locale")
+_language_origin = _runtime_module("language_origin")
+LanguageOriginCommand = _language_origin.command_type(SynthParamCommand)
 _voice_policy = _runtime_module("voice_policy")
 _error_diagnostics = _runtime_module("error_diagnostics")
 _pref_spec = importlib.util.spec_from_file_location("_dordiai_main_preferences", RUNTIME / "preferences.py")
@@ -308,6 +312,7 @@ def speech_parts(sequence, fallback, english, mixed=False, detect_russian=False,
                  enabled_languages=None, priorities=(), forced=False):
     lang = fallback
     explicit = forced
+    origin_explicit = None  # Untagged direct synth callers retain their existing contract.
     pending = []
     characters = False
     for item in sequence:
@@ -318,16 +323,19 @@ def speech_parts(sequence, fallback, english, mixed=False, detect_russian=False,
             elif item.strip():
                 pending.append(item.strip())
             continue
-        if isinstance(item, (LangChangeCommand, BreakCommand, IndexCommand, PitchCommand,
+        if isinstance(item, (LanguageOriginCommand, LangChangeCommand, BreakCommand, IndexCommand, PitchCommand,
                              CharacterModeCommand, RateCommand, VolumeCommand)):
             yield from text_parts(pending, lang, english, mixed, detect_russian, spelling_language, explicit,
                                   enabled_languages=enabled_languages, priorities=priorities)
             pending.clear()
-            if isinstance(item, LangChangeCommand):
+            if isinstance(item, LanguageOriginCommand):
+                origin_explicit = item.explicit
+                explicit = forced or origin_explicit
+            elif isinstance(item, LangChangeCommand):
                 lang = fallback if forced else language_code(item.lang, fallback, english)
                 if enabled_languages is not None and _prefs.language_key(lang) not in enabled_languages:
                     lang = fallback
-                explicit = forced or bool(item.lang)
+                explicit = forced or (bool(item.lang) if origin_explicit is None else origin_explicit)
             elif isinstance(item, BreakCommand):
                 yield "break", max(0, item.time)
             elif isinstance(item, PitchCommand):
@@ -1072,7 +1080,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         NumericDriverSetting("ruTimbre", "Російський тембр", availableInSettingsRing=True),
         NumericDriverSetting("ruVolume", "Російська гучність", availableInSettingsRing=True, defaultVal=100),
     )
-    supportedCommands = frozenset({BreakCommand, CharacterModeCommand, IndexCommand, LangChangeCommand,
+    supportedCommands = frozenset({LanguageOriginCommand, BreakCommand, CharacterModeCommand, IndexCommand, LangChangeCommand,
                                    PitchCommand, RateCommand, VolumeCommand})
     supportedNotifications = frozenset({synthDoneSpeaking, synthIndexReached})
 
@@ -1193,9 +1201,14 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         self._worker_lease=None
         self._engine = self._english_engine = None
         self._native_membership_token = None
+        self._language_origin_subscription = None
         try:
             self._native_membership_runtime = _runtime_module("native_membership_runtime")
             self._native_membership_token = self._native_membership_runtime.acquire(models, RUNTIME.parent)
+            self._language_origin_subscription = _language_origin.subscribe(
+                self, _nvda_speech, _nvda_synth_handler, LangChangeCommand,
+                LanguageOriginCommand, EndUtteranceCommand,
+                default_explicit=lambda owner: _typing_locale.language_for(owner, None) is not None)
             if self.name=='kx47Preview' and not separate:
                 self._engine,self._worker_lease=acquire_shared_worker(python,RUNTIME/'nvda_worker.py',models,reference_config,'mixed')
             else:
@@ -1203,6 +1216,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             self._english_engine = SpeechWorker(python, RUNTIME / "nvda_worker.py", models, reference_config, "en") if separate else None
         except BaseException:
             self._closed = True
+            self._release_language_origin()
             with _shared_lock:
                 _live_drivers.discard(self)
             if self._worker_lease is not None:
@@ -1221,6 +1235,16 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         self._initialize_audio_output()
         self._thread = Thread(target=self._run, daemon=True, name="Diordiai speech")
         self._thread.start()
+
+    def _release_language_origin(self):
+        subscription = getattr(self, "_language_origin_subscription", None)
+        self._language_origin_subscription = None
+        if subscription is not None:
+            try:
+                subscription.close()
+            except BaseException:
+                # The callback is already marked closed before unregistering.
+                log.warning("dordiai-voices: language-origin subscription cleanup failed.")
 
     def _release_native_membership(self):
         token = getattr(self, "_native_membership_token", None)
@@ -1256,6 +1280,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             elif engine is not None:
                 cleanup.append(engine.close)
             if english is not None and english is not engine:cleanup.append(english.close)
+            cleanup.append(self._release_language_origin)
             cleanup.append(self._release_native_membership)
             for release in cleanup:
                 try:
@@ -1587,6 +1612,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             self.cancel()
             self._closed = True
             self._jobs.put(None)
+        self._release_language_origin()
         # _run owns the worker until outstanding streams have acknowledged
         # cancellation. Releasing here lets a replacement driver reuse it
         # while this driver's old stream is still issuing cancel/drop.
@@ -1766,6 +1792,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                         if generation == self._generation and self._jobs.empty():
                             synthDoneSpeaking.notify(synth=self)
         finally:
+            self._release_language_origin()
             outstanding = [thread for thread in cancelling_threads + list(warm_threads.values())
                            if thread.is_alive()]
             for thread in outstanding:

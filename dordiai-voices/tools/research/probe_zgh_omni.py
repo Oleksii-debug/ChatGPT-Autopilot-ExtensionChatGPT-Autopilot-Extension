@@ -350,6 +350,7 @@ def save_wave(path,audio,rate,np):
 
 
 def target_profile(runtime,converter,np):
+    runtime=Path(runtime).resolve()
     from voice_policy import require_voice_allowed,EXCLUDED_VOICE_IDS
     from voice_assets import asset_path
     require_voice_allowed(PROFILE)

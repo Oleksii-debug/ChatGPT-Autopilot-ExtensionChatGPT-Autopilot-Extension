@@ -21,6 +21,7 @@ from pathlib import Path
 import re
 import stat
 import struct
+import sys
 from threading import RLock
 import unicodedata
 import zlib
@@ -41,6 +42,11 @@ MAX_RAW_BLOCK_BYTES = 65536
 MAX_KEY_BYTES = 384
 DEFAULT_CACHE_BYTES = 4 * 1024 * 1024
 DEFAULT_CACHE_BLOCKS = 32
+DEFAULT_WORD_CACHE_ENTRIES = 1024
+DEFAULT_WORD_CACHE_BYTES = 512 * 1024
+# Conservative entry-link/dict/integer allowance, in addition to measured key,
+# result and pair sizes. Shared language-code strings are owned by self.codes.
+WORD_CACHE_ENTRY_OVERHEAD = 256
 
 
 class LexiconError(ValueError):
@@ -95,13 +101,19 @@ class MembershipLexicon:
     """Thread-safe read-only exact lookup; no model, DLL, network or guessing."""
 
     def __init__(self, path, expected_sha256, *, cache_blocks=DEFAULT_CACHE_BLOCKS,
-                 cache_bytes=DEFAULT_CACHE_BYTES, cancelled=None):
+                 cache_bytes=DEFAULT_CACHE_BYTES, cancelled=None,
+                 word_cache_entries=DEFAULT_WORD_CACHE_ENTRIES,
+                 word_cache_bytes=DEFAULT_WORD_CACHE_BYTES):
         if not isinstance(expected_sha256, str) or not re.fullmatch("[a-f0-9]{64}", expected_sha256):
             raise LexiconError("A full trusted lowercase lexicon SHA256 is required")
         if type(cache_blocks) is not int or not 0 <= cache_blocks <= 128:
             raise LexiconError("Decoded block count must be bounded")
         if type(cache_bytes) is not int or not 0 <= cache_bytes <= 16 * 1024 * 1024:
             raise LexiconError("Decoded cache byte limit must be bounded")
+        if type(word_cache_entries) is not int or not 0 <= word_cache_entries <= 4096:
+            raise LexiconError("Recent word entry count must be bounded")
+        if type(word_cache_bytes) is not int or not 0 <= word_cache_bytes <= 4 * 1024 * 1024:
+            raise LexiconError("Recent word byte limit must be bounded")
         self.path = Path(path)
         self.dataset_sha256 = expected_sha256
         self._lock = RLock()
@@ -109,6 +121,9 @@ class MembershipLexicon:
         self._closed = False
         self._cache, self._cached_bytes = OrderedDict(), 0
         self._cache_blocks, self._cache_limit = cache_blocks, cache_bytes
+        self._word_cache, self._word_cached_bytes = OrderedDict(), 0
+        self._word_cache_entries, self._word_cache_limit = word_cache_entries, word_cache_bytes
+        self._word_cache_hits, self._word_cache_misses, self._word_cache_evictions = 0, 0, 0
         self.codes, self.word_count, self.metadata = (), 0, {}
         try:
             self._stream = self.path.open("rb")
@@ -206,10 +221,12 @@ class MembershipLexicon:
             current_path = self.path.stat()
             current_fd = os.fstat(self._stream.fileno())
         except OSError as error:
+            self._clear_word_cache()
             raise StaleLexiconError("Native lexicon resource is no longer available") from error
         if (_signature(current_path) != self._path_signature or
                 _signature(current_fd) != self._fd_signature or
                 not os.path.samestat(current_path, current_fd)):
+            self._clear_word_cache()
             raise StaleLexiconError("Native lexicon resource changed; close and reload it")
 
     def _block(self, number, cancelled=None):
@@ -268,6 +285,26 @@ class MembershipLexicon:
             self._cached_bytes += charge
         return keys, masks
 
+    def _clear_word_cache(self):
+        self._word_cache.clear()
+        self._word_cached_bytes = 0
+
+    def _remember_word(self, key, result):
+        if not self._word_cache_entries or not self._word_cache_limit:
+            return
+        pair = (result, 0)
+        charged = (sys.getsizeof(key) + sys.getsizeof(result) +
+                   sys.getsizeof(pair) + WORD_CACHE_ENTRY_OVERHEAD)
+        if charged > self._word_cache_limit:
+            return
+        while self._word_cache and (len(self._word_cache) >= self._word_cache_entries or
+                self._word_cached_bytes + charged > self._word_cache_limit):
+            _, (_, old_charged) = self._word_cache.popitem(last=False)
+            self._word_cached_bytes -= old_charged
+            self._word_cache_evictions += 1
+        self._word_cache[key] = (result, charged)
+        self._word_cached_bytes += charged
+
     def candidates(self, word, *, cancelled=None):
         if not isinstance(word, str):
             raise TypeError("Native lexical membership requires a word string")
@@ -282,17 +319,28 @@ class MembershipLexicon:
             key = token.encode("utf-8")
             if len(key) > MAX_KEY_BYTES:
                 return frozenset()
+            cached = self._word_cache.get(key)
+            if cached is not None:
+                # A word hit must never bypass the same cancellation/resource
+                # checks applied to a decoded-block result.
+                _check_cancel(cancelled)
+                self._check_current()
+                self._word_cache.move_to_end(key)
+                self._word_cache_hits += 1
+                return cached[0]
+            self._word_cache_misses += 1
             number = bisect_right(self._first_keys, key)-1
-            if number < 0:
-                return frozenset()
-            keys, masks = self._block(number, cancelled)
+            result = frozenset()
+            if number >= 0:
+                keys, masks = self._block(number, cancelled)
+                position = bisect_left(keys, key)
+                if position < len(keys) and keys[position] == key:
+                    mask = masks[position]
+                    result = frozenset(code for index, code in enumerate(self.codes) if mask & (1 << index))
             _check_cancel(cancelled)
             self._check_current()
-            position = bisect_left(keys, key)
-            if position == len(keys) or keys[position] != key:
-                return frozenset()
-            mask = masks[position]
-            return frozenset(code for index, code in enumerate(self.codes) if mask & (1 << index))
+            self._remember_word(key, result)
+            return result
 
     lookup = candidates
 
@@ -322,12 +370,17 @@ class MembershipLexicon:
                     "cache_block_limit": self._cache_blocks, "dataset_sha256": self.dataset_sha256,
                     "max_raw_block_bytes": MAX_RAW_BLOCK_BYTES, "max_block_words": MAX_BLOCK_WORDS,
                     "membership_mask_bytes": getattr(self,"_mask_bytes",None), "language_table_limit": MAX_CODES,
+                    "cached_words": len(self._word_cache), "word_cache_bytes_charged": self._word_cached_bytes,
+                    "word_cache_entry_limit": self._word_cache_entries, "word_cache_byte_limit": self._word_cache_limit,
+                    "word_cache_hits": self._word_cache_hits, "word_cache_misses": self._word_cache_misses,
+                    "word_cache_evictions": self._word_cache_evictions,
                     "scope": "finite exact dictionary memberships; unknown and shared spellings remain unresolved"}
 
     def close(self):
         with self._lock:
             self._cache.clear()
             self._cached_bytes = 0
+            self._clear_word_cache()
             self._first_keys, self._entries = (), ()
             if self._map is not None:
                 self._map.close()

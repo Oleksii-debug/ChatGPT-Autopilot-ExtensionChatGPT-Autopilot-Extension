@@ -1,0 +1,18 @@
+{
+  "format": "dordiai-source12-character-name-review",
+  "format_version": 1,
+  "files": {
+    "kx47Runtime/models/CharacterNames/ay.json": {
+      "sha256": "e22079378e0dcc4c531369bfbbf1aa6da772dd835c3c7a66098ecfd0071225bd",
+      "size_bytes": 28931,
+      "source_repertoire_count": 32,
+      "primary_source_sha256": "227ed343f0d68d460159bfb7f9a2a785085f82629a50fdd0d2498e3a2260b072"
+    },
+    "kx47Runtime/models/CharacterNames/fil.json": {
+      "sha256": "aeb30e2e2705ac132e2389dc57904313046c00950c8334206990a0f67b7dbf68",
+      "size_bytes": 336264,
+      "source_repertoire_count": 28,
+      "primary_source_sha256": "5f20b7eb93ef53af129822bede538121b8967fbc0e7fd93c64bef646d740f66f"
+    }
+  }
+}

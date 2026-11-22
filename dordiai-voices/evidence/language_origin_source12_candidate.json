@@ -1,0 +1,42 @@
+{
+  "format": "dordiai-language-origin-candidate",
+  "format_version": 1,
+  "base_driver_git_blob": "2b934da7d6ab59cd24f77077dd7223428fb71d95",
+  "files": {
+    "source/0.12.2/kx47Runtime/language_origin.py": "381ad8005b98c41c54249a3460be0542acc4ef24",
+    "source/0.12.2/synthDrivers/kx47Preview.py": "a2759e35a5091a7c2c0c1bc9a09c780eadad4b88",
+    "tests/nvda_stubs.py": "63723d3ed1714fd86efbcbee583c16593ea42cc2",
+    "tests/test_audio_pipeline.py": "00c4fa9059a7d1a5bd467d5eeea5192806c17ef7",
+    "tests/test_language_origin.py": "46441c3536a423fa2d3dba28f31af248cb9dab68",
+    "tools/windows_nvda_language_origin_probe.py": "da2129f1a3446bc8002de199a0a15ee8be19874a",
+    "tests/test_windows_nvda_language_origin_probe.py": "a582c8b1056c9d7756105c7eba5f89bcd87be8a7"
+  },
+  "verification": {
+    "kind": "Linux CPython unit regressions only",
+    "total": 1271,
+    "passed": 1219,
+    "skipped": 52,
+    "actual_nvda_transport": {
+      "status": "passed",
+      "run_id": 45039893824,
+      "job_id": 137261765553,
+      "invariants": 9,
+      "report_git_blob": "022ef20de03c78a4b802f9a67eaccc00ad10f0c8",
+      "scope": "actual frozen NVDA private queues/public Filter class only; source12 end-to-end pending"
+    },
+    "actual_product12_pipeline": "not executed",
+    "physical_audio": false,
+    "command": "python -m unittest discover -s tests",
+    "environment": "isolated restored09f4 source tree with unchanged outer workflow fixtures and these candidate overlays"
+  },
+  "policy": {
+    "default_unmarked": "automatic",
+    "named_nvda_locale": "explicit",
+    "valid_owned_typing_context": "explicit keyboard locale",
+    "forced_and_disabled": "existing driver policy takes precedence",
+    "direct_untagged_synth_call": "legacy contract",
+    "personalLanguage": "pre-existing normalization issue remains OPEN, separate follow-up",
+    "no_global_nvda_monkeypatch": true,
+    "no_speech_text_persistence": true
+  }
+}

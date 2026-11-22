@@ -218,6 +218,38 @@ def _native_word_classifier_scope(policy, script, enabled):
     return allowed if enabled is None or allowed & enabled else frozenset()
 
 
+def _dictionary_word_ranges(text, script):
+    """Retain an authenticated whole Cyrillic compound before its components.
+
+    A shared pair of component spellings can form a uniquely recorded word.
+    Unknown chains keep the former component policy. Only the exact maximal
+    ASCII-hyphen chain is looked up, once; no cross-space/dash joining or
+    combinatorial substring search is performed.
+    """
+    ranges = list(_word_ranges(text))
+    if script != "cyrillic":
+        yield from ranges
+        return
+    position = 0
+    lookup = None
+    while position < len(ranges):
+        start, end = ranges[position]
+        stop = position + 1
+        while stop < len(ranges) and text[end:ranges[stop][0]] == "-":
+            end = ranges[stop][1]
+            stop += 1
+        if stop > position + 1 and end - start <= 96:
+            if lookup is None:
+                speech = _auxiliary("speech_text")
+                lookup = speech.native_cyrillic_word_candidates
+            if lookup(text[start:end]):
+                yield start, end
+                position = stop
+                continue
+        yield from ranges[position:stop]
+        position = stop
+
+
 @lru_cache(maxsize=8192)
 def _legacy_lexical_candidates(word,script,skip_native_core=False):
     """Merge extended and core lexical evidence; never overwrite a homograph."""
@@ -276,7 +308,7 @@ def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",pr
         preferred=family_priority or _tag(script,text,preferred,enabled) or preferred
     context=_tag(script,text,preferred,enabled) if mode=="context" else None
     if enabled is not None and context not in enabled:context=None
-    matches=list(_word_ranges(text))
+    matches=list(_dictionary_word_ranges(text, script))
     if not matches:return [(context,text)]
     sentence_tag,sentence_score=_phrase_language(text,script) if len(matches)>1 and mode=="context" else (None,0.)
     if sentence_tag not in CODES|CORE or (enabled is not None and sentence_tag not in enabled):

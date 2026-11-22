@@ -1,0 +1,78 @@
+{
+  "format": "dordiai-ay-fil-character-data-source12-candidate-v1",
+  "based_on_source_snapshot": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+  "candidate_for_product_version": "0.13.1-dev.12",
+  "source11_frozen_unchanged": true,
+  "generator": "Existing tools/prepare_character_names.py used unchanged with --languages ay,fil; freshly fetched pinned NVDA/CLDR metadata and existing English comparison reference; only two selected locale outputs proposed",
+  "generator_sha256": "15646857a80d44407dd85bc52404a4f5bea5899d39934e983830ab06a162374b",
+  "runtime_resolver_changed": false,
+  "acoustic_models_or_vectors_changed": false,
+  "voice_audio_regenerated": false,
+  "all_other_override_entries_unchanged": true,
+  "bounded_ay_fact_changes": [
+    "qh → qha",
+    "ä → aa",
+    "ï → ii",
+    "ü → uu"
+  ],
+  "fil_primary_name_count": 28,
+  "languages": [
+    {
+      "code": "ay",
+      "source_names_before": 31,
+      "source_names_after": 32,
+      "runtime_case_aliases_before": 69,
+      "runtime_case_aliases_after": 72,
+      "symbol_names_preserved": 0,
+      "symbol_names_byte_equivalent": true,
+      "phonetic_examples_preserved": true,
+      "existing_primary_symbol_provenance_preserved": true,
+      "source_complete": true,
+      "letter_names_ready": false,
+      "native_pronunciation_verified": false,
+      "before_sha256": "20388353cd19f33c9eddfac2bd194e92d26327ccd06a2863631d5bed9fa06153",
+      "after_sha256": "e22079378e0dcc4c531369bfbbf1aa6da772dd835c3c7a66098ecfd0071225bd",
+      "after_bytes": 28931
+    },
+    {
+      "code": "fil",
+      "source_names_before": 0,
+      "source_names_after": 28,
+      "runtime_case_aliases_before": 0,
+      "runtime_case_aliases_after": 57,
+      "symbol_names_preserved": 1531,
+      "symbol_names_byte_equivalent": true,
+      "phonetic_examples_preserved": true,
+      "existing_primary_symbol_provenance_preserved": true,
+      "source_complete": true,
+      "letter_names_ready": false,
+      "native_pronunciation_verified": false,
+      "before_sha256": "ecb98230bd2959158c32402f63dd995a79fe128e4b51b7a7dc25d10972ce57d3",
+      "after_sha256": "aeb30e2e2705ac132e2389dc57904313046c00950c8334206990a0f67b7dbf68",
+      "after_bytes": 336264
+    }
+  ],
+  "semantic_tests": {
+    "existing_character_suite": 22,
+    "new_source_to_native_lookup_tests": 6,
+    "all_primary_names_exercised": 60,
+    "uppercase_and_title_grapheme_aliases_exercised": true,
+    "ordinary_letter_bank_semantics_exercised": true,
+    "unknown_name_foreign_fallback_refused": true,
+    "fil_e_name_i_cannot_replace_i_glyph_ay": true,
+    "existing1531_filipino_symbols_and_pinned_cldr_preserved": true
+  },
+  "prior_actual_native_pcm_proofs": {
+    "combined_receipt_git_blob": "0645e4aa391ce65a8ab02da1bce68f01f3ce0c28",
+    "ay_run": 45038768977,
+    "fil_run": 45038769182,
+    "native_wavs": 60,
+    "viktoriia_wavs": 60,
+    "scope": "Actual isolated original-weight names explicitly supplied as text; not live production raw-glyph typing acceptance"
+  },
+  "listener_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

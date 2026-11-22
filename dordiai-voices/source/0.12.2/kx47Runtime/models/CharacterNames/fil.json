@@ -12,13 +12,105 @@
       "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/7d2b9cb11cec08f4d333ad73209deb3df0711c3b/cldr-json/cldr-misc-full/main/fil/characters.json",
       "sha256": "41b317292895ea90fe67ba23c9f12597bde2439fad55333f200cf00abf4164e9",
       "license": "Unicode-3.0"
+    },
+    "curated_primary_alphabet_names": {
+      "url": "https://kwfwikaatkultura.ph/wp-content/uploads/2024/03/Manwal-sa-Masinop-na-Pagsulat.pdf",
+      "bytes": 2042405,
+      "sha256": "5f20b7eb93ef53af129822bede538121b8967fbc0e7fd93c64bef646d740f66f",
+      "sha256_scope": "original PDF bytes actually downloaded and inspected",
+      "title": "KWF Manwal sa Masinop na Pagsulat",
+      "author": "Virgilio S. Almario, editor; Komisyon sa Wikang Filipino",
+      "edition": 2014,
+      "location": "Printed page9, PDF page19 (zero-based18), §1.1 Titik, all28-letter ordinary-name table; printed page5 corroborating prose list",
+      "caution": "These are explicitly prescribed Filipino ordinary names (English-derived except Spanish ñ), not unreviewed English fallback. NG is ONE Filipino alphabet letter, supplied literal spaced table name en dyi. Page5 gives joined endyi as alternative. The unchanged native MMS acoustic checkpoint is Central Tagalog tgl, used by existing selected Filipino catalog entry; this does not establish pronunciation acceptance.",
+      "license_note": "All rights reserved in original PDF; factual name mappings independently transcribed. No PDF/images/prose redistributed.",
+      "role": "Explicit complete Filipino ordinary letter-name table, not historical Abakada names or unreviewed English voice fallback",
+      "native_pronunciation_verified": false,
+      "publisher_identity": {
+        "url": "https://kwfdiksiyonaryo.ph/",
+        "evidence": "Official KWF dictionary homepage copyright Komisyon sa Wikang Filipino links both kwf.gov.ph and Repositoryo ng mga Wika ng Pilipinas kwfwikaatkultura.ph",
+        "repertoire_corroboration_url": "https://kwfdiksiyonaryo.ph/css/files/gabay_op.pdf",
+        "repertoire_only_pdf_bytes": 596291,
+        "repertoire_only_pdf_sha256": "2350faee606990c795a3699df706ad9d2cafaa1ee15c16f6de9ce54a3366771f",
+        "repertoire_only_location": "PDF page2 alphabet chart; not cited as ordinary-name table"
+      },
+      "technical_name_pcm_proof": {
+        "run_id": 45038769182,
+        "raw_report_git_blob": "56d5ee58ff05b377d6480fe7d7492521a0f23532",
+        "source_names_rendered": 28,
+        "native_and_viktoriia_finite_pcm": true,
+        "scope": "Isolated names explicitly supplied as ordinary text, unchanged core11/private ORT1.26; not production raw-glyph or NVDA/typing acceptance",
+        "native_pronunciation_verified": false,
+        "listener_pronunciation_verified": false,
+        "windows_nvda_verified": false,
+        "typing_verified": false,
+        "physical_audio_verified": false
+      }
     }
   },
   "missing_sources": [
     "nvda_symbols",
     "nvda_descriptions"
   ],
-  "letter_names": {},
+  "letter_names": {
+    "a": "ey",
+    "A": "ey",
+    "b": "bi",
+    "B": "bi",
+    "c": "si",
+    "C": "si",
+    "d": "di",
+    "D": "di",
+    "e": "i",
+    "E": "i",
+    "f": "ef",
+    "F": "ef",
+    "g": "dyi",
+    "G": "dyi",
+    "h": "eyts",
+    "H": "eyts",
+    "i": "ay",
+    "I": "ay",
+    "j": "dyey",
+    "J": "dyey",
+    "k": "key",
+    "K": "key",
+    "l": "el",
+    "L": "el",
+    "m": "em",
+    "M": "em",
+    "n": "en",
+    "N": "en",
+    "ñ": "enye",
+    "Ñ": "enye",
+    "ng": "en dyi",
+    "NG": "en dyi",
+    "Ng": "en dyi",
+    "o": "o",
+    "O": "o",
+    "p": "pi",
+    "P": "pi",
+    "q": "kyu",
+    "Q": "kyu",
+    "r": "ar",
+    "R": "ar",
+    "s": "es",
+    "S": "es",
+    "t": "ti",
+    "T": "ti",
+    "u": "yu",
+    "U": "yu",
+    "v": "vi",
+    "V": "vi",
+    "w": "dobolyu",
+    "W": "dobolyu",
+    "x": "eks",
+    "X": "eks",
+    "y": "way",
+    "Y": "way",
+    "z": "zi",
+    "Z": "zi"
+  },
   "symbol_names": {
     "{": "bukas na kulot na bracket",
     "🏻": "light na kulay ng balat",
@@ -1584,37 +1676,743 @@
     "y",
     "z"
   ],
-  "missing_ordinary_letter_names": [
-    "a",
-    "b",
-    "c",
-    "d",
-    "e",
-    "f",
-    "g",
-    "h",
-    "i",
-    "j",
-    "k",
-    "l",
-    "m",
-    "n",
-    "ñ",
-    "ng",
-    "o",
-    "p",
-    "q",
-    "r",
-    "s",
-    "t",
-    "u",
-    "v",
-    "w",
-    "x",
-    "y",
-    "z"
-  ],
+  "missing_ordinary_letter_names": [],
   "bank_entries": [
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "a",
+      "aliases": [
+        "ey"
+      ],
+      "text": "ey",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "A",
+      "aliases": [
+        "ey"
+      ],
+      "text": "ey",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "b",
+      "aliases": [
+        "bi"
+      ],
+      "text": "bi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "B",
+      "aliases": [
+        "bi"
+      ],
+      "text": "bi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "c",
+      "aliases": [
+        "si"
+      ],
+      "text": "si",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "C",
+      "aliases": [
+        "si"
+      ],
+      "text": "si",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "d",
+      "aliases": [
+        "di"
+      ],
+      "text": "di",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "D",
+      "aliases": [
+        "di"
+      ],
+      "text": "di",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "e",
+      "aliases": [],
+      "text": "i",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "E",
+      "aliases": [],
+      "text": "i",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "f",
+      "aliases": [
+        "ef"
+      ],
+      "text": "ef",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "F",
+      "aliases": [
+        "ef"
+      ],
+      "text": "ef",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "g",
+      "aliases": [
+        "dyi"
+      ],
+      "text": "dyi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "G",
+      "aliases": [
+        "dyi"
+      ],
+      "text": "dyi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "h",
+      "aliases": [
+        "eyts"
+      ],
+      "text": "eyts",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "H",
+      "aliases": [
+        "eyts"
+      ],
+      "text": "eyts",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "i",
+      "aliases": [
+        "ay"
+      ],
+      "text": "ay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "I",
+      "aliases": [
+        "ay"
+      ],
+      "text": "ay",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "j",
+      "aliases": [
+        "dyey"
+      ],
+      "text": "dyey",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "J",
+      "aliases": [
+        "dyey"
+      ],
+      "text": "dyey",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "k",
+      "aliases": [
+        "key"
+      ],
+      "text": "key",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "K",
+      "aliases": [
+        "key"
+      ],
+      "text": "key",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "l",
+      "aliases": [
+        "el"
+      ],
+      "text": "el",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "L",
+      "aliases": [
+        "el"
+      ],
+      "text": "el",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "m",
+      "aliases": [
+        "em"
+      ],
+      "text": "em",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "M",
+      "aliases": [
+        "em"
+      ],
+      "text": "em",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "n",
+      "aliases": [
+        "en"
+      ],
+      "text": "en",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "N",
+      "aliases": [
+        "en"
+      ],
+      "text": "en",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "ñ",
+      "aliases": [
+        "enye"
+      ],
+      "text": "enye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "Ñ",
+      "aliases": [
+        "enye"
+      ],
+      "text": "enye",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "ng",
+      "aliases": [
+        "en dyi"
+      ],
+      "text": "en dyi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "NG",
+      "aliases": [
+        "en dyi"
+      ],
+      "text": "en dyi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "Ng",
+      "aliases": [
+        "en dyi"
+      ],
+      "text": "en dyi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "o",
+      "aliases": [],
+      "text": "o",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "O",
+      "aliases": [
+        "o"
+      ],
+      "text": "o",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "p",
+      "aliases": [
+        "pi"
+      ],
+      "text": "pi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "P",
+      "aliases": [
+        "pi"
+      ],
+      "text": "pi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "q",
+      "aliases": [
+        "kyu"
+      ],
+      "text": "kyu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "Q",
+      "aliases": [
+        "kyu"
+      ],
+      "text": "kyu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "r",
+      "aliases": [
+        "ar"
+      ],
+      "text": "ar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "R",
+      "aliases": [
+        "ar"
+      ],
+      "text": "ar",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "s",
+      "aliases": [
+        "es"
+      ],
+      "text": "es",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "S",
+      "aliases": [
+        "es"
+      ],
+      "text": "es",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "t",
+      "aliases": [
+        "ti"
+      ],
+      "text": "ti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "T",
+      "aliases": [
+        "ti"
+      ],
+      "text": "ti",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "u",
+      "aliases": [
+        "yu"
+      ],
+      "text": "yu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "U",
+      "aliases": [
+        "yu"
+      ],
+      "text": "yu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "v",
+      "aliases": [
+        "vi"
+      ],
+      "text": "vi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "V",
+      "aliases": [
+        "vi"
+      ],
+      "text": "vi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "w",
+      "aliases": [
+        "dobolyu"
+      ],
+      "text": "dobolyu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "W",
+      "aliases": [
+        "dobolyu"
+      ],
+      "text": "dobolyu",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "x",
+      "aliases": [
+        "eks"
+      ],
+      "text": "eks",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "X",
+      "aliases": [
+        "eks"
+      ],
+      "text": "eks",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "y",
+      "aliases": [
+        "way"
+      ],
+      "text": "way",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "Y",
+      "aliases": [
+        "way"
+      ],
+      "text": "way",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "z",
+      "aliases": [
+        "zi"
+      ],
+      "text": "zi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "fil",
+      "lookup_text": "Z",
+      "aliases": [
+        "zi"
+      ],
+      "text": "zi",
+      "semantic_kind": "spoken_name",
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending"
+    },
     {
       "kind": "letter",
       "language": "fil",
@@ -8276,12 +9074,13 @@
     "symbol_names": "Upstream explicit native-locale symbol replacements, requiring acoustic/frontend validation",
     "phonetic_descriptions": "Spelling examples only; never promoted to ordinary alphabet names",
     "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
-    "ordinary_letter_names_status": "not-established-by-these-sources",
+    "ordinary_letter_names_status": "source-complete-acoustic-acceptance-pending",
     "runtime_enabled": false,
     "native_pronunciation_verified": false,
     "symbol_keys": "Pinned explicit CLDR/NVDA native names; supplementary symbols and bounded emoji sequences stay symbol_names, never ordinary alphabet names",
     "bank_storage_kind": "The letters bank stores short navigation clips for both symbols and letters; source_kind distinguishes their linguistic semantics"
   },
+  "curated_modifier_names": [],
   "unreviewed_symbol_candidates": {
     "‾": {
       "name": "overline",
@@ -9948,8 +10747,42 @@
       "reason": "Identical to English reference; possible untranslated text or loanword requires local review"
     }
   },
-  "ordinary_alphabet_source_complete": false,
-  "ordinary_alphabet_source_repertoire": [],
+  "ordinary_alphabet_source_complete": true,
+  "ordinary_alphabet_source_repertoire": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "ñ",
+    "ng",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z"
+  ],
+  "ordinary_letter_name_alternatives": {
+    "ng": [
+      "endyi"
+    ]
+  },
   "letter_names_ready": false,
   "symbol_bank_preparation": {
     "default_symbol_budget": 512,
@@ -10978,6 +11811,19 @@
       "🫸"
     ],
     "scope": "Full native symbol_names remain available at runtime. This is a bounded preparation plan, not existing PCM. The voice bank builder must also enforce its global index byte limit across selected languages.",
-    "conflicting_name_aliases_omitted": []
+    "conflicting_name_aliases_omitted": [
+      {
+        "lookup_text": "e",
+        "alias": "i",
+        "conflicts_with_lookup": "I",
+        "reason": "Same casefolded/trimmed name key for different exact source labels; glyph keys retained"
+      },
+      {
+        "lookup_text": "E",
+        "alias": "i",
+        "conflicts_with_lookup": "I",
+        "reason": "Same casefolded/trimmed name key for different exact source labels; glyph keys retained"
+      }
+    ]
   }
 }

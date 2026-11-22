@@ -1,0 +1,35 @@
+{
+  "format": "dordiai-source12-reviewed-prebuild",
+  "format_version": 1,
+  "base_source_snapshot": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+  "source_changes": {
+    "source/0.12.2/kx47Runtime/language_origin.py": "381ad8005b98c41c54249a3460be0542acc4ef24",
+    "source/0.12.2/synthDrivers/kx47Preview.py": "a2759e35a5091a7c2c0c1bc9a09c780eadad4b88",
+    "source/0.12.2/kx47Runtime/native_word_membership.py": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+    "source/0.12.2/kx47Runtime/wide_languages.py": "7c33c5396703d0a07d5d849a7b593078fe5f0ae5",
+    "tests/nvda_stubs.py": "63723d3ed1714fd86efbcbee583c16593ea42cc2",
+    "tests/test_audio_pipeline.py": "00c4fa9059a7d1a5bd467d5eeea5192806c17ef7",
+    "tests/test_language_origin.py": "46441c3536a423fa2d3dba28f31af248cb9dab68",
+    "tests/test_native_compound_routing.py": "4d727cb3b3056a0e70fd5658834a914fcc0f98a0",
+    "tools/character_name_overrides.json": "94da92964c2db148637f8b6eca6243913d4fb081",
+    "source/0.12.2/kx47Runtime/models/CharacterNames/ay.json": "78e01f593353e3e450587687b5bc3114d26348e6",
+    "source/0.12.2/kx47Runtime/models/CharacterNames/fil.json": "2426edef78a3ec42bf39fb657fd9fb91b411b3a7",
+    "tests/test_character_names.py": "8de89d94e06ea68eb69b741bbb70494a1e88aba0",
+    "tests/test_ay_fil_character_dispatch.py": "885daaeb6ca83c6fb8db0065ac7d37e3836e4b15",
+    "tools/data/source12_character_name_pins.json": "e41583589afddcb5fd222f22427f1d332704af7f",
+    "evidence/character_names_ay_fil_source12_candidate.json": "b4345bc9f19758d466c9566cd9d96eba816139ec",
+    "tools/research/source12_integration.py": "2f84510f30dd2c6dcf326d25aa3e835881e787e1",
+    "tests/test_source12_integration.py": "9aab8a0c596bb81cbffe54c79ad94cc5297bff06",
+    "tools/windows_nvda_language_origin_probe.py": "da2129f1a3446bc8002de199a0a15ee8be19874a",
+    "tests/test_windows_nvda_language_origin_probe.py": "a582c8b1056c9d7756105c7eba5f89bcd87be8a7"
+  },
+  "actual_overlay_git_blobs_verified": 19,
+  "local_suite": {
+    "total": 1304,
+    "passed": 1252,
+    "skipped": 52,
+    "seconds": 7.555
+  },
+  "required_remaining": "Matching Windows assembly, exact unchanged model/private/bank comparison and real NVDA12 pipeline",
+  "product_ready": false
+}

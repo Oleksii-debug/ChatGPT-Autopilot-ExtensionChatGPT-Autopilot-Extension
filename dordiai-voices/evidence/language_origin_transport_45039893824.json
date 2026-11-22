@@ -1,0 +1,346 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "status": "partial",
+  "run_id": "1309da169f7b44749bcb7d0cd0ba54db",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "nvda_version_expected": "2026.3.1",
+  "checks": [
+    {
+      "name": "physical_audio_output",
+      "status": "blocked",
+      "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+    },
+    {
+      "name": "select_dordiai",
+      "status": "passed",
+      "driver_name": "kx47Preview"
+    },
+    {
+      "name": "host_sonic_import_and_dll",
+      "status": "passed",
+      "module": "synthDrivers._sonic"
+    },
+    {
+      "name": "allowed_voice_catalog",
+      "status": "passed",
+      "count": 45,
+      "voices": [
+        "adam",
+        "agnieszka",
+        "alex",
+        "alice_day1",
+        "astra_day2",
+        "bella",
+        "brian",
+        "brian_studio",
+        "brianna",
+        "callum_day1",
+        "charlie_day1",
+        "chris",
+        "claude_day2",
+        "daniel",
+        "daniel_day1",
+        "david",
+        "elis",
+        "gemini_day2",
+        "george",
+        "george_unpacked",
+        "gpt_day2",
+        "grok_day2",
+        "harry",
+        "hazel",
+        "keeper",
+        "laura_day1",
+        "laura_unpacked",
+        "lian",
+        "liza",
+        "liza_talk",
+        "mark",
+        "mykola",
+        "oksana",
+        "oleksii",
+        "oleksii_day1",
+        "oleksii_day2",
+        "oleksii_unpacked",
+        "olena",
+        "sara",
+        "sara_archive",
+        "studio_day1",
+        "veren",
+        "viktoriia",
+        "will",
+        "yevhen"
+      ],
+      "excluded_present": []
+    },
+    {
+      "name": "fresh_default_languages",
+      "status": "passed",
+      "enabled": [
+        "en",
+        "ru",
+        "uk"
+      ]
+    },
+    {
+      "name": "settings_dialog",
+      "status": "passed",
+      "title": "dordiai-voices — налаштування",
+      "visible": true,
+      "pages": [
+        "Мовлення",
+        "Голоси",
+        "Мови",
+        "Пакети"
+      ],
+      "labels": [
+        "dordiai-voices — налаштування",
+        "panel",
+        "Основний голос",
+        "Визначення мови",
+        "Швидкість, відсотків",
+        "Множник швидкості",
+        "Гучність, відсотків",
+        "Висота, відсотків",
+        "Тембр, відсотків",
+        "Мова чисел",
+        "Мова кириличних літер",
+        "panel",
+        "Доступні голоси",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "panel",
+        "Мови для перемикання",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "Основна мова",
+        "Мова для призначення голосу",
+        "Голос для цієї мови",
+        "Показано встановлені мови. Галочка вмикає мову, але не видаляє її файли. Нові мови\nпотрібно вмикати окремо. Текст вимкненою мовою читається основною мовою.\nВиберіть мову й сумісний голос. У примусовому режимі весь текст читається основною\nмовою.",
+        "panel",
+        "Установлені додаткові пакети",
+        "Установити пакет із ZIP-файла…",
+        "Видалити вибраний пакет…",
+        "Вибрати попередню версію голосу…",
+        "Основний комплект не видаляється тут. Під час роботи з пакетом навігацію озвучує\nвбудований eSpeak. Потім dordiai-voices автоматично перезавантажиться, і можна буде\nввімкнути нові мови на вкладці «Мови».",
+        "OK",
+        "Cancel",
+        "&Apply"
+      ],
+      "checked_languages": [
+        "en",
+        "ru",
+        "uk"
+      ],
+      "voice_rows": 45,
+      "missing_controls": []
+    },
+    {
+      "name": "settings_hotkey_binding",
+      "status": "passed",
+      "scripts": [
+        "script_preferences"
+      ]
+    },
+    {
+      "name": "keyboard_tab",
+      "status": "passed",
+      "events_emitted": true,
+      "changed_focus": true,
+      "focused_type": "WxCtrlWithEnableEvnt",
+      "reason": null
+    },
+    {
+      "name": "keyboard_checkbox_space",
+      "status": "passed",
+      "changed": true,
+      "reason": null
+    },
+    {
+      "name": "language_origin_actual_transport",
+      "status": "passed",
+      "checks": 9
+    }
+  ],
+  "limitations": [
+    "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+    "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+    "One keyboard smoke check is not a complete accessibility assessment.",
+    "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "nvda_version_actual": "2026.3.1",
+  "language_origin_transport": {
+    "scope": "Actual NVDA generic SynthParamCommand/filter/queue preprocessing and replay API; private queue, no synth delivery",
+    "product_source_modified": false,
+    "global_manager_modified": false,
+    "callbacks_run": false,
+    "physical_audio_verified": false,
+    "checks": [
+      {
+        "name": "private_manager_has_no_global_callbacks",
+        "passed": true
+      },
+      {
+        "name": "real_queue_retains_exact_parameter_objects",
+        "passed": true
+      },
+      {
+        "name": "index_callback_split_uses_host_commands",
+        "passed": true
+      },
+      {
+        "name": "original_parameter_order_across_splits",
+        "passed": true,
+        "trace": [
+          {
+            "text": "automatic",
+            "local_origin": false
+          },
+          {
+            "text": "after_callback",
+            "local_origin": null
+          },
+          {
+            "text": "authored",
+            "local_origin": true
+          },
+          {
+            "text": "automatic_again",
+            "local_origin": false
+          }
+        ]
+      },
+      {
+        "name": "automatic_overrides_explicit_in_real_replay",
+        "passed": true
+      },
+      {
+        "name": "explicit_retained_in_real_replay",
+        "passed": true
+      },
+      {
+        "name": "actual_index_completion_and_priority_resume_replays_automatic",
+        "passed": true
+      },
+      {
+        "name": "actual_filter_class_retains_original_objects",
+        "passed": true
+      },
+      {
+        "name": "fresh_high_level_call_resets_queued_origin",
+        "passed": true
+      }
+    ],
+    "processed": [
+      [
+        {
+          "type": "LanguageOriginCommand",
+          "explicit": false,
+          "real_synth_parameter": true,
+          "isDefault": false
+        },
+        {
+          "type": "LangChangeCommand",
+          "lang": "uk"
+        },
+        {
+          "type": "str",
+          "text": "automatic"
+        },
+        {
+          "type": "IndexCommand"
+        }
+      ],
+      [
+        {
+          "type": "str",
+          "text": "after_callback"
+        },
+        {
+          "type": "IndexCommand"
+        }
+      ],
+      [
+        {
+          "type": "EndUtteranceCommand"
+        }
+      ],
+      [
+        {
+          "type": "LanguageOriginCommand",
+          "explicit": false,
+          "real_synth_parameter": true,
+          "isDefault": false
+        },
+        {
+          "type": "LangChangeCommand",
+          "lang": "uk"
+        },
+        {
+          "type": "LanguageOriginCommand",
+          "explicit": true,
+          "real_synth_parameter": true,
+          "isDefault": false
+        },
+        {
+          "type": "LangChangeCommand",
+          "lang": "ru"
+        },
+        {
+          "type": "str",
+          "text": "authored"
+        },
+        {
+          "type": "IndexCommand"
+        }
+      ],
+      [
+        {
+          "type": "EndUtteranceCommand"
+        }
+      ],
+      [
+        {
+          "type": "LanguageOriginCommand",
+          "explicit": true,
+          "real_synth_parameter": true,
+          "isDefault": false
+        },
+        {
+          "type": "LangChangeCommand",
+          "lang": "ru"
+        },
+        {
+          "type": "LanguageOriginCommand",
+          "explicit": false,
+          "real_synth_parameter": true,
+          "isDefault": false
+        },
+        {
+          "type": "LangChangeCommand",
+          "lang": "uk"
+        },
+        {
+          "type": "str",
+          "text": "automatic_again"
+        },
+        {
+          "type": "IndexCommand"
+        }
+      ],
+      [
+        {
+          "type": "EndUtteranceCommand"
+        }
+      ]
+    ]
+  },
+  "pcm_metrics": {},
+  "finished_at_ns": 1795362325732327900
+}

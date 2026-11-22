@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.11",
+  "target_version": "0.13.1-dev.12",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -416,6 +416,50 @@
       "authored_rich_metadata_cases_blocked": "Probe isolated detectFormatAfterCursor was false; genuine nativefontLCIDs alternate but TextInfo only initially exposesru_RU. Tool-only setting/restore correction prepared.",
       "cleanup_restored": true,
       "evidence": "evidence/source11_plain_text_provenance_failure.md"
+    },
+    "source12_review": {
+      "status": "reviewed_awaiting_actual_build",
+      "local_suite": {
+        "base_snapshot": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+        "tests_total": 1304,
+        "passed": 1252,
+        "skipped": 52,
+        "seconds": 7.555,
+        "scope": "Linux isolated source12 candidate overlay; final manifestversion bump only after suite"
+      },
+      "origin_actual_private_queue_run": 45039893824,
+      "origin_invariants": 9,
+      "word_cache_actual_external_manager_run": 45039894049,
+      "word_cache_controls": 9,
+      "prepared_banks_regenerated": false,
+      "private_runtime_changes": false,
+      "actual_source12_archive_exists": false
+    },
+    "language_origin_transport": {
+      "run": 45039893824,
+      "job": 137261765553,
+      "actual_generic_parameter_invariants": 9,
+      "status": "passed_private_host_queue_only",
+      "evidence": "evidence/language_origin_transport_45039893824.json",
+      "actual_source12_driver_pipeline_verified": false
+    },
+    "recent_word_cache": {
+      "candidate_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+      "actual_windows_run": 45036190641,
+      "actual_linux_run": 45035639189,
+      "actual_frozen_nvda_run": 45039894049,
+      "status": "mechanical_host_and_lifecycle_verified_for12",
+      "frozen_wrapper_median_ms_range": [
+        0.767,
+        0.808
+      ],
+      "baseline_wrapper_median_ms_range": [
+        1.752,
+        1.876
+      ],
+      "first_use_unique_speedup_claimed": false,
+      "typing_audio_acceptance": false,
+      "evidence": "evidence/native_word_cache_nvda_45039894049.json"
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -472,7 +516,7 @@
     "nvda_evidence": "evidence/source11_nvda_45033534150.json"
   },
   "current_environment_blocker": "Local executor available. Physical microphone/speaker acoustic validation unavailable in hosted CI; bounded own virtual render-loopback calibration in preparation.",
-  "working_source_target_version": "Immutable11 source84ca83e built; installed NVDA dictionary/normal/typing/recovery verified. Plain TextInfo actual run45034220666 active. All production changes next require12.",
+  "working_source_target_version": "Production12 candidate reviewed and staged: locale provenance/typed-context bridge, bounded exact-word cache, exact whole-compound membership and source-backed AY/FIL ordinary-name data. Local1304total/1252pass/52skip. ActualWindowsbuild and fullmatchingNVDA12 pending; immutable11 retained.",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,

@@ -36,7 +36,7 @@ def standalone_driver_parts():
                  and node.name in {"initial_audio", "buffered_items"}]
     driver = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "SynthDriver")
     methods = [node for node in driver.body if isinstance(node, ast.FunctionDef)
-               and node.name in {"_play", "_render_parts", "cancel", "terminate", "_run", "_release_native_membership"}]
+               and node.name in {"_play", "_render_parts", "cancel", "terminate", "_run", "_release_native_membership", "_release_language_origin"}]
     stub = ast.ClassDef(name="Playback", bases=[], keywords=[], body=methods, decorator_list=[])
     module = ast.fix_missing_locations(ast.Module(body=functions + [stub], type_ignores=[]))
     namespace = dict(Queue=Queue, Empty=Empty, Full=Full, Thread=Thread, closing=closing,
