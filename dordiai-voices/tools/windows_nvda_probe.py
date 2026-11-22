@@ -35,6 +35,108 @@ NVDA_URL = "https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe"
 NVDA_SHA256 = "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052"
 SCOPE = "isolated-real-windows-nvda-smoke"
 
+# Fixed import-only code: no speech request, user text or arbitrary code input.
+# A short-copy retry is diagnostic only and never changes the installed add-on.
+NATIVE_IMPORT_DIAGNOSTIC = r'''
+import contextlib, ctypes, hashlib, importlib.util, json, os, shutil, sys, tempfile
+from pathlib import Path
+runtime, parent_app, mode = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+sys.path.insert(0, str(runtime))
+roots = [(str(runtime), "<runtime>"), (str(parent_app), "<nvda>"),
+         (os.environ.get("USERPROFILE", ""), "<profile>")]
+def error_details(error):
+    message = str(error)
+    for value, replacement in roots:
+        if value:
+            message = message.replace(value, replacement)
+    return {"type": type(error).__name__, "message": message[:4096],
+            "import_name": getattr(error, "name", None), "errno": getattr(error, "errno", None),
+            "winerror": getattr(error, "winerror", None)}
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+def path_row(path):
+    return {"basename": path.name, "path_length": len(str(path)), "exists": path.is_file(),
+            "sha256": digest(path)}
+def loaded_dlls():
+    rows = []
+    if os.name != "nt":
+        return rows
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
+    kernel.GetModuleHandleW.restype = ctypes.c_void_p
+    kernel.GetModuleFileNameW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_uint]
+    kernel.GetModuleFileNameW.restype = ctypes.c_uint
+    for name in ("python314.dll", "MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll"):
+        handle = kernel.GetModuleHandleW(name)
+        if not handle:
+            rows.append({"name": name, "loaded": False})
+            continue
+        buffer = ctypes.create_unicode_buffer(32768)
+        kernel.GetModuleFileNameW(handle, buffer, len(buffer))
+        path = Path(buffer.value)
+        location = "other"
+        for folder, label in ((runtime, "runtime"), (parent_app, "nvda"),
+                              (Path(os.environ.get("SystemRoot", "C:/Windows")), "windows")):
+            if path.is_relative_to(folder):
+                location = label
+                break
+        rows.append(dict(path_row(path), name=name, loaded=True, location=location))
+    return rows
+report = {"scope": "fixed import-only child diagnostic; no TTS input or production fix", "mode": mode,
+          "python_version": sys.version.split()[0], "pointer_bits": ctypes.sizeof(ctypes.c_void_p) * 8,
+          "runtime_path_length": len(str(runtime)), "executable_path_length": len(sys.executable),
+          "path_entries": [{"basename": Path(item).name, "length": len(item),
+              "sha256": hashlib.sha256(item.encode()).hexdigest()} for item in os.environ.get("PATH", "").split(os.pathsep) if item]}
+try:
+    with contextlib.redirect_stdout(sys.stderr):
+        from windows_runtime import reset_inherited_dll_directory
+        report["bootstrap"] = reset_inherited_dll_directory()
+        spec = importlib.util.find_spec("marisa_trie")
+        origin = Path(spec.origin) if spec and spec.origin else None
+        report["extension"] = path_row(origin) if origin else None
+        report["loaded_before"] = loaded_dlls()
+        report["dll_candidates"] = [{"directory": label, **path_row(folder / "MSVCP140.dll")}
+            for label, folder in (("private_python", Path(sys.executable).parent),
+                ("extension", origin.parent if origin else runtime), ("nvda", parent_app),
+                ("system32", Path(os.environ.get("SystemRoot", "C:/Windows")) / "System32"))]
+        if mode == "worker-import-order":
+            import ukrainian_voices, voice_controls, voice_delivery, speech_tempo
+        try:
+            import marisa_trie
+            from marisa_trie import RecordTrie
+            report["installed_path_import"] = {"status": "passed"}
+        except Exception as error:
+            report["installed_path_import"] = {"status": "failed", "error": error_details(error)}
+            if origin is not None and origin.is_file():
+                with tempfile.TemporaryDirectory(prefix="dv-pyd-") as temporary:
+                    short_path = Path(temporary) / origin.name
+                    shutil.copyfile(origin, short_path)
+                    report["short_copy"] = dict(path_row(short_path), same_bytes=digest(short_path) == digest(origin))
+                    try:
+                        sys.modules.pop("marisa_trie", None)
+                        short_spec = importlib.util.spec_from_file_location("marisa_trie", short_path)
+                        module = importlib.util.module_from_spec(short_spec)
+                        sys.modules["marisa_trie"] = module
+                        short_spec.loader.exec_module(module)
+                        from marisa_trie import RecordTrie
+                        report["short_copy_import"] = {"status": "passed"}
+                    except Exception as short_error:
+                        sys.modules.pop("marisa_trie", None)
+                        report["short_copy_import"] = {"status": "failed", "error": error_details(short_error)}
+        report["loaded_after"] = loaded_dlls()
+        if report.get("installed_path_import", {}).get("status") == "passed" or report.get("short_copy_import", {}).get("status") == "passed":
+            try:
+                from ukrainian_stress import dictionary
+                dictionary()
+                report["dictionary_constructed"] = True
+            except Exception as error:
+                report["dictionary_error"] = error_details(error)
+    report["status"] = "completed-diagnostic"
+except Exception as error:
+    report.update(status="failed-diagnostic", error=error_details(error))
+print(json.dumps(report))
+'''
+
 # This code runs inside the downloaded, unmodified NVDA interpreter. Normal
 # mode uses actual Windows audio. Explicit --headless-ui-probe substitutes
 # only the output sink, with physical/device acceptance always blocked.
@@ -48,6 +150,7 @@ import threading
 import time
 import traceback
 import wave
+NATIVE_IMPORT_DIAGNOSTIC = __NATIVE_IMPORT_DIAGNOSTIC__
 
 import core
 import globalPluginHandler
@@ -84,6 +187,7 @@ ORIGINAL_FEED = None
 ACTIVE_REQUEST = None
 LATENCY_THREAD = None
 LATENCY_STOP = threading.Event()
+IMPORT_DIAGNOSTIC_DONE = threading.Event()
 RECOVERY_ORIGINAL_WAVE_FACTORY = None
 RECOVERY_OUTPUTS = []
 DONE = threading.Event()
@@ -419,7 +523,7 @@ def wait_for_stage(stage, deadline, continuation):
         check(stage + "_pcm_submission", "failed", reason="Permanent speech import failure; further requests stopped",
               metrics=stats, diagnostics=details)
         DRIVER.cancel()
-        finish()
+        start_native_import_diagnostic()
         return
     if DONE.is_set():
         error = getattr(DRIVER, "_dordiai_last_error", None)
@@ -445,6 +549,39 @@ def permanent_speech_failure(details):
     return details.get("type") in {"ImportError", "ModuleNotFoundError"} or (
         isinstance(details.get("worker"), dict) and
         details["worker"].get("type") in {"ImportError", "ModuleNotFoundError"})
+
+
+def start_native_import_diagnostic():
+    """Run fixed imports from actual NVDA, retaining its inherited environment."""
+    import globalVars
+    import subprocess
+    command = list(DRIVER._engine._command)
+    runtime = str(Path(command[4]).parent)
+    def run():
+        reports = []
+        for mode in ("clean", "worker-import-order"):
+            try:
+                completed = subprocess.run([command[0], "-I", "-B", "-u", "-c", NATIVE_IMPORT_DIAGNOSTIC,
+                    runtime, str(globalVars.appDir), mode], cwd=runtime, capture_output=True, timeout=20)
+                report = json.loads(completed.stdout)
+                report["exit_code"] = completed.returncode
+                reports.append(report)
+                (OUTPUT / ("native-import-" + mode + "-stderr.log")).write_bytes(completed.stderr[-131072:])
+            except Exception as error:
+                reports.append({"mode": mode, "status": "diagnostic-controller-error", "error_type": type(error).__name__})
+        RESULT["native_import_diagnostics"] = {"launcher": "actual NVDA subprocess", "cases": reports}
+        IMPORT_DIAGNOSTIC_DONE.set()
+    threading.Thread(target=run, daemon=True, name="Dordiai fixed native-import diagnostic").start()
+    later(100, lambda: await_native_import_diagnostic(time.monotonic() + 45))
+
+
+def await_native_import_diagnostic(deadline):
+    if IMPORT_DIAGNOSTIC_DONE.is_set() or time.monotonic() >= deadline:
+        check("fixed_native_import_diagnostics", "passed" if IMPORT_DIAGNOSTIC_DONE.is_set() else "blocked",
+              scope="Diagnostic completion only; never a model, speech or product acceptance check")
+        finish()
+    else:
+        later(100, lambda: await_native_import_diagnostic(deadline))
 
 
 def start_character():
@@ -951,7 +1088,7 @@ def main(argv=None):
             'name = "dordiaiProbe"\nsummary = "Isolated dordiai integration probe"\n'
             'version = "1.0.0"\nauthor = "dordiai-voices"\n'
             'minimumNVDAVersion = "2026.1"\nlastTestedNVDAVersion = "2026.3.1"\n', encoding="utf-8")
-        (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__PROBE_SETTINGS__", repr({
+        (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__NATIVE_IMPORT_DIAGNOSTIC__", repr(NATIVE_IMPORT_DIAGNOSTIC)).replace("__PROBE_SETTINGS__", repr({
             "output": str(run), "run_id": run_id, "headless_ui_probe": args.headless_ui_probe,
             "fatal_recovery_probe": args.fatal_recovery_probe,
         })), encoding="utf-8")

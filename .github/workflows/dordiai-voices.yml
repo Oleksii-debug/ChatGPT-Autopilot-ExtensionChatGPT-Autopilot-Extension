@@ -14,6 +14,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  nvda-diagnostics:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[probe-nvda]')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Preserve exact source bytes during Windows checkout
+        shell: cmd
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Reuse the immutable development core for loader diagnostics
+        uses: actions/download-artifact@v4
+        with:
+          name: dordiai-voices-development-core
+          path: dordiai-voices/dist
+          run-id: 44997655739
+          github-token: ${{ github.token }}
+      - name: Verify exact previously tested archive bytes
+        shell: python
+        run: |
+          import hashlib, pathlib
+          path = pathlib.Path("dordiai-voices/dist/dordiai-voices-0.13.1-dev.5.nvda-addon")
+          with path.open("rb") as stream:
+              actual = hashlib.file_digest(stream, "sha256").hexdigest()
+          if actual != "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d":
+              raise RuntimeError("Immutable diagnostic core SHA-256 mismatch")
+      - name: Probe the actual NVDA child environment
+        shell: python
+        run: |
+          import json, pathlib, subprocess, sys
+          root = pathlib.Path("dordiai-voices")
+          subprocess.run([sys.executable, str(root / "tools/setup_audio_endpoint.py"), "--output", str(root / "windows-results/audio"), "--ephemeral-ci", "--start-existing-services"], check=False)
+          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.5.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--fatal-recovery-probe"]
+          audio = root / "windows-results/audio/audio-endpoint.json"
+          if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
+              command.append("--headless-ui-probe")
+          subprocess.run(command, check=True)
+      - name: Collect bounded diagnostic evidence
+        if: always()
+        run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-voices-nvda-loader-diagnostics
+          path: dordiai-voices/windows-evidence
+          if-no-files-found: warn
+          retention-days: 7
+
   artifact-diagnostics:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[diagnose-nvda]')
     runs-on: ubuntu-latest

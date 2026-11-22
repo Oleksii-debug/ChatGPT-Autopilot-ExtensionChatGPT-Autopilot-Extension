@@ -46,7 +46,19 @@ GitHub branch: `dordiai-voices/audit-20261122` in the temporary repository.
 Root coordinates external commits and branch updates; subagents work in
 disjoint files and do not push or overwrite another agent's changes.
 
-The immutable dev.1 build is reproduced from
-`evidence/dev1_source_snapshot.json.gz`; live source may include newer dev.2
-model adapters. Check the source and archive hashes before attributing a
-Windows run to a particular build.
+Use the versioned `evidence/source_snapshot_*.json.gz` and release reports;
+the earliest dev.1 snapshot has its historical filename
+`evidence/dev1_source_snapshot.json.gz`. Check exact source and archive hashes
+before attributing a Windows run to a build.
+
+Do not require the user to provide the original large archive again. A verified
+core resource backup is saved as four `dordiai-core-0.13.1-dev.4-backup-00N.zip`
+files plus its tools ZIP. `tools/restore_core_backup.py` reconstructs the exact
+core SHA b80f0f2a428ba097b37437ccfd028ce41630b73fd92c5cfa9539da1b08a1b90e.
+This old development build has a known Windows bootstrap bug; use it as
+verified resource data, then overlay the latest code before launching the
+add-on. Do not present the old build as an accepted installer. `tools/recover_core_baseline.py`
+verifies and extracts only its payload, excluding generated release metadata.
+An actual core4 + frozen source5 rebuild produced the identical dev5 ZIP:
+see `evidence/recovered_core4_to_dev5_rebuild.json`. This recovers core resources,
+not optional language models which were absent from that core.

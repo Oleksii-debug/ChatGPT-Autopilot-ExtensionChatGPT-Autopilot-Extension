@@ -7,6 +7,8 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import threading
 import time
 import unittest
@@ -194,12 +196,44 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         details = {"type": "RuntimeError", "worker": {"type": "ImportError", "import_name": "native"}}
         namespace = {"RESULT": {}, "snapshot": lambda stage: {"pcm_bytes": 0},
                      "DRIVER": SimpleNamespace(_dordiai_last_error_details=details, cancel=lambda: events.append("cancel")),
-                     "check": lambda *args, **kw: events.append((args, kw)), "finish": lambda: events.append("finish"),
+                     "check": lambda *args, **kw: events.append((args, kw)),
+                     "start_native_import_diagnostic": lambda: events.append("diagnostic"),
                      "later": lambda *args: self.fail("permanent error must not schedule more requests")}
         exec(compile(ast.Module(body=definitions, type_ignores=[]), "permanent-stage-check", "exec"), namespace)
         namespace["wait_for_stage"]("phrase", time.monotonic() + 150, lambda: self.fail("must finish"))
-        self.assertEqual(events[-2:], ["cancel", "finish"])
+        self.assertEqual(events[-2:], ["cancel", "diagnostic"])
         self.assertEqual(events[0][1]["diagnostics"], details)
+
+    def test_generated_plugin_includes_fixed_diagnostic_and_compiles(self):
+        source = probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", "{}").replace(
+            "__NATIVE_IMPORT_DIAGNOSTIC__", repr(probe.NATIVE_IMPORT_DIAGNOSTIC))
+        compile(source, "generated-real-nvda-plugin", "exec")
+        compile(probe.NATIVE_IMPORT_DIAGNOSTIC, "fixed-import-only-child", "exec")
+        self.assertNotIn("DRIVER.speak", probe.NATIVE_IMPORT_DIAGNOSTIC)
+
+    def test_short_copy_diagnostic_control_flow_preserves_exact_module_bytes(self):
+        # Deliberately pure Python fixture verifies the diagnostic's retry and
+        # hashing logic. This test establishes no native DLL/Windows success.
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = Path(temporary) / "diagnostic-original"
+            runtime.mkdir()
+            (runtime / "windows_runtime.py").write_text(
+                'def reset_inherited_dll_directory(): return {"status":"fixture"}\n', encoding="utf-8")
+            (runtime / "marisa_trie.py").write_text(
+                'if "diagnostic-original" in __file__:\n'
+                '    raise ImportError("fixed fixture original-path failure", name="marisa_trie")\n'
+                'class RecordTrie: pass\n', encoding="utf-8")
+            (runtime / "ukrainian_stress.py").write_text('def dictionary(): return object()\n', encoding="utf-8")
+            completed = subprocess.run([sys.executable, "-I", "-c", probe.NATIVE_IMPORT_DIAGNOSTIC,
+                str(runtime), temporary, "clean"], capture_output=True, text=True, timeout=10)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        report = json.loads(completed.stdout)
+        self.assertEqual(report["installed_path_import"]["status"], "failed")
+        self.assertEqual(report["short_copy_import"]["status"], "passed")
+        self.assertTrue(report["short_copy"]["same_bytes"])
+        self.assertEqual(report["short_copy"]["sha256"], report["extension"]["sha256"])
+        self.assertEqual(report["short_copy"]["basename"], report["extension"]["basename"])
+        self.assertTrue(report["dictionary_constructed"])
 
     def test_signature_check_detects_original_driver_selection_failure(self):
         # Reproduce the exact error observed after real NVDA selected the
