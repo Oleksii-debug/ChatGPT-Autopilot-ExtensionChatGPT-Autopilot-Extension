@@ -90,13 +90,14 @@ def _typing_on_synth(speechSequence):
 def _typing_observe_parts(*args, **kwargs):
     source = _TYPING["original_parts"](*args, **kwargs)
     try:
-        for kind, value in source:
+        for part in source:
+            kind, value = part
             state = _TYPING
             row = state.get("active") if state and not state.get("cleaned") else None
             if row is not None and row["typed_events"] and kind in {"text", "character"} and isinstance(value, dict):
                 row["routes"].append({key: value.get(key) for key in
                                       ("language", "profile", "character", "text")})
-            yield kind, value
+            yield part
     finally:
         close = getattr(source, "close", None)
         if close is not None:
