@@ -16,6 +16,7 @@ from time import monotonic
 from threading import Condition, Thread, RLock
 from unicodedata import normalize
 import wave
+from weakref import WeakSet
 
 from autoSettingsUtils.driverSetting import BooleanDriverSetting, DriverSetting, NumericDriverSetting
 import config
@@ -479,6 +480,12 @@ def _resource_epoch(references):
 
 class SpeechWorker:
     def __init__(self, python, script, models, reference_config=None, preload_language="mixed"):
+        with _shared_lock:
+            if _package_maintenance is not None:
+                raise RuntimeError("Триває оновлення пакетів dordiai-voices. Тимчасово користуйтеся резервним синтезатором.")
+        self._lifecycle_lock = RLock()
+        self._retired = False
+        self._pipe_closers = []
         self._command = [str(python), "-I", "-B", "-u", str(script), str(models)]
         if reference_config is not None:
             model, samples, engine = reference_config
@@ -497,6 +504,11 @@ class SpeechWorker:
         self._letterBank = NativeLetterBank(self._references)
         self._commandBank = NativeLetterBank(self._references, "native_commands")
         self._wideNavigation = {}
+        with _shared_lock:
+            if _package_maintenance is not None:
+                self._retired = True
+                raise RuntimeError("Триває оновлення пакетів dordiai-voices.")
+            _all_workers.add(self)
 
     def fast_clip(self, request):
         """Read prepared speech without waiting for any neural model or worker."""
@@ -606,6 +618,8 @@ class SpeechWorker:
         return self._checked_prepared_clip(request,pcm,native_letter or core_at_cap)
 
     def _assert_resource_epoch(self):
+        if self._retired:
+            raise RuntimeError("Робочий процес dordiai-voices завершено для оновлення пакетів.")
         if self._resource_epoch!=_resource_epoch(self._references):
             raise RuntimeError("Пакети dordiai-voices змінилися. Повторно виберіть синтезатор або перезапустіть NVDA.")
 
@@ -658,19 +672,23 @@ class SpeechWorker:
             responses.put(None)
 
     def _send(self, request):
-        if self._process is not None and self._process.poll() is not None:self.close()
-        if self._process is None:
-            self._process = subprocess.Popen(
-                self._command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                cwd=str(Path(self._command[4]).resolve().parent),
-                                stderr=subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
-            )
-            self._responses = Queue()
-            Thread(target=self._read, args=(self._process, self._responses), daemon=True).start()
+        with self._lifecycle_lock:
+            if self._retired:
+                raise RuntimeError("Робочий процес завершено для оновлення пакетів.")
+            if self._process is not None and self._process.poll() is not None:self.close()
+            if self._process is None:
+                self._process = subprocess.Popen(
+                    self._command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    cwd=str(Path(self._command[4]).resolve().parent),
+                                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
+                )
+                self._responses = Queue()
+                Thread(target=self._read, args=(self._process, self._responses), daemon=True).start()
+            process = self._process
         try:
-            self._process.stdin.write((json.dumps(request) + "\n").encode("ascii"))
-            self._process.stdin.flush()
+            process.stdin.write((json.dumps(request) + "\n").encode("ascii"))
+            process.stdin.flush()
         except OSError:
             self.close()
             raise
@@ -842,21 +860,50 @@ class SpeechWorker:
     def buffered_stream(self, request, cancelled):
         yield from buffered_items(lambda stop: self.stream(request, stop), cancelled, pending_count=2)
 
-    def close(self):
-        self._ready_modes.clear()
-        process, self._process = self._process, None
-        if process is not None:
-            try:
+    def close(self, timeout=1.0):
+        deadline = monotonic() + min(30.0, max(0.01, float(timeout)))
+        if not self._lifecycle_lock.acquire(timeout=max(0.01, deadline-monotonic())):
+            raise TimeoutError("Не вдалося своєчасно завершити робочий процес dordiai-voices.")
+        try:
+            self._ready_modes.clear()
+            process = self._process
+            if process is not None:
                 if process.poll() is None:
                     process.kill()
-                process.wait()
-            finally:
-                process.stdin.close()
-                process.stdout.close()
+                process.wait(timeout=max(0.01, deadline-monotonic()))
+                # Keep the process reference if wait fails: its file handles
+                # have not been proven closed and maintenance must abort.
+                self._process = None
+                errors = []
+                def close_pipes():
+                    for pipe in (process.stdin, process.stdout):
+                        try:
+                            pipe.close()
+                        except Exception as error:
+                            errors.append(error)
+                closer = Thread(target=close_pipes, daemon=True, name="dordiai worker pipe cleanup")
+                self._pipe_closers.append((closer, errors))
+                closer.start()
+            for closer, errors in list(self._pipe_closers):
+                closer.join(timeout=max(0.0, deadline-monotonic()))
+                if closer.is_alive():
+                    raise TimeoutError("Не вдалося своєчасно закрити канали робочого процесу.")
+                self._pipe_closers.remove((closer, errors))
+                if errors:
+                    raise RuntimeError("Не вдалося закрити канал робочого процесу.") from errors[0]
+        finally:
+            self._lifecycle_lock.release()
+
+    def retire(self, timeout=1.0):
+        self._retired = True
+        self.close(timeout=timeout)
 
 
 _shared_lock=RLock()
 _shared_entry=None
+_package_maintenance=None
+_all_workers=WeakSet()
+_live_drivers=WeakSet()
 
 
 def acquire_shared_worker(python,script,models,reference_config,language):
@@ -865,6 +912,8 @@ def acquire_shared_worker(python,script,models,reference_config,language):
     references=reference_config[1] if reference_config is not None else None
     key=(str(python),str(script),str(models),tuple(map(str,reference_config or ())),language,_resource_epoch(references))
     with _shared_lock:
+        if _package_maintenance is not None:
+            raise RuntimeError("Триває оновлення пакетів dordiai-voices.")
         if _shared_entry is not None and _shared_entry['lease'] is not None:
             return SpeechWorker(python,script,models,reference_config,language),None
         if _shared_entry is None or _shared_entry['key']!=key:
@@ -888,6 +937,88 @@ def close_shared_worker():
 
 
 atexit.register(close_shared_worker)
+
+
+def begin_package_maintenance(owner):
+    """Reserve this add-on before switching away; never retire another live owner."""
+    global _package_maintenance, _shared_entry
+    with _shared_lock:
+        if _package_maintenance is not None:
+            raise RuntimeError("Інша операція з пакетами вже триває.")
+        drivers = tuple(_live_drivers)
+        if any(driver is not owner and not getattr(driver, "_closed", True) for driver in drivers):
+            raise RuntimeError("Інший екземпляр dordiai-voices ще працює. Пакет не змінено.")
+        workers = set(_all_workers)
+        for driver in (*drivers, owner):
+            for attribute in ("_engine", "_english_engine"):
+                worker = getattr(driver, attribute, None)
+                if worker is not None:
+                    workers.add(worker)
+        if _shared_entry is not None:
+            if (_shared_entry["lease"] is not None and
+                    _shared_entry["lease"] is not getattr(owner, "_worker_lease", None)):
+                raise RuntimeError("Спільний робочий процес зайнятий іншим екземпляром. Пакет не змінено.")
+            workers.add(_shared_entry["worker"])
+        session = {"token": object(), "owner": owner, "workers": tuple(workers), "drivers": drivers,
+                   "detached_entry": _shared_entry, "quiesce_started": False, "quiesced": False}
+        _package_maintenance = session
+        # No future acquire may lease an old worker after this reservation.
+        _shared_entry = None
+        return session
+
+
+def quiesce_package_maintenance(session, timeout=8.0):
+    """Background-only bounded process retirement before any package mutation."""
+    deadline = monotonic() + min(30.0, max(0.05, float(timeout)))
+    with _shared_lock:
+        if _package_maintenance is not session:
+            raise RuntimeError("Операція оновлення втратила право на робочі процеси.")
+        if not getattr(session["owner"], "_closed", False):
+            raise RuntimeError("dordiai-voices ще не відключено. Пакет не змінено.")
+        session["quiesce_started"] = True
+    for worker in session["workers"]:
+        if monotonic() >= deadline:
+            raise TimeoutError("Робочі процеси не завершилися вчасно. Пакет не змінено.")
+        worker.retire(timeout=max(0.01, deadline-monotonic()))
+        if monotonic() > deadline:
+            raise TimeoutError("Робочі процеси не завершилися вчасно. Пакет не змінено.")
+    for driver in dict.fromkeys((*session["drivers"], session["owner"])):
+        thread = getattr(driver, "_thread", None)
+        threads = ([thread] if thread is not None else [])
+        for pending in threads:
+            pending.join(timeout=max(0.0, deadline-monotonic()))
+            if pending.is_alive():
+                raise TimeoutError("Озвучення ще завершується. Пакет не змінено.")
+        for pending in getattr(driver, "_retirement_threads", ()):
+            pending.join(timeout=max(0.0, deadline-monotonic()))
+            if pending.is_alive():
+                raise TimeoutError("Попередній потік озвучення ще працює. Пакет не змінено.")
+    session["quiesced"] = True
+
+
+def end_package_maintenance(session):
+    global _package_maintenance, _shared_entry
+    pending = ()
+    with _shared_lock:
+        if _package_maintenance is session:
+            if not session["quiesce_started"] and not getattr(session["owner"], "_closed", True):
+                # A failure before switching away must not orphan an active
+                # owner's reusable pool entry.
+                _shared_entry = session["detached_entry"]
+            elif not session["quiesced"]:
+                pending = session["workers"]
+            _package_maintenance = None
+        else:
+            return False
+    if pending:
+        def cleanup():
+            for worker in pending:
+                try:
+                    worker.retire(timeout=1.0)
+                except Exception:
+                    log.warning("dordiai-voices: retired package worker cleanup did not complete.")
+        Thread(target=cleanup, daemon=True, name="dordiai package worker cleanup").start()
+    return True
 
 
 class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
@@ -943,6 +1074,9 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         return cls._runtime_config() is not None
 
     def __init__(self):
+        with _shared_lock:
+            if _package_maintenance is not None:
+                raise RuntimeError("Триває оновлення пакетів dordiai-voices. Дочекайтеся завершення.")
         self._dordiai_init()
         _wide.refresh_personal(True)
         if _wide.PERSONAL:
@@ -1019,13 +1153,33 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         self._paused = False
         self._closed = False
         self._jobs = Queue()
+        with _shared_lock:
+            if _package_maintenance is not None:
+                self._closed = True
+                raise RuntimeError("Триває оновлення пакетів dordiai-voices.")
+            _live_drivers.add(self)
         separate = info.get("referenceEngine") == "holos" and not self._canJoin
         self._worker_lease=None
-        if self.name=='kx47Preview' and not separate:
-            self._engine,self._worker_lease=acquire_shared_worker(python,RUNTIME/'nvda_worker.py',models,reference_config,'mixed')
-        else:
-            self._engine=SpeechWorker(python,RUNTIME/'nvda_worker.py',models,reference_config,'uk' if separate else 'mixed')
-        self._english_engine = SpeechWorker(python, RUNTIME / "nvda_worker.py", models, reference_config, "en") if separate else None
+        self._engine = self._english_engine = None
+        try:
+            if self.name=='kx47Preview' and not separate:
+                self._engine,self._worker_lease=acquire_shared_worker(python,RUNTIME/'nvda_worker.py',models,reference_config,'mixed')
+            else:
+                self._engine=SpeechWorker(python,RUNTIME/'nvda_worker.py',models,reference_config,'uk' if separate else 'mixed')
+            self._english_engine = SpeechWorker(python, RUNTIME / "nvda_worker.py", models, reference_config, "en") if separate else None
+        except BaseException:
+            self._closed = True
+            with _shared_lock:
+                _live_drivers.discard(self)
+            if self._worker_lease is not None:
+                release_shared_worker(self._worker_lease)
+            elif self._engine is not None:
+                try:
+                    self._engine.close()
+                except BaseException:
+                    log.warning("dordiai-voices: failed constructor worker cleanup did not complete.")
+            self._engine = self._english_engine = self._worker_lease = None
+            raise
         self._initialize_audio_output()
         self._thread = Thread(target=self._run, daemon=True, name="Diordiai speech")
         self._thread.start()
@@ -1371,6 +1525,15 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         # cancellation. Releasing here lets a replacement driver reuse it
         # while this driver's old stream is still issuing cancel/drop.
 
+    def _dordiai_begin_package_maintenance(self):
+        return begin_package_maintenance(self)
+
+    def _dordiai_quiesce_package_maintenance(self, session, timeout=8.0):
+        return quiesce_package_maintenance(session, timeout)
+
+    def _dordiai_end_package_maintenance(self, session):
+        return end_package_maintenance(session)
+
     def _play(self, pcm, generation):
         frame_bytes = SAMPLE_RATE * 2 // 100
         for offset in range(0, len(pcm), frame_bytes):
@@ -1542,6 +1705,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             for thread in outstanding:
                 thread.join(timeout=.05)
             outstanding = [thread for thread in outstanding if thread.is_alive()]
+            self._retirement_threads = tuple(outstanding)
             if self._worker_lease is None or outstanding:
                 self._engine.close()
             if self._english_engine is not None:

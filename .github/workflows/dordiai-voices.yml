@@ -169,6 +169,9 @@ jobs:
       - name: Actual pinned new MMS representative on the embedded Windows runtime
         if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/nvda_worker.py') != ''
         run: python dordiai-voices/tools/windows_mms_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/mms-ha --timeout 120
+      - name: Actual explicitly enabled shared MMS graph on the embedded Windows runtime
+        if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/mms_family_sessions.py') != ''
+        run: python dordiai-voices/tools/windows_mms_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/mms-ha-shared --timeout 120 --shared-family
       - name: Reclaim isolated engine probe files
         if: always()
         shell: python

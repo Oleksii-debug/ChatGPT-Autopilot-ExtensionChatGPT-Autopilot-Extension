@@ -1,0 +1,3086 @@
+{
+  "format": "dordiai-mms-shared-graph-research-v1",
+  "status": "prototype-only-not-integrated",
+  "production_files_changed": false,
+  "models_quantized_or_retrained": false,
+  "graph_bytes": 927175,
+  "graph_sha256": "d883f15134dafb68b33acf514deac3c87c2684632fed992a8857570d12db7ec6",
+  "original_family_fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+  "initializer_count": 460,
+  "metadata_only_output_annotations": [
+    "durations"
+  ],
+  "guards": {
+    "non_vocabulary_shape_rejected": true,
+    "changed_topology_rejected": true
+  },
+  "family_scan": {
+    "ha": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 34
+    },
+    "so": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 27
+    },
+    "yo": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 43
+    }
+  },
+  "pinned_models": {
+    "ha": {
+      "sha256": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32",
+      "bytes": 114013956,
+      "native_vocab_rows": 34
+    },
+    "so": {
+      "sha256": "0199dd00b919d345110a04a7d3c96f621834afcce4bff396afd493c3e10de0c1",
+      "bytes": 114008580,
+      "native_vocab_rows": 27
+    },
+    "yo": {
+      "sha256": "1daf1b837dfb032995a9afdfd1b974d07fd69fd42c91765fc551969ba6d4c183",
+      "bytes": 114020868,
+      "native_vocab_rows": 43
+    }
+  },
+  "environment": {
+    "onnxruntime": "1.27.0",
+    "threads": 2,
+    "fresh_process_per_case": true,
+    "model_file_disk_cache": "OS cache was not flushed; cold means fresh ORT session, not cold disk",
+    "RSS_note": "File-backed mappings remain resident after touching weights; anonymous bytes measure non-reclaimable heap separately."
+  },
+  "native_parity": [
+    {
+      "code": "ha",
+      "item": 0,
+      "samples": 17152,
+      "float32_bitwise_equal": true,
+      "max_float_error": 0.0,
+      "cosine": 0.9999999999999999,
+      "pcm16_bitwise_equal": true,
+      "pcm16_different_samples": 0,
+      "pcm16_max_lsb_difference": 0
+    },
+    {
+      "code": "ha",
+      "item": 1,
+      "samples": 20224,
+      "float32_bitwise_equal": true,
+      "max_float_error": 0.0,
+      "cosine": 1.0000000000000002,
+      "pcm16_bitwise_equal": true,
+      "pcm16_different_samples": 0,
+      "pcm16_max_lsb_difference": 0
+    },
+    {
+      "code": "so",
+      "item": 0,
+      "samples": 17152,
+      "float32_bitwise_equal": true,
+      "max_float_error": 0.0,
+      "cosine": 0.9999999999999999,
+      "pcm16_bitwise_equal": true,
+      "pcm16_different_samples": 0,
+      "pcm16_max_lsb_difference": 0
+    },
+    {
+      "code": "so",
+      "item": 1,
+      "samples": 26880,
+      "float32_bitwise_equal": true,
+      "max_float_error": 0.0,
+      "cosine": 1.0,
+      "pcm16_bitwise_equal": true,
+      "pcm16_different_samples": 0,
+      "pcm16_max_lsb_difference": 0
+    },
+    {
+      "code": "yo",
+      "item": 0,
+      "samples": 9216,
+      "float32_bitwise_equal": false,
+      "max_float_error": 5.76837919652462e-08,
+      "cosine": 0.9999999999999619,
+      "pcm16_bitwise_equal": false,
+      "pcm16_different_samples": 2,
+      "pcm16_max_lsb_difference": 1
+    },
+    {
+      "code": "yo",
+      "item": 1,
+      "samples": 12544,
+      "float32_bitwise_equal": false,
+      "max_float_error": 1.1455267667770386e-07,
+      "cosine": 0.9999999999999759,
+      "pcm16_bitwise_equal": false,
+      "pcm16_different_samples": 3,
+      "pcm16_max_lsb_difference": 1
+    }
+  ],
+  "native_numerical_guard_passed": true,
+  "native_waveform_always_bit_identical": false,
+  "repeat_pairs_have_no_measured_median_slowdown": true,
+  "combined_each_language_has_no_measured_median_slowdown": true,
+  "per_language_combined_fresh_process_pairs": {
+    "ha": {
+      "warm": {
+        "original": {
+          "count": 13,
+          "median_seconds": 0.18755143899761606,
+          "p95_seconds": 0.19794731100046192,
+          "minimum_seconds": 0.18306340599883697,
+          "maximum_seconds": 0.19794731100046192
+        },
+        "shared": {
+          "count": 13,
+          "median_seconds": 0.1837784390008892,
+          "p95_seconds": 0.19859372999781044,
+          "minimum_seconds": 0.17488174400205025,
+          "maximum_seconds": 0.19859372999781044
+        },
+        "median_ratio_shared_over_original": 0.9798828523156529
+      },
+      "alternating": {
+        "original": {
+          "count": 13,
+          "median_seconds": 0.19425014499938698,
+          "p95_seconds": 0.31649452400233713,
+          "minimum_seconds": 0.1773958740013768,
+          "maximum_seconds": 0.31649452400233713
+        },
+        "shared": {
+          "count": 13,
+          "median_seconds": 0.1846874939983536,
+          "p95_seconds": 0.19180023499939125,
+          "minimum_seconds": 0.17776923500059638,
+          "maximum_seconds": 0.19180023499939125
+        },
+        "median_ratio_shared_over_original": 0.9507714601651208
+      }
+    },
+    "so": {
+      "warm": {
+        "original": {
+          "count": 13,
+          "median_seconds": 0.19736444299996947,
+          "p95_seconds": 0.3257236520003062,
+          "minimum_seconds": 0.18223427100019762,
+          "maximum_seconds": 0.3257236520003062
+        },
+        "shared": {
+          "count": 13,
+          "median_seconds": 0.18543090400271467,
+          "p95_seconds": 0.2495473849994596,
+          "minimum_seconds": 0.1792825409975194,
+          "maximum_seconds": 0.2495473849994596
+        },
+        "median_ratio_shared_over_original": 0.9395355170573625
+      },
+      "alternating": {
+        "original": {
+          "count": 13,
+          "median_seconds": 0.18908368499978678,
+          "p95_seconds": 0.20030903699807823,
+          "minimum_seconds": 0.17705543199917884,
+          "maximum_seconds": 0.20030903699807823
+        },
+        "shared": {
+          "count": 13,
+          "median_seconds": 0.1854001360006805,
+          "p95_seconds": 0.2023646089983231,
+          "minimum_seconds": 0.17818216900195694,
+          "maximum_seconds": 0.2023646089983231
+        },
+        "median_ratio_shared_over_original": 0.9805189485327069
+      }
+    },
+    "yo": {
+      "warm": {
+        "original": {
+          "count": 13,
+          "median_seconds": 0.10497829399901093,
+          "p95_seconds": 0.1511660079995636,
+          "minimum_seconds": 0.10257007299878751,
+          "maximum_seconds": 0.1511660079995636
+        },
+        "shared": {
+          "count": 13,
+          "median_seconds": 0.10262056300052791,
+          "p95_seconds": 0.11974377399747027,
+          "minimum_seconds": 0.097980392001773,
+          "maximum_seconds": 0.11974377399747027
+        },
+        "median_ratio_shared_over_original": 0.9775407762055531
+      },
+      "alternating": {
+        "original": {
+          "count": 13,
+          "median_seconds": 0.10808567099957145,
+          "p95_seconds": 0.1256806860001234,
+          "minimum_seconds": 0.0999871259991778,
+          "maximum_seconds": 0.1256806860001234
+        },
+        "shared": {
+          "count": 13,
+          "median_seconds": 0.10507963399868459,
+          "p95_seconds": 0.10905830899719149,
+          "minimum_seconds": 0.10192587500205263,
+          "maximum_seconds": 0.10905830899719149
+        },
+        "median_ratio_shared_over_original": 0.9721883856288519
+      }
+    }
+  },
+  "actual_on_demand_switches": {
+    "ha": {
+      "original_activate_and_first_word_seconds": 1.2219239599980938,
+      "shared_activate_and_first_word_seconds": 0.32589524499780964,
+      "shared_common_graph_setup_excluded_seconds": 0.4658639570006926
+    },
+    "so": {
+      "original_activate_and_first_word_seconds": 0.921465776002151,
+      "shared_activate_and_first_word_seconds": 0.33748769299927517,
+      "shared_common_graph_setup_excluded_seconds": 0.4658639570006926
+    },
+    "yo": {
+      "original_activate_and_first_word_seconds": 0.9252683459999389,
+      "shared_activate_and_first_word_seconds": 0.20822633299758309,
+      "shared_common_graph_setup_excluded_seconds": 0.4658639570006926
+    }
+  },
+  "summaries": {
+    "original": {
+      "open_seconds": 2.232663760001742,
+      "warm": {
+        "count": 15,
+        "median_seconds": 0.1888167600009183,
+        "p95_seconds": 0.19953253099811263,
+        "minimum_seconds": 0.10483363599996665,
+        "maximum_seconds": 0.19953253099811263
+      },
+      "alternating": {
+        "count": 15,
+        "median_seconds": 0.19425014499938698,
+        "p95_seconds": 0.2049921590005397,
+        "minimum_seconds": 0.10903147000135505,
+        "maximum_seconds": 0.2049921590005397
+      },
+      "rss_after_inference": 513904640,
+      "anonymous_after_inference": 484999168
+    },
+    "shared": {
+      "open_seconds": 0.7593832179954916,
+      "warm": {
+        "count": 15,
+        "median_seconds": 0.18216932200084557,
+        "p95_seconds": 0.19859372999781044,
+        "minimum_seconds": 0.10169931599739357,
+        "maximum_seconds": 0.19859372999781044
+      },
+      "alternating": {
+        "count": 15,
+        "median_seconds": 0.1858695400005672,
+        "p95_seconds": 0.2023646089983231,
+        "minimum_seconds": 0.1041361150018929,
+        "maximum_seconds": 0.2023646089983231
+      },
+      "rss_after_inference": 442368000,
+      "anonymous_after_inference": 74387456
+    },
+    "original-disabled": {
+      "open_seconds": 2.4464669009976205,
+      "warm": {
+        "count": 15,
+        "median_seconds": 0.18774750600277912,
+        "p95_seconds": 0.20252088800043566,
+        "minimum_seconds": 0.1068899349993444,
+        "maximum_seconds": 0.20252088800043566
+      },
+      "alternating": {
+        "count": 15,
+        "median_seconds": 0.1914442080014851,
+        "p95_seconds": 0.3231756339991989,
+        "minimum_seconds": 0.10816811999757192,
+        "maximum_seconds": 0.3231756339991989
+      },
+      "rss_after_inference": 562790400,
+      "anonymous_after_inference": 534401024
+    },
+    "shared-disabled": {
+      "open_seconds": 0.7102526870003203,
+      "warm": {
+        "count": 15,
+        "median_seconds": 0.18068535199927283,
+        "p95_seconds": 0.31910368100216147,
+        "minimum_seconds": 0.1752758869988611,
+        "maximum_seconds": 0.31910368100216147
+      },
+      "alternating": {
+        "count": 15,
+        "median_seconds": 0.189085554000485,
+        "p95_seconds": 0.32422462699832977,
+        "minimum_seconds": 0.10638522400040529,
+        "maximum_seconds": 0.32422462699832977
+      },
+      "rss_after_inference": 446509056,
+      "anonymous_after_inference": 78598144
+    },
+    "original-repeat": {
+      "open_seconds": 2.4900949630027753,
+      "warm": {
+        "count": 24,
+        "median_seconds": 0.1846359634982946,
+        "p95_seconds": 0.3248977539988118,
+        "minimum_seconds": 0.10257007299878751,
+        "maximum_seconds": 0.3257236520003062
+      },
+      "alternating": {
+        "count": 24,
+        "median_seconds": 0.1807865965001838,
+        "p95_seconds": 0.310537512999872,
+        "minimum_seconds": 0.0999871259991778,
+        "maximum_seconds": 0.31649452400233713
+      },
+      "rss_after_inference": 514002944,
+      "anonymous_after_inference": 485306368
+    },
+    "shared-repeat": {
+      "open_seconds": 0.7423699960017984,
+      "warm": {
+        "count": 24,
+        "median_seconds": 0.17980783699931635,
+        "p95_seconds": 0.19404301599934115,
+        "minimum_seconds": 0.097980392001773,
+        "maximum_seconds": 0.2495473849994596
+      },
+      "alternating": {
+        "count": 24,
+        "median_seconds": 0.1802240855013224,
+        "p95_seconds": 0.19180023499939125,
+        "minimum_seconds": 0.10192587500205263,
+        "maximum_seconds": 0.19465081299858866
+      },
+      "rss_after_inference": 441643008,
+      "anonymous_after_inference": 73527296
+    },
+    "original-ondemand": {
+      "open_seconds": 2.4924100280004495,
+      "warm": {
+        "count": 6,
+        "median_seconds": 0.18084710149923922,
+        "p95_seconds": 0.23709600100119133,
+        "minimum_seconds": 0.1058592410008714,
+        "maximum_seconds": 0.23709600100119133
+      },
+      "alternating": {
+        "count": 6,
+        "median_seconds": 0.18632063850054692,
+        "p95_seconds": 0.19596908799940138,
+        "minimum_seconds": 0.10491796399946907,
+        "maximum_seconds": 0.19596908799940138
+      },
+      "rss_after_inference": 515235840,
+      "anonymous_after_inference": 486363136
+    },
+    "shared-ondemand": {
+      "open_seconds": 0.7854896070020914,
+      "warm": {
+        "count": 6,
+        "median_seconds": 0.18707001300026604,
+        "p95_seconds": 0.19066453499908675,
+        "minimum_seconds": 0.10741707299894188,
+        "maximum_seconds": 0.19066453499908675
+      },
+      "alternating": {
+        "count": 6,
+        "median_seconds": 0.18650047950177395,
+        "p95_seconds": 0.2406428110007255,
+        "minimum_seconds": 0.11498169899641653,
+        "maximum_seconds": 0.2406428110007255
+      },
+      "rss_after_inference": 442568704,
+      "anonymous_after_inference": 74555392
+    }
+  },
+  "raw_fresh_process_measurements": {
+    "original": {
+      "mode": "original",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "default",
+      "original_weights_unchanged": true,
+      "before": {
+        "Rss_bytes": 43835392,
+        "Pss_bytes": 42991616,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 18243584,
+        "Private_Dirty_bytes": 24580096,
+        "Anonymous_bytes": 24580096
+      },
+      "after_open": {
+        "Rss_bytes": 468566016,
+        "Pss_bytes": 467722240,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 26746880,
+        "Private_Dirty_bytes": 440807424,
+        "Anonymous_bytes": 440807424
+      },
+      "after_inference": {
+        "Rss_bytes": 513904640,
+        "Pss_bytes": 513060864,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 27893760,
+        "Private_Dirty_bytes": 484999168,
+        "Anonymous_bytes": 484999168
+      },
+      "opened": [
+        {
+          "scope": "ha",
+          "seconds": 0.7107702140019683
+        },
+        {
+          "scope": "so",
+          "seconds": 0.716358659999969
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.8055348859998048
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.2169385989982402,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.22516616900247755,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.21827109799778555,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.3046363810026378,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.122361791000003,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.17818753800020204,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.19555499799753306,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.1888167600009183,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.19503524800165906,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.18791125400093733,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.1876472490002925,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.19657829700008733,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.18899282500206027,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.19385220299955108,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.19953253099811263,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.19736444299996947,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.1511660079995636,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10554083000170067,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10497829399901093,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.10483363599996665,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.10530470199955744,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.19425014499938698,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.1948371889993723,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.11261279999962426,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.2049921590005397,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.2000710270003765,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.11305088000153773,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.19352938200245262,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.19248583299849997,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10903147000135505,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.19716900099956547,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.20030903699807823,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.10904375799873378,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.204386607001652,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.19548938300067675,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.11597424799765577,
+          "samples": 9216
+        }
+      ]
+    },
+    "shared": {
+      "mode": "shared",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "default",
+      "original_weights_unchanged": true,
+      "before": {
+        "Rss_bytes": 43491328,
+        "Pss_bytes": 42647552,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 17899520,
+        "Private_Dirty_bytes": 24580096,
+        "Anonymous_bytes": 24580096
+      },
+      "after_open": {
+        "Rss_bytes": 71974912,
+        "Pss_bytes": 71131136,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 26218496,
+        "Private_Dirty_bytes": 44744704,
+        "Anonymous_bytes": 44744704
+      },
+      "after_inference": {
+        "Rss_bytes": 442368000,
+        "Pss_bytes": 441524224,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 366968832,
+        "Private_Dirty_bytes": 74387456,
+        "Anonymous_bytes": 74387456
+      },
+      "opened": [
+        {
+          "scope": "one-shared-graph",
+          "seconds": 0.4563613520003855
+        },
+        {
+          "scope": "ha",
+          "seconds": 0.12218768199818442
+        },
+        {
+          "scope": "so",
+          "seconds": 0.09045504199821153
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.09037914199871011
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.2075042120013677,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.22706705699965823,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.18723753599988413,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.3066070579989173,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.11624535800001468,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.14153480700042564,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.19859372999781044,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.1813043270012713,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.19130136699823197,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.19263418700211332,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.1837784390008892,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.19106860800093273,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.1870848449980258,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.18097895100072492,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.18710054099938134,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.18216932200084557,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.10542526899735094,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10872620399823063,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.11974377399747027,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.1079658919989015,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.10169931599739357,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.1846874939983536,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.1902935170001001,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.10466718699899502,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.18660599799841293,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.1943615950003732,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.1054777550016297,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.18899226100256783,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.18964971599780256,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10505288200147334,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.18640383900128654,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.2023646089983231,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.1078201070013165,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.1858695400005672,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.18545157900007325,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.1041361150018929,
+          "samples": 9216
+        }
+      ]
+    },
+    "original-disabled": {
+      "mode": "original-disabled",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "disabled",
+      "original_weights_unchanged": true,
+      "before": {
+        "Rss_bytes": 43696128,
+        "Pss_bytes": 42852352,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 18104320,
+        "Private_Dirty_bytes": 24580096,
+        "Anonymous_bytes": 24580096
+      },
+      "after_open": {
+        "Rss_bytes": 516612096,
+        "Pss_bytes": 515768320,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 25903104,
+        "Private_Dirty_bytes": 489697280,
+        "Anonymous_bytes": 489697280
+      },
+      "after_inference": {
+        "Rss_bytes": 562790400,
+        "Pss_bytes": 561946624,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 27377664,
+        "Private_Dirty_bytes": 534401024,
+        "Anonymous_bytes": 534401024
+      },
+      "opened": [
+        {
+          "scope": "ha",
+          "seconds": 0.9598117559980892
+        },
+        {
+          "scope": "so",
+          "seconds": 0.6711181399987254
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.815537005000806
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.21351609399789595,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.2202747299998009,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.2150659029975941,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.314456557000085,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.11703063800086966,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.14917724600309157,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.20018590800100355,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.19837851999909617,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.19780185299896402,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.1860465239988116,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.18607676600004197,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.20131894199948874,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.20172562900188495,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.19313437800155953,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.18774750600277912,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.20252088800043566,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.1167299489970901,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10765301399806049,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10814159299843595,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.10826354999881005,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.1068899349993444,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18888598999910755,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.1937362739990931,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.110182178003015,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.1908627439988777,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.1934504150012799,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10816811999757192,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.19549084900063463,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.19276816799902008,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.11872135999874445,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.3231756339991989,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.19556046599973342,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.1116309339995496,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.3204871659982018,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.1914442080014851,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.13549864800006617,
+          "samples": 9216
+        }
+      ]
+    },
+    "shared-disabled": {
+      "mode": "shared-disabled",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "disabled",
+      "original_weights_unchanged": true,
+      "before": {
+        "Rss_bytes": 43872256,
+        "Pss_bytes": 43028480,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 18272256,
+        "Private_Dirty_bytes": 24588288,
+        "Anonymous_bytes": 24588288
+      },
+      "after_open": {
+        "Rss_bytes": 75341824,
+        "Pss_bytes": 74498048,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 25870336,
+        "Private_Dirty_bytes": 48459776,
+        "Anonymous_bytes": 48459776
+      },
+      "after_inference": {
+        "Rss_bytes": 446509056,
+        "Pss_bytes": 445665280,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 366899200,
+        "Private_Dirty_bytes": 78598144,
+        "Anonymous_bytes": 78598144
+      },
+      "opened": [
+        {
+          "scope": "one-shared-graph",
+          "seconds": 0.4077176569990115
+        },
+        {
+          "scope": "ha",
+          "seconds": 0.10988617100156262
+        },
+        {
+          "scope": "so",
+          "seconds": 0.08888086200022371
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.10376799699952244
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.21029975100100273,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.22110199999951874,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.1978682690023561,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.36225473300146405,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.11505308599953423,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.14279287899989868,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.19024744000125793,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.18900097299774643,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.18512296200060518,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.17866357100137975,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.179981825996947,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.1860803660019883,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.18019891099902452,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.17923491399778868,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.29550770400237525,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.31910368100216147,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.18068535199927283,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.17574958100158256,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.1752758869988611,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.18393980999826454,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.1778017139986332,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.32422462699832977,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.3231086810010311,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.18690577700181166,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.3210546219997923,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.31604515399885713,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.18057891499847756,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.32348752599864383,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.3192616939995787,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.1810154289996717,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.25301499100169167,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.189085554000485,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.10638522400040529,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.18792165000195382,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.18148941900290083,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.10669248799968045,
+          "samples": 9216
+        }
+      ]
+    },
+    "original-repeat": {
+      "mode": "original-repeat",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "default",
+      "original_weights_unchanged": true,
+      "before": {
+        "Rss_bytes": 43569152,
+        "Pss_bytes": 42725376,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 17969152,
+        "Private_Dirty_bytes": 24588288,
+        "Anonymous_bytes": 24588288
+      },
+      "after_open": {
+        "Rss_bytes": 468598784,
+        "Pss_bytes": 467755008,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 26472448,
+        "Private_Dirty_bytes": 441114624,
+        "Anonymous_bytes": 441114624
+      },
+      "after_inference": {
+        "Rss_bytes": 514002944,
+        "Pss_bytes": 513159168,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 27684864,
+        "Private_Dirty_bytes": 485306368,
+        "Anonymous_bytes": 485306368
+      },
+      "opened": [
+        {
+          "scope": "ha",
+          "seconds": 1.0120944870031963
+        },
+        {
+          "scope": "so",
+          "seconds": 0.7149728240001423
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.7630276519994368
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.21731305299908854,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.22625162199983606,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.3422016190015711,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.5146957780016237,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.18868462299724342,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.2538050059993111,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.19794731100046192,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.1835252609998861,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.1869802780020109,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.1844250119975186,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.18306340599883697,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 5,
+          "seconds": 0.18734040799972718,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 6,
+          "seconds": 0.18487177300266922,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 7,
+          "seconds": 0.18755143899761606,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.3226125500004855,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.3248977539988118,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.3257236520003062,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.3228825490004965,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.20176234799873782,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 5,
+          "seconds": 0.18484691499907058,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 6,
+          "seconds": 0.18807335900055477,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 7,
+          "seconds": 0.18223427100019762,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.11231578200022341,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.1056798110003001,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10581667700171238,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.10425719300110359,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.10257615800219355,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 5,
+          "seconds": 0.10257007299878751,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 6,
+          "seconds": 0.10272918000191567,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 7,
+          "seconds": 0.10391502000129549,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.3104722979987855,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.18908368499978678,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.10808567099957145,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.310537512999872,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.19011725700329407,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10754595399703248,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.31649452400233713,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.1842417010011559,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.1256806860001234,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.19153774399819667,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.18027798399998574,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.1063345760012453,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.18861444799767924,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.17705543199917884,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.10529602899987367,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 5,
+          "seconds": 0.17892925799969817,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 5,
+          "seconds": 0.18129520900038187,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 5,
+          "seconds": 0.10326568900200073,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 6,
+          "seconds": 0.1773958740013768,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 6,
+          "seconds": 0.18621197700122138,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 6,
+          "seconds": 0.0999871259991778,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 7,
+          "seconds": 0.1918124709991389,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 7,
+          "seconds": 0.1871008529997198,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 7,
+          "seconds": 0.10751759100094205,
+          "samples": 9216
+        }
+      ]
+    },
+    "shared-repeat": {
+      "mode": "shared-repeat",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "default",
+      "original_weights_unchanged": true,
+      "before": {
+        "Rss_bytes": 43573248,
+        "Pss_bytes": 42729472,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 17969152,
+        "Private_Dirty_bytes": 24592384,
+        "Anonymous_bytes": 24592384
+      },
+      "after_open": {
+        "Rss_bytes": 71778304,
+        "Pss_bytes": 70934528,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 26288128,
+        "Private_Dirty_bytes": 44478464,
+        "Anonymous_bytes": 44478464
+      },
+      "after_inference": {
+        "Rss_bytes": 441643008,
+        "Pss_bytes": 440799232,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 367104000,
+        "Private_Dirty_bytes": 73527296,
+        "Anonymous_bytes": 73527296
+      },
+      "opened": [
+        {
+          "scope": "one-shared-graph",
+          "seconds": 0.45068812200042885
+        },
+        {
+          "scope": "ha",
+          "seconds": 0.11006804699718487
+        },
+        {
+          "scope": "so",
+          "seconds": 0.09495078600230045
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.08666304100188427
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.30858936199729214,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.21476404900022317,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.19326790500053903,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.2939161089998379,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.10799451599814347,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.13851413799784495,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18408681599976262,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.17676036400007433,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.18346002100224723,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.1830977099998563,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.18019771499893977,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 5,
+          "seconds": 0.19404301599934115,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 6,
+          "seconds": 0.18436646699774428,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 7,
+          "seconds": 0.17488174400205025,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.1792825409975194,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.17941795899969293,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.2495473849994596,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.1885727129993029,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.1845281059977424,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 5,
+          "seconds": 0.18702436600142391,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 6,
+          "seconds": 0.18543090400271467,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 7,
+          "seconds": 0.18226651399891125,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.11610884299807367,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10491415499927825,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10222404199885204,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.097980392001773,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.1006247049990634,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 5,
+          "seconds": 0.1020109950004553,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 6,
+          "seconds": 0.10262056300052791,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 7,
+          "seconds": 0.09950648499943782,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18178108199936105,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.18201912400036235,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.10905830899719149,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.1832641719993262,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.18176618500001496,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.103923381997447,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 2,
+          "seconds": 0.18003153500103508,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 2,
+          "seconds": 0.17818216900195694,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 2,
+          "seconds": 0.10687435799991363,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 3,
+          "seconds": 0.17776923500059638,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 3,
+          "seconds": 0.1854001360006805,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 3,
+          "seconds": 0.10809409599823994,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 4,
+          "seconds": 0.18222457699812367,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 4,
+          "seconds": 0.19465081299858866,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 4,
+          "seconds": 0.10507963399868459,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 5,
+          "seconds": 0.18768856300084735,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 5,
+          "seconds": 0.1808769819981535,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 5,
+          "seconds": 0.10572634500204003,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 6,
+          "seconds": 0.18041663600160973,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 6,
+          "seconds": 0.18046898299871827,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 6,
+          "seconds": 0.10192587500205263,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 7,
+          "seconds": 0.19180023499939125,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 7,
+          "seconds": 0.17830660300023737,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 7,
+          "seconds": 0.10280841500207316,
+          "samples": 9216
+        }
+      ]
+    },
+    "original-ondemand": {
+      "mode": "original-ondemand",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "default",
+      "original_weights_unchanged": true,
+      "switch_on_demand": true,
+      "before": {
+        "Rss_bytes": 43835392,
+        "Pss_bytes": 42991616,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 18219008,
+        "Private_Dirty_bytes": 24604672,
+        "Anonymous_bytes": 24604672
+      },
+      "after_open": {
+        "Rss_bytes": 43835392,
+        "Pss_bytes": 42991616,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 18219008,
+        "Private_Dirty_bytes": 24604672,
+        "Anonymous_bytes": 24604672
+      },
+      "after_inference": {
+        "Rss_bytes": 515235840,
+        "Pss_bytes": 514392064,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 27860992,
+        "Private_Dirty_bytes": 486363136,
+        "Anonymous_bytes": 486363136
+      },
+      "opened": [
+        {
+          "scope": "ha",
+          "seconds": 1.0174653680005576
+        },
+        {
+          "scope": "so",
+          "seconds": 0.7238019479991635
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.7511427120007284
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 1.2219239599980938,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.21654051999939838,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.921465776002151,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.2933300969998527,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.9252683459999389,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.22997837500224705,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18323045600118348,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.17846374699729495,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.20016588799990132,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.23709600100119133,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.145483513999352,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.1058592410008714,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18843618300161324,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.19596908799940138,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.10562225399917224,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.1842050939994806,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.19305051899937098,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10491796399946907,
+          "samples": 9216
+        }
+      ]
+    },
+    "shared-ondemand": {
+      "mode": "shared-ondemand",
+      "onnxruntime": "1.27.0",
+      "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "thread_count": 2,
+      "optimization": "default",
+      "original_weights_unchanged": true,
+      "switch_on_demand": true,
+      "before": {
+        "Rss_bytes": 43552768,
+        "Pss_bytes": 42708992,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 17940480,
+        "Private_Dirty_bytes": 24600576,
+        "Anonymous_bytes": 24600576
+      },
+      "after_open": {
+        "Rss_bytes": 72105984,
+        "Pss_bytes": 71262208,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 26247168,
+        "Private_Dirty_bytes": 44847104,
+        "Anonymous_bytes": 44847104
+      },
+      "after_inference": {
+        "Rss_bytes": 442568704,
+        "Pss_bytes": 441724928,
+        "Shared_Clean_bytes": 1011712,
+        "Shared_Dirty_bytes": 0,
+        "Private_Clean_bytes": 367001600,
+        "Private_Dirty_bytes": 74555392,
+        "Anonymous_bytes": 74555392
+      },
+      "opened": [
+        {
+          "scope": "one-shared-graph",
+          "seconds": 0.4658639570006926
+        },
+        {
+          "scope": "ha",
+          "seconds": 0.11532011500094086
+        },
+        {
+          "scope": "so",
+          "seconds": 0.11152558899993892
+        },
+        {
+          "scope": "yo",
+          "seconds": 0.09277994600051898
+        }
+      ],
+      "cold": [
+        {
+          "code": "ha",
+          "item": 0,
+          "seconds": 0.32589524499780964,
+          "samples": 17152,
+          "text": "sannu"
+        },
+        {
+          "code": "ha",
+          "item": 1,
+          "seconds": 0.21944847399936407,
+          "samples": 20224,
+          "text": "Ina kwana?"
+        },
+        {
+          "code": "so",
+          "item": 0,
+          "seconds": 0.33748769299927517,
+          "samples": 17152,
+          "text": "salaan"
+        },
+        {
+          "code": "so",
+          "item": 1,
+          "seconds": 0.32192368600226473,
+          "samples": 26880,
+          "text": "Subax wanaagsan."
+        },
+        {
+          "code": "yo",
+          "item": 0,
+          "seconds": 0.20822633299758309,
+          "samples": 9216,
+          "text": "bawo"
+        },
+        {
+          "code": "yo",
+          "item": 1,
+          "seconds": 0.14071542099918588,
+          "samples": 12544,
+          "text": "Bawo ni?"
+        }
+      ],
+      "warm": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18868742000267957,
+          "samples": 17152
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.18790299700049218,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.1862370290000399,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.19066453499908675,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.11225747400021646,
+          "samples": 9216
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.10741707299894188,
+          "samples": 9216
+        }
+      ],
+      "alternating": [
+        {
+          "code": "ha",
+          "repeat": 0,
+          "seconds": 0.18659080400175299,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 0,
+          "seconds": 0.2406428110007255,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 0,
+          "seconds": 0.13972672800082364,
+          "samples": 9216
+        },
+        {
+          "code": "ha",
+          "repeat": 1,
+          "seconds": 0.19005471100172144,
+          "samples": 17152
+        },
+        {
+          "code": "so",
+          "repeat": 1,
+          "seconds": 0.18641015500179492,
+          "samples": 17152
+        },
+        {
+          "code": "yo",
+          "repeat": 1,
+          "seconds": 0.11498169899641653,
+          "samples": 9216
+        }
+      ]
+    }
+  },
+  "decision": "candidate-for-separate-reviewed-integration",
+  "scope_limits": [
+    "Three actual native languages measured, not all29 language pronunciation or NVDA behavior.",
+    "Zero-noise validation; production stochastic settings need independent guard tests.",
+    "Yoruba has tiny numerical rounding differences; exact float/PCM equality is reported per sample.",
+    "Shared graph does not share or shrink trained weights; no600-language size claim.",
+    "Concurrency, cancellation, resource replacement and memory pressure are not production-validated."
+  ],
+  "actual_selected_voice_conversion": {
+    "scope": "actual WideVoices.converted with original OpenVoice flow/decoder and allowed target embedding",
+    "converter_model_hashes": {
+      "flow": "831fe762c0b47137e20753b9023b3901fc229bbc05bd6644ddce7073d7015404",
+      "decoder": "9d57879aff5d3d50ae810b4e4791170b3fd1d27004be71fc2ae3f90afd588d36"
+    },
+    "graph_load_seconds": 0.8935690440011967,
+    "languages": [
+      {
+        "code": "ha",
+        "target": "viktoriia",
+        "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+        "target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+        "seconds": {
+          "original": 0.4278062779994798,
+          "shared": 0.3188122360006673
+        },
+        "parity": {
+          "samples": 23638,
+          "float32_bitwise_equal": true,
+          "max_float_error": 0.0,
+          "cosine": 0.9999999999999999,
+          "pcm16_bitwise_equal": true,
+          "pcm16_different_samples": 0,
+          "pcm16_max_lsb_difference": 0
+        }
+      },
+      {
+        "code": "so",
+        "target": "viktoriia",
+        "source_sha256": "fd1f6005a2abea5a101ded57951464c903d9cc7a73d43efa2c3aac105d86e0b2",
+        "target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+        "seconds": {
+          "original": 0.3383273809995444,
+          "shared": 0.28743083299923455
+        },
+        "parity": {
+          "samples": 23638,
+          "float32_bitwise_equal": true,
+          "max_float_error": 0.0,
+          "cosine": 1.0,
+          "pcm16_bitwise_equal": true,
+          "pcm16_different_samples": 0,
+          "pcm16_max_lsb_difference": 0
+        }
+      },
+      {
+        "code": "yo",
+        "target": "viktoriia",
+        "source_sha256": "a800558c7113fea46b9e15fcd202c9fb7127cea338a2ecc8e011025f6724cc21",
+        "target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+        "seconds": {
+          "original": 0.22972905899951002,
+          "shared": 0.17828660500163096
+        },
+        "parity": {
+          "samples": 12701,
+          "float32_bitwise_equal": false,
+          "max_float_error": 5.029141902923584e-07,
+          "cosine": 0.9999999999980043,
+          "pcm16_bitwise_equal": false,
+          "pcm16_different_samples": 21,
+          "pcm16_max_lsb_difference": 1
+        }
+      }
+    ],
+    "nvda_or_audio_device_verified": false
+  },
+  "converted_numerical_guard_passed": true,
+  "final_guarded_descriptor_validation": {
+    "mode": "shared-final-guarded",
+    "onnxruntime": "1.27.0",
+    "runtime_module": "/workspace/scratch/eb1194a9e557/tts-tools/lib/python3.12/site-packages/onnxruntime/__init__.py",
+    "thread_count": 2,
+    "optimization": "default",
+    "original_weights_unchanged": true,
+    "switch_on_demand": false,
+    "strict_original_tensor_descriptor_and_ort_shape_revalidation": true,
+    "guard_checks": {
+      "tampered_weight_offset_rejected": true,
+      "out_of_native_vocabulary_id_rejected": true
+    },
+    "before": {
+      "Rss_bytes": 44552192,
+      "Pss_bytes": 43708416,
+      "Shared_Clean_bytes": 1011712,
+      "Shared_Dirty_bytes": 0,
+      "Private_Clean_bytes": 18124800,
+      "Private_Dirty_bytes": 25415680,
+      "Anonymous_bytes": 25415680
+    },
+    "after_open": {
+      "Rss_bytes": 73322496,
+      "Pss_bytes": 72478720,
+      "Shared_Clean_bytes": 1011712,
+      "Shared_Dirty_bytes": 0,
+      "Private_Clean_bytes": 26439680,
+      "Private_Dirty_bytes": 45871104,
+      "Anonymous_bytes": 45871104
+    },
+    "after_inference": {
+      "Rss_bytes": 444153856,
+      "Pss_bytes": 443310080,
+      "Shared_Clean_bytes": 1011712,
+      "Shared_Dirty_bytes": 0,
+      "Private_Clean_bytes": 367255552,
+      "Private_Dirty_bytes": 75886592,
+      "Anonymous_bytes": 75886592
+    },
+    "opened": [
+      {
+        "scope": "one-shared-graph",
+        "seconds": 0.44329460299923085
+      },
+      {
+        "scope": "ha",
+        "seconds": 0.11966142800156376
+      },
+      {
+        "scope": "so",
+        "seconds": 0.09948052899926552
+      },
+      {
+        "scope": "yo",
+        "seconds": 0.10526393599866424
+      }
+    ],
+    "cold": [
+      {
+        "code": "ha",
+        "item": 0,
+        "seconds": 0.20559411499925773,
+        "samples": 17152,
+        "text": "sannu"
+      },
+      {
+        "code": "ha",
+        "item": 1,
+        "seconds": 0.21746756200082018,
+        "samples": 20224,
+        "text": "Ina kwana?"
+      },
+      {
+        "code": "so",
+        "item": 0,
+        "seconds": 0.21167236499968567,
+        "samples": 17152,
+        "text": "salaan"
+      },
+      {
+        "code": "so",
+        "item": 1,
+        "seconds": 0.3226899080000294,
+        "samples": 26880,
+        "text": "Subax wanaagsan."
+      },
+      {
+        "code": "yo",
+        "item": 0,
+        "seconds": 0.1166010759989149,
+        "samples": 9216,
+        "text": "bawo"
+      },
+      {
+        "code": "yo",
+        "item": 1,
+        "seconds": 0.17539623500124435,
+        "samples": 12544,
+        "text": "Bawo ni?"
+      }
+    ],
+    "warm": [
+      {
+        "code": "ha",
+        "repeat": 0,
+        "seconds": 0.18658305400094832,
+        "samples": 17152
+      },
+      {
+        "code": "ha",
+        "repeat": 1,
+        "seconds": 0.18641457999910926,
+        "samples": 17152
+      },
+      {
+        "code": "ha",
+        "repeat": 2,
+        "seconds": 0.1760972349984513,
+        "samples": 17152
+      },
+      {
+        "code": "so",
+        "repeat": 0,
+        "seconds": 0.17666355300025316,
+        "samples": 17152
+      },
+      {
+        "code": "so",
+        "repeat": 1,
+        "seconds": 0.1837408540013712,
+        "samples": 17152
+      },
+      {
+        "code": "so",
+        "repeat": 2,
+        "seconds": 0.1752764519987977,
+        "samples": 17152
+      },
+      {
+        "code": "yo",
+        "repeat": 0,
+        "seconds": 0.10149098400142975,
+        "samples": 9216
+      },
+      {
+        "code": "yo",
+        "repeat": 1,
+        "seconds": 0.10305231399979675,
+        "samples": 9216
+      },
+      {
+        "code": "yo",
+        "repeat": 2,
+        "seconds": 0.10010553200118011,
+        "samples": 9216
+      }
+    ],
+    "alternating": [
+      {
+        "code": "ha",
+        "repeat": 0,
+        "seconds": 0.18323524500010535,
+        "samples": 17152
+      },
+      {
+        "code": "so",
+        "repeat": 0,
+        "seconds": 0.17775849399913568,
+        "samples": 17152
+      },
+      {
+        "code": "yo",
+        "repeat": 0,
+        "seconds": 0.10352252899974701,
+        "samples": 9216
+      },
+      {
+        "code": "ha",
+        "repeat": 1,
+        "seconds": 0.18033732500043698,
+        "samples": 17152
+      },
+      {
+        "code": "so",
+        "repeat": 1,
+        "seconds": 0.17887193199931062,
+        "samples": 17152
+      },
+      {
+        "code": "yo",
+        "repeat": 1,
+        "seconds": 0.10219545899963123,
+        "samples": 9216
+      },
+      {
+        "code": "ha",
+        "repeat": 2,
+        "seconds": 0.18214608700145618,
+        "samples": 17152
+      },
+      {
+        "code": "so",
+        "repeat": 2,
+        "seconds": 0.18220665700209793,
+        "samples": 17152
+      },
+      {
+        "code": "yo",
+        "repeat": 2,
+        "seconds": 0.11196756099889171,
+        "samples": 9216
+      }
+    ]
+  },
+  "additional_read_only_all29_family_scan": {
+    "ay": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 41
+    },
+    "fil": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 43
+    },
+    "km": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 74
+    },
+    "tg": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 41
+    },
+    "lo": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 51
+    },
+    "mai": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 66
+    },
+    "doi": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 64
+    },
+    "dv": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 53
+    },
+    "dz": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 58
+    },
+    "ha": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 34
+    },
+    "yo": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 43
+    },
+    "ff": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 41
+    },
+    "mg": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 30
+    },
+    "so": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 27
+    },
+    "sn": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 33
+    },
+    "rw": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 44
+    },
+    "rn": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 29
+    },
+    "ny": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 39
+    },
+    "ak": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 30
+    },
+    "bm": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 36
+    },
+    "dyu": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 32
+    },
+    "mos": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 35
+    },
+    "ts": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 30
+    },
+    "sg": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 40
+    },
+    "tpi": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 37
+    },
+    "sm": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 26
+    },
+    "fj": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 36
+    },
+    "gil": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 27
+    },
+    "kab": {
+      "fingerprint": "5d6d5ae5643013445018a3ca9f3e27fda47edcdc2fbc5dcf4ea7a0b294aaa45e",
+      "weight_count": 460,
+      "native_vocab_rows": 38
+    }
+  }
+}

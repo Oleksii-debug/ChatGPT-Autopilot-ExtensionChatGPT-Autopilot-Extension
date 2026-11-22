@@ -124,11 +124,16 @@ class MMSFrontend:
 class MMSCarrier:
     def __init__(self, directory, session_factory=None, owner=None):
         self.folder = Path(directory)
+        from mms_family_sessions import resource_identity, assert_resources
+        self._resource_identity = resource_identity(self.folder)
         self.config = json.loads((self.folder / "config.json").read_text(encoding="utf8"))
         self.code = self.config.get("code")
         if self.code not in SUPPORTED or self.config.get("iso_code") != SUPPORTED[self.code]:
             raise ValueError("MMS checkpoint language does not match its selected standard")
+        if self.folder.name != self.code:
+            raise ValueError("MMS directory and native language configuration disagree")
         self.frontend = MMSFrontend(self.config, read_tokens(self.folder / "tokens.txt"))
+        assert_resources(self._resource_identity)
         self.sample_rate = int(self.config["sample_rate"])
         if not 8000 <= self.sample_rate <= 48000:
             raise ValueError("Invalid native MMS sample rate")
@@ -136,6 +141,7 @@ class MMSCarrier:
         self._graph = None
         self._inputs = None
         self._closed = False
+        self.model_session_mode = "unloaded"
         self._lock = RLock()
         if owner is not None:
             from wide_loading import DeferredValue
@@ -148,10 +154,18 @@ class MMSCarrier:
             self._deferred = None
 
     def _open(self):
+        from mms_family_sessions import assert_resources
+        if hasattr(self, "_resource_identity"):
+            assert_resources(self._resource_identity)
         with self._lock:
             if self._closed:
                 return None
-        if self.session_factory is None:
+            if hasattr(self, "_resource_identity"):
+                assert_resources(self._resource_identity)
+        from mms_family_sessions import for_language
+        graph = for_language(self.folder / "model.onnx", self.code, self.session_factory)
+        shared = graph is not None
+        if graph is None and self.session_factory is None:
             import onnxruntime as ort
             ort.disable_telemetry_events()
             options = ort.SessionOptions()
@@ -160,7 +174,7 @@ class MMSCarrier:
             options.add_session_config_entry("session.intra_op.allow_spinning", "0")
             graph = ort.InferenceSession(str(self.folder / "model.onnx"), sess_options=options,
                                         providers=["CPUExecutionProvider"])
-        else:
+        elif graph is None:
             graph = self.session_factory(self.folder / "model.onnx")
         if self.owner is not None:
             from session_control import GuardedSession
@@ -179,10 +193,16 @@ class MMSCarrier:
             if self._closed:
                 return None
             self._inputs = inputs
+            if hasattr(self, "_resource_identity"):
+                assert_resources(self._resource_identity)
             self._graph = graph
+            self.model_session_mode = "shared-exact-weights" if shared else "original"
         return graph
 
     def preload(self):
+        if hasattr(self, "_resource_identity"):
+            from mms_family_sessions import assert_resources
+            assert_resources(self._resource_identity)
         with self._lock:
             if self._closed:
                 raise RuntimeError("MMS carrier was closed")
@@ -191,6 +211,8 @@ class MMSCarrier:
         with self._lock:
             if self._closed or graph is None:
                 raise RuntimeError("MMS carrier was closed")
+            if hasattr(self, "_resource_identity"):
+                assert_resources(self._resource_identity)
         return graph
 
     def close(self):
@@ -208,6 +230,8 @@ class MMSCarrier:
         import numpy as np
         if self.owner is not None:
             self.owner.check_cancelled()
+        from mms_family_sessions import assert_resources
+        assert_resources(self._resource_identity)
         if character and not any(char.isdecimal() for char in text) and not self.frontend.navigation:
             text = prepared_character_name(self.code, text, self.folder.parent.parent)
             character = False
@@ -229,6 +253,7 @@ class MMSCarrier:
         wave = np.asarray(graph.run(["y"], values)[0], np.float32).reshape(-1)
         if self.owner is not None:
             self.owner.check_cancelled()
+        assert_resources(self._resource_identity)
         if len(wave) < 32 or not np.isfinite(wave).all() or np.max(np.abs(wave)) < 1e-7:
             raise ValueError("MMS checkpoint returned invalid or silent audio")
         return wave, self.sample_rate, applied
@@ -239,13 +264,26 @@ def available(models):
     return {code for code in SUPPORTED if all((root / code / name).is_file() for name in REQUIRED)}
 
 
-@lru_cache(maxsize=4)
 def source(code, models):
-    import numpy as np
     if code not in SUPPORTED:
         raise KeyError(code)
-    value = np.load(Path(models) / "MMS" / code / "source.npy", allow_pickle=False)
+    from mms_family_sessions import resource_identity
+    folder = Path(models) / "MMS" / code
+    return _source_snapshot(str(folder / "source.npy"), resource_identity(folder))
+
+
+@lru_cache(maxsize=4)
+def _source_snapshot(path, identity):
+    import numpy as np
+    from mms_family_sessions import assert_resources
+    assert_resources(identity)
+    with Path(path).open("rb") as stream:
+        value = np.load(stream, allow_pickle=False)
+    assert_resources(identity)
     if value.shape != (1, 256, 1) or value.dtype != np.float32 or not np.isfinite(value).all():
         raise ValueError("Invalid MMS native source identity")
     value.setflags(write=False)
     return value
+
+
+source.cache_clear = _source_snapshot.cache_clear

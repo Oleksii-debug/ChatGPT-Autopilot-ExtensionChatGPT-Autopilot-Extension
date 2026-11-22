@@ -16,7 +16,8 @@
       "maximum_bytes": 3000000000,
       "evidence": "evidence/release_build_0.13.1-dev.5.json",
       "built_version": "0.13.1-dev.5",
-      "installed_bytes": 2129363570
+      "installed_bytes": 2129363570,
+      "archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d"
     },
     "selected_language_resources": {
       "status": "incomplete",
@@ -34,33 +35,81 @@
     "interactive_speed": {
       "status": "not_accepted",
       "evidence": "evidence/omnivoice_cpu_word_benchmark.json",
-      "slow_model_language_count": 7,
-      "caveat": "Prepared clip timings do not certify uncached words or physical output."
+      "slow_model_language_count": 5,
+      "caveat": "Five primary Omni paths remain slow; native Bodo/Kashmiri alternatives do not establish typing, pronunciation or physical latency acceptance."
     },
     "windows_models": {
-      "status": "current_dev1_source_passed",
-      "current_run": 44991026216,
-      "previous_passed_run": 44987758880,
-      "selected_language_count": 21,
-      "evidence": "evidence/windows_44992624809/mms-ha/report.json",
-      "new_mms_ha_representative": "passed"
+      "status": "dev5_standalone_pcm_smoke_passed",
+      "current_run": 44997655739,
+      "core_version": "0.13.1-dev.5",
+      "core_language_count": 3,
+      "core_runs_per_language": 2,
+      "extended_passed_language_count": 21,
+      "extended_languages_without_samples": 62,
+      "extended_passed_languages": [
+        "en",
+        "ru",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pl",
+        "uk",
+        "ro",
+        "nl",
+        "pt",
+        "cs",
+        "sv",
+        "bg",
+        "da",
+        "fi",
+        "sk",
+        "nb",
+        "cmn",
+        "ja",
+        "ko"
+      ],
+      "new_mms_ha_representative": "passed-engine-smoke",
+      "native_extension_preflight": "RecordTrie import, dictionary construction and nonoverride word passed in inherited and reset child modes",
+      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "report_members": [
+        "engine/report.json",
+        "extra-engines/report.json",
+        "mms-ha/report.json"
+      ],
+      "caveat": "Core languages overlap extended21. These are standalone worker PCM tests, not real NVDA output or all83 installed languages."
     },
     "actual_nvda": {
-      "status": "physical_output_blocked",
-      "reason": "Windows CI has no audio endpoint; explicit recording-sink probe is separate.",
-      "wave_player_verified": false,
-      "physical_acoustic_latency_verified": false,
+      "status": "ui_smoke_passed_phrase_pcm_failed",
+      "current_run": 44997655739,
+      "nvda_version": "2026.3.1",
+      "core_version": "0.13.1-dev.5",
+      "core_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+      "recording_sink_test_double": true,
       "driver_selection_with_recording_sink": true,
-      "probe_helper_fix_commit": "ff7899fc695546458ac7a236aa57104d46dea6cc",
+      "allowed_profiles": 45,
+      "default_languages": [
+        "en",
+        "ru",
+        "uk"
+      ],
       "settings_window_smoke": true,
       "hotkey_binding_smoke": true,
       "keyboard_tab_and_space_smoke": true,
-      "audio_submission": "failed_worker_ImportError_on_intermediate_dev2",
-      "diagnostics_and_trusted_cwd_fix": "pending_real_Windows_run",
-      "evidence": "evidence/windows_44992624809/nvda/windows-nvda-probe.json",
+      "host_sonic_import_and_dll_smoke": true,
+      "audio_submission": "failed_marisa_trie_ImportError",
       "confirmed_import_module": "marisa_trie",
-      "diagnostics_and_child_dll_isolation": "awaiting_dev5_Windows_confirmation",
-      "fatal_import_accessibility_recovery": "implemented; actual NVDA optional injection probe pending"
+      "worker_bootstrap_reset_observed": true,
+      "dll_search_reset_resolved_import_error": false,
+      "reason": "Actual NVDA child still fails in Ukrainian stress dictionary import despite passing standalone RecordTrie/dictionary checks. Separately, CI has zero audio endpoints.",
+      "builtin_windows_fallback_selected": true,
+      "fallback_notice_requested": true,
+      "fallback_audibility_verified": false,
+      "wave_player_verified": false,
+      "physical_acoustic_latency_verified": false,
+      "physical_audio_verified": false,
+      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "report_member": "nvda/windows-nvda-probe.json"
     },
     "native_pronunciation": {
       "status": "not_accepted",
@@ -72,7 +121,74 @@
       "rebuilt_version": "0.13.1-dev.5",
       "evidence": "evidence/recovered_core4_to_dev5_rebuild.json",
       "optional_resources_recovered": false
+    },
+    "main_unit_suite": {
+      "status": "passed",
+      "tests_per_platform": 485,
+      "platforms": [
+        "host Linux",
+        "Windows"
+      ],
+      "checkpoint_version": "0.13.1-dev.5",
+      "run": 44997655739,
+      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739"
+    },
+    "windows_character_structure": {
+      "status": "passed_limited_structural_smoke",
+      "required_structure_cases_passed": 11,
+      "required_failures": 0,
+      "exploratory_raw_supplementary_case": "explicitly unsupported",
+      "nvda_typing_verified": false,
+      "pronunciation_verified": false,
+      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "report_member": "characters/report.json"
+    },
+    "physical_audio_output": {
+      "status": "blocked_no_audio_endpoint",
+      "wave_out_devices": 0,
+      "wave_player_verified": false,
+      "physical_audio_verified": false,
+      "acoustic_latency_verified": false,
+      "evidence": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+      "report_member": "audio/audio-endpoint.json"
     }
   },
-  "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product."
+  "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
+  "latest_windows_reports": {
+    "core": {
+      "artifact_member": "engine/report.json",
+      "sha256": "d39d4df04674e2d09fad3f4950680473cd804c25c58c6daa020d672c8fea50fe"
+    },
+    "extended": {
+      "artifact_member": "extra-engines/report.json",
+      "sha256": "27379334ac976f20b4b36c1d5bb845edb7f1e62b8c3a1ac6fd48ba1e034e02d6"
+    },
+    "mms_ha": {
+      "artifact_member": "mms-ha/report.json",
+      "sha256": "f63717782c1a2fd41f7993112c8fec69d0a5125ded873423f72a7d5817472b78"
+    },
+    "characters": {
+      "artifact_member": "characters/report.json",
+      "sha256": "0d004ccd1676944660f255ca05f1349c4b1c5585406e0deb04199ce3be755866"
+    },
+    "nvda": {
+      "artifact_member": "nvda/windows-nvda-probe.json",
+      "sha256": "ffe4767f0f89d6a1b2513572f44b0f969ed04161ef9d25dcbec70b87eacc751f"
+    },
+    "audio_endpoint": {
+      "artifact_member": "audio/audio-endpoint.json",
+      "sha256": "c5b773693325a1a37129638e668628650126c8b006251b6818f584c22fbeae70"
+    }
+  },
+  "latest_windows_run": 44997655739,
+  "durable_windows_reports": {
+    "path": "evidence/windows_dev5_run_44997655739.json.gz",
+    "sha256": "58661f013fb10495a0c62b9180f83d14039bfcddc70c5d6e4dc50a67dc6935fd"
+  },
+  "native_loader_diagnosis": {
+    "run_id": 44999586051,
+    "evidence": "evidence/windows_dev5_loader_44999586051.json.gz",
+    "proven_cause": "Native module absolute path264characters fails with filename-too-long; identicalbytes at84characters import successfully.",
+    "production_fix_accepted": false
+  }
 }

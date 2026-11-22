@@ -1,0 +1,1346 @@
+{
+  "status": "isolated-native-rule-phonemic-experiment-not-registered",
+  "language": "to",
+  "model_is_native_tongan": false,
+  "carrier": "espeak-ng explicit phonemes, Spanish five-vowel acoustic table",
+  "source_identity_is_actual_same_carrier": true,
+  "source_sha256": "aee40185dfb2525061c42a75b49a1fa85896be5628fa91d63e754ec9a498c4b1",
+  "source_norm": 13.568866729736328,
+  "source_shape": [
+    1,
+    256,
+    1
+  ],
+  "calibration_text": "Mālō e lelei. ʻOku ou sai pē. Mālō e lelei.",
+  "calibration_wav_sha256": "2cb32c51272a7723a4a32f30d9b0e39b2ee7a6938a25d5cad1e49546dab9eb22",
+  "calibration_seconds": 3.286485260770975,
+  "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+  "target_identity_file": "packages/0.12.2/kx47Runtime/models/voices/classmate_locales/viktoriia.npy",
+  "flow_sha256": "831fe762c0b47137e20753b9023b3901fc229bbc05bd6644ddce7073d7015404",
+  "decoder_sha256": "9d57879aff5d3d50ae810b4e4791170b3fd1d27004be71fc2ae3f90afd588d36",
+  "frontend_sha256": "cbd37e629ef28286d2c5ea33388d694a2fe2a9ed108bff24bfa489b56e8426e5",
+  "ordinary_letter_names_metadata_sha256": "764577657b8a6326652f1efaa893c03a292b5f96d1fa99fc8cff5749a5e46062",
+  "target_identity_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+  "onnxruntime": "1.27.0",
+  "registered": false,
+  "native_listener_verified": false,
+  "native_phonetic_fidelity_verified": false,
+  "ordinary_character_names_verified": false,
+  "windows_nvda_verified": false,
+  "sources": [
+    {
+      "title": "Faufaua! An Introduction to Tongan",
+      "publisher": "NZ Ministry of Education",
+      "year": 2010,
+      "pages": [
+        13,
+        14,
+        15,
+        20,
+        21
+      ],
+      "pdf_sha256": "f26b5eb0fb7109d1518441b770683952b801dc5ba7873db76188b4f49de82e61",
+      "url": "https://mapaoch00pr.blob.core.windows.net/mapaoch00pr/artefacts/pdf/5a7c980b-4849-4690-ad8d-4a9cda5201d9/Faufaua%21-an-introduction-to-Tongan.pdf"
+    },
+    {
+      "title": "Phonetics of Tongan stress",
+      "authors": "Marc Garellek and James White",
+      "year": 2015,
+      "doi": "10.1017/S0025100314000206",
+      "url": "https://www.homepages.ucl.ac.uk/~ucjtcwh/index_files/GarellekWhite2015.pdf",
+      "sections": [
+        "1.1 phoneme inventory and penultimate-mora stress"
+      ]
+    },
+    {
+      "title": "Tongan",
+      "authors": "Marc Garellek and Marija Tabain",
+      "year": 2019,
+      "doi": "10.1017/S0025100318000397",
+      "url": "https://www.cambridge.org/core/journals/journal-of-the-international-phonetic-association/article/tongan/FEE50E3523F8844E0617DB290EA0516A",
+      "sections": [
+        "Stress: definitive vowel copying",
+        "Vowel sequences",
+        "Consonants"
+      ]
+    },
+    {
+      "title": "Tongan Language Week Education Resource 2016",
+      "publisher": "Te Papa",
+      "pdf_page": 6,
+      "section": "Explicit ordinary Letter name fields",
+      "url": "https://www.tepapa.govt.nz/assets/76067/1692747224-final_final_version-tongan_resource_2016.pdf"
+    },
+    {
+      "title": "eSpeak NG dictionary documentation",
+      "section": "Phoneme names: | separator",
+      "url": "https://github.com/espeak-ng/espeak-ng/blob/master/docs/dictionary.md"
+    }
+  ],
+  "remaining_limits": [
+    "unwritten definitive accents",
+    "unmarked clitic stress domains",
+    "optional vowel fusion",
+    "secondary and loanword stress",
+    "native phrasal intonation",
+    "phonemic carrier timing/quality and target voice projection need native review"
+  ],
+  "cases": [
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "uma",
+      "frontend": [
+        {
+          "text": "uma",
+          "segments": [
+            "u",
+            "m",
+            "a"
+          ],
+          "graphemes": [
+            "u",
+            "m",
+            "a"
+          ],
+          "mora_positions": [
+            0,
+            2
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "ˈuma",
+          "encoded": "[['u|m|a]]",
+          "mora_count": 2
+        }
+      ],
+      "encoded": "[['u|m|a]]",
+      "carrier_ms": 0.5350050014385488,
+      "carrier_samples": 6008,
+      "carrier_seconds": 0.2724716553287982,
+      "carrier_pcm_sha256": "9576063d90a23a96efc9bb72f1a13856944f5332c496d65e6a1a98bb634e15fa",
+      "projection_ms": 78.29232500080252,
+      "projected_samples": 5888,
+      "projected_pcm_sha256": "fac8c50f84da1291613da9fbfd4bc6ebdf326b2e9cf5da4855244426830eb15f",
+      "projected_peak": 0.24713234603405,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "ʻuma",
+      "frontend": [
+        {
+          "text": "ʻuma",
+          "segments": [
+            "ʔ",
+            "u",
+            "m",
+            "a"
+          ],
+          "graphemes": [
+            "ʻ",
+            "u",
+            "m",
+            "a"
+          ],
+          "mora_positions": [
+            1,
+            3
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "ˈʔuma",
+          "encoded": "[['?|u|m|a]]",
+          "mora_count": 2
+        }
+      ],
+      "encoded": "[['?|u|m|a]]",
+      "carrier_ms": 0.4102849998162128,
+      "carrier_samples": 7228,
+      "carrier_seconds": 0.32780045351473924,
+      "carrier_pcm_sha256": "c23a75fa163c4c12e243844d6a0d7c99b1182c49c23c72b6c433b03ef30bccb2",
+      "projection_ms": 88.41780699731316,
+      "projected_samples": 7168,
+      "projected_pcm_sha256": "ea7c2601a413083558720d070c889e506a4d42099b9fa0dcc2340431643f9938",
+      "projected_peak": 0.28012576699256897,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "kaka",
+      "frontend": [
+        {
+          "text": "kaka",
+          "segments": [
+            "k",
+            "a",
+            "k",
+            "a"
+          ],
+          "graphemes": [
+            "k",
+            "a",
+            "k",
+            "a"
+          ],
+          "mora_positions": [
+            1,
+            3
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "ˈkaka",
+          "encoded": "[['k|a|k|a]]",
+          "mora_count": 2
+        }
+      ],
+      "encoded": "[['k|a|k|a]]",
+      "carrier_ms": 0.3609240011428483,
+      "carrier_samples": 8787,
+      "carrier_seconds": 0.39850340136054424,
+      "carrier_pcm_sha256": "ce5b098701807252855b27b981e4b8147399aba341deaa19628877613a3d4805",
+      "projection_ms": 99.26942399761174,
+      "projected_samples": 8704,
+      "projected_pcm_sha256": "8a03d3f6964c2018954558a737baa248fc546d90bff3f478bebce3a85f6176d4",
+      "projected_peak": 0.4322561025619507,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "kakā",
+      "frontend": [
+        {
+          "text": "kakā",
+          "segments": [
+            "k",
+            "a",
+            "k",
+            "a",
+            "a"
+          ],
+          "graphemes": [
+            "k",
+            "a",
+            "k",
+            "ā"
+          ],
+          "mora_positions": [
+            1,
+            3,
+            4
+          ],
+          "stress_position": 2,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "kaˈkaa",
+          "encoded": "[[k|a|'k|a|a]]",
+          "mora_count": 3
+        }
+      ],
+      "encoded": "[[k|a|'k|a|a]]",
+      "carrier_ms": 0.44344999696477316,
+      "carrier_samples": 10190,
+      "carrier_seconds": 0.4621315192743764,
+      "carrier_pcm_sha256": "ba418c96ff02c0e0e1c5a93c00370a477295d776a99d205c800e8442e403639f",
+      "projection_ms": 109.95950100186747,
+      "projected_samples": 9984,
+      "projected_pcm_sha256": "ec3a70659dcccadd2ae2b027d2550870f9b0b91ed83a8c934c899abc0d45a87f",
+      "projected_peak": 0.49287179112434387,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "kākā",
+      "frontend": [
+        {
+          "text": "kākā",
+          "segments": [
+            "k",
+            "a",
+            "a",
+            "k",
+            "a",
+            "a"
+          ],
+          "graphemes": [
+            "k",
+            "ā",
+            "k",
+            "ā"
+          ],
+          "mora_positions": [
+            1,
+            2,
+            4,
+            5
+          ],
+          "stress_position": 3,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "kaaˈkaa",
+          "encoded": "[[k|a|a|'k|a|a]]",
+          "mora_count": 4
+        }
+      ],
+      "encoded": "[[k|a|a|'k|a|a]]",
+      "carrier_ms": 0.5183780012885109,
+      "carrier_samples": 11759,
+      "carrier_seconds": 0.5332879818594104,
+      "carrier_pcm_sha256": "4dd1b169b82cebacde226c5d46058a6a8162b20ad5a9a696473e68b108a0f280",
+      "projection_ms": 136.23722099873703,
+      "projected_samples": 11520,
+      "projected_pcm_sha256": "b1c78668874b192b9683844452110bec1ab4e7073c508e17df6ba82e0802c44e",
+      "projected_peak": 0.4610481858253479,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "tangata",
+      "frontend": [
+        {
+          "text": "tangata",
+          "segments": [
+            "t",
+            "a",
+            "ŋ",
+            "a",
+            "t",
+            "a"
+          ],
+          "graphemes": [
+            "t",
+            "a",
+            "ng",
+            "a",
+            "t",
+            "a"
+          ],
+          "mora_positions": [
+            1,
+            3,
+            5
+          ],
+          "stress_position": 2,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "taˈŋata",
+          "encoded": "[[t|a|'N|a|t|a]]",
+          "mora_count": 3
+        }
+      ],
+      "encoded": "[[t|a|'N|a|t|a]]",
+      "carrier_ms": 0.49389199921279214,
+      "carrier_samples": 10611,
+      "carrier_seconds": 0.48122448979591836,
+      "carrier_pcm_sha256": "0b9248100aec132deb523f9a45842e6a2a36814d090d647e439eaccd119bae9f",
+      "projection_ms": 114.33906400270644,
+      "projected_samples": 10496,
+      "projected_pcm_sha256": "7fa0c4df8e893d079715f5b4a0c9eb3a15b9b577f0cbbbe201bb099baccb8cca",
+      "projected_peak": 0.36877936124801636,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "tangatá",
+      "frontend": [
+        {
+          "text": "tangatá",
+          "segments": [
+            "t",
+            "a",
+            "ŋ",
+            "a",
+            "t",
+            "a",
+            "a"
+          ],
+          "graphemes": [
+            "t",
+            "a",
+            "ng",
+            "a",
+            "t",
+            "á"
+          ],
+          "mora_positions": [
+            1,
+            3,
+            5,
+            6
+          ],
+          "stress_position": 4,
+          "marked_accent": "definitive",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "taŋaˈtaa",
+          "encoded": "[[t|a|N|a|'t|a|a]]",
+          "mora_count": 4
+        }
+      ],
+      "encoded": "[[t|a|N|a|'t|a|a]]",
+      "carrier_ms": 0.6067280010029208,
+      "carrier_samples": 12113,
+      "carrier_seconds": 0.5493424036281179,
+      "carrier_pcm_sha256": "838cf834fdaa273284c9743c43de62614e36b9b72e1ee436fc89bd36abca39d7",
+      "projection_ms": 131.58458000179962,
+      "projected_samples": 12032,
+      "projected_pcm_sha256": "94e16677c71ae6b5426eac56980bacbe2457c677a1e3a719d9dee59f3d4f64a1",
+      "projected_peak": 0.4871741235256195,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "koté",
+      "frontend": [
+        {
+          "text": "koté",
+          "segments": [
+            "k",
+            "o",
+            "t",
+            "e",
+            "e"
+          ],
+          "graphemes": [
+            "k",
+            "o",
+            "t",
+            "é"
+          ],
+          "mora_positions": [
+            1,
+            3,
+            4
+          ],
+          "stress_position": 2,
+          "marked_accent": "definitive",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "koˈtee",
+          "encoded": "[[k|o|'t|e|e]]",
+          "mora_count": 3
+        }
+      ],
+      "encoded": "[[k|o|'t|e|e]]",
+      "carrier_ms": 0.4003989997727331,
+      "carrier_samples": 9684,
+      "carrier_seconds": 0.43918367346938775,
+      "carrier_pcm_sha256": "7492c795ffe60df246aeff60cd5f968c466d01be13c3acea45c7013f3757e6f6",
+      "projection_ms": 107.46644199753064,
+      "projected_samples": 9472,
+      "projected_pcm_sha256": "d02227f8b87e5172e67bb579a3307abc761e941bc7a3d075e29d9b4cc3e98fa6",
+      "projected_peak": 0.32815080881118774,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "Mālō e lelei.",
+      "frontend": [
+        {
+          "text": "Mālō",
+          "segments": [
+            "m",
+            "a",
+            "a",
+            "l",
+            "o",
+            "o"
+          ],
+          "graphemes": [
+            "m",
+            "ā",
+            "l",
+            "ō"
+          ],
+          "mora_positions": [
+            1,
+            2,
+            4,
+            5
+          ],
+          "stress_position": 3,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "maaˈloo",
+          "encoded": "[[m|a|a|'l|o|o]]",
+          "mora_count": 4
+        },
+        {
+          "text": "e",
+          "segments": [
+            "e"
+          ],
+          "graphemes": [
+            "e"
+          ],
+          "mora_positions": [
+            0
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈe",
+          "encoded": "[['e]]",
+          "mora_count": 1
+        },
+        {
+          "text": "lelei",
+          "segments": [
+            "l",
+            "e",
+            "l",
+            "e",
+            "i"
+          ],
+          "graphemes": [
+            "l",
+            "e",
+            "l",
+            "e",
+            "i"
+          ],
+          "mora_positions": [
+            1,
+            3,
+            4
+          ],
+          "stress_position": 2,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "vowel sequences retained; optional fusion and loanword stress are unresolved"
+          ],
+          "ipa": "leˈlei",
+          "encoded": "[[l|e|'l|e|i]]",
+          "mora_count": 3
+        }
+      ],
+      "encoded": "[[m|a|a|'l|o|o]] [['e]] [[l|e|'l|e|i]].",
+      "carrier_ms": 1.1048570013372228,
+      "carrier_samples": 19058,
+      "carrier_seconds": 0.8643083900226758,
+      "carrier_pcm_sha256": "1ff3d02a7b67f542b6d827fa448e581da56f36f163c08cb50a9604cab1a431d2",
+      "projection_ms": 215.40897299928474,
+      "projected_samples": 18944,
+      "projected_pcm_sha256": "48ffb277ed114ad8538aae34b46e777d5b072577eadd6b5591b06b5d4dc48531",
+      "projected_peak": 0.4349634051322937,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-text",
+      "lookup_text": null,
+      "text": "Kuo´ u fiu, mālō.",
+      "frontend": [
+        {
+          "text": "Kuo´ u",
+          "segments": [
+            "k",
+            "u",
+            "o",
+            "u"
+          ],
+          "graphemes": [
+            "k",
+            "u",
+            "o",
+            "u"
+          ],
+          "mora_positions": [
+            1,
+            2,
+            3
+          ],
+          "stress_position": 2,
+          "marked_accent": "enclitic",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "vowel sequences retained; optional fusion and loanword stress are unresolved"
+          ],
+          "ipa": "kuˈou",
+          "encoded": "[[k|u|'o|u]]",
+          "mora_count": 3
+        },
+        {
+          "text": "fiu",
+          "segments": [
+            "f",
+            "i",
+            "u"
+          ],
+          "graphemes": [
+            "f",
+            "i",
+            "u"
+          ],
+          "mora_positions": [
+            1,
+            2
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "vowel sequences retained; optional fusion and loanword stress are unresolved"
+          ],
+          "ipa": "ˈfiu",
+          "encoded": "[['f|i|u]]",
+          "mora_count": 2
+        },
+        {
+          "text": "mālō",
+          "segments": [
+            "m",
+            "a",
+            "a",
+            "l",
+            "o",
+            "o"
+          ],
+          "graphemes": [
+            "m",
+            "ā",
+            "l",
+            "ō"
+          ],
+          "mora_positions": [
+            1,
+            2,
+            4,
+            5
+          ],
+          "stress_position": 3,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending"
+          ],
+          "ipa": "maaˈloo",
+          "encoded": "[[m|a|a|'l|o|o]]",
+          "mora_count": 4
+        }
+      ],
+      "encoded": "[[k|u|'o|u]] [['f|i|u]], [[m|a|a|'l|o|o]].",
+      "carrier_ms": 1.2182339996797964,
+      "carrier_samples": 27380,
+      "carrier_seconds": 1.2417233560090704,
+      "carrier_pcm_sha256": "5b8cbe52488235d1d609844731026a5e003ba0843b18b8373b6fb364aa2b47c3",
+      "projection_ms": 297.8811350003525,
+      "projected_samples": 27136,
+      "projected_pcm_sha256": "b9164b5e09e323b28e747e71712dd5f7daae06fc7cb2c78543a6d97cd58f7821",
+      "projected_peak": 0.39756762981414795,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "a",
+      "text": "a",
+      "frontend": [
+        {
+          "text": "a",
+          "segments": [
+            "a"
+          ],
+          "graphemes": [
+            "a"
+          ],
+          "mora_positions": [
+            0
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈa",
+          "encoded": "[['a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['a]]",
+      "carrier_ms": 0.2920139995694626,
+      "carrier_samples": 3897,
+      "carrier_seconds": 0.17673469387755103,
+      "carrier_pcm_sha256": "89205a9aa5bc1a71d64160a099008ed9037e0e854128af1d3accfe99dae45e41",
+      "projection_ms": 53.097538999281824,
+      "projected_samples": 3840,
+      "projected_pcm_sha256": "2191338c4f40e3cee22e70bc5dd9845df985edf58854f249cc17ca739fe3d57a",
+      "projected_peak": 0.39715659618377686,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "e",
+      "text": "e",
+      "frontend": [
+        {
+          "text": "e",
+          "segments": [
+            "e"
+          ],
+          "graphemes": [
+            "e"
+          ],
+          "mora_positions": [
+            0
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈe",
+          "encoded": "[['e]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['e]]",
+      "carrier_ms": 0.2660530008142814,
+      "carrier_samples": 3901,
+      "carrier_seconds": 0.17691609977324263,
+      "carrier_pcm_sha256": "9ae433aa21c5a3f6a54c5cb71c2d42a5ffd698fde7d677df88b1daaf6dfda560",
+      "projection_ms": 51.68180500186281,
+      "projected_samples": 3840,
+      "projected_pcm_sha256": "6516d70070f2705130d95fb0393efa505a1c4b52811dae27793f22fdf0b5d5c7",
+      "projected_peak": 0.26138707995414734,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "i",
+      "text": "i",
+      "frontend": [
+        {
+          "text": "i",
+          "segments": [
+            "i"
+          ],
+          "graphemes": [
+            "i"
+          ],
+          "mora_positions": [
+            0
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈi",
+          "encoded": "[['i]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['i]]",
+      "carrier_ms": 0.25806300254771486,
+      "carrier_samples": 3889,
+      "carrier_seconds": 0.1763718820861678,
+      "carrier_pcm_sha256": "f9e1618a6ec150063b50bece4fbf629645200b25b99becd3e14bbff535ab9d00",
+      "projection_ms": 49.58494300080929,
+      "projected_samples": 3840,
+      "projected_pcm_sha256": "7b413225230acc9ad7f4b6d1628a11bebe25e177507f5304e898a9b562d56fc6",
+      "projected_peak": 0.23989196121692657,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "o",
+      "text": "o",
+      "frontend": [
+        {
+          "text": "o",
+          "segments": [
+            "o"
+          ],
+          "graphemes": [
+            "o"
+          ],
+          "mora_positions": [
+            0
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈo",
+          "encoded": "[['o]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['o]]",
+      "carrier_ms": 0.30945599792175926,
+      "carrier_samples": 3888,
+      "carrier_seconds": 0.1763265306122449,
+      "carrier_pcm_sha256": "964b6aff80e06dce2747dbd30fb0947237a04cc84fdcd7df0227d4c14fa56f86",
+      "projection_ms": 49.309374000586104,
+      "projected_samples": 3840,
+      "projected_pcm_sha256": "dc92f8dd39fad62c8f43ce76f6ac7abd4a36ca00f626e422e97a477180524fa4",
+      "projected_peak": 0.32406896352767944,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "u",
+      "text": "u",
+      "frontend": [
+        {
+          "text": "u",
+          "segments": [
+            "u"
+          ],
+          "graphemes": [
+            "u"
+          ],
+          "mora_positions": [
+            0
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈu",
+          "encoded": "[['u]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['u]]",
+      "carrier_ms": 0.2507110002625268,
+      "carrier_samples": 3879,
+      "carrier_seconds": 0.17591836734693878,
+      "carrier_pcm_sha256": "32c91e1c7881c7f9c57fdff90da3e504b7a2c27e7e223850de516430d5e3a898",
+      "projection_ms": 49.71379799826536,
+      "projected_samples": 3840,
+      "projected_pcm_sha256": "77d6c538e40cb437fe4400c7a882504389bdbb98dce915ca8f2a14122d374f4f",
+      "projected_peak": 0.28553077578544617,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "f",
+      "text": "fa",
+      "frontend": [
+        {
+          "text": "fa",
+          "segments": [
+            "f",
+            "a"
+          ],
+          "graphemes": [
+            "f",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈfa",
+          "encoded": "[['f|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['f|a]]",
+      "carrier_ms": 0.30782099929638207,
+      "carrier_samples": 5746,
+      "carrier_seconds": 0.26058956916099774,
+      "carrier_pcm_sha256": "43d0434b24dbaa8ebce1aff0bc38bec9b3e04c92fa1d810f76c29818f5d26627",
+      "projection_ms": 65.65199299802771,
+      "projected_samples": 5632,
+      "projected_pcm_sha256": "ef63104a755e6d290f73e035c6626847427b0fb7dcebcd2053b6c33433d4db8d",
+      "projected_peak": 0.2956112027168274,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "h",
+      "text": "ha",
+      "frontend": [
+        {
+          "text": "ha",
+          "segments": [
+            "h",
+            "a"
+          ],
+          "graphemes": [
+            "h",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈha",
+          "encoded": "[['h|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['h|a]]",
+      "carrier_ms": 0.25754799935384654,
+      "carrier_samples": 5457,
+      "carrier_seconds": 0.2474829931972789,
+      "carrier_pcm_sha256": "ba04154881609c7a2458c1965f7db2626aa594f07798983e852353b3cfd4011f",
+      "projection_ms": 65.05346199992346,
+      "projected_samples": 5376,
+      "projected_pcm_sha256": "086d8d6dc65b2bf8c5e6419b9c500d16d0b3d0f56d166bc07c20e1f42769cf94",
+      "projected_peak": 0.40477436780929565,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "k",
+      "text": "ka",
+      "frontend": [
+        {
+          "text": "ka",
+          "segments": [
+            "k",
+            "a"
+          ],
+          "graphemes": [
+            "k",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈka",
+          "encoded": "[['k|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['k|a]]",
+      "carrier_ms": 0.3016949995071627,
+      "carrier_samples": 5647,
+      "carrier_seconds": 0.2560997732426304,
+      "carrier_pcm_sha256": "3958eb59d4867101845479ee2fa31c386a95a62655125a8f8eeb4d8eef13bc0e",
+      "projection_ms": 66.60260200078483,
+      "projected_samples": 5632,
+      "projected_pcm_sha256": "a87bc7ca42c8a4ce7db8f9e16148133207844cd13eb9b3a36003c332c7e16c62",
+      "projected_peak": 0.33050087094306946,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "l",
+      "text": "la",
+      "frontend": [
+        {
+          "text": "la",
+          "segments": [
+            "l",
+            "a"
+          ],
+          "graphemes": [
+            "l",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈla",
+          "encoded": "[['l|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['l|a]]",
+      "carrier_ms": 0.317202000587713,
+      "carrier_samples": 5131,
+      "carrier_seconds": 0.2326984126984127,
+      "carrier_pcm_sha256": "b57f44630d5a2b13168bfc4ec26137a843b4e0255b47fdc879938e6faa8d42bb",
+      "projection_ms": 59.57837300229585,
+      "projected_samples": 5120,
+      "projected_pcm_sha256": "eb66ac85695e61e02663c225476ac9bb880138c847780a9fe425670688c98dc9",
+      "projected_peak": 0.3445276916027069,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "m",
+      "text": "ma",
+      "frontend": [
+        {
+          "text": "ma",
+          "segments": [
+            "m",
+            "a"
+          ],
+          "graphemes": [
+            "m",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈma",
+          "encoded": "[['m|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['m|a]]",
+      "carrier_ms": 0.31901699912850745,
+      "carrier_samples": 5384,
+      "carrier_seconds": 0.24417233560090704,
+      "carrier_pcm_sha256": "754807540753c4fee3efa555d957a2be96b9244a221de9a3cfb200ee338828dd",
+      "projection_ms": 64.64574400160927,
+      "projected_samples": 5376,
+      "projected_pcm_sha256": "98676c1db55467e86d3c4b04be397fb0dd63405a815d4b7309f9814a0e90eb8b",
+      "projected_peak": 0.29525938630104065,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "n",
+      "text": "na",
+      "frontend": [
+        {
+          "text": "na",
+          "segments": [
+            "n",
+            "a"
+          ],
+          "graphemes": [
+            "n",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈna",
+          "encoded": "[['n|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['n|a]]",
+      "carrier_ms": 0.35074400148005225,
+      "carrier_samples": 5308,
+      "carrier_seconds": 0.24072562358276645,
+      "carrier_pcm_sha256": "3914f8c6680def17ce0d4edceff1bf2651681bae362880a68503104e8823e0b6",
+      "projection_ms": 60.67304400130524,
+      "projected_samples": 5120,
+      "projected_pcm_sha256": "e45e2055c4e0a2acac6e10cff66810cd930a791fc5ab231eedce2896336acc72",
+      "projected_peak": 0.3764241337776184,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "ng",
+      "text": "nga",
+      "frontend": [
+        {
+          "text": "nga",
+          "segments": [
+            "ŋ",
+            "a"
+          ],
+          "graphemes": [
+            "ng",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈŋa",
+          "encoded": "[['N|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['N|a]]",
+      "carrier_ms": 0.39886100057628937,
+      "carrier_samples": 5760,
+      "carrier_seconds": 0.2612244897959184,
+      "carrier_pcm_sha256": "215c0b945703f848d9ee0b35bcd338a7573ceb916cf27dd77a23238af938e3db",
+      "projection_ms": 66.50302600246505,
+      "projected_samples": 5632,
+      "projected_pcm_sha256": "82432a782c99dc879eff856823afa6843aead78e8f7b7b5a7d6cc57bebe36bf4",
+      "projected_peak": 0.36124885082244873,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "p",
+      "text": "pa",
+      "frontend": [
+        {
+          "text": "pa",
+          "segments": [
+            "p",
+            "a"
+          ],
+          "graphemes": [
+            "p",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈpa",
+          "encoded": "[['p|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['p|a]]",
+      "carrier_ms": 0.24605100043118,
+      "carrier_samples": 5306,
+      "carrier_seconds": 0.24063492063492065,
+      "carrier_pcm_sha256": "6b65116b639b29f2c9a776f55547f60c967a488f84b37415add51fd0948b8ea8",
+      "projection_ms": 61.13306300176191,
+      "projected_samples": 5120,
+      "projected_pcm_sha256": "f208f76d4135741a7f8ee5116e8deddcd83a98f748a86aba31e8078e4a12a570",
+      "projected_peak": 0.33066055178642273,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "s",
+      "text": "sa",
+      "frontend": [
+        {
+          "text": "sa",
+          "segments": [
+            "s",
+            "a"
+          ],
+          "graphemes": [
+            "s",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈsa",
+          "encoded": "[['s|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['s|a]]",
+      "carrier_ms": 0.2748949991655536,
+      "carrier_samples": 5688,
+      "carrier_seconds": 0.25795918367346937,
+      "carrier_pcm_sha256": "154128160546f3d5ba44e7a9f5ee4724a36784ba31c55c0ab8808c06e15ead3e",
+      "projection_ms": 65.10907800111454,
+      "projected_samples": 5632,
+      "projected_pcm_sha256": "c1a174358baee93fde483cc6d9a6b6e3ac52015cd27ab4f7bdc1abc2001f1b12",
+      "projected_peak": 0.29933735728263855,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "t",
+      "text": "ta",
+      "frontend": [
+        {
+          "text": "ta",
+          "segments": [
+            "t",
+            "a"
+          ],
+          "graphemes": [
+            "t",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈta",
+          "encoded": "[['t|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['t|a]]",
+      "carrier_ms": 0.25648200244177133,
+      "carrier_samples": 5143,
+      "carrier_seconds": 0.23324263038548754,
+      "carrier_pcm_sha256": "c6e71ceb6480df49fc290386f39c948396ba9a5dda9c5979d55a4c54a5b2c5f9",
+      "projection_ms": 62.08335600240389,
+      "projected_samples": 5120,
+      "projected_pcm_sha256": "ff1bed17033bc3db008ea68efeecb749eb523c8afbb83d58ee4106749de2d9c5",
+      "projected_peak": 0.3619785010814667,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "v",
+      "text": "va",
+      "frontend": [
+        {
+          "text": "va",
+          "segments": [
+            "v",
+            "a"
+          ],
+          "graphemes": [
+            "v",
+            "a"
+          ],
+          "mora_positions": [
+            1
+          ],
+          "stress_position": 0,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "isolated one-mora stress; connected-speech clitic domain is unresolved"
+          ],
+          "ipa": "ˈva",
+          "encoded": "[['v|a]]",
+          "mora_count": 1
+        }
+      ],
+      "encoded": "[['v|a]]",
+      "carrier_ms": 0.3512330004014075,
+      "carrier_samples": 5907,
+      "carrier_seconds": 0.26789115646258504,
+      "carrier_pcm_sha256": "01f8c3cb8015531a6705c773451bbc7ddd09008b3b8b2500716f8975364c025f",
+      "projection_ms": 71.5120159984508,
+      "projected_samples": 5888,
+      "projected_pcm_sha256": "848758394db61194046eb3cb303216c12c3454af7ab7bfd470d37eb809c7c1c2",
+      "projected_peak": 0.370101660490036,
+      "finite_nonzero": true
+    },
+    {
+      "semantic_kind": "ordinary-letter-name",
+      "lookup_text": "ʻ",
+      "text": "fakauʻa",
+      "frontend": [
+        {
+          "text": "fakauʻa",
+          "segments": [
+            "f",
+            "a",
+            "k",
+            "a",
+            "u",
+            "ʔ",
+            "a"
+          ],
+          "graphemes": [
+            "f",
+            "a",
+            "k",
+            "a",
+            "u",
+            "ʻ",
+            "a"
+          ],
+          "mora_positions": [
+            1,
+            3,
+            4,
+            6
+          ],
+          "stress_position": 4,
+          "marked_accent": "none",
+          "warnings": [
+            "native acoustic and listener validation pending",
+            "vowel sequences retained; optional fusion and loanword stress are unresolved"
+          ],
+          "ipa": "fakaˈuʔa",
+          "encoded": "[[f|a|k|a|'u|?|a]]",
+          "mora_count": 4
+        }
+      ],
+      "encoded": "[[f|a|k|a|'u|?|a]]",
+      "carrier_ms": 0.5257019984128419,
+      "carrier_samples": 13115,
+      "carrier_seconds": 0.5947845804988662,
+      "carrier_pcm_sha256": "53a192b28780d7a4a26c516e977d7aa1da521e376e941212545abd3bc4eb94b7",
+      "projection_ms": 140.56933000028948,
+      "projected_samples": 13056,
+      "projected_pcm_sha256": "b3b3af9f0010352b0f1e1949aefeccb141702757cec66695bb1559d8cadfbfbe",
+      "projected_peak": 0.36718788743019104,
+      "finite_nonzero": true
+    }
+  ]
+}

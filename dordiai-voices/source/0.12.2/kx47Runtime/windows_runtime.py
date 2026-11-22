@@ -1,5 +1,50 @@
 """Restore the private worker's DLL search independently of its NVDA parent."""
 import os
+import ntpath
+import sys
+
+
+def extended_windows_path(value):
+    """Make a Windows filesystem path explicit for native Unicode APIs.
+
+    Resolve relative paths before adding the namespace: Windows does not
+    interpret forward slashes or dot components inside extended-length paths.
+    This changes spelling only; no files, aliases or binary copies are made.
+    """
+    value = os.fspath(value)
+    if not isinstance(value, str):
+        raise TypeError("Private runtime paths must be Unicode strings")
+    if value.startswith(("\\\\?\\", "\\\\.\\")):
+        return value
+    if not value:
+        value = "."
+    if not ntpath.isabs(value) or not ntpath.splitdrive(value)[0]:
+        value = ntpath.abspath(value)
+    value = ntpath.normpath(value)
+    if not ntpath.isabs(value) or not ntpath.splitdrive(value)[0]:
+        raise ValueError("Private runtime path could not be made absolute")
+    if value.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + value[2:]
+    return "\\\\?\\" + value
+
+
+def private_runtime_path(value):
+    """Keep non-Windows path behavior unchanged."""
+    return extended_windows_path(value) if os.name == "nt" else os.fspath(value)
+
+
+def configure_worker_import_paths():
+    """Apply native-loader-safe spelling only inside the private interpreter."""
+    if os.name != "nt":
+        return {"status": "not-windows", "extended_import_paths": False}
+    previous = list(sys.path)
+    sys.path[:] = [extended_windows_path(value) if isinstance(value, str) else value
+                   for value in previous]
+    if sys.executable:
+        sys.executable = extended_windows_path(sys.executable)
+    return {"status": "extended-paths", "extended_import_paths": True,
+            "sys_path_entries": len(sys.path),
+            "long_sys_path_entries": sum(isinstance(value, str) and len(value) >= 260 for value in previous)}
 
 
 def reset_inherited_dll_directory():

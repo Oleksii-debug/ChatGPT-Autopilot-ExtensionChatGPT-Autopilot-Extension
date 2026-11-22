@@ -1,0 +1,14 @@
+Exact-weight shared mathematical graph for the 29 audited native MMS models.
+No per-language learned float32 weight is removed, quantized or rewritten.
+
+Original MMS/VITS models: Meta / facebook/mms-tts.
+Native-script ONNX exports: willwade/mms-tts-multilingual-models-onnx,
+revision 4f49fc254f11ddb0e35fbf25b6e48b04463a6779.
+https://huggingface.co/willwade/mms-tts-multilingual-models-onnx
+Declared upstream model license: CC BY-NC 4.0.
+https://creativecommons.org/licenses/by-nc/4.0/
+
+The graph retains original computation and stochastic nodes. Initializers are
+read-only views into each separately installed, exact checksum-pinned model.
+The previously untyped diagnostic durations output has a type annotation only.
+Native pronunciation and NVDA quality acceptance are separate from graph parity.

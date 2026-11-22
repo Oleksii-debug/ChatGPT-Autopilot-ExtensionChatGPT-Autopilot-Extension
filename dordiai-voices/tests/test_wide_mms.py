@@ -97,7 +97,8 @@ class GraphContractTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.folder = Path(temporary.name)
+        self.folder = Path(temporary.name) / "ha"
+        self.folder.mkdir()
         (self.folder / "config.json").write_text(json.dumps(CONFIG), encoding="utf8")
         (self.folder / "tokens.txt").write_text("d 0\n_ 1\ns 2\na 3\nn 4\nu 5\n  6\n", encoding="utf8")
 

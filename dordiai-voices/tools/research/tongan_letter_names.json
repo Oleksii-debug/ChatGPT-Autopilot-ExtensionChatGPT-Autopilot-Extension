@@ -1,0 +1,42 @@
+{
+  "language": "to",
+  "status": "primary-text-names-only-native-acoustic-acceptance-pending",
+  "registered": false,
+  "semantic_kind": "ordinary-letter-name",
+  "source": {
+    "publisher": "Museum of New Zealand Te Papa Tongarewa / Tongan Language Week National Partnership Committee",
+    "title": "Tongan Language Week Education Resource 2016",
+    "url": "https://www.tepapa.govt.nz/assets/76067/1692747224-final_final_version-tongan_resource_2016.pdf",
+    "pdf_page": 6,
+    "section": "ʻAlafapeta faka-Tonga / Tongan alphabet",
+    "retrieved": "2026-11-22",
+    "interpretation": "Explicit Letter name fields; consonant notation f(a) is expanded to fa, not the example word Fale. The source's typographic apostrophe in fakau’a is normalized to native modifier turned comma.",
+    "pdf_hash": null,
+    "pdf_hash_limitation": "Public primary PDF inspected through web extraction; direct binary retrieval unavailable. No hash is invented."
+  },
+  "letter_names": {
+    "a": "a",
+    "e": "e",
+    "i": "i",
+    "o": "o",
+    "u": "u",
+    "f": "fa",
+    "h": "ha",
+    "k": "ka",
+    "l": "la",
+    "m": "ma",
+    "n": "na",
+    "ng": "nga",
+    "p": "pa",
+    "s": "sa",
+    "t": "ta",
+    "v": "va",
+    "ʻ": "fakauʻa"
+  },
+  "not_covered": [
+    "Names of diacritic-bearing variants as separately spelled characters",
+    "Names of punctuation and other symbols",
+    "Native listener validation of synthesized ordinary names",
+    "NVDA typing latency and interruption acceptance"
+  ]
+}

@@ -46,6 +46,66 @@ def windows_kernel(kernel):
 
 
 class WindowsRuntimeBootstrapTests(unittest.TestCase):
+    def test_extended_namespace_normalizes_local_and_unc_paths(self):
+        cases = {
+            "C:/runtime/models/../voices/model.onnx": "\\\\?\\C:\\runtime\\voices\\model.onnx",
+            "\\\\server\\share\\models\\voice.onnx": "\\\\?\\UNC\\server\\share\\models\\voice.onnx",
+            "\\\\?\\C:\\runtime\\voice.onnx": "\\\\?\\C:\\runtime\\voice.onnx",
+            "\\\\?\\UNC\\server\\share\\voice.onnx": "\\\\?\\UNC\\server\\share\\voice.onnx",
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(bootstrap.extended_windows_path(value), expected)
+
+    def test_relative_paths_resolve_before_entering_namespace(self):
+        with patch.object(bootstrap.ntpath, "abspath", return_value="C:\\runtime\\models") as absolute:
+            self.assertEqual(bootstrap.extended_windows_path("models"), "\\\\?\\C:\\runtime\\models")
+        absolute.assert_called_once_with("models")
+
+    def test_non_windows_private_paths_are_preserved(self):
+        with patch.object(bootstrap.os, "name", "posix"):
+            self.assertEqual(bootstrap.private_runtime_path("/runtime/models"), "/runtime/models")
+            self.assertFalse(bootstrap.configure_worker_import_paths()["extended_import_paths"])
+
+    def test_child_import_paths_and_executable_gain_prefix_without_copying(self):
+        paths = ["C:\\runtime\\python\\python314.zip", "C:\\runtime\\python\\Lib\\site-packages"]
+        with patch.object(bootstrap.os, "name", "nt"), patch.object(bootstrap.sys, "path", list(paths)), \
+                patch.object(bootstrap.sys, "executable", "C:\\runtime\\python\\python.exe"):
+            result = bootstrap.configure_worker_import_paths()
+            self.assertTrue(result["extended_import_paths"])
+            self.assertEqual(bootstrap.sys.path, [bootstrap.extended_windows_path(value) for value in paths])
+            self.assertEqual(bootstrap.sys.executable, "\\\\?\\C:\\runtime\\python\\python.exe")
+
+    @unittest.skipUnless(os.name == "nt", "Actual Windows namespace behavior requires Windows")
+    def test_real_windows_child_imports_module_past_260_characters(self):
+        # A pure Python module checks actual long-path import routing; the
+        # separate pinned Windows probe verifies the real marisa native PYD.
+        script = r'''
+import json, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from windows_runtime import extended_windows_path, configure_worker_import_paths
+with tempfile.TemporaryDirectory(prefix="dordiai-long-path-") as temporary:
+    folder = Path(temporary)
+    while len(str(folder / "namespace_fixture.py")) < 280:
+        folder /= "directory-within-component-limit"
+    folder = Path(extended_windows_path(folder))
+    folder.mkdir(parents=True)
+    (folder / "namespace_fixture.py").write_text("PROBE_VALUE = 47\n", encoding="utf-8")
+    sys.path.insert(0, str(folder))
+    configure_worker_import_paths()
+    import namespace_fixture
+    print(json.dumps({"value": namespace_fixture.PROBE_VALUE, "path_length": len(namespace_fixture.__file__),
+                      "prefixed": namespace_fixture.__file__.startswith("\\\\?\\")}))
+'''
+        completed = subprocess.run([sys.executable, "-I", "-c", script, str(RUNTIME)],
+                                   capture_output=True, text=True, timeout=10)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["value"], 47)
+        self.assertGreater(result["path_length"], 260)
+        self.assertTrue(result["prefixed"])
+
     def test_inherited_directory_is_reset_in_child_not_added_to_search(self):
         kernel = kernel_fixture("private-parent-dlls")
         with windows_kernel(kernel):
@@ -115,9 +175,13 @@ print(json.dumps(result))
         reset = next(node.lineno for node in tree.body if isinstance(node, ast.Assign)
                      and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name)
                      and node.value.func.id == "reset_inherited_dll_directory")
+        configure = next(node.lineno for node in tree.body if isinstance(node, ast.Assign)
+                         and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name)
+                         and node.value.func.id == "configure_worker_import_paths")
         for node in tree.body:
             if isinstance(node, ast.ImportFrom) and node.module in {"session_control", "voice_policy"}:
                 self.assertLess(reset, node.lineno)
+                self.assertLess(configure, node.lineno)
         # The host driver must not change process-global Windows loader state.
         driver = (ROOT / "source/0.12.2/synthDrivers/kx47Preview.py").read_text(encoding="utf-8")
         self.assertNotIn("SetDllDirectory", driver)

@@ -12,8 +12,9 @@ from threading import Thread
 # The embedded interpreter is launched with -I and a restricted ._pth file;
 # sibling modules must be reachable before importing request-control helpers.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from windows_runtime import reset_inherited_dll_directory
+from windows_runtime import reset_inherited_dll_directory, configure_worker_import_paths, private_runtime_path
 WORKER_BOOTSTRAP = reset_inherited_dll_directory()
+WORKER_BOOTSTRAP["paths"] = configure_worker_import_paths()
 from session_control import RequestCancellation, SynthesisCancelled
 from voice_policy import require_voice_allowed
 from error_diagnostics import safe_error
@@ -64,6 +65,11 @@ def main():
     parser.add_argument("--reference-engine", choices=("omnivoice", "openvoice", "holos"), default="omnivoice")
     parser.add_argument("--preload-language", choices=("uk", "en", "mixed"), default="mixed")
     args = parser.parse_args()
+    args.models = Path(private_runtime_path(args.models))
+    if args.reference_model is not None:
+        args.reference_model = Path(private_runtime_path(args.reference_model))
+    if args.references is not None:
+        args.references = Path(private_runtime_path(args.references))
     if bool(args.reference_model) != bool(args.references):
         parser.error("Supply both the reference model and reference samples.")
 

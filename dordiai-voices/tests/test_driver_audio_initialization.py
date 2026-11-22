@@ -78,6 +78,20 @@ class AudioInitializationTests(unittest.TestCase):
         self.workers[0].close.assert_not_called()
         self.player.close.assert_not_called()
 
+    def test_failed_worker_acquisition_is_not_retained_as_live_maintenance_owner(self):
+        error = RuntimeError("worker construction failed")
+        self.factory.side_effect = error
+        obj, initialize = self.construct()
+        with self.assertRaises(RuntimeError) as caught:
+            initialize()
+        self.assertIs(caught.exception, error)
+        self.assertTrue(obj._closed)
+        self.assertNotIn(obj, self.driver._live_drivers)
+        self.assertIsNone(obj._engine)
+        self.assertIsNone(obj._worker_lease)
+        obj.terminate()
+        self.thread.assert_not_called()
+
     def test_trimming_failure_closes_created_player_before_releasing_shared_lease(self):
         error=OSError("Audio device became unavailable while configuring playback")
         self.player.enableTrimmingLeadingSilence.side_effect=error

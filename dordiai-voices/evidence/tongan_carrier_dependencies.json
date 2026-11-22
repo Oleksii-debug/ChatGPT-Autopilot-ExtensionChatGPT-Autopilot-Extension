@@ -1,0 +1,33 @@
+{
+  "status": "isolated-research-runtime-not-bundled-or-installed-systemwide",
+  "date": "2026-11-22",
+  "uses_native_tongan_model": false,
+  "espeak_table": "es; explicit native-rule phonemes only",
+  "source": "official Debian package mirror",
+  "packages": [
+    {
+      "url": "https://deb.debian.org/debian/pool/main/e/espeak-ng/libespeak-ng1_1.51+dfsg-10+deb12u2_amd64.deb",
+      "bytes": 200132,
+      "sha256": "2b127a95b50d92cbd7a615968d2ac1566e1cbc87e27bcda0c2894afb2407c6d2"
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/e/espeak-ng/espeak-ng-data_1.51+dfsg-10+deb12u2_amd64.deb",
+      "bytes": 4255896,
+      "sha256": "573f5661c6a5adcf949018baad158c4c773bf5579390ee5235a890f1cd694106"
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/p/pcaudiolib/libpcaudio0_1.2-2_amd64.deb",
+      "bytes": 8800,
+      "sha256": "5309759e4d129c7d9a601240cc6e62820ecfa86a1a98e207992ffa6a572dbcd2"
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/s/sonic/libsonic0_0.2.0-12_amd64.deb",
+      "bytes": 11024,
+      "sha256": "9d60de6918ace0b10e3e4e95421befd08aaf03b5b2a3d71ceb799e0cf259916f"
+    }
+  ],
+  "network_at_inference": false,
+  "playback_device_opened": false,
+  "platform": "Linux x86_64; Windows client resource compatibility unverified",
+  "license_notes": "Existing eSpeak NG carrier family is GPL-3.0-or-later with file-level third-party exceptions; libpcaudio package copyright records GPL-3+; Sonic library Apache-2.0. These research dependencies are not copied into any installable pack."
+}

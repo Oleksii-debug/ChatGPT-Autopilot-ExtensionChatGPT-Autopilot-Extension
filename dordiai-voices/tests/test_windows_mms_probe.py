@@ -8,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -51,6 +52,15 @@ class WindowsMMSProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "differ from prepared source"):
                 probe.stage_resources(self.fixture, self.index, Path(folder), bad_download)
+
+    def test_shared_probe_rejects_successful_audio_from_original_fallback(self):
+        # A nonzero waveform alone must not masquerade as shared-graph proof.
+        result = SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({
+            "frames": 1600, "peak": .4, "rms": .05, "model_session_mode": "original"}))
+        with tempfile.TemporaryDirectory() as folder, patch.object(probe.subprocess, "run", return_value=result):
+            with self.assertRaisesRegex(ValueError, "requested inference path"):
+                probe.native_carrier_probe(Path(folder), Path(folder), "fixed probe", Path(folder), 10,
+                                           expected_mode="shared-exact-weights")
 
     @unittest.skipIf(probe.os.name == "nt", "Non-Windows guard only")
     def test_non_windows_does_not_download_models_or_pretend_to_verify(self):

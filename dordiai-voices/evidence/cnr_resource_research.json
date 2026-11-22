@@ -1,0 +1,78 @@
+{
+  "language": "cnr",
+  "date": "2026-11-22",
+  "status": "real-native-data-candidate-no-verified-native-model",
+  "registered": false,
+  "native_model_ready": false,
+  "catalogue_coverage_changed": false,
+  "training_started": false,
+  "corpus": {
+    "repository": "disco-eth/WorldSpeech",
+    "revision": "b76b85395039f50332fbc421f7c098ee2f2653d7",
+    "url": "https://huggingface.co/datasets/disco-eth/WorldSpeech/tree/b76b85395039f50332fbc421f7c098ee2f2653d7/data/cnr_me",
+    "language_config": "cnr_me",
+    "publisher_label": "Montenegro / Montenegrin",
+    "publisher_reported_hours": 47.9,
+    "sample_rate": 24000,
+    "kind": "Human-transcribed parliamentary/broadcast ASR corpus, not a trained TTS checkpoint",
+    "readme_bytes": 44523,
+    "readme_sha256": "0940f18df0a53640dfb8cf10ab4d4396a96d88a986607497ed1357200425140d",
+    "readme_url": "https://huggingface.co/datasets/disco-eth/WorldSpeech/raw/b76b85395039f50332fbc421f7c098ee2f2653d7/README.md",
+    "dataset_license": "CC-BY-NC-4.0; more restrictive original source terms also apply",
+    "specific_source_license_label": "Parliamentary Proceedings",
+    "specific_source_license_url": "https://www.skupstina.me/",
+    "specific_source_redistribution_and_training_terms_verified": false,
+    "actual_files": [
+      {
+        "path": "data/cnr_me/test-00000.parquet",
+        "bytes": 61311010,
+        "sha256": "1383357fac184cb7579e4717d3e845c8402e4a50d22a92b2378bde74e4753783"
+      },
+      {
+        "path": "data/cnr_me/train-00000.parquet",
+        "bytes": 70225298,
+        "sha256": "329af12121ffa7acd6a1042349cfdf35ca247f54e7568919f624fb73437dae6a"
+      },
+      {
+        "path": "data/cnr_me/train-00002.parquet",
+        "bytes": 20613818,
+        "sha256": "ee0f78099fdb8984dc7508d80fbd5a1662983496291d8d86cbb79f286bc3207d"
+      }
+    ],
+    "binary_files_downloaded": false,
+    "audio_or_transcript_content_validated": false,
+    "dataset_server_rows_probe": "HTTP 502; no row-based quality or glyph coverage claims",
+    "possible_next_step": "Select genuinely Montenegrin clean speaker-consistent segments, verify source terms and native transcripts including ś/ź and ijekavian forms, then estimate supervised TTS/adapter training compute. Corpus hours alone do not prove a ready native synthesizer."
+  },
+  "rejected_model_leads": [
+    {
+      "repository": "Balkansmedia/tts-ai-",
+      "url": "https://github.com/Balkansmedia/tts-ai-",
+      "related_model": "nikolab/speecht5_tts_hr",
+      "related_model_url": "https://huggingface.co/nikolab/speecht5_tts_hr",
+      "reason": "Publisher explicitly states published training used Croatian VoxPopuli data; collecting Montenegrin data is future work. Regional BCSM project ambition is not native CNR model evidence."
+    },
+    {
+      "publisher": "AlfaNum",
+      "url": "https://www.alfanum.co.rs/en/an-sintetizator/",
+      "demo_url": "https://www.alfanum.co.rs/en/demo-stranica/",
+      "reason": "Genuine Montenegrin commercial service exists, but no openly downloadable/redistributable weights verified. Promotional demo recordings explicitly prohibit commercial use. No demo output harvested."
+    },
+    {
+      "publisher": "SIL-AI",
+      "identifier": "mlv-mntnt-audio-aligned-speecht5-ms70",
+      "reason": "Third-party search result conjectures Montenegrin from identifier. ISO mlv is not cnr; no primary native Montenegrin declaration. Rejected without downloading."
+    }
+  ],
+  "hub_searches": {
+    "text_to_speech_tag_cnr_count": 0,
+    "model_name_montenegrin_count": 0,
+    "model_name_crnogorski_count": 0,
+    "interpretation": "Observed public search results only, not proof that no model exists anywhere"
+  },
+  "not_done": [
+    "Serbian/Croatian model is not renamed to Montenegrin",
+    "No unsupported claim of native ś/ź phonemes or Montenegrin prosody",
+    "No automatic training, model registration, paid API use or change to the frozen runtime"
+  ]
+}

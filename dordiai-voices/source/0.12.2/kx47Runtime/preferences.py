@@ -84,19 +84,38 @@ def begin_package_speech(synth):
     if handler.getSynth() is not synth:
         raise RuntimeError("Вибрано інший синтезатор. Пакет не змінено.")
     synth.saveSettings()
-    speech.cancelSpeech()
+    reserve = getattr(synth, "_dordiai_begin_package_maintenance", None)
+    if reserve is None:
+        raise RuntimeError("Драйвер не підтримує безпечне завершення робочих процесів. Пакет не змінено.")
+    maintenance = reserve()
     error = None
     try:
+        speech.cancelSpeech()
         selected = handler.setSynth("espeak", isFallback=True)
     except Exception as exception:
         selected, error = False, str(exception)
     fallback = handler.getSynth()
     if not selected or fallback is None or getattr(fallback, "name", None) != "espeak":
+        synth._dordiai_end_package_maintenance(maintenance)
         detail = "Не вдалося ввімкнути вбудований eSpeak для озвучення під час роботи з пакетом. Пакет не змінено."
         if error:
             detail += " " + error
         raise RuntimeError(detail)
-    return {"synth_name": synth.name, "temporary_synth": fallback}
+    return {"synth_name": synth.name, "temporary_synth": fallback, "retired_driver": synth,
+            "maintenance": maintenance, "maintenance_released": False}
+
+
+def quiesce_package_speech(session, timeout=8.0):
+    """Run in the package worker, never on NVDA's event thread."""
+    session["retired_driver"]._dordiai_quiesce_package_maintenance(session["maintenance"], timeout=timeout)
+
+
+def release_package_speech(session):
+    if session.get("maintenance_released"):
+        return
+    if not session["retired_driver"]._dordiai_end_package_maintenance(session["maintenance"]):
+        raise RuntimeError("Не вдалося зняти блокування оновлення пакетів.")
+    session["maintenance_released"] = True
 
 
 def finish_package_speech(session):
@@ -107,6 +126,7 @@ def finish_package_speech(session):
     """
     import speech
     import synthDriverHandler as handler
+    release_package_speech(session)
     current = handler.getSynth()
     errors = []
     if current is not session["temporary_synth"] and getattr(current, "name", None) != session["synth_name"]:
@@ -768,13 +788,29 @@ def open_dialog(synth):
             message(status)
 
             def work():
+                success, detail = False, ""
                 try:
+                    quiesce_package_speech(self._package_speech)
                     operation()
                 except Exception as error:
-                    wx.CallAfter(self._package_finished, False, str(error))
+                    detail = str(error)
                 else:
-                    wx.CallAfter(self._package_finished, True, "Пакет змінено й перевірено.")
-            Thread(target=work, daemon=True, name="Dordiai package operation").start()
+                    success, detail = True, "Пакет змінено й перевірено."
+                finally:
+                    try:
+                        release_package_speech(self._package_speech)
+                    except Exception as error:
+                        success, detail = False, detail + " " + str(error)
+                wx.CallAfter(self._package_finished, success, detail)
+            try:
+                Thread(target=work, daemon=True, name="Dordiai package operation").start()
+            except Exception as error:
+                detail = "Не вдалося почати операцію з пакетом: " + str(error)
+                try:
+                    release_package_speech(self._package_speech)
+                except Exception as cleanup_error:
+                    detail += " " + str(cleanup_error)
+                self._package_finished(False, detail)
 
         def _package_finished(self, success, detail):
             # A rolled-back transaction can replace the index too, so always

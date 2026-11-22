@@ -104,7 +104,7 @@ def embedded_runtime_info(runtime):
     return document
 
 
-def native_carrier_probe(runtime, directory, text, output, timeout):
+def native_carrier_probe(runtime, directory, text, output, timeout, expected_mode=None):
     # This separate embedded process uses fixed zero-noise inference settings;
     # the later worker check retains the actual production noise settings.
     script = r'''
@@ -118,7 +118,7 @@ audio,rate,applied=carrier.audio(sys.argv[3],speed=1.,noise_scale=0.,noise_scale
 pcm=np.rint(np.clip(audio,-1,1)*32767).astype('<i2').tobytes()
 with wave.open(sys.argv[4],'wb') as target:
  target.setnchannels(1);target.setsampwidth(2);target.setframerate(rate);target.writeframes(pcm)
-print(json.dumps({'sample_rate':rate,'frames':len(audio),'duration_seconds':len(audio)/rate,'peak':float(np.max(np.abs(audio))),'rms':float(np.sqrt(np.mean(audio**2))),'noise_scale':0.,'noise_scale_w':0.,'providers':carrier.preload().get_providers()}))
+print(json.dumps({'sample_rate':rate,'frames':len(audio),'duration_seconds':len(audio)/rate,'peak':float(np.max(np.abs(audio))),'rms':float(np.sqrt(np.mean(audio**2))),'noise_scale':0.,'noise_scale_w':0.,'providers':carrier.preload().get_providers(),'model_session_mode':getattr(carrier,'model_session_mode',None)}))
 carrier.close()
 '''
     result = subprocess.run([str(runtime / "python/python.exe"), "-I", "-B", "-c", script,
@@ -130,6 +130,8 @@ carrier.close()
     document = json.loads(result.stdout)
     if document["frames"] <= 0 or document["peak"] <= 0 or not math.isfinite(document["rms"]):
         raise ValueError("Actual embedded native carrier returned invalid sample metrics")
+    if expected_mode is not None and document.get("model_session_mode") != expected_mode:
+        raise ValueError("Actual embedded MMS session did not use the requested inference path")
     document["wave_file"] = "ha-native-carrier.wav"
     document["wave_sha256"] = sha256((output / document["wave_file"]).read_bytes()).hexdigest()
     return document
@@ -142,6 +144,8 @@ def main(argv=None):
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX)
     parser.add_argument("--timeout", type=float, default=120.)
+    parser.add_argument("--shared-family", action="store_true",
+                        help="Explicitly test the guarded shared graph; does not change its production default")
     args = parser.parse_args(argv)
     if not 0 < args.timeout <= 300:
         parser.error("--timeout must be positive and no more than 300 seconds")
@@ -153,12 +157,15 @@ def main(argv=None):
               "language": "ha", "native_pronunciation_verified": False, "nvda_verified": False,
               "wave_player_verified": False, "physical_audio_verified": False, "product_ready": False,
               "host_acoustic_dependencies_installed": False, "runs": []}
+    report["requested_model_session_mode"] = "shared-exact-weights" if args.shared_family else "original"
+    previous_mode = os.environ.get("DORDIAI_MMS_SHARED_GRAPH")
     worker = None
     result_code = 1
     try:
         if os.name != "nt":
             report.update(status="blocked", reason="Actual Windows embedded runtime is required; no downloads or acoustic execution performed")
             return 2
+        os.environ["DORDIAI_MMS_SHARED_GRAPH"] = "1" if args.shared_family else "0"
         runtime = args.package_root.resolve() / "kx47Runtime"
         if args.package_root.name == "kx47Runtime":
             runtime = args.package_root.resolve()
@@ -171,7 +178,8 @@ def main(argv=None):
         report["resource_preparation"] = stage_resources(document, index, output / "staging/MMS/ha", acquire.download)
         report["embedded_runtime"] = embedded_runtime_info(runtime)
         report["native_carrier_probe"] = native_carrier_probe(
-            runtime, output / "staging/MMS/ha", document["sample_text"], output, args.timeout)
+            runtime, output / "staging/MMS/ha", document["sample_text"], output, args.timeout,
+            expected_mode=report["requested_model_session_mode"])
         builder = load_tool(HERE / "build_resource_pack.py", "_mms_windows_pack_builder")
         archive = output / "windows-mms-ha-probe.zip"
         report["resource_archive"] = builder.create_resource_pack(
@@ -211,6 +219,10 @@ def main(argv=None):
         report.update(status="failed", error=type(error).__name__ + ": " + str(error))
         result_code = 1
     finally:
+        if previous_mode is None:
+            os.environ.pop("DORDIAI_MMS_SHARED_GRAPH", None)
+        else:
+            os.environ["DORDIAI_MMS_SHARED_GRAPH"] = previous_mode
         if worker is not None:
             report["worker_shutdown"] = worker.close()
             if report["worker_shutdown"]["forced_termination"] or report["worker_shutdown"]["exit_code"] != 0:

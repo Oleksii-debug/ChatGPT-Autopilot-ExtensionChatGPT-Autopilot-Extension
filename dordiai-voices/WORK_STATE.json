@@ -15,15 +15,17 @@
     "Versioned voice import, adapter asset use, integrity checks, removal and rollback",
     "Core and three resource packages built; real resource install/list/uninstall round-trip verified",
     "Fixed imposed startup buffers, cancellation tracking, queued error propagation, bounded cleanup",
-    "Windows engine and actual NVDA probe tools plus GitHub Actions workflow implemented"
+    "Windows engine and actual NVDA probe tools plus GitHub Actions workflow implemented",
+    "Actual Windows dev5 standalone PCM smoke: core3, extended21 and representative MMS Hausa",
+    "Actual NVDA limited UI smoke:45profiles, default3languages, settings/hotkey binding/Tab/Space",
+    "Drive-independent core4 + source5 exact ZIP reproduction verified"
   ],
   "open_requirements": [
     "10 selected entries have no integrated resources; one selected group is explicitly partial",
-    "Character naming and keyboard echo for new languages; existing word-trained classifier covers45labels",
-    "Remaining seven Omni languages are too slow for interactive NVDA; validated improvements retain quality but do not meet targets",
-    "Windows actual models/NVDA output/accessibility/latency acceptance on matching final source",
-    "Native-speaker pronunciation acceptance and robust long fast multilingual reading",
-    "Actual NVDA child worker ImportError diagnosis/fix; full-source Windows rerun with final dev3 adapters"
+    "Complete character naming and actual NVDA keyboard echo across selected languages; current standalone character checks establish structure only",
+    "Five primary Omni language paths remain too slow for interactive NVDA; Bodo/Kashmiri alternatives are experimental and not pronunciation/NVDA accepted",
+    "Fix the actual NVDA-launched child marisa_trie ImportError; current dev5 cannot submit phrase PCM through NVDA",
+    "Native-speaker pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source"
   ],
   "environment": {
     "os": "Linux",
@@ -41,8 +43,8 @@
     "first_remote_ci": "Initial missing NumPy and test fixture UTF-8 issues fixed; both host test suites now pass",
     "linux_remote_unit_tests_passed": true,
     "windows_remote_unit_tests_passed": true,
-    "current_windows_run": 44996254700,
-    "current_windows_stage": "Windowsunit exposed GetDllDirectory requiredcapacity1 versusactualemptystring; correctedbuffercheckready, fatalimport builtin-fallback recovery added fordev5",
+    "current_windows_run": 44997655739,
+    "current_windows_stage": "Dev5 main suites pass on host and Windows; standalone core/extended/MMS PCM passes; actual NVDA UI passes but phrase PCM fails marisa_trie ImportError.",
     "dev2_staged_resource_entries": 125,
     "dev2_staged_full_entries": 124,
     "dev2_staged_partial_entries": 1,
@@ -50,30 +52,77 @@
     "windows_core_engine_probe_passed": true,
     "windows_extra_engine_probe_passed": true,
     "windows_nvda_probe_passed": false,
-    "windows_nvda_failure": "Confirmed actual child ImportError marisa_trie in Ukrainianstress package under NVDA; sameprivateinterpreterworksstandalone. ChildDLLsearchisolationfix inprogress.",
+    "windows_nvda_failure": "Confirmed Windows filename/extension-too-long loader error for marisa_trie. Child-only extended namespace fix under implementation and exact-path validation.",
     "recovered_diagnostics_run": 44989248999,
     "recovered_artifact_bytes_read": 1954355,
     "recovered_artifact_total_bytes": 1941758431,
-    "next_nvda_check": "Audio services/device diagnostics and explicitly labeled headless recording-sink GUI/API probe; physical acceptance remains blocked",
-    "local_optional_model_tests_skipped": 6,
+    "next_nvda_check": "Resolve actual NVDA-launched child import, then repeat phrase/typing/cancellation/long-reading checks. Physical output and acoustic latency still need a real audio endpoint.",
     "previous_real_windows_language_count": 21,
     "nvda_helper_fix_commit": "ff7899fc695546458ac7a236aa57104d46dea6cc",
     "windows_new_mms_representative_passed": true,
     "nvda_settings_smoke_passed": true,
     "nvda_keyboard_tab_space_smoke_passed": true,
     "final_source_snapshot": "evidence/source_snapshot_0.13.1-dev.5.json.gz",
-    "worker_import_diagnostics": "Safe structured child/host traceback metadata added; child cwd aligned to successful engine probe; actual Windows confirmation pending",
+    "worker_import_diagnostics": "Structured child traceback confirms marisa_trie ImportError after bootstrap status reset; inherited and post-reset DLL directories absent. SetDllDirectory reset has not resolved the actual NVDA failure.",
     "final_source_tree_sha256": "4354acb50d5d56cc166f849b4bbd8a9574d830d906a8895f82018d866dc7a038",
     "core_archive_bytes": 1767225930,
     "core_installed_bytes": 2129363570,
     "core_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
     "core_built_version": "0.13.1-dev.5",
     "drive_independent_core_resume_verified": true,
-    "drive_independent_core_resume_evidence": "evidence/recovered_core4_to_dev5_rebuild.json"
+    "drive_independent_core_resume_evidence": "evidence/recovered_core4_to_dev5_rebuild.json",
+    "verified_main_suite_tests_per_platform": 485,
+    "verified_main_suite_checkpoint_version": "0.13.1-dev.5",
+    "windows_standalone_pcm_verified": true,
+    "nvda_ui_smoke_verified": true,
+    "nvda_hotkey_binding_smoke_passed": true,
+    "nvda_host_sonic_smoke_passed": true,
+    "windows_core_languages_tested": 3,
+    "windows_core_runs_per_language": 2,
+    "windows_extended_languages_tested": 21,
+    "windows_extended_languages_skipped_without_samples": 62,
+    "windows_extended_language_codes": [
+      "en",
+      "ru",
+      "de",
+      "fr",
+      "it",
+      "es",
+      "pl",
+      "uk",
+      "ro",
+      "nl",
+      "pt",
+      "cs",
+      "sv",
+      "bg",
+      "da",
+      "fi",
+      "sk",
+      "nb",
+      "cmn",
+      "ja",
+      "ko"
+    ],
+    "windows_mms_ha_engine_smoke_passed": true,
+    "windows_character_structure_cases_passed": 11,
+    "windows_character_exploratory_unsupported": 1,
+    "windows_character_required_failures": 0,
+    "nvda_phrase_pcm_submission_verified": false,
+    "nvda_builtin_windows_fallback_selected": true,
+    "nvda_fallback_audibility_verified": false,
+    "physical_audio_endpoint_count": 0,
+    "windows_loader_diagnosis": {
+      "run": 44999586051,
+      "evidence": "evidence/windows_dev5_loader_44999586051.json.gz",
+      "cause": "Windows native loader rejects 264-character marisa_trie PYD path; identical SHA-256 module imports at84characters in both fixed import-only children spawned by actual NVDA.",
+      "extended_namespace_fix": "under actual Windows validation; no speech acceptance yet",
+      "diagnostic_limitation": "TemporaryDirectory removal of loaded short-copy PYD raised recorded WinError5, so dictionary postcheck was not reached in this diagnostic; production install was not changed."
+    }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Run full dev3 source through Windows/NVDA, fix proven import errors, preserve strict gates for missing languages/character names/performance",
+  "next_work": "Resolve proven NVDA child import failure and verify actual phrase/typing/cancellation; keep ongoing MMS graph-sharing integration separate from immutable dev5 acceptance.",
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
     "omni_fixed_reference_sets": 10,
@@ -92,8 +141,43 @@
       "Kashmiri (Matcha)"
     ],
     "mms_per_language_packs_built": 29,
-    "additional_native_resource_packs_built": 35,
+    "additional_native_resource_packs_built": 37,
     "slow_omni_primary_paths_after_preferred_native_integration": 5
   },
-  "intermediate_windows_build_version": "0.13.1-dev.2"
+  "intermediate_windows_build_version": "0.13.1-dev.2",
+  "latest_windows_evidence": {
+    "run": 44997655739,
+    "run_url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44997655739",
+    "core_version": "0.13.1-dev.5",
+    "core_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+    "reports": {
+      "core": {
+        "artifact_member": "engine/report.json",
+        "sha256": "d39d4df04674e2d09fad3f4950680473cd804c25c58c6daa020d672c8fea50fe"
+      },
+      "extended": {
+        "artifact_member": "extra-engines/report.json",
+        "sha256": "27379334ac976f20b4b36c1d5bb845edb7f1e62b8c3a1ac6fd48ba1e034e02d6"
+      },
+      "mms_ha": {
+        "artifact_member": "mms-ha/report.json",
+        "sha256": "f63717782c1a2fd41f7993112c8fec69d0a5125ded873423f72a7d5817472b78"
+      },
+      "characters": {
+        "artifact_member": "characters/report.json",
+        "sha256": "0d004ccd1676944660f255ca05f1349c4b1c5585406e0deb04199ce3be755866"
+      },
+      "nvda": {
+        "artifact_member": "nvda/windows-nvda-probe.json",
+        "sha256": "ffe4767f0f89d6a1b2513572f44b0f969ed04161ef9d25dcbec70b87eacc751f"
+      },
+      "audio_endpoint": {
+        "artifact_member": "audio/audio-endpoint.json",
+        "sha256": "c5b773693325a1a37129638e668628650126c8b006251b6818f584c22fbeae70"
+      }
+    },
+    "scope": "Standalone PCM and limited real NVDA UI smoke; physical output, pronunciation and full typing acceptance remain unverified.",
+    "durable_reports": "evidence/windows_dev5_run_44997655739.json.gz",
+    "durable_reports_sha256": "58661f013fb10495a0c62b9180f83d14039bfcddc70c5d6e4dc50a67dc6935fd"
+  }
 }

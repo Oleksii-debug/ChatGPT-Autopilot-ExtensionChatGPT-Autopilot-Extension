@@ -279,6 +279,10 @@ class PackageSpeechTests(unittest.TestCase):
 
     def setUp(self):
         self.original = types.SimpleNamespace(name="kx47Preview", saveSettings=MagicMock())
+        self.maintenance = object()
+        self.original._dordiai_begin_package_maintenance = MagicMock(return_value=self.maintenance)
+        self.original._dordiai_quiesce_package_maintenance = MagicMock()
+        self.original._dordiai_end_package_maintenance = MagicMock(return_value=True)
         self.current = self.original
         self.configured = "kx47Preview"
         self.calls = []
@@ -365,6 +369,7 @@ class PackageSpeechTests(unittest.TestCase):
         self.handler.setSynth = lambda name, isFallback=False: False
         with self.modules(), self.assertRaisesRegex(RuntimeError, "Пакет не змінено"):
             prefs.begin_package_speech(self.original)
+        self.original._dordiai_end_package_maintenance.assert_called_once_with(self.maintenance)
 
     def test_different_current_synth_is_not_terminated_when_maintenance_is_requested(self):
         self.current = types.SimpleNamespace(name="oneCore")
@@ -373,7 +378,7 @@ class PackageSpeechTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
         self.original.saveSettings.assert_not_called()
 
-    def _run_dialog_operation(self, fail):
+    def _run_dialog_operation(self, fail, quiesce_fails=False):
         """Drive the actual dialog transaction methods, with queued UI callbacks."""
         self.original.description = "Dordiai test"
         queued, dialog_types, observed = [], [], []
@@ -398,6 +403,11 @@ class PackageSpeechTests(unittest.TestCase):
             observed.append(("operation", self.current.name))
             if fail:
                 raise ValueError("transaction rolled back")
+        def quiesce(*args, **kwargs):
+            observed.append(("quiesce", self.current.name))
+            if quiesce_fails:
+                raise TimeoutError("worker still owns model handles; package unchanged")
+        self.original._dordiai_quiesce_package_maintenance.side_effect = quiesce
         with self.modules(), patch.dict(sys.modules, {"wx": wx, "gui": gui,
             "gui.settingsDialogs": settings, "ui": ui}), patch("threading.Thread", ImmediateWorker):
             prefs.open_dialog(self.original)
@@ -412,7 +422,10 @@ class PackageSpeechTests(unittest.TestCase):
             dialog._package_busy = False
             dialog._run_package_operation("Робота з пакетом", operation)
             self.assertTrue(dialog._package_busy)
-            self.assertEqual(observed, [("notice", "espeak"), ("operation", "espeak")])
+            expected = [("notice", "espeak"), ("quiesce", "espeak")]
+            if not quiesce_fails:
+                expected.append(("operation", "espeak"))
+            self.assertEqual(observed, expected)
             callback, args = queued.pop(0)
             callback(*args)
         self.assertFalse(dialog._package_busy)
@@ -423,12 +436,17 @@ class PackageSpeechTests(unittest.TestCase):
         detail = gui.messageBox.call_args.args[0]
         self.assertIn("автоматично перезавантажено", detail)
         self.assertEqual("transaction rolled back" in detail, fail)
+        self.assertEqual("worker still owns model handles" in detail, quiesce_fails)
+        self.original._dordiai_end_package_maintenance.assert_called_once_with(self.maintenance)
 
     def test_dialog_package_success_reloads_and_reopens_fresh_settings(self):
         self._run_dialog_operation(False)
 
     def test_dialog_package_rollback_still_reloads_and_exposes_transaction_error(self):
         self._run_dialog_operation(True)
+
+    def test_quiesce_timeout_aborts_before_mutation_releases_barrier_and_restores_speech(self):
+        self._run_dialog_operation(False, quiesce_fails=True)
 
 
 class FatalImportRecoveryTests(unittest.TestCase):

@@ -9,6 +9,8 @@ import types
 import unittest
 from unittest.mock import patch
 from time import monotonic
+from threading import RLock
+from threading import RLock
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / "source/0.12.2/kx47Runtime"
@@ -89,6 +91,10 @@ class ErrorDiagnosticsTests(unittest.TestCase):
         namespace["Thread"] = lambda **kw: types.SimpleNamespace(start=lambda: None)
         worker = namespace["Worker"]()
         worker._process = None
+        worker._lifecycle_lock = RLock()
+        worker._retired = False
+        worker._lifecycle_lock = RLock()
+        worker._retired = False
         worker._command = ["python.exe", "-I", "-B", "-u", str(RUNTIME / "nvda_worker.py"), "models"]
         worker._read = lambda *args: None
         worker._send({"mode": "cancel"})
