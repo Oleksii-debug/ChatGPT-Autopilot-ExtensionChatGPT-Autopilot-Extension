@@ -106,7 +106,14 @@ class _GithubOnlyRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class GitHub:
-    def __init__(self, token):
+    def __init__(self, token, *, asset_names=None):
+        names = (CORE_NAME, RECEIPT_NAME) if asset_names is None else tuple(asset_names)
+        if (len(names) != 2
+                or any(not isinstance(n, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,149}", n)
+                       for n in names)
+                or len(set(names)) != 2):
+            raise BackupError("Expected exactly two safe, explicitly owned asset names")
+        self.asset_names = frozenset(names)
         if not token:
             raise BackupError("GITHUB_TOKEN is required")
         self.token = token
@@ -164,7 +171,7 @@ class GitHub:
             raise BackupError("GitHub asset verification download failed") from None
 
     def upload(self, release_id, name, stream, size):
-        if name not in (CORE_NAME, RECEIPT_NAME) or type(release_id) is not int:
+        if name not in self.asset_names or type(release_id) is not int:
             raise BackupError("Upload escaped the owned backup asset names")
         path = ("/repos/" + REPOSITORY + "/releases/" + str(release_id)
                 + "/assets?name=" + urllib.parse.quote(name, safe=""))
