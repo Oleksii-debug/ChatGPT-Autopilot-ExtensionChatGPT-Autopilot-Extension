@@ -1,0 +1,70 @@
+{
+  "format": "dordiai-source11-generic-nvda-addon-module-maxpath-boundary",
+  "format_version": 1,
+  "run_id": 45033029720,
+  "commit": "8b1fed1251277b328268979360cfa32aa1df244c",
+  "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+  "status": "failed-before-manager-observer-driver-selection",
+  "known_module_loader_limit": true,
+  "actual_plain_paths": {
+    "driver_py": 251,
+    "letter_bank_py": 260,
+    "preferences_global_plugin_py": 263,
+    "dml_binary": 282
+  },
+  "actual_cause": "NVDA unprefixed package import cannot find synthDrivers._dordiai_letter_bank at260chars and globalPlugins.dordiaiMainPreferences at263chars; driver251chars itself imports successfully. No dataset/mmap/fallback/typing acceptance attempted.",
+  "full_nvda_log": {
+    "artifact_id": 14758037931,
+    "job_id": 137240601919,
+    "bytes": 46086,
+    "sha256": "afe72c47edbdef985443d6fb9695a4b72c978f5d703d146b5d7f5ddda1803f8c",
+    "gzip_git_blob": "cb96eaa5cbfaada672b0c68f87f1fbe5d21b1dfa"
+  },
+  "exact_json_proofs": [
+    {
+      "id": 137240601919,
+      "mode": "normal",
+      "exact_gzip_blob": "351a0d6ea3c59c4aaf8cbbd4d09960ab566a85e1",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "949882da139bd7f1c00b35a4b217ebd29f3db86d529021d0fcf5dc2245422a7d",
+      "gzip_sha256": "9e23e0782e449b75e5e13a59d19e3a355cce5d8102d31c23c9272d0c3a89579f",
+      "json_size_bytes": 16839
+    },
+    {
+      "id": 137240602117,
+      "mode": "descriptor-corruption",
+      "exact_gzip_blob": "63ee84254f2940f3f3ed99e1ef45aa4cef6e52fa",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "8a1b8e3408ae13fc8d631d24b563c43076b68a4f53b363ff799c11b1e89975eb",
+      "gzip_sha256": "20cc3fcfe86c208c8ccee9b0851c855f66b128c4e4cf5696f1ff5028c57e6fce",
+      "json_size_bytes": 17666
+    },
+    {
+      "id": 137240602169,
+      "mode": "ru-missing",
+      "exact_gzip_blob": "da8cb70ace082b4c1356b4078f659f1e43e60867",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "f5fa960edc99a1dbcb32030804f4f0b2c1d92d414115360404e0af65daf7ab20",
+      "gzip_sha256": "de020785708326add0be97fab800fc712f6bef1fbfc1a5d6d672859eb30c75c3",
+      "json_size_bytes": 19483
+    },
+    {
+      "id": 137240602181,
+      "mode": "typing",
+      "exact_gzip_blob": "305d713a8e29c679b898bc0c118f93a0595fa6e6",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "6b215800bb4a8b7c1f2057859b31cd48fd0fbbe8917c22eff4d9e7f6f61b11da",
+      "gzip_sha256": "a0291e40d8636efd83a10100cec686454f33a4ab18c2546448a7c46cb25208ad",
+      "json_size_bytes": 16899
+    }
+  ],
+  "immutable_archive_modified": false,
+  "native_membership_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

@@ -1,0 +1,128 @@
+{
+  "format": "dordiai-owned-real-waveplayer-virtual-capture",
+  "format_version": 1,
+  "status": "failed",
+  "endpoint_kind": "owned-virtual-audio",
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "virtual_audio_verified": false,
+  "wave_player_verified": false,
+  "recording_pcm_sink_test_double": false,
+  "requested_phrase_waveform_match_verified": false,
+  "capture_identity_scope": "nonzero request-span overlap only",
+  "reboot_performed": false,
+  "certificates_imported": false,
+  "signature_enforcement_modified": false,
+  "vendor_installer_executed": false,
+  "vendor_requires_finalization_reboot": true,
+  "scope": "Actual immutable core10, real NVDA/WavePlayer and virtual MME capture; no physical/pronunciation acceptance",
+  "core_sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
+  "verification": {
+    "format": "dordiai-vb46-catalogue-verification",
+    "package_sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
+    "catalogue_members": {
+      "vbMmeCable64_win10.inf": true,
+      "vbaudio_cable64_win10.sys": true,
+      "vbaudio_cable64arm_win10.sys": true
+    },
+    "authenticode_valid": true,
+    "signtool_authenticode_valid": true,
+    "signtool": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\signtool.exe",
+    "vendor_finalization_reboot_instruction": true,
+    "installer_executed": false,
+    "certificates_imported": false,
+    "physical_audio_verified": false,
+    "product_ready": false
+  },
+  "endpoints_before": {
+    "out": [],
+    "in": []
+  },
+  "owned_instance_id": "ROOT\\DORDIAI_VBCABLE_0030E161748345A8A07F6D26850493B1\\0000",
+  "driver_install_returned_success": true,
+  "windows_install_error": 0,
+  "windows_requires_reboot": false,
+  "device_status": {
+    "configret": 0,
+    "flags": 25174027,
+    "problem": 0
+  },
+  "endpoints_during": {
+    "out": [
+      {
+        "index": 0,
+        "error": 0,
+        "name": "Speakers (VB-Audio Virtual Cabl",
+        "channels": 2
+      },
+      {
+        "index": 1,
+        "error": 0,
+        "name": "CABLE In 16 Ch (VB-Audio Virtua",
+        "channels": 2
+      }
+    ],
+    "in": [
+      {
+        "index": 0,
+        "error": 0,
+        "name": "CABLE Output (VB-Audio Virtual ",
+        "channels": 2
+      }
+    ]
+  },
+  "render_endpoint": {
+    "index": 0,
+    "error": 0,
+    "name": "Speakers (VB-Audio Virtual Cabl",
+    "channels": 2
+  },
+  "capture_endpoint": {
+    "index": 0,
+    "error": 0,
+    "name": "CABLE Output (VB-Audio Virtual ",
+    "channels": 2
+  },
+  "output_device_selection": "Unmodified NVDA Windows default; only newly observed vendor outputs",
+  "cleanup": {
+    "attempted": true,
+    "scope": "Only this call's exact owned device instance",
+    "driver_store_purge_attempted": false,
+    "removal_requested": true,
+    "removed": true,
+    "absence_verified": true,
+    "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence"
+  },
+  "reason": "RuntimeError: Open actual MME capture failed with MMRESULT 1",
+  "capture": {
+    "format": "dordiai-real-mme-virtual-capture",
+    "sample_rate": 48000,
+    "channels": 2,
+    "bits": 16,
+    "buffer_frames": 960,
+    "buffer_count": 16,
+    "buffer_duration_ms": 20.0,
+    "ring_capacity_ms": 320.0,
+    "capture_started_perf_counter_ns": null,
+    "capture_stopped_perf_counter_ns": 162730499500,
+    "processed_frames": 0,
+    "nonzero_samples": 0,
+    "peak": 0,
+    "rms": 0,
+    "captured_pcm_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "capture_closed": false,
+    "errors": [],
+    "observed_all_buffers_done": 0,
+    "activity_transitions": [],
+    "excerpt_bytes": 0,
+    "physical_audio_verified": false,
+    "gapless_audio_verified": false,
+    "cancel_to_capture_silence_verified": false,
+    "requested_phrase_waveform_match_verified": false,
+    "capture_identity_scope": "nonzero request-span overlap only",
+    "clock_scope": "20ms FIFO buffers polled after native DONE; QPC arrival observations, not ADC/acoustic timestamps",
+    "tail_scope": "Up to320ms queued capture tail is not included after stop; no complete played-audio claim",
+    "capture_source": "Owned virtual audio driver; neither a WavePlayer patch nor a recording sink test double"
+  }
+}

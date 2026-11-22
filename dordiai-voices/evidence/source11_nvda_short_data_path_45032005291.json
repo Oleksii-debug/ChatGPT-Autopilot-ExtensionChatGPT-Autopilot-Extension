@@ -1,0 +1,56 @@
+{
+  "format": "dordiai-immutable-source11-initial-longpath-probe-construction-failure",
+  "format_version": 1,
+  "run_id": 45032005291,
+  "commit": "b6139e585701dbeaf59b9e60bc2cbd3a097370af",
+  "core_run_id": 45029834209,
+  "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+  "scope": "All4 real NVDA drivers selected and native singleton/lease passed. Tool required actual>260dataset, but constructed namespace258/plain254, so correctly aborted beforecases/audio. No product failure inferred; no speech/function acceptance claimed.",
+  "status": "failed-probe-path-construction",
+  "proofs": [
+    {
+      "id": 137237430530,
+      "mode": "ru-missing",
+      "exact_gzip_blob": "d5d1fe21a1b4662c930129bf0b4efe45f3fb5719",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "8de3fd51f72e70e448059ca2946baeac2da8aaa65aad20845a8723a8bfc58f9f",
+      "gzip_sha256": "a39c8caa8c78952c24d4b7ea781d65fa6e7e9247162e3d121b42836139d9d565",
+      "json_size_bytes": 20128
+    },
+    {
+      "id": 137237430764,
+      "mode": "normal",
+      "exact_gzip_blob": "605dbb3c44f4e60060ba31a07de41e29f4575e5d",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "1e94f64e9fb949fa1252c17365460654ad849eb32e957251256253e6e5452000",
+      "gzip_sha256": "bf2a28c80621d49311a6833c99eb59eca11bfdad8efc221988cae0c7fd88db83",
+      "json_size_bytes": 17596
+    },
+    {
+      "id": 137237430783,
+      "mode": "typing",
+      "exact_gzip_blob": "b2cc61b5fd091fa14dfc8f4bfbd01e3163042ed7",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "5c44571dbd52cbdb40c74dacf3a2a120fcad528f369d67643f9ed1c00db95cc9",
+      "gzip_sha256": "5d25e53d19085f264b12142c1ef2114f6d28346ff18b7ffce65a554945567fa0",
+      "json_size_bytes": 17660
+    },
+    {
+      "id": 137237430792,
+      "mode": "descriptor-corruption",
+      "exact_gzip_blob": "0d7e98e19108cc644b78445fe2396e6cdcdbef47",
+      "encoding": "gzip+base64",
+      "chunks": 1,
+      "json_sha256": "a102f16ee8c21cd9e8ed60f4417c92ac28dae59f64b2788ed4ae7fc5581b43cc",
+      "gzip_sha256": "d1598733629555262f8ca6aff802df6fbd00af3f5da270cb1ff8f6cbe526cca5",
+      "json_size_bytes": 18423
+    }
+  ],
+  "installed_long_path_verified": false,
+  "production_routing_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

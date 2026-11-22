@@ -12,20 +12,21 @@
     },
     "core_size": {
       "status": "windows_build_passed",
-      "bytes": 1974796411,
+      "bytes": 1992938157,
       "maximum_bytes": 3000000000,
-      "built_version": "0.13.1-dev.10",
-      "archive_sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
-      "evidence": "evidence/windows_dev10_run_45021069771.json.gz"
+      "built_version": "0.13.1-dev.11",
+      "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+      "evidence": "evidence/source11_worker_45029834209.json"
     },
     "selected_language_resources": {
       "status": "incomplete",
       "catalogue_entries": 135,
-      "complete_resource_entries": 124,
+      "complete_resource_entries": 126,
       "partial_resource_entries": 1,
-      "missing_entries": 10,
-      "evidence": "evidence/language_coverage_dev2.json",
-      "caveat": "Resource presence is not pronunciation, typing or latency acceptance."
+      "missing_entries": 8,
+      "evidence": "evidence/language_resource_delta_source11.json",
+      "caveat": "Resource presence is not pronunciation, typing or latency acceptance.",
+      "scope": "Combined resource inventory including older optional packs plus six actual11 Afri packs; older full125 inventory not reinstalled in this six-pack run."
     },
     "new_character_names": {
       "status": "incomplete",
@@ -228,11 +229,13 @@
       "optional_resources_recovered": false
     },
     "main_unit_suite": {
-      "status": "Windows matching-source suite passed",
-      "windows_tests": 812,
-      "windows_skipped": 29,
-      "run": 45021069771,
-      "source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
+      "status": "matching-source Windows suite passed",
+      "windows_tests": 1058,
+      "windows_tests_total": 1058,
+      "windows_passed": 1022,
+      "windows_skipped": 36,
+      "run": 45029834209,
+      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
       "linux_tests_tracked_separately": true
     },
     "windows_character_structure": {
@@ -246,7 +249,7 @@
       "report_member": "characters/report.json"
     },
     "physical_audio_output": {
-      "status": "blocked_no_audio_endpoint",
+      "status": "not_accepted; virtual_render_only_actual10_WavePlayer_passed; input_capture_access_denied; own_render_loopback_pending",
       "wave_out_devices": 0,
       "wave_player_verified": false,
       "physical_audio_verified": false,
@@ -327,8 +330,10 @@
       "full_source_equality_verified": true,
       "frozen_nvda_leaf_compatibility_verified": true,
       "actual_built_in_version": "0.13.1-dev.11",
-      "installed_manager_nvda_verified": false,
-      "evidence": "evidence/native_membership_all_source_equality_45029256575.json"
+      "installed_manager_nvda_verified": true,
+      "evidence": "evidence/native_membership_all_source_equality_45029256575.json",
+      "installed_manager_evidence": "evidence/source11_nvda_45033534150.json",
+      "production_plain_file_routing_verified": false
     },
     "afri_six_native_packages": {
       "actual_installed_core11": true,
@@ -337,6 +342,52 @@
       "nvda_verified": false,
       "pronunciation_verified": false,
       "physical_audio_verified": false
+    },
+    "actual_nvda_source11": {
+      "run": 45033534150,
+      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+      "core_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+      "evidence": "evidence/source11_nvda_45033534150.json",
+      "modes": [
+        {
+          "mode": "normal",
+          "job": 137242134361,
+          "actual_report_status": "partial",
+          "gha_conclusion": "failure-workflow-allowlist-only",
+          "failed_checks": 0
+        },
+        {
+          "mode": "typing",
+          "job": 137242134451,
+          "actual_report_status": "partial",
+          "gha_conclusion": "success",
+          "failed_checks": 0
+        },
+        {
+          "mode": "ru-missing",
+          "job": 137242134090,
+          "actual_report_status": "partial",
+          "gha_conclusion": "success",
+          "failed_checks": 0
+        },
+        {
+          "mode": "descriptor-corruption",
+          "job": 137242134344,
+          "actual_report_status": "partial",
+          "gha_conclusion": "success",
+          "failed_checks": 0
+        }
+      ],
+      "normal_workflow_allowlist_only_failure": true,
+      "physical_audio_verified": false,
+      "unmarked_mixed_file_routing_verified": false
+    },
+    "real_waveplayer_core10_control": {
+      "status": "passed_actual_virtual_render_control",
+      "recording_pcm_sink_test_double": false,
+      "physical_audio_verified": false,
+      "virtual_capture_verified": false,
+      "evidence": "evidence/virtual_audio_io_45032356299_summary.json"
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -357,34 +408,43 @@
     "production_fix_accepted": "Functional Windows NVDA private worker import and PCM verified in dev8; acoustic output unverified."
   },
   "current_frozen_core": {
-    "version": "0.13.1-dev.10",
-    "archive_sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
-    "archive_bytes": 1974796411,
-    "installed_payload_bytes": 2388863320,
-    "files": 10228,
-    "windows_run": 45021069771,
-    "source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
-    "core_artifact": 14753953381,
-    "evidence_artifact": 14754117799,
-    "core_three_engines_passed": true,
-    "sampled_extended21_passed": true,
-    "mms_original_and_default_shared_passed": true,
-    "nvda_176_first_pass_glyphs_completed": true,
-    "nvda_three_100_sample_series_completed": true,
-    "genuine_builtin_import_notification_recovery_passed": true,
-    "actual_required_resource_failure_verified": true,
-    "actual_keyboard_echo_verified": true,
-    "actual_keyboard_pipeline_cases": 9,
-    "all_45_profiles_static_176_bank_mapping": true,
-    "static_prepared_requests": 7920,
-    "static_live_requests": 0,
-    "first_use_predevice_target_passed": true,
+    "version": "0.13.1-dev.11",
+    "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+    "run": 45029834209,
+    "job": 137230752726,
+    "archive_bytes": 1992938157,
+    "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+    "installed_bytes": 2408429678,
+    "files": 10257,
+    "core_artifact": 14757229220,
+    "evidence_artifact": 14757224120,
+    "windows_tests": 1058,
+    "windows_skipped": 36,
+    "old_bank_files_byte_identical": 180,
+    "old_private_python_files_byte_identical": 1596,
+    "actual_packaged_native_profile_requests": 225,
+    "default_three_engine_regression_passed": true,
+    "same_worker_source_removal_restoration_passed": true,
+    "eight_excluded_voices_rejected": true,
+    "worker_clean_exit": true,
+    "nvda_verified": "limited_functional_with_explicit_recording_sink; plain_file_word_routing_pending",
+    "typing_verified": true,
     "physical_audio_verified": false,
-    "full_pronunciation_verified": false,
-    "product_ready": false
+    "native_pronunciation_verified": false,
+    "product_ready": false,
+    "evidence": "evidence/source11_worker_45029834209.json",
+    "windows_tests_total": 1058,
+    "windows_passed": 1022,
+    "nvda_functional_checks_verified": true,
+    "nvda_functional_run": 45033534150,
+    "actual_typing_cases": 9,
+    "required_resource_recovery_verified": true,
+    "native_dictionary_recovery_verified": true,
+    "installed_dictionary_manager_verified": true,
+    "nvda_evidence": "evidence/source11_nvda_45033534150.json"
   },
-  "current_environment_blocker": "Local executor remains unavailable; real Linux/Windows execution and byte-preserving checkpoints continue through owned GitHub Actions.",
-  "working_source_target_version": "0.13.1-dev.11 built and immutable at84ca83e; actual worker225 passed; matching NVDA11 acceptance pending. Production changes next require12.",
+  "current_environment_blocker": "Local executor available. Physical microphone/speaker acoustic validation unavailable in hosted CI; bounded own virtual render-loopback calibration in preparation.",
+  "working_source_target_version": "Immutable11 source84ca83e built; installed NVDA dictionary/normal/typing/recovery verified. Plain TextInfo actual run45034220666 active. All production changes next require12.",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,
@@ -464,6 +524,30 @@
       "binary_source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
       "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
       "evidence": "evidence/draft_core10_backup_45024623994.json"
+    },
+    "core11": {
+      "run": 45031797093,
+      "release_id": 454496891,
+      "asset_id": 779291724,
+      "receipt_asset_id": 779295872,
+      "sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+      "bytes": 1992938157,
+      "readback_sha256_verified": true,
+      "draft": true,
+      "published": false,
+      "binary_source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+      "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+      "evidence": "evidence/dordiai-core-dev11-backup-receipt.json"
+    },
+    "afri_six11": {
+      "run": 45032005307,
+      "release_id": 454498261,
+      "assets": 6,
+      "receipt_asset_id": 779299684,
+      "all7_readback_sha256_verified": true,
+      "draft": true,
+      "published": false,
+      "evidence": "evidence/dordiai-afri-six-dev11-backup-receipt.json"
     }
   },
   "latest_built_core": {
@@ -486,11 +570,47 @@
     "same_worker_source_removal_restoration_passed": true,
     "eight_excluded_voices_rejected": true,
     "worker_clean_exit": true,
-    "nvda_verified": false,
-    "typing_verified": false,
+    "nvda_verified": "limited_functional_with_explicit_recording_sink; plain_file_word_routing_pending",
+    "typing_verified": true,
     "physical_audio_verified": false,
     "native_pronunciation_verified": false,
     "product_ready": false,
-    "evidence": "evidence/source11_worker_45029834209.json"
+    "evidence": "evidence/source11_worker_45029834209.json",
+    "windows_tests_total": 1058,
+    "windows_passed": 1022,
+    "nvda_functional_checks_verified": true,
+    "nvda_functional_run": 45033534150,
+    "actual_typing_cases": 9,
+    "required_resource_recovery_verified": true,
+    "native_dictionary_recovery_verified": true,
+    "installed_dictionary_manager_verified": true,
+    "nvda_evidence": "evidence/source11_nvda_45033534150.json"
+  },
+  "current_frozen_core_historical10": {
+    "version": "0.13.1-dev.10",
+    "archive_sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
+    "archive_bytes": 1974796411,
+    "installed_payload_bytes": 2388863320,
+    "files": 10228,
+    "windows_run": 45021069771,
+    "source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
+    "core_artifact": 14753953381,
+    "evidence_artifact": 14754117799,
+    "core_three_engines_passed": true,
+    "sampled_extended21_passed": true,
+    "mms_original_and_default_shared_passed": true,
+    "nvda_176_first_pass_glyphs_completed": true,
+    "nvda_three_100_sample_series_completed": true,
+    "genuine_builtin_import_notification_recovery_passed": true,
+    "actual_required_resource_failure_verified": true,
+    "actual_keyboard_echo_verified": true,
+    "actual_keyboard_pipeline_cases": 9,
+    "all_45_profiles_static_176_bank_mapping": true,
+    "static_prepared_requests": 7920,
+    "static_live_requests": 0,
+    "first_use_predevice_target_passed": true,
+    "physical_audio_verified": false,
+    "full_pronunciation_verified": false,
+    "product_ready": false
   }
 }

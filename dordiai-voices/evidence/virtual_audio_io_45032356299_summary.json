@@ -1,0 +1,115 @@
+{
+  "format": "dordiai-real-waveplayer-virtual-endpoint-observation",
+  "format_version": 1,
+  "source_run_id": 45032356299,
+  "source_job_id": 137238494577,
+  "source_commit": "2220bb93adaeb69a129cfe8c7c590c7e314e6be0",
+  "workflow_conclusion": "success",
+  "fixture_tests": 37,
+  "core_sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
+  "real_wave_player_verified": true,
+  "recording_pcm_sink_test_double": false,
+  "physical_audio_verified": false,
+  "virtual_capture_verified": false,
+  "requested_phrase_waveform_match_verified": false,
+  "product_ready": false,
+  "native_input": {
+    "formats_tested": 6,
+    "query_mmresults": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "actual_open_mmresults": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "message": "Undefined external error.",
+    "same_results_after_render_handles_closed_and_nvda_exit": true,
+    "active_render_overlap_tested": false
+  },
+  "native_output": {
+    "formats_tested": 6,
+    "actual_open_mmresults": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "close_mmresults": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "wasapi_input": {
+    "CoInitializeEx_STA": "0x00000000",
+    "activate_IAudioClient": "0x00000000",
+    "get_mix_format": "0x00000000",
+    "is_format_supported": "0x00000000",
+    "mix_format": "48000Hz stereo32bit float/extensible",
+    "initialize_shared_mix": "0x80070005",
+    "interpretation": "Access denied at capture initialization; specific permission/policy cause not yet attributed",
+    "capture_started": false,
+    "pcm_read": false,
+    "settings_changed": false
+  },
+  "real_nvda": {
+    "status": "passed",
+    "alphabet176": {
+      "count": 176,
+      "p95_ms": 3.385,
+      "max_ms": 10.1615
+    },
+    "warm_letters": {
+      "count": 100,
+      "p95_ms": 3.1097
+    },
+    "warm_switch": {
+      "count": 100,
+      "p95_ms": 2.9681
+    },
+    "cancel_API": {
+      "count": 100,
+      "p95_ms": 0.2724
+    },
+    "request_events": 479,
+    "cancel_events": 100,
+    "initial_phrase_request_to_feed_ms": 527.7702,
+    "boundary": "Actual unchanged WavePlayer feed/return and cancel API; not captured/physical/acoustic latency"
+  },
+  "cleanup": {
+    "attempted": true,
+    "scope": "Only this call's exact owned device instance",
+    "driver_store_purge_attempted": false,
+    "removal_requested": true,
+    "removed": true,
+    "absence_verified": true,
+    "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence"
+  },
+  "original_json_evidence": {
+    "path": "evidence/virtual_audio_io_45032356299.json.gz",
+    "files": 6,
+    "bytes": 85015,
+    "sha256": "336edc2af40122d021e05cd208a95f9c28dee0f07e53c11a317399b9d5181bbb",
+    "git_blob": "a6e2450f3214ec94fdc5a3b972510eb877221a76"
+  },
+  "prior_failed_capture_original": {
+    "path": "evidence/virtual_capture_failed_45029834077.json",
+    "bytes": 4475,
+    "sha256": "e514b24bd19cad36e8b3dc581e7415f3e949d803b3380c6c5432529290c579bd",
+    "git_blob": "485ab76e5b7590f7a4d0f597cec643a79a7e2e7e"
+  }
+}

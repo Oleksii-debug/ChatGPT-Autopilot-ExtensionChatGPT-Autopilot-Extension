@@ -1,0 +1,790 @@
+{
+  "all405_payloads_unchanged": true,
+  "backend_accepted": false,
+  "dynamic_shapes_valid": true,
+  "existing_reference_cases": [
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 71,
+      "pcm_max_lsb": 1,
+      "pcm_pass": true,
+      "rtf": 0.6212613860894043,
+      "sample_id": "word",
+      "seconds": 0.5842392789999948,
+      "speaker": "female",
+      "token_count": 3
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 66,
+      "pcm_max_lsb": 5,
+      "pcm_pass": false,
+      "rtf": 0.6193580662931693,
+      "sample_id": "word",
+      "seconds": 0.5464957159999955,
+      "speaker": "male",
+      "token_count": 3
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 246,
+      "pcm_max_lsb": 3,
+      "pcm_pass": false,
+      "rtf": 0.639770591711426,
+      "sample_id": "phrase0",
+      "seconds": 1.9014968480000007,
+      "speaker": "female",
+      "token_count": 22
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 229,
+      "pcm_max_lsb": 6,
+      "pcm_pass": false,
+      "rtf": 0.6282033316210107,
+      "sample_id": "phrase0",
+      "seconds": 1.7431289179999965,
+      "speaker": "male",
+      "token_count": 22
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 263,
+      "pcm_max_lsb": 1,
+      "pcm_pass": true,
+      "rtf": 0.6305805285306484,
+      "sample_id": "phrase1",
+      "seconds": 1.9986399989999981,
+      "speaker": "female",
+      "token_count": 28
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 252,
+      "pcm_max_lsb": 4,
+      "pcm_pass": false,
+      "rtf": 0.6254032061553252,
+      "sample_id": "phrase1",
+      "seconds": 1.9023602649999987,
+      "speaker": "male",
+      "token_count": 28
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 71,
+      "pcm_max_lsb": 1,
+      "pcm_pass": true,
+      "rtf": 0.6220292526692783,
+      "sample_id": "meetei-word",
+      "seconds": 0.584961387000007,
+      "speaker": "female",
+      "token_count": 3
+    },
+    {
+      "float_parity": "not-reassessed-from16bit-reference",
+      "frames": 66,
+      "pcm_max_lsb": 5,
+      "pcm_pass": false,
+      "rtf": 0.6206911007658225,
+      "sample_id": "meetei-word",
+      "seconds": 0.5476719299999928,
+      "speaker": "male",
+      "token_count": 3
+    }
+  ],
+  "existing_reference_pcm_pass": false,
+  "fixed_shape_original_vs_repaired": {
+    "audio": {
+      "bit_exact": true,
+      "float_atol": 1e-05,
+      "float_pass": true,
+      "max_abs": 0.0,
+      "pcm_lsb_limit": 1,
+      "pcm_max_lsb": 0,
+      "pcm_pass": true,
+      "shape": [
+        1,
+        1,
+        20736
+      ],
+      "snr_db": null
+    },
+    "durations": {
+      "bit_exact": true,
+      "float_atol": 1e-05,
+      "float_pass": true,
+      "max_abs": 0.0,
+      "shape": [
+        1,
+        3
+      ],
+      "snr_db": null
+    },
+    "encoded": {
+      "bit_exact": true,
+      "float_atol": 1e-05,
+      "float_pass": true,
+      "max_abs": 0.0,
+      "shape": [
+        1,
+        512,
+        3
+      ],
+      "snr_db": null
+    },
+    "mel": {
+      "bit_exact": true,
+      "float_atol": 1e-05,
+      "float_pass": true,
+      "max_abs": 0.0,
+      "shape": [
+        1,
+        71,
+        80
+      ],
+      "snr_db": null
+    }
+  },
+  "format": "dordiai-mni-shape-only-repair-proof",
+  "format_version": 1,
+  "graphs": {
+    "fastpitch-decoder.onnx": {
+      "original_sha256": "ca15ba06692c2ec4c3653b817766c05ff68f932f4fffd69f1c5eb731d4a28e27",
+      "repaired": {
+        "sha256": "6dca281a575531108a48b6ede18750e20b387e5d84c5700f75506460d953c3a6",
+        "size_bytes": 111393631
+      },
+      "shape_edits": [
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.0/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.1/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.2/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.3/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.4/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 71,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/decoder/decoder/transformer_block/fft_layers.5/self_attn/Reshape_5"
+        }
+      ]
+    },
+    "fastpitch-encoder.onnx": {
+      "original_sha256": "abbac5ab7e2fb005b917e9622038f6a335b1afd331c4cc5cf49dcab46be6dd48",
+      "repaired": {
+        "sha256": "fd6f67022f292af34d01eb960733603f4162a945720cd90cd783f8f7f7ca614e",
+        "size_bytes": 105988484
+      },
+      "shape_edits": [
+        {
+          "concat": "/encoder/encoder/fft_layers.0/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.0/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.0/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/encoder/encoder/fft_layers.0/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.0/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.0/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.0/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/encoder/encoder/fft_layers.0/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.1/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.1/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.1/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/encoder/encoder/fft_layers.1/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.1/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.1/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.1/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/encoder/encoder/fft_layers.1/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.2/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.2/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.2/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/encoder/encoder/fft_layers.2/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.2/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.2/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.2/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/encoder/encoder/fft_layers.2/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.3/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.3/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.3/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/encoder/encoder/fft_layers.3/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.3/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.3/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.3/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/encoder/encoder/fft_layers.3/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.4/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.4/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.4/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/encoder/encoder/fft_layers.4/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.4/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.4/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.4/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/encoder/encoder/fft_layers.4/self_attn/Reshape_5"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.5/self_attn/Concat_3",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.5/self_attn/Reshape_4/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.5/self_attn/Unsqueeze_6_output_0",
+          "reshape": "/encoder/encoder/fft_layers.5/self_attn/Reshape_4"
+        },
+        {
+          "concat": "/encoder/encoder/fft_layers.5/self_attn/Concat_4",
+          "new_constant": [
+            -1
+          ],
+          "new_first_input": "/encoder/encoder/fft_layers.5/self_attn/Reshape_5/DordiaiDynamicSequence_output_0",
+          "original_frozen_sequence": 3,
+          "other_shape_components_unchanged": true,
+          "previous_first_input": "/encoder/encoder/fft_layers.5/self_attn/Unsqueeze_9_output_0",
+          "reshape": "/encoder/encoder/fft_layers.5/self_attn/Reshape_5"
+        }
+      ]
+    },
+    "hifigan.onnx": {
+      "original_sha256": "68dde10994f7a87bcc7f18fd8e5b74f21446b902a33b6b0b8206013fdfe1586e",
+      "repaired": {
+        "sha256": "68dde10994f7a87bcc7f18fd8e5b74f21446b902a33b6b0b8206013fdfe1586e",
+        "size_bytes": 55823329
+      },
+      "shape_edits": []
+    }
+  },
+  "holdout_scope": "New standalone utterances from known publisher phrases; not unseen training data or independent linguistic evaluation.",
+  "human_pronunciation_validation": "pending",
+  "network_guard": {
+    "denied_syscalls": [
+      "socket",
+      "connect",
+      "sendto",
+      "sendmsg",
+      "sendmmsg"
+    ],
+    "installed_before_torch_import": true,
+    "kind": "linux-seccomp"
+  },
+  "new_float_holdouts": [
+    {
+      "cleaned": "\u0985\u09b8\u09c1\u09ae",
+      "comparisons": {
+        "audio": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 2.1051615476608276e-05,
+          "pcm_lsb_limit": 1,
+          "pcm_max_lsb": 1,
+          "pcm_pass": true,
+          "shape": [
+            1,
+            1,
+            23552
+          ],
+          "snr_db": 94.72233881570014
+        },
+        "durations": {
+          "bit_exact": true,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 0.0,
+          "shape": [
+            1,
+            4
+          ],
+          "snr_db": null
+        },
+        "encoded": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 2.6226043701171875e-06,
+          "shape": [
+            1,
+            512,
+            4
+          ],
+          "snr_db": 123.26052102657553
+        },
+        "mel": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 2.09808349609375e-05,
+          "shape": [
+            1,
+            82,
+            80
+          ],
+          "snr_db": 127.30133949319688
+        }
+      },
+      "parity_pass": false,
+      "seconds": 0.6578520990000101,
+      "source": "new-word-from-original-native-MNI-config-test-sentences",
+      "speaker": "female",
+      "text": "\u0985\u09b8\u09c1\u09ae",
+      "token_ids": [
+        45,
+        84,
+        90,
+        78
+      ],
+      "wave": {
+        "file": "female-holdout0.wav",
+        "finite": true,
+        "nonzero": true,
+        "pcm_sha256": "04e49c6103431d37de552c56e8585b012803c7da31808fa6def2002c37e37d43",
+        "peak": 0.2751914858818054,
+        "sample_rate": 22050,
+        "samples": 23552,
+        "seconds": 1.0681179138321995,
+        "sha256": "15e92edbe1f9f2ef7761032595abd0adf5ed03c688adaefcf55b7a0be6c9be2b"
+      }
+    },
+    {
+      "cleaned": "\u0985\u09b8\u09c1\u09ae",
+      "comparisons": {
+        "audio": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 2.3601576685905457e-05,
+          "pcm_lsb_limit": 1,
+          "pcm_max_lsb": 1,
+          "pcm_pass": true,
+          "shape": [
+            1,
+            1,
+            18944
+          ],
+          "snr_db": 85.70814761813523
+        },
+        "durations": {
+          "bit_exact": true,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 0.0,
+          "shape": [
+            1,
+            4
+          ],
+          "snr_db": null
+        },
+        "encoded": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 2.86102294921875e-06,
+          "shape": [
+            1,
+            512,
+            4
+          ],
+          "snr_db": 121.07552784547127
+        },
+        "mel": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 3.24249267578125e-05,
+          "shape": [
+            1,
+            64,
+            80
+          ],
+          "snr_db": 124.26211550207198
+        }
+      },
+      "parity_pass": false,
+      "seconds": 0.5286367539999901,
+      "source": "new-word-from-original-native-MNI-config-test-sentences",
+      "speaker": "male",
+      "text": "\u0985\u09b8\u09c1\u09ae",
+      "token_ids": [
+        45,
+        84,
+        90,
+        78
+      ],
+      "wave": {
+        "file": "male-holdout0.wav",
+        "finite": true,
+        "nonzero": true,
+        "pcm_sha256": "f7e969d917b7f4f9e6fa639f0981f9d00ecb40f2bc66c1fe31fa0e653506db7f",
+        "peak": 0.2532026171684265,
+        "sample_rate": 22050,
+        "samples": 18944,
+        "seconds": 0.8591383219954648,
+        "sha256": "7445a6f7095642c2f77c5ba57940cfcd0d1626bfb612e2cbed24da491c8034d3"
+      }
+    },
+    {
+      "cleaned": "\u0995\u09be\u0996\u09bf\u09ac\u09a8\u09be",
+      "comparisons": {
+        "audio": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 2.063484862446785e-05,
+          "pcm_lsb_limit": 1,
+          "pcm_max_lsb": 1,
+          "pcm_pass": true,
+          "shape": [
+            1,
+            1,
+            23040
+          ],
+          "snr_db": 89.51724803443457
+        },
+        "durations": {
+          "bit_exact": true,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 0.0,
+          "shape": [
+            1,
+            7
+          ],
+          "snr_db": null
+        },
+        "encoded": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 4.291534423828125e-06,
+          "shape": [
+            1,
+            512,
+            7
+          ],
+          "snr_db": 122.44571448671584
+        },
+        "mel": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 1.3828277587890625e-05,
+          "shape": [
+            1,
+            80,
+            80
+          ],
+          "snr_db": 126.57972274423688
+        }
+      },
+      "parity_pass": false,
+      "seconds": 0.6395290270000089,
+      "source": "new-word-from-original-native-MNI-config-test-sentences",
+      "speaker": "female",
+      "text": "\u0995\u09be\u0996\u09bf\u09ac\u09a8\u09be",
+      "token_ids": [
+        55,
+        87,
+        56,
+        88,
+        76,
+        73,
+        87
+      ],
+      "wave": {
+        "file": "female-holdout1.wav",
+        "finite": true,
+        "nonzero": true,
+        "pcm_sha256": "ebca2182b5a94a2fdfdc81a0957e27b5ad7a330b4b74a04b53422a5389dd6b05",
+        "peak": 0.2622201442718506,
+        "sample_rate": 22050,
+        "samples": 23040,
+        "seconds": 1.0448979591836736,
+        "sha256": "60890642187fd7173c9bd716ba7dc3f8474eba5e2e68fd4cf564fa76a688d66a"
+      }
+    },
+    {
+      "cleaned": "\u0995\u09be\u0996\u09bf\u09ac\u09a8\u09be",
+      "comparisons": {
+        "audio": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 0.00011091679334640503,
+          "pcm_lsb_limit": 1,
+          "pcm_max_lsb": 4,
+          "pcm_pass": false,
+          "shape": [
+            1,
+            1,
+            25600
+          ],
+          "snr_db": 83.73589556376498
+        },
+        "durations": {
+          "bit_exact": true,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 0.0,
+          "shape": [
+            1,
+            7
+          ],
+          "snr_db": null
+        },
+        "encoded": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": true,
+          "max_abs": 3.889203071594238e-06,
+          "shape": [
+            1,
+            512,
+            7
+          ],
+          "snr_db": 118.91242981222481
+        },
+        "mel": {
+          "bit_exact": false,
+          "float_atol": 1e-05,
+          "float_pass": false,
+          "max_abs": 3.647804260253906e-05,
+          "shape": [
+            1,
+            90,
+            80
+          ],
+          "snr_db": 121.17749341189108
+        }
+      },
+      "parity_pass": false,
+      "seconds": 0.712302257999994,
+      "source": "new-word-from-original-native-MNI-config-test-sentences",
+      "speaker": "male",
+      "text": "\u0995\u09be\u0996\u09bf\u09ac\u09a8\u09be",
+      "token_ids": [
+        55,
+        87,
+        56,
+        88,
+        76,
+        73,
+        87
+      ],
+      "wave": {
+        "file": "male-holdout1.wav",
+        "finite": true,
+        "nonzero": true,
+        "pcm_sha256": "417227f15be2e6fa3f1c4a53f2a8921e150a3c185af47e8af1204f8535b2da32",
+        "peak": 0.39842936396598816,
+        "sample_rate": 22050,
+        "samples": 25600,
+        "seconds": 1.1609977324263039,
+        "sha256": "b5f403a191df5ecf3aa77b8f0aad1a0caa051eb8c4b9097b51328db051842586"
+      }
+    }
+  ],
+  "new_float_holdouts_pass": false,
+  "original_backend_accepted": false,
+  "original_development_float_gate_failure_retained": true,
+  "original_fixed_shape_equivalence_pass": true,
+  "policy": {
+    "all405_original_weight_identities_required": true,
+    "float_atol": 1e-05,
+    "pcm_lsb_limit": 1
+  },
+  "production_integrated": false,
+  "quantization_performed": false,
+  "repaired_session_open_seconds": 0.3054374479999993,
+  "shape_edit_count": 24,
+  "source_artifact_id": 14757527796,
+  "source_artifact_sha256": "81b5dc8fa87f3f6604264de435c05c9e6feb2deeb6d3e889f6808b6d6764d51a",
+  "source_proof_git_blob": "c74f720a09a3f2a9bc9d2dc7acc23ee5fa2db797",
+  "status": "dynamic-shape-repair-verified-backend-still-rejected",
+  "torch_checkpoint_deserialized": false,
+  "torch_model_exported": false
+}
