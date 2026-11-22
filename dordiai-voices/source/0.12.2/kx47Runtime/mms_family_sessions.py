@@ -5,6 +5,7 @@ resource falls back before synthesis to the original same-language model.
 Cancellation, memory exhaustion, stale resources and inference errors propagate.
 No original model is rewritten, quantized or truncated.
 """
+from collections import namedtuple
 from functools import lru_cache
 from hashlib import sha256
 import errno
@@ -87,8 +88,31 @@ def assert_resources(identity):
         raise MMSResourceChanged("Native MMS frontend/model resources changed; recreate the carrier")
 
 
+_FileIdentity = namedtuple("_FileIdentity", "path_key opened_stat")
+
+
+def _assert_file_current(path, identity):
+    # Windows Python can expose birthtime through stat(path).st_ctime_ns while
+    # fstat(fd).st_ctime_ns exposes NTFS ChangeTime. Keep both complete snapshots:
+    # compare path only with path and descriptor only with descriptor. Reopening
+    # also binds the current pathname to the exact inode that was hashed/mapped.
+    if signature(path) != identity.path_key:
+        raise MMSResourceChanged("Native MMS pathname changed; recreate the carrier")
+    try:
+        with Path(path).open("rb") as current:
+            reopened = os.fstat(current.fileno())
+            if (not os.path.samestat(identity.opened_stat, reopened)
+                    or _stat_key(reopened) != _stat_key(identity.opened_stat)):
+                raise MMSResourceChanged("Native MMS opened resource changed; recreate the carrier")
+    except (FileNotFoundError, NotADirectoryError) as error:
+        raise MMSResourceChanged("Native MMS resource disappeared during validation") from error
+    if signature(path) != identity.path_key:
+        raise MMSResourceChanged("Native MMS pathname changed during validation")
+
+
 def _assert_current(model, original_signature, epoch):
-    if signature(model) != original_signature or any(signature(Path(path)) != saved for path, saved in epoch):
+    _assert_file_current(model, original_signature)
+    if any(signature(Path(path)) != saved for path, saved in epoch):
         raise MMSResourceChanged("Native MMS resources changed; the old carrier cannot be reused")
 
 
@@ -101,15 +125,16 @@ def _hash_stream(stream):
 
 
 def _read_pinned(path, size, expected):
+    path_key = signature(path)
     with path.open("rb") as stream:
         before = os.fstat(stream.fileno())
         if not stat.S_ISREG(before.st_mode) or before.st_size != size:
             raise InvalidSharedMMS("Shared MMS asset size/type differs")
         data = stream.read(size + 1)
         after = os.fstat(stream.fileno())
-    identity = _stat_key(before)
-    if identity != _stat_key(after) or signature(path) != identity:
-        raise MMSResourceChanged("Shared MMS asset changed during validation")
+        if _stat_key(before) != _stat_key(after):
+            raise MMSResourceChanged("Shared MMS asset changed during validation")
+        _assert_file_current(path, _FileIdentity(path_key, before))
     if len(data) != size or sha256(data).hexdigest() != expected:
         raise InvalidSharedMMS("Shared MMS asset digest differs")
     return data
@@ -224,9 +249,10 @@ def _open_weights(model, entry, schema, epoch, code, known_models):
     import numpy as np
     # Every operation uses this same opened file, including its mmap. A path
     # replacement cannot switch weights between hash validation and mapping.
+    path_key = signature(model)
     with model.open("rb") as stream:
         before = os.fstat(stream.fileno())
-        identity = _stat_key(before)
+        identity = _FileIdentity(path_key, before)
         if not stat.S_ISREG(before.st_mode):
             raise InvalidSharedMMS("Native MMS model size/type differs")
         def check_language(actual_hash):
@@ -236,7 +262,7 @@ def _open_weights(model, entry, schema, epoch, code, known_models):
             if 0 < before.st_size <= 150000000:
                 check_language(_hash_stream(stream))
             raise InvalidSharedMMS("Native MMS model size/type differs")
-        key = (str(model.absolute()), identity, entry["sha256"], epoch)
+        key = (str(model.absolute()), _stat_key(before), entry["sha256"], epoch)
         with _VERIFIED_LOCK:
             verified = key in _VERIFIED
         if not verified:
@@ -258,7 +284,7 @@ def _open_weights(model, entry, schema, epoch, code, known_models):
             view = np.ndarray(shape, dtype="<f4", buffer=mapping, offset=offset)
             view.setflags(write=False)
             weights[name] = view
-        if _stat_key(os.fstat(stream.fileno())) != identity:
+        if _stat_key(os.fstat(stream.fileno())) != _stat_key(before):
             raise MMSResourceChanged("Native MMS model changed during validation")
         _assert_current(model, identity, epoch)
         with _VERIFIED_LOCK:

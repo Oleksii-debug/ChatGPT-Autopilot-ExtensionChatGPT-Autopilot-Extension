@@ -67,7 +67,7 @@ report["stress_cache"]=[{"relative":str(p.relative_to(cache)),"bytes":p.stat().s
  for p in cache.rglob("*") if p.is_file()]
 from stressonnx import make_stressor
 report["stress_cases"]=[]
-for label,path in (("plain_absolute",str(cache)),("extended_absolute",private_runtime_path(cache)),("relative",str(Path("models")/"stress"))):
+for label,path in (("plain_absolute",str(cache)),("extended_absolute",private_runtime_path(cache)),("relative",str(Path("models")/"PocketTTS"/"stress"))):
  row={"label":label,"path_length":len(path)}
  try:
   stressor=make_stressor(lang="ru",cache_dir=path)

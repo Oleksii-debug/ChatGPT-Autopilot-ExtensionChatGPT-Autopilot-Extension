@@ -19,7 +19,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.13.1-dev.6"
+VERSION = "0.13.1-dev.7"
 RELEASE_MANIFEST = "dordiai-release.json"
 PACK_MANIFEST = "dordiai-resource-pack.json"
 EXCLUDED = frozenset({"kostia", "inna", "dina", "vira", "innesa", "veronika_classmate", "anatolii", "veronika"})
@@ -101,6 +101,28 @@ def _source_files(directory):
     return result
 
 
+STRESS_VENDOR_PATH = "kx47Runtime/python/Lib/site-packages/stressonnx/download.py"
+STRESS_VENDOR_REFERENCE = Path(__file__).resolve().parent / "vendor/stressonnx-download-original.txt"
+
+
+def patch_stress_cache(data):
+    """Normalize only the audited offline vendor resolver, never unknown code.
+
+    The full reference pins source text (BOM/CRLF normalization is explicit).
+    The original archive and all model weights remain read only.
+    """
+    original = STRESS_VENDOR_REFERENCE.read_text(encoding="utf-8").replace("\r\n", "\n")
+    before = "local = os.path.join(cache_dir, hf_subdir, fname)"
+    after = "local = os.path.normpath(os.path.join(cache_dir, hf_subdir, fname))"
+    if original.count(before) != 1:
+        raise ValueError("Invalid pinned stressonnx compatibility reference")
+    patched = original.replace(before, after)
+    actual = data.decode("utf-8-sig").replace("\r\n", "\n")
+    if actual not in (original, patched):
+        raise ValueError("Unknown stressonnx source; compatibility patch aborted")
+    return patched.encode("utf-8")
+
+
 def collect_inputs(baseline, source, version=VERSION):
     files = _source_files(Path(baseline))
     files.update(_source_files(Path(source)))
@@ -110,6 +132,9 @@ def collect_inputs(baseline, source, version=VERSION):
         original = files.get("kx47Runtime/models/WideLanguages/Hebrew/" + filename)
         if original is not None:
             files.setdefault("doc/third-party/Hebrew/" + filename, original)
+    if STRESS_VENDOR_PATH in files:
+        files.setdefault("doc/third-party/stressonnx/dordiai-compatibility.txt",
+                         Path(__file__).resolve().parent / "vendor/NOTICE-stressonnx.txt")
     voice_catalogue = files.get("kx47Runtime/models/voices/catalog.json")
     voice_count = len(remove_excluded_metadata(json.loads(voice_catalogue.read_bytes()))) if voice_catalogue else 0
     result, excluded = [], []
@@ -121,7 +146,7 @@ def collect_inputs(baseline, source, version=VERSION):
         if excluded_path(name):
             excluded.append(name)
             continue
-        content = None
+        content = patch_stress_cache(path.read_bytes()) if name == STRESS_VENDOR_PATH else None
         if path.suffix == ".json" and (name.startswith("kx47Runtime/models/voices/")
                                       or name == "kx47Runtime/models/english_voice_profiles.json"
                                       or name.startswith("kx47Runtime/models/WideLanguages/navigation/")):
@@ -205,10 +230,15 @@ def build_release(baseline, source, output, version=VERSION, only=None, max_core
         voice_ids = sorted(json.loads(catalogue.transformed or catalogue.source.read_bytes()))
         if set(voice_ids) & EXCLUDED:
             raise ValueError("Excluded voice in release catalogue")
+    vendor_patches = [{"path": item.path,
+                       "input_sha256": hashlib.sha256(item.source.read_bytes()).hexdigest(),
+                       "output_sha256": hashlib.sha256(item.transformed).hexdigest(),
+                       "reason": "Normalize Windows extended-path separators; retain offline model lookup"}
+                      for item in files if item.path == STRESS_VENDOR_PATH and item.transformed is not None]
     report = {"format": "dordiai-release-build", "format_version": 1, "version": version,
               "baseline": "0.12.2", "voice_ids": voice_ids, "voice_count": len(voice_ids),
               "excluded_voice_ids": sorted(EXCLUDED), "excluded_input_files": excluded,
-              "windows_nvda_validation": "not_performed_by_builder", "artifacts": []}
+              "windows_nvda_validation": "not_performed_by_builder", "compatibility_patches": vendor_patches, "artifacts": []}
     for group, payload in groups.items():
         if only and group not in only:
             continue
@@ -218,7 +248,7 @@ def build_release(baseline, source, output, version=VERSION, only=None, max_core
             filename = f"dordiai-voices-{version}.nvda-addon"
             metadata = {"format": "dordiai-core-release", "format_version": 1, "version": version,
                         "voice_ids": voice_ids, "excluded_voice_ids": sorted(EXCLUDED),
-                        "initial_languages": ["uk", "en", "ru"],
+                        "initial_languages": ["uk", "en", "ru"], "compatibility_patches": vendor_patches,
                         "windows_nvda_validation": "not_performed_by_builder"}
             manifest = RELEASE_MANIFEST
         else:

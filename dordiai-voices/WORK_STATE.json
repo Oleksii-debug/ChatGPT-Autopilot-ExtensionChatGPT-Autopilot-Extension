@@ -3,7 +3,7 @@
   "authorization": "User said старт on 2026-11-22",
   "status": "implementation_in_progress",
   "base_version": "0.12.2",
-  "target_version": "0.13.1-dev.6",
+  "target_version": "0.13.1-dev.7",
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
@@ -45,7 +45,7 @@
     "linux_remote_unit_tests_passed": true,
     "windows_remote_unit_tests_passed": true,
     "current_windows_run": 45000863624,
-    "current_windows_stage": "Host unit suites passed after fixture-only floating clock tolerance fix. Actual core engine/character/shared-MMS probes failed; actual NVDA probe still running. Exact failures pending complete logs.",
+    "current_windows_stage": "Dev6 complete: actual NVDA phrase/character PCM passed; warm UK letters100 P95 2.6726ms/P99 2.8308ms at recording sink. RU extended cache separator bug and MMS stat/fstat ctime mismatch confirmed; dev7 candidates under CI.",
     "dev2_staged_resource_entries": 125,
     "dev2_staged_full_entries": 124,
     "dev2_staged_partial_entries": 1,
@@ -136,11 +136,24 @@
     },
     "drive_independent_dev6_rebuild": {
       "status": "rebuilt archive produced matching inventory and byte size, final outer SHA comparison not executed before outage; do not claim exact SHA proof"
+    },
+    "dev6_nvda_phrase_and_character_pcm_verified": true,
+    "dev7_changes": {
+      "vendor_resolver": "Pinned complete audited source with one-line separator normalization; offline behavior unchanged",
+      "mms_identity": "Independent reviewed full FD/FD and path/path clocks, reopened identity and epoch guards",
+      "shared_default_enabled": false,
+      "actual_windows_pending": true
+    },
+    "dev6_recording_sink_warm_letters": {
+      "count": 100,
+      "p95_ms": 2.6726,
+      "p99_ms": 2.8308,
+      "physical_audio_acceptance": false
     }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Obtain completed run45000863624 logs and diagnose actual dev6 regressions via GitHub route. Preserve immutable builds/source snapshots. Do not ask user for technical setup or claim full product ready.",
+  "next_work": "Run dev7 complete Windows engines, original/shared MMS and actual NVDA PCM/switch/cancel checks. Local executor remains unavailable; continue through GitHub Actions.",
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
     "omni_fixed_reference_sets": 10,

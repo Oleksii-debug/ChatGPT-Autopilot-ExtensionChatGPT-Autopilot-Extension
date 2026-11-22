@@ -1,0 +1,123 @@
+{
+  "format": "dordiai-windows-resource-clock-diagnostic-v1",
+  "provenance": {
+    "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+    "commit": "0fa51005207646db3f8aaa3c1fda1870563216c6",
+    "workflow_run": 45002031653,
+    "job": 137145458891,
+    "artifact": 14746127866,
+    "artifact_sha256": "18de02157dc1acbdcd5700aea185a5c69ef783b43d15ec1ea6400a9ad8e00829",
+    "frozen_core_sha256": "ee60a000b3ea4387c2baf2afbbb252fd886b603d4e532220e62f29bf9dc465c8"
+  },
+  "key_fields": [
+    "st_dev",
+    "st_ino",
+    "st_size",
+    "st_mtime_ns",
+    "st_ctime_ns"
+  ],
+  "scope": "fixed Windows resource diagnostics; no user input or product acceptance",
+  "stat_samples": [
+    {
+      "basename": "graph.onnx",
+      "path_length": 196,
+      "before_path": [
+        8268737450272404000,
+        281474976713079,
+        927175,
+        1795335443911586300,
+        1795335443909570600
+      ],
+      "before_fd": [
+        8268737450272404000,
+        281474976713079,
+        927175,
+        1795335443911586300,
+        1795335443911586300
+      ],
+      "mapped_path": [
+        8268737450272404000,
+        281474976713079,
+        927175,
+        1795335443911586300,
+        1795335443909570600
+      ],
+      "mapped_fd": [
+        8268737450272404000,
+        281474976713079,
+        927175,
+        1795335443911586300,
+        1795335443911586300
+      ],
+      "after_path": [
+        8268737450272404000,
+        281474976713079,
+        927175,
+        1795335443911586300,
+        1795335443909570600
+      ]
+    },
+    {
+      "basename": "model.onnx",
+      "path_length": 176,
+      "before_path": [
+        8268737450272404000,
+        281474976723573,
+        114013956,
+        1795335459070496000,
+        1795335455301220000
+      ],
+      "before_fd": [
+        8268737450272404000,
+        281474976723573,
+        114013956,
+        1795335459070496000,
+        1795335459557335000
+      ],
+      "mapped_path": [
+        8268737450272404000,
+        281474976723573,
+        114013956,
+        1795335459070496000,
+        1795335455301220000
+      ],
+      "mapped_fd": [
+        8268737450272404000,
+        281474976723573,
+        114013956,
+        1795335459070496000,
+        1795335459557335000
+      ],
+      "after_path": [
+        8268737450272404000,
+        281474976723573,
+        114013956,
+        1795335459070496000,
+        1795335455301220000
+      ]
+    }
+  ],
+  "shared_identity_failure": {
+    "expected_model": [
+      8268737450272404000,
+      281474976723573,
+      114013956,
+      1795335459070496000,
+      1795335459557335000
+    ],
+    "actual_model": [
+      8268737450272404000,
+      281474976723573,
+      114013956,
+      1795335459070496000,
+      1795335455301220000
+    ],
+    "epoch": []
+  },
+  "shared_carrier": {
+    "type": "MMSResourceChanged",
+    "message": "Native MMS resources changed; the old carrier cannot be reused"
+  },
+  "finding": "Path stat and descriptor fstat ctime_ns differ on the same file. Every other recorded field agrees, while each accessor remains individually stable before, during and after read-only mapping. The failure is cross-accessor identity comparison, not evidence of resource replacement.",
+  "candidate_status": "Separate full path and descriptor snapshots prepared; actual Windows shared-synthesis rerun required. Shared runtime default remains disabled."
+}

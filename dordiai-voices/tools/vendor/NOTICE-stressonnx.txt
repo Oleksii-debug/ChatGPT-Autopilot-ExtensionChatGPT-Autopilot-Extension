@@ -1,0 +1,15 @@
+stressonnx offline cache resolver compatibility patch, dordiai-voices dev.7.
+
+Original package: stressonnx, Apache-2.0; the packaged upstream licence and
+distribution notices remain included unchanged. Source is the supplied audited
+0.12.2 baseline; the exact complete resolver module text is pinned in the build
+recipe. The original input archive is not modified.
+
+Modified line: normalize os.path.join(cache_dir, hf_subdir, fname) with
+os.path.normpath before checking and returning a local file. Windows extended
+paths require native separators; nested Hub filenames contain forward slashes.
+Returned dictionary keys, model bytes, selected model, offline missing-file
+errors and all pronunciation settings remain unchanged.
+
+The release manifest records SHA-256 of the input and transformed module.
+Unknown vendor source is rejected. No download is enabled by this patch.

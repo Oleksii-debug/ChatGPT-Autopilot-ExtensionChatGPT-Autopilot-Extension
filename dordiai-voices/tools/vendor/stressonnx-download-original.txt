@@ -1,0 +1,66 @@
+"""Single download layer: resolve model files from the HuggingFace Hub cache."""
+import logging
+import os
+import time
+
+
+
+from stressonnx.errors import ModelDownloadError
+from stressonnx.registry import HF_REPO_ID, HF_REPO_REVISION
+
+LOG = logging.getLogger("stressonnx")
+
+# ---------------------------------------------------------------------------
+# HF download helpers
+# ---------------------------------------------------------------------------
+
+def _download_files(hf_subdir: str, filenames: list, cache_dir: str | None = None,
+                    model_id: str | None = None) -> dict:
+    """Resolve model files for one HF subdir; return ``{relative_name: local_path}``.
+
+    This is the single download layer — every backend obtains its files
+    through the returned dict and never constructs model paths itself.  All
+    files of a bundle are fetched from the pinned :data:`HF_REPO_REVISION`,
+    so a bundle can never mix repository revisions and an upstream
+    force-push cannot silently change what users run.
+
+    With ``cache_dir=None`` (the default) files live in the standard Hugging
+    Face cache: ``hf_hub_download`` handles reuse, ``HF_HOME`` relocation and
+    ``HF_HUB_OFFLINE`` semantics, and models are shared with every other HF
+    consumer on the machine.
+
+    With an explicit ``cache_dir`` the invariant is
+    ``local(f) = cache_dir / hf_subdir / f`` — exactly the tree layout of the
+    HF repo, never ``cache_dir/hf_subdir/hf_subdir/f``.  Existing non-empty
+    files are returned without touching the network (``hf_hub_download``
+    writes via atomic rename, so a partially transferred file never lands at
+    the final path; the emptiness check guards external truncation).
+
+    *model_id* names the user-facing model in error messages; it defaults to
+    the HF subdir.  Raises :class:`ModelDownloadError` (chaining the hub
+    exception) when a file cannot be fetched.
+    """
+    display_id = model_id or hf_subdir
+    paths = {}
+    fetched = 0
+    t0 = time.monotonic()
+    for fname in filenames:
+        hf_path = f"{hf_subdir}/{fname}"
+        if cache_dir is not None:
+            local = os.path.join(cache_dir, hf_subdir, fname)
+            if os.path.exists(local) and os.path.getsize(local) > 0:
+                paths[fname] = local
+                continue
+        try:
+            if fetched == 0:
+                LOG.info("Resolving model files for %s (%s@%s) …",
+                         display_id, HF_REPO_ID, HF_REPO_REVISION[:12])
+            fetched += 1
+            raise FileNotFoundError(hf_path)
+        except Exception as exc:
+            raise ModelDownloadError(display_id, hf_path, exc,
+                                     repo_id=HF_REPO_ID) from exc
+    if fetched:
+        LOG.info("Model files for %s ready (%d file(s), %.1fs).",
+                 display_id, fetched, time.monotonic() - t0)
+    return paths
