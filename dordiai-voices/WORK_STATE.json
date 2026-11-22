@@ -200,11 +200,11 @@
       "overlay_published": false
     },
     "last_recorded_tooling_linux_suite": {
-      "tests": 810,
-      "skipped": 31,
-      "run": 45019989240,
-      "job": 137200547240,
-      "source_commit": "476e0b63774d16956fb2883d8d30a666b0c45b70"
+      "tests": 945,
+      "skipped": 32,
+      "run": 45027190075,
+      "job": 137222663311,
+      "source_commit": "e877c90bf892e6f4c73ab32742f33fe40102e1a6"
     },
     "prepared_bank_generation": {
       "status": "complete_actual_generation_and_immutable_core10_NVDA_accepted_predevice_only",
@@ -378,26 +378,29 @@
       "union_forms": 6642550,
       "gzip_bytes": 20455967,
       "artifact": 14753984293,
-      "resource_size_and_runtime_benchmark_pending": true,
-      "compact_build_retry_source": "e877c90bf892e6f4c73ab32742f33fe40102e1a6"
+      "resource_size_and_runtime_benchmark_pending": false,
+      "compact_build_retry_source": "e877c90bf892e6f4c73ab32742f33fe40102e1a6",
+      "compact_build_and_two_hosts_successful_run": 45027190211,
+      "exact_metrics_recovery_pending": true
     },
     "extended_keyboard_scenarios": {
       "immutable_core_version": "0.13.1-dev.10",
       "passed": [
         "standard",
-        "characters-only"
+        "characters-only",
+        "navigation",
+        "forced-uk",
+        "disabled-ru"
       ],
       "passed_artifacts": {
         "standard": 14755960226,
         "characters_only": 14755767125
       },
-      "pending": [
-        "navigation",
-        "forced-uk",
-        "disabled-ru"
-      ],
+      "pending": [],
       "retry_source": "e86dc354a171ca123668b1a07d26273acb938289",
-      "scope": "Actual real-key NVDA with explicit recording sink; no device-acoustic acceptance."
+      "scope": "Actual real-key NVDA with explicit recording sink; no device-acoustic acceptance.",
+      "latest_successful_retry_run": 45027257765,
+      "exact_evidence_preservation_pending": true
     },
     "word_classifier_v4": {
       "run": 45024624278,
@@ -407,7 +410,7 @@
       "old_labels_retained": 45,
       "emitting_labels": 25,
       "reason": "Multiple per-predicted-language gates fail and paired core precision regresses.",
-      "evidence": "evidence/word_lid_v4_review.json",
+      "evidence": "evidence/word_lid_v4_actual_review.md",
       "production_old45_preserved": true
     },
     "afri_six_resources": {

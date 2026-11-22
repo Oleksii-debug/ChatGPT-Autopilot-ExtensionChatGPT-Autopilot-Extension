@@ -320,7 +320,7 @@
       "old_labels_retained": 45,
       "emitting_labels": 25,
       "reason": "Multiple per-predicted-language gates fail and paired core precision regresses.",
-      "evidence": "evidence/word_lid_v4_review.json",
+      "evidence": "evidence/word_lid_v4_actual_review.md",
       "production_old45_preserved": true
     }
   },
