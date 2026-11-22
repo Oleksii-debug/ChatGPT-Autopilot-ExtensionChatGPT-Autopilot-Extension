@@ -26,7 +26,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install only metadata/protobuf dependencies
-        run: python -m pip install --only-binary=:all: numpy==2.3.5 onnx==1.17.0
+        run: |
+          python -m pip install --only-binary=:all: numpy==2.3.5 onnx==1.17.0
       - name: Check bounded header parsing and state observations
         run: python -m unittest discover -s dordiai-voices/tests -p test_afri_checkpoint_inspection.py -v
       - uses: actions/cache/restore@v4
