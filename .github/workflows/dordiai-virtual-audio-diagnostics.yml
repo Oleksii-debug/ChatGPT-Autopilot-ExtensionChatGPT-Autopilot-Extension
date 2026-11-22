@@ -1,0 +1,181 @@
+name: Dordiai owned native audio I/O diagnosis core10
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-virtual-audio-diagnostics.yml"
+      - "dordiai-voices/tools/windows_virtual_audio_trial.py"
+      - "dordiai-voices/tools/windows_virtual_audio_capture.py"
+      - "dordiai-voices/tools/virtual_capture_probe.py"
+      - "dordiai-voices/tools/windows_virtual_audio_diagnostics.py"
+      - "dordiai-voices/tests/test_virtual_audio_diagnostics.py"
+      - "dordiai-voices/tools/wasapi_capture_diagnostics.py"
+      - "dordiai-voices/tests/test_wasapi_capture_diagnostics.py"
+      - "dordiai-voices/tests/test_virtual_audio_capture.py"
+      - "dordiai-voices/tests/test_virtual_audio_trial.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dordiai-owned-native-audio-diagnostics-core10
+  cancel-in-progress: false
+jobs:
+  native-io-diagnostics:
+    if: >-
+      github.repository == 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension' &&
+      github.ref == 'refs/heads/dordiai-voices/audit-20261122' &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(github.event.head_commit.message, '[virtual-audio-diagnostics]'))
+    runs-on: windows-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Check environment and verification guards without installation
+        run: |
+          python -m unittest discover -s dordiai-voices/tests -p 'test_virtual_audio_*.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s dordiai-voices/tests -p test_wasapi_capture_diagnostics.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Recover the exact previous failed capture report without rerunning it
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: 14757645803
+          run-id: 45029834077
+          repository: Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dordiai-previous-capture-${{ github.run_id }}
+          merge-multiple: true
+      - name: Print checksum and exact original failed-report bytes for durable evidence
+        shell: python
+        run: |
+          import base64,hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-previous-capture-"+os.environ["GITHUB_RUN_ID"])
+          paths=list(root.rglob("virtual-waveplayer-capture.json"))
+          if len(paths)!=1:raise RuntimeError("Expected exactly one original failed capture report")
+          raw=paths[0].read_bytes()
+          if len(raw)>4*1024*1024:raise RuntimeError("Original metadata report exceeds read bound")
+          document=json.loads(raw)
+          if document.get("core_sha256")!="437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8":
+              raise RuntimeError("Original failed capture identity mismatch")
+          print("PREVIOUS_CAPTURE_REPORT_META "+json.dumps({"source_run":45029834077,"artifact":14757645803,
+                "size_bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}),flush=True)
+          print("PREVIOUS_CAPTURE_REPORT_B64 "+base64.b64encode(raw).decode("ascii"),flush=True)
+      - name: Verify official package, existing trusted signatures and catalogue coverage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or
+              $env:GITHUB_REPOSITORY -ne 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension' -or
+              $env:RUNNER_ARCH -ne 'X64') { throw 'Owned hosted x64 scope required' }
+          $package = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-package-' + $env:GITHUB_RUN_ID)
+          $verification = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-verification-' + $env:GITHUB_RUN_ID)
+          if ((Test-Path -LiteralPath $package) -or (Test-Path -LiteralPath $verification)) { throw 'Refusing existing roots' }
+          New-Item -ItemType Directory -Path $package,$verification | Out-Null
+          $zip = Join-Path $verification 'VBCABLE_Driver_Pack46.zip'
+          Invoke-WebRequest -Uri 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip' -OutFile $zip
+          if ((Get-Item -LiteralPath $zip).Length -ne 1324680 -or
+              (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90') { throw 'Pinned vendor ZIP mismatch' }
+          Expand-Archive -LiteralPath $zip -DestinationPath $package
+          $pins = python -c "import sys,json;sys.path.insert(0,'dordiai-voices/tools');import windows_virtual_audio_trial as t;print(json.dumps(t.EXPECTED))" | ConvertFrom-Json -AsHashtable
+          foreach ($name in $pins.Keys) {
+            if ((Get-FileHash -LiteralPath (Join-Path $package $name) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $pins[$name]) { throw ('Pinned member mismatch: '+$name) }
+          }
+          $thumbprints = @{
+            'vbaudio_cable64_win10.cat'='6022340C9F4CB00307DF8DB036D392ADAC766212'
+            'vbaudio_cable64_win10.sys'='762B6D6B2958E709F24C8DEA080150E2D4FB5889'
+            'vbaudio_cable64arm_win10.sys'='762B6D6B2958E709F24C8DEA080150E2D4FB5889'
+            'VBCABLE_Setup_x64.exe'='A77952D93229D0EC36E2543081EEA7D125732B9C'
+          }
+          foreach ($name in $thumbprints.Keys) {
+            $signature = Get-AuthenticodeSignature -LiteralPath (Join-Path $package $name)
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $thumbprints[$name]) { throw ('Pinned trusted signer required: '+$name) }
+          }
+          $sdk = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+          $tools = @(Get-ChildItem -LiteralPath $sdk -Filter signtool.exe -Recurse -File | Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending)
+          if ($tools.Count -eq 0) { throw 'Microsoft SDK SignTool unavailable; no replacement downloaded' }
+          $signtool = $tools[0].FullName
+          $signature = Get-AuthenticodeSignature -LiteralPath $signtool
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw 'Trusted Microsoft SDK verifier required' }
+          $members = [ordered]@{}
+          foreach ($name in @('vbMmeCable64_win10.inf','vbaudio_cable64_win10.sys','vbaudio_cable64arm_win10.sys')) {
+            & $signtool verify /kp /v /c (Join-Path $package 'vbaudio_cable64_win10.cat') (Join-Path $package $name) 2>&1 | Tee-Object -FilePath (Join-Path $verification ($name+'.catalogue.log'))
+            if ($LASTEXITCODE -ne 0) { throw ('Kernel-policy catalogue verification failed: '+$name) }
+            $members[$name] = $true
+          }
+          $proof = [ordered]@{
+            format='dordiai-vb46-catalogue-verification'; package_sha256='bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90'
+            catalogue_members=$members; authenticode_valid=$true; signtool_authenticode_valid=$true
+            signtool=$signtool; vendor_finalization_reboot_instruction=$true
+            installer_executed=$false; certificates_imported=$false; physical_audio_verified=$false; product_ready=$false
+          }
+          $proof | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $verification 'validation.json') -Encoding utf8NoBOM
+          Write-Output ('VIRTUAL_AUDIO_CATALOGUE_VERIFICATION '+($proof | ConvertTo-Json -Depth 8 -Compress))
+      - name: Start existing audio services and validate only the expected no-endpoint block
+        shell: python
+        run: |
+          import json,os,pathlib,subprocess,sys
+          sys.path.insert(0,"dordiai-voices/tools")
+          from windows_virtual_audio_trial import check_audio_service_receipt
+          output=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-vb46-audio-"+os.environ["GITHUB_RUN_ID"])
+          completed=subprocess.run([sys.executable,"dordiai-voices/tools/setup_audio_endpoint.py",
+              "--output",str(output),"--ephemeral-ci","--start-existing-services"],check=False)
+          report=json.loads((output/"audio-endpoint.json").read_text(encoding="utf-8"))
+          state=check_audio_service_receipt(report,completed.returncode)
+          print(json.dumps({"existing_service_receipt":state,"returncode":completed.returncode,
+                            "wave_out_devices_after":report["wave_out_devices_after"],
+                            "physical_audio_verified":False,"driver_installed_by_service_helper":False}),flush=True)
+      - name: Download only immutable verified core10 for the real software audio path
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: 14753953381
+          run-id: 45021069771
+          repository: Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dordiai-core10-input-${{ github.run_id }}
+          merge-multiple: true
+      - name: Diagnose bounded native inputs and independently try real NVDA WavePlayer
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-package-' + $env:GITHUB_RUN_ID)
+          $validation = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-verification-' + $env:GITHUB_RUN_ID + '\validation.json')
+          $output = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-diagnostics-' + $env:GITHUB_RUN_ID)
+          $addon = Join-Path $env:RUNNER_TEMP ('dordiai-core10-input-' + $env:GITHUB_RUN_ID + '\dordiai-voices-0.13.1-dev.10.nvda-addon')
+          python dordiai-voices/tools/windows_virtual_audio_diagnostics.py --package $package --validation $validation --output $output --addon $addon --timeout 420 --ephemeral-ci
+          $code = $LASTEXITCODE
+          if ($code -eq 2) {
+            $reportPath = Join-Path $output 'native-io-diagnostics.json'
+            if (-not (Test-Path -LiteralPath $reportPath)) { throw 'Blocked trial has no guarded receipt' }
+            $report = Get-Content -Raw -LiteralPath $reportPath | ConvertFrom-Json
+            if ($report.status -ne 'blocked' -or $report.cleanup_failure -eq $true -or
+                ($report.cleanup.attempted -eq $true -and $report.cleanup.removed -ne $true) -or
+                $report.physical_audio_verified -ne $false -or $report.reboot_performed -ne $false -or
+                $report.certificates_imported -ne $false -or $report.signature_enforcement_modified -ne $false) {
+              throw 'Unrecognized blocked receipt or incomplete owned-device cleanup'
+            }
+            Write-Output 'Receipt confirms BLOCKED; no reboot or trust bypass attempted'
+            exit 0
+          }
+          exit $code
+      - name: Collect bounded original native I/O and real NVDA reports
+        if: always()
+        run: >-
+          python dordiai-voices/tools/collect_windows_evidence.py
+          --source "${{ runner.temp }}/dordiai-vb46-diagnostics-${{ github.run_id }}"
+          --output "${{ runner.temp }}/dordiai-vb46-diagnostics-evidence-${{ github.run_id }}"
+      - name: Preserve only software-pipeline evidence, never vendor/core binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-native-audio-io-diagnostics-core10
+          path: |
+            ${{ runner.temp }}/dordiai-vb46-diagnostics-evidence-${{ github.run_id }}
+            ${{ runner.temp }}/dordiai-vb46-verification-${{ github.run_id }}/*.json
+            ${{ runner.temp }}/dordiai-vb46-verification-${{ github.run_id }}/*.log
+          if-no-files-found: warn
+          retention-days: 30

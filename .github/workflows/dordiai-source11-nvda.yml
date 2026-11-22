@@ -1,0 +1,135 @@
+name: Immutable source11 actual NVDA integration
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-nvda11:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[source11-nvda]')
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, typing, ru-missing, descriptor-corruption]
+    env:
+      PYTHONUTF8: '1'
+      CORE_SHA256: '223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb'
+      NVDA_PROBE_MODE: ${{ matrix.mode }}
+    steps:
+      - name: Preserve source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Check actual probe contracts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m unittest discover -s dordiai-voices/tests -p "test_windows_nvda*probe.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m py_compile dordiai-voices/tools/windows_nvda_membership_integration_probe.py dordiai-voices/tools/windows_nvda_native_descriptor_probe.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-source11-development-core-45029834209
+          run-id: 45029834209
+          github-token: ${{ github.token }}
+          path: dordiai-voices/dist
+      - name: Verify exact unchanged source11 archive
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib
+          files=list(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
+          if len(files)!=1 or files[0].name!="dordiai-voices-0.13.1-dev.11.nvda-addon" or files[0].stat().st_size!=1992938157:
+              raise RuntimeError("Expected exact immutable source11 addon")
+          with files[0].open("rb") as stream:digest=hashlib.file_digest(stream,"sha256").hexdigest()
+          if digest!=os.environ["CORE_SHA256"]:raise RuntimeError("Immutable source11 archive hash differs")
+          print(json.dumps({"source_run":45029834209,"source_commit":"84ca83e36e729fece88fc56af078a0de826d9db3",
+              "archive":files[0].name,"sha256":digest,"bytes":files[0].stat().st_size,"mode":os.environ["NVDA_PROBE_MODE"]}),flush=True)
+      - name: Probe existing audio endpoints
+        run: python dordiai-voices/tools/setup_audio_endpoint.py --output dordiai-voices/windows-results/audio --ephemeral-ci --start-existing-services
+        continue-on-error: true
+      - name: Real fresh owned NVDA source11 integration
+        shell: python
+        run: |
+          import json,os,pathlib,subprocess,sys
+          root=pathlib.Path("dordiai-voices")
+          output=root/"windows-results/nvda"
+          mode=os.environ["NVDA_PROBE_MODE"]
+          tool=("windows_nvda_native_descriptor_probe.py" if mode=="descriptor-corruption"
+                else "windows_nvda_membership_integration_probe.py")
+          command=[sys.executable,str(root/"tools"/tool),"--addon",
+              str(root/"dist/dordiai-voices-0.13.1-dev.11.nvda-addon"),"--output",str(output),"--timeout","600"]
+          if mode=="normal":command.append("--fatal-recovery-probe")
+          elif mode=="typing":command.append("--typing-probe")
+          elif mode=="ru-missing":command.append("--required-resource-recovery-probe")
+          audio=root/"windows-results/audio/audio-endpoint.json"
+          headless=audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after")==0
+          if headless:command.append("--headless-ui-probe")
+          completed=subprocess.run(command,check=False)
+          if completed.returncode==2 and headless:
+              report=json.loads((output/"windows-nvda-probe.json").read_text(encoding="utf-8"))
+              allowed={"windows_audio_output_enumeration","physical_audio_output"}
+              unexpected=[row for doc in (report,report.get("probe",{})) for row in doc.get("checks",[])
+                  if row.get("status")!="passed" and not(row.get("status")=="blocked" and row.get("name") in allowed)]
+              if (report.get("status")!="partial" or unexpected or
+                  report.get("recording_pcm_sink_test_double") is not True or
+                  report.get("physical_audio_verified") is not False or report.get("product_ready") is not False):
+                  raise RuntimeError("Actual source11 integration failed: "+json.dumps(unexpected))
+              print("Actual NVDA functional checks passed; explicit output double leaves WavePlayer/physical/acoustic blocked.",flush=True)
+          elif completed.returncode:
+              raise subprocess.CalledProcessError(completed.returncode,command)
+          if mode=="descriptor-corruption":
+              cleanup=json.loads((output/"native-descriptor-restoration.json").read_text(encoding="utf-8"))
+              if (cleanup.get("status")!="passed" or cleanup.get("sha256")!="2de5611c384e933e19d1cdf5fda37f17bd5c4b7602d09964f53fdb7280877459" or
+                  cleanup.get("mapped_binary_modified_or_renamed") is not False):
+                  raise RuntimeError("Owned descriptor exact restoration not proved")
+      - name: Collect bounded diagnostics
+        if: always()
+        run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
+      - name: Preserve exact engineering JSON receipts
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/windows-evidence")
+          files={}
+          for path in sorted(root.rglob("*.json")):
+              raw=path.read_bytes()
+              if len(raw)>4*1024*1024:raise ValueError("Report exceeds quota")
+              files[path.relative_to(root).as_posix()]={"sha256":hashlib.sha256(raw).hexdigest(),
+                  "size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}
+              document=json.loads(raw)
+              if path.name=="nvda-probe.json":
+                  native=document.get("native_membership",{})
+                  print("SOURCE11_NATIVE_MANAGER "+json.dumps({key:native.get(key) for key in ("lookup_timings","statistics_after","scope")}),flush=True)
+                  for key in ("native_descriptor_recovery","required_resource_recovery","actual_typing"):
+                      row=document.get(key)
+                      if row is not None:print("SOURCE11_"+key.upper()+" "+json.dumps(row,ensure_ascii=True),flush=True)
+                  print("SOURCE11_NONPASSING "+json.dumps([row for row in document.get("checks",[]) if row.get("status")!="passed"]),flush=True)
+          document={"format":"dordiai-exact-source11-nvda-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "core_run_id":45029834209,"core_archive_sha256":os.environ["CORE_SHA256"],
+              "mode":os.environ["NVDA_PROBE_MODE"],"scope":"Exact engineering evidence; never acoustic or physical acceptance","files":files}
+          encoded=json.dumps(document,sort_keys=True,ensure_ascii=True,separators=(",",":")).encode()
+          if len(encoded)>16*1024*1024:raise ValueError("JSON bundle exceeds quota")
+          compressed=gzip.compress(encoded,mtime=0)
+          payload=base64.b64encode(compressed).decode("ascii")
+          if len(payload)>1024*1024:raise ValueError("Compressed bundle exceeds log quota")
+          chunks=[payload[i:i+24000] for i in range(0,len(payload),24000)]
+          print("DORDIAI_SOURCE11_NVDA_JSON_META "+json.dumps({"encoding":"gzip+base64","chunks":len(chunks),
+              "json_sha256":hashlib.sha256(encoded).hexdigest(),"gzip_sha256":hashlib.sha256(compressed).hexdigest(),
+              "json_size_bytes":len(encoded)}),flush=True)
+          for i,part in enumerate(chunks):print("DORDIAI_SOURCE11_NVDA_GZIP_B64_%03d "%i+part,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-source11-nvda-${{ matrix.mode }}
+          path: dordiai-voices/windows-evidence
+          if-no-files-found: warn
+          retention-days: 30
