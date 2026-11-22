@@ -116,6 +116,14 @@ jobs:
           } finally {
             Remove-NetFirewallRule -Name $rule -ErrorAction Continue
           }
+      - name: Preserve exact shared resource inventory even after stage failure
+        if: always()
+        shell: python
+        run: |
+          import os,pathlib,shutil
+          if os.environ.get('AR29_STAGE'):
+              p=pathlib.Path(os.environ['AR29_STAGE'])/'core12/ar29-shared-resource-inventory.json'
+              if p.is_file():shutil.copyfile(p,'dordiai-voices/ar29-results/shared-resource-inventory.json')
       - name: Print exact bounded result with no listening or NVDA claims
         if: always()
         shell: python

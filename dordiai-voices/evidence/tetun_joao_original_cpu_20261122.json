@@ -1,0 +1,806 @@
+{
+  "actual_config_speakers_executed": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "all_original_model_config_card_and_primary_source_unchanged": true,
+  "cases": [
+    {
+      "generation_seconds": 0.01993220299937093,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.050494608931081,
+      "speaker_id": 0,
+      "speaker_label": "Agostinho",
+      "text": "hau",
+      "wave": {
+        "file": "speaker0-hau.wav",
+        "peak": 0.597726583480835,
+        "raw_float_sha256": "98b4772d4e73d1e9dd6d4f7ba7c5eb5c269e0b55ff6171b3b573a773c700ced9",
+        "rms": 0.0932263731956482,
+        "samples": 8704,
+        "seconds": 0.3947392290249433,
+        "sha256": "d0e4c85806cf6b3ed3ebc227392f7fdc1c89630918a5e429dcd41702dc172f52",
+        "size_bytes": 17452
+      }
+    },
+    {
+      "generation_seconds": 0.017757397999957902,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.044985136247595564,
+      "speaker_id": 0,
+      "speaker_label": "Agostinho",
+      "text": "au",
+      "wave": {
+        "file": "speaker0-au.wav",
+        "peak": 0.4280468225479126,
+        "raw_float_sha256": "961aeb58669dfdfef4f52f01cd851ad44d6437bd23a3d8c4d853b6928a30cf07",
+        "rms": 0.05270040035247803,
+        "samples": 8704,
+        "seconds": 0.3947392290249433,
+        "sha256": "b7a8696f44feaeeac3ee14f749b9508d384ed39d0fca649e93e5b5c360984e75",
+        "size_bytes": 17452
+      }
+    },
+    {
+      "generation_seconds": 0.052655091000815446,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.041230282548578856,
+      "speaker_id": 0,
+      "speaker_label": "Agostinho",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker0-phrase.wav",
+        "peak": 0.6042158007621765,
+        "raw_float_sha256": "bbb4c46513f336a880f3f2cf93a893441a8b7dd2eded310839e08012cea1eb56",
+        "rms": 0.079905666410923,
+        "samples": 28160,
+        "seconds": 1.2770975056689342,
+        "sha256": "3f12637abca3bdb89622d103dc5d231f9a5d9a3ac26dfed9a9f098e20d238d43",
+        "size_bytes": 56364
+      }
+    },
+    {
+      "generation_seconds": 0.021855412000149954,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.04377832799812014,
+      "speaker_id": 1,
+      "speaker_label": "Estefanus",
+      "text": "hau",
+      "wave": {
+        "file": "speaker1-hau.wav",
+        "peak": 0.5927582383155823,
+        "raw_float_sha256": "466d629fd892aa294049b20995d76dfa25097e2bea2c86afcff5d8700f48f110",
+        "rms": 0.1196407824754715,
+        "samples": 11008,
+        "seconds": 0.4992290249433107,
+        "sha256": "bec608da7a05d62ce81b2ab52de8ed9b44e003114aaca19905cc3692bdee59a2",
+        "size_bytes": 22060
+      }
+    },
+    {
+      "generation_seconds": 0.016784321000159252,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.04985106116022515,
+      "speaker_id": 1,
+      "speaker_label": "Estefanus",
+      "text": "au",
+      "wave": {
+        "file": "speaker1-au.wav",
+        "peak": 0.6704935431480408,
+        "raw_float_sha256": "22f49c7daed7c20d26c84837cf9285c5ee3627039a0f16dfb6d7272c1a2e7ccf",
+        "rms": 0.1330413967370987,
+        "samples": 7424,
+        "seconds": 0.33668934240362813,
+        "sha256": "b753f629a53ecf77adcfdc77ae326fff84ce8b229910ca4c1636acb4cdf86647",
+        "size_bytes": 14892
+      }
+    },
+    {
+      "generation_seconds": 0.04219629100043676,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.03746891980346451,
+      "speaker_id": 1,
+      "speaker_label": "Estefanus",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker1-phrase.wav",
+        "peak": 0.727371871471405,
+        "raw_float_sha256": "b5c7e87d1ad8cf5e862f62e67e3265d9957d05922bb083cc462a06fc506e95ca",
+        "rms": 0.1863889992237091,
+        "samples": 24832,
+        "seconds": 1.1261678004535147,
+        "sha256": "b850e76b901df0c02be35bf2134795d38ab4f1461111d8c5d1b1c464a58889d5",
+        "size_bytes": 49708
+      }
+    },
+    {
+      "generation_seconds": 0.0313529129998642,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.036006861023281544,
+      "speaker_id": 2,
+      "speaker_label": "Paulino",
+      "text": "hau",
+      "wave": {
+        "file": "speaker2-hau.wav",
+        "peak": 0.8227226734161377,
+        "raw_float_sha256": "365c7a4f86775b29970954175f6a8bffd9ad7c96a1bba95847c69f4e2e124a72",
+        "rms": 0.08662492781877518,
+        "samples": 19200,
+        "seconds": 0.8707482993197279,
+        "sha256": "5f82eac03369f9bfe2cbe1257477a873d3085fa88977aae9544a194a81ea2b5b",
+        "size_bytes": 38444
+      }
+    },
+    {
+      "generation_seconds": 0.042531487000815105,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.03241908491316278,
+      "speaker_id": 2,
+      "speaker_label": "Paulino",
+      "text": "au",
+      "wave": {
+        "file": "speaker2-au.wav",
+        "peak": 0.6285080313682556,
+        "raw_float_sha256": "7e39827159903862c8534c03593a4638ac0c8a842369917954e96a9faab8500b",
+        "rms": 0.05617555230855942,
+        "samples": 28928,
+        "seconds": 1.3119274376417234,
+        "sha256": "5a37ed20298b69655533c82ad3237385a3e3e2b9111940adcececee55d4bdaa9",
+        "size_bytes": 57900
+      }
+    },
+    {
+      "generation_seconds": 0.06414542499987874,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.03784264290580389,
+      "speaker_id": 2,
+      "speaker_label": "Paulino",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker2-phrase.wav",
+        "peak": 0.6693336367607117,
+        "raw_float_sha256": "67b541b383f26f2635c24d189f3dad658ac1bcf2412ee19096cbc8bfcccc8e07",
+        "rms": 0.08387601375579834,
+        "samples": 37376,
+        "seconds": 1.6950566893424037,
+        "sha256": "9d4cb8d12033fe7961bb912f465129f8b37cd5ab5f88e0101f5a0207b0083619",
+        "size_bytes": 74796
+      }
+    },
+    {
+      "generation_seconds": 0.030420388000493404,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.034028487997711014,
+      "speaker_id": 3,
+      "speaker_label": "",
+      "text": "hau",
+      "wave": {
+        "file": "speaker3-hau.wav",
+        "peak": 0.4787804186344147,
+        "raw_float_sha256": "63069f95b31398126d53a96f11d28b6382bd95e9a780a04305b3b0fdbbdc33eb",
+        "rms": 0.06267055869102478,
+        "samples": 19712,
+        "seconds": 0.893968253968254,
+        "sha256": "908784d17459e0c27ea08f979b9e5c2e9f6f4f26d3233ec785804adc8db208f1",
+        "size_bytes": 39468
+      }
+    },
+    {
+      "generation_seconds": 0.017181889999847044,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.05103187964663622,
+      "speaker_id": 3,
+      "speaker_label": "",
+      "text": "au",
+      "wave": {
+        "file": "speaker3-au.wav",
+        "peak": 0.6669310927391052,
+        "raw_float_sha256": "c7cb872583027fd60e8dd1360b0d8365ec80189ca90f6ce36fd2f6c22bc6995c",
+        "rms": 0.12260023504495621,
+        "samples": 7424,
+        "seconds": 0.33668934240362813,
+        "sha256": "782c2ba290db9c9a7d33c8eb42becf14b71386c0e09842a3d3b4926432cf2e22",
+        "size_bytes": 14892
+      }
+    },
+    {
+      "generation_seconds": 0.042879240000729624,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.03388357375344353,
+      "speaker_id": 3,
+      "speaker_label": "",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker3-phrase.wav",
+        "peak": 0.5680198669433594,
+        "raw_float_sha256": "745607d82fa9fbc52fda36353871af32f80a92ee49af2550dbf1f848ca7514ee",
+        "rms": 0.12587642669677734,
+        "samples": 27904,
+        "seconds": 1.2654875283446712,
+        "sha256": "963417146787ef9fc1b38d1a82ea8e6a6606bf34f579bb8bd0e9fea85e1d8fed",
+        "size_bytes": 55852
+      }
+    }
+  ],
+  "cpu_threads": 2,
+  "files": {
+    "MODEL_CARD": {
+      "sha256": "e4ba9ef903a42a22479707c39fd5807c315a12eb275f384ba5f2e45d4d412bed",
+      "size_bytes": 242
+    },
+    "tdt_TL-joao-medium.onnx": {
+      "sha256": "4584d1d2ec321944380239a7f416044b348e7f794ca0363193cdcebe7aed0270",
+      "size_bytes": 77055182
+    },
+    "tdt_TL-joao-medium.onnx.json": {
+      "sha256": "b67d8d1699af69dcf77dadb8a54349aa68a7277483fe5a4d5fff918199157c7c",
+      "size_bytes": 7172
+    }
+  },
+  "format": "dordiai-original-tetun-joao-cpu-probe",
+  "format_version": 1,
+  "language_inventory_increment": 0,
+  "load_seconds": 1.0906370210004752,
+  "native_pronunciation_verified": false,
+  "native_training_corpus_independently_verified": false,
+  "network_policy": {
+    "kernel": "libseccomp, errnoEPERM for socket/connect/bind/listen/accept/accept4/sendto/sendmsg",
+    "network_access_denied_before_native_imports": true,
+    "python_audit_guard": true
+  },
+  "nvda_verified": false,
+  "ordinary_letter_names_ready": false,
+  "original_pt_frontend_erases_native_initial_h_contrast": true,
+  "own_native_tetun_frontend_implemented": false,
+  "peak_rss_bytes": 235790336,
+  "primary_native_source": {
+    "authors": [
+      "C. Williams-van Klinken",
+      "J. Hajek",
+      "R. Nordlinger"
+    ],
+    "doi": "10.15144/PL-528",
+    "licence": "Online edition2015 CC-BY-SA4.0 per PDF footer; only short linguistic facts retained.",
+    "sha256": "b53d86db59c82153af7f163cab1ac9740905ccf92384d7df45f4037ff788c80e",
+    "size_bytes": 14960132,
+    "title": "Tetun Dili: A grammar of an East Timorese language",
+    "url": "https://openresearch-repository.anu.edu.au/server/api/core/bitstreams/59d52d21-1125-4d13-92b0-702c768236ad/content",
+    "visually_verified_pages": [
+      {
+        "fact": "h is a voiceless glottal fricative; intervocalic variants do not imply obligatory initial deletion.",
+        "pdf_page": 24,
+        "printed_page": 10
+      },
+      {
+        "fact": "au is bamboo.",
+        "pdf_page": 38,
+        "printed_page": 24
+      },
+      {
+        "fact": "Hau naran Maria. is example7.42a; hau is first-person singular.",
+        "pdf_page": 75,
+        "printed_page": 61
+      }
+    ],
+    "year": 2002
+  },
+  "product_integrated": false,
+  "publisher_declaration": {
+    "actual_config_speaker_count": 4,
+    "actual_speaker_id_map": {
+      "": 3,
+      "Agostinho": 0,
+      "Estefanus": 1,
+      "Paulino": 2
+    },
+    "dataset_url": "TBD",
+    "declared_native_standard": "Tetun Dili (tdt), not every Tetun variety",
+    "genuine_native_pronunciation_verified": false,
+    "language_inventory_increment": 0,
+    "native_training_evidence": "Publisher commit985bbb... reports >3k audios from3 different speakers; no independent corpus audit claimed.",
+    "original_frontend_language": "pt",
+    "product_integrated": false,
+    "stale_voices_json_not_authoritative": {
+      "actual_model_size_bytes": 77055182,
+      "registry_model_size_bytes": 63511038,
+      "registry_speakers": 1
+    },
+    "weights_licence": "TBD; the Space code MIT marker does not license model weights"
+  },
+  "readiness_barriers": [
+    "Publisher original pt frontend collapses genuine native hau/au inputs if measured flag true; output audio cannot restore a distinction missing from identical input IDs.",
+    "Training data URL and model weights licence remainTBD; do not infer model rights from the Space code MIT licence.",
+    "Native phone/stress fidelity, retained selected-profile projection and unchanged private Windows/NVDA interaction are unverified."
+  ],
+  "repository": "raphaelmerx/piper-voices",
+  "revision": "985bbb918a764710465f9df9afcdde5d86dd7b05",
+  "runtime": {
+    "numpy": "2.3.5",
+    "original_product_private_runtime_used": false,
+    "ort": "1.27.0",
+    "ort_native_binaries": [
+      {
+        "file": "libonnxruntime_providers_shared.so",
+        "sha256": "086ec1d5388f64153d9c63470d126693db9a182c8ce236d3a1119068471b8a0d",
+        "size_bytes": 14632
+      },
+      {
+        "file": "onnxruntime_pybind11_state.cpython-312-x86_64-linux-gnu.so",
+        "sha256": "5703f8e7b5f3185b088fcad623b59620f39d79b8b71c84b28d52285fc875ae23",
+        "size_bytes": 25252752
+      }
+    ],
+    "piper_tts": "1.4.1",
+    "product_private_runtime_modified": false,
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]"
+  },
+  "selected_profile_projection_verified": false,
+  "status": "actual-original-model-executed-but-native-frontend-unaccepted",
+  "weights_requantized": false,
+  "windows_verified": false,
+  "zero_noise_diagnostic": {
+    "au_raw_float_sha256": "f75db69ed3d6465171d87d663eb5880c9fe04fac121b3afd44769f8a4515a47d",
+    "hau_raw_float_sha256": "f75db69ed3d6465171d87d663eb5880c9fe04fac121b3afd44769f8a4515a47d",
+    "mode": "zero-noise diagnostic only; original default cases above remain unchanged",
+    "raw_waveforms_bit_identical": true,
+    "same_model_input_ids": true
+  }
+}

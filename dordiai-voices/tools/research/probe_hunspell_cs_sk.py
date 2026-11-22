@@ -80,6 +80,64 @@ def load_format():
     return module, fingerprint(path)
 
 
+def compact_memberships(output, sources, counts, fmt):
+    """Reuse the existing stdlib format and compare EVERY native-checked row."""
+    path = ROOT / "tools/build_native_word_membership.py"
+    spec = importlib.util.spec_from_file_location("_dordiai_cs_sk_membership_builder", path)
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+    inputs = output / "memberships.jsonl.gz"
+    pin = fingerprint(inputs)
+    expected_count = counts["cs"] + counts["sk"] - counts["shared"]
+
+    def records():
+        count, expanded = 0, 0
+        with gzip.open(inputs, "rb") as stream:
+            for line in stream:
+                expanded += len(line)
+                if len(line) > 4096 or expanded > 64 * 1024 * 1024:
+                    raise ValueError("Finite native membership stream exceeds bounds")
+                row = json.loads(line)
+                labels = row.get("labels")
+                if (set(row) != {"word", "labels"} or not isinstance(labels, list)
+                        or not labels or labels != sorted(set(labels))
+                        or not set(labels) <= {"cs", "sk"}):
+                    raise ValueError("Malformed native-checked membership row")
+                mask = sum(1 << index for index, code in enumerate(("cs", "sk")) if code in labels)
+                count += 1
+                if count > expected_count:
+                    raise ValueError("Finite source count exceeded")
+                yield row["word"].encode("utf-8"), mask
+        if count != expected_count or fingerprint(inputs) != pin:
+            raise ValueError("Native-checked membership source changed")
+
+    target = output / "native-word-cs-sk.bin"
+    result = builder.write_memberships(target, records(), codes=("cs", "sk"), source_metadata={
+        "source": SOURCE, "input_files": sources, "native_memberships": pin,
+        "all_inflections_enumerated": False, "source_scope": "Native-accepted finite dictionary-root candidates only"})
+    counts_after = {"cs": 0, "sk": 0, "shared": 0}
+    with fmt.MembershipLexicon(target, result["sha256"]) as reader:
+        compared = 0
+        for raw, mask in records():
+            expected = frozenset(code for index, code in enumerate(("cs", "sk")) if mask & (1 << index))
+            actual = reader.candidates(raw.decode("utf-8"))
+            if actual != expected:
+                raise ValueError("Full native source comparison differs after compaction")
+            for code in actual:
+                counts_after[code] += 1
+            counts_after["shared"] += len(actual) == 2
+            compared += 1
+        statistics = reader.statistics()
+    if counts_after != {key: counts[key] for key in counts_after}:
+        raise ValueError("Per-language native membership counts changed")
+    return {"artifact": result, "all_native_source_rows_compared": compared,
+            "all_memberships_equal": True, "per_language_counts": counts_after,
+            "stdlib_reader_closed": reader.statistics()["closed"],
+            "reader_statistics_before_close": statistics, "builder": fingerprint(path),
+            "runtime_third_party_library_required": False, "runtime_network_required": False,
+            "nvda_integrated": False}
+
+
 class NativeDictionaries:
     def __init__(self, library, directory):
         self.library_pin = fingerprint(library)
@@ -169,6 +227,7 @@ def run(directory, library, output):
             raise ValueError("Original inputs changed during the native experiment")
     finally:
         native.close()
+    compact = compact_memberships(output, before, counts, fmt)
     report = {"format": "dordiai-finite-cs-sk-native-dictionary-stem-experiment", "format_version": 1,
               "source": SOURCE, "source_revision": REVISION, "input_files": before,
               "source_licences": {
@@ -178,6 +237,7 @@ def run(directory, library, output):
               "library": {"path": str(library), **native.library_pin},
               "platform": platform.platform(), "reader_format": format_pin,
               "source_counts": source_counts, "candidate_union": len(words), "counts": counts,
+              "compact": compact,
               "examples": examples, "seconds": time.perf_counter() - started,
               "output": fingerprint(output / "memberships.jsonl.gz"),
               "both_native_dictionaries_check_every_candidate": True,

@@ -10,7 +10,8 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "source/0.12.2/kx47Runtime/native_membership_runtime.py"
+BASE = ROOT / "experiments/native-resource-path-cache/baseline_source12.py"
+HELPERS = ROOT / "source/0.12.2/kx47Runtime"
 CANDIDATE = ROOT / "experiments/native-resource-path-cache/native_membership_runtime.py"
 
 
@@ -171,7 +172,7 @@ class CandidateOwnedResourceTests(integration.OwnedResourceTests):
         folder = Path(self.staging.name)
         shutil.copyfile(CANDIDATE, folder / "native_membership_runtime.py")
         for name in ("host_paths.py", "windows_runtime.py"):
-            shutil.copyfile(BASE.with_name(name), folder / name)
+            shutil.copyfile(HELPERS / name, folder / name)
         own = load("resource_path_cache_lifecycle_" + str(id(self)), folder / "native_membership_runtime.py")
         replacement = patch.object(integration, "manager", own)
         replacement.start()

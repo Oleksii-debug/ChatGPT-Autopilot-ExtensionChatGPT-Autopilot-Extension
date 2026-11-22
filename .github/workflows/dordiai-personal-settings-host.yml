@@ -1,0 +1,84 @@
+name: Actual frozen NVDA personal settings APIs
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-settings-host:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[personal-settings-host]')
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - name: Preserve exact reviewed source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Check bounded configuration-only probe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m unittest discover -s dordiai-voices/tests -p "test_windows_nvda_personal_settings_probe.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m py_compile dordiai-voices/tools/windows_nvda_personal_settings_probe.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify unchanged official bootstrap controller and candidate probe
+        shell: python
+        run: |
+          import hashlib,pathlib
+          expected={
+              "tools/windows_nvda_probe.py":"ec3d93b5b6e3f92af70d0b989ca9e280db5a840f",
+              "tools/windows_nvda_personal_settings_probe.py":"5cd4fe98316a74197700b333e8f6f99344bb77a6"}
+          for name,digest in expected.items():
+              path=pathlib.Path("dordiai-voices")/name
+              if path.is_symlink() or not path.is_file() or path.stat().st_size>1024*1024:
+                  raise ValueError("Reviewed host probe file is not a bounded regular file")
+              raw=path.read_bytes()
+              if hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+b"\0"+raw).hexdigest()!=digest:
+                  raise ValueError("Reviewed host probe bytes differ: "+name)
+      - name: Actual official frozen NVDA configuration and real profile APIs
+        run: >-
+          python dordiai-voices/tools/windows_nvda_personal_settings_probe.py
+          --candidate-dir dordiai-voices/candidates/personal-language/host-inputs
+          --runtime-dir dordiai-voices/candidates/personal-language/host-inputs
+          --output dordiai-voices/windows-personal-settings
+          --timeout 180
+      - name: Verify and preserve exact configuration-only receipts
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path("dordiai-voices/windows-personal-settings")
+          files={}
+          for path in sorted(root.glob("*.json")):
+              raw=path.read_bytes()
+              if len(raw)>1024*1024:raise ValueError("Configuration report exceeds quota")
+              files[path.name]={"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),
+                  "source_base64":base64.b64encode(raw).decode("ascii")}
+              if path.name=="host-probe.json":
+                  document=json.loads(raw)
+                  print("PERSONAL_SETTINGS_ACTUAL_API "+json.dumps(document,ensure_ascii=True),flush=True)
+          document={"format":"dordiai-exact-personal-settings-host-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "product_archive_used":False,"scope":"Actual frozen settings/profile APIs only; metadata fixtures, no models or speech",
+              "files":files}
+          encoded=json.dumps(document,sort_keys=True,ensure_ascii=True,separators=(",",":")).encode("utf-8")
+          compressed=gzip.compress(encoded,mtime=0)
+          payload=base64.b64encode(compressed).decode("ascii")
+          if len(payload)>1024*1024:raise ValueError("Exact settings receipt exceeds log quota")
+          print("DORDIAI_PERSONAL_SETTINGS_JSON_META "+json.dumps({"encoding":"gzip+base64",
+              "json_sha256":hashlib.sha256(encoded).hexdigest(),"gzip_sha256":hashlib.sha256(compressed).hexdigest()}),flush=True)
+          for i in range(0,len(payload),24000):
+              print("DORDIAI_PERSONAL_SETTINGS_GZIP_B64_%03d "%(i//24000)+payload[i:i+24000],flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-actual-personal-settings-host
+          path: dordiai-voices/windows-personal-settings
+          if-no-files-found: warn
+          retention-days: 30

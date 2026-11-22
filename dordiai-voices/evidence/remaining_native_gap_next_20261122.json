@@ -1,0 +1,230 @@
+{
+  "format": "dordiai-remaining-native-gap-bounded-assessment",
+  "format_version": 1,
+  "checked_at": "2026-11-22",
+  "production_modified": false,
+  "language_inventory_increment": 0,
+  "scope": [
+    "tet",
+    "nr",
+    "aa",
+    "comorian",
+    "ho",
+    "to",
+    "ito",
+    "cnr"
+  ],
+  "checked_primary_inventories": [
+    {
+      "repository": "espeak-ng/espeak-ng",
+      "revision": "ee9fa7cc4704d683020526f47a9655f14c8d5f4c",
+      "path": "docs/languages.md",
+      "blob": "ba3b79168543890911543182c4e171d34047ebbb",
+      "observation": "No exact native entries for these eight gaps in this checked official list. This is not a claim that no custom engine or future implementation can exist."
+    },
+    {
+      "repository": "RHVoice/RHVoice",
+      "revision": "8a819d0b481bb40c4c62f5293d1997e5918625c9",
+      "path": "data/languages",
+      "observed_names": [
+        "Albanian",
+        "Belarusian",
+        "Brazilian-Portuguese",
+        "Croatian",
+        "Czech",
+        "English",
+        "Esperanto",
+        "Georgian",
+        "Kyrgyz",
+        "Luxembourgish",
+        "Macedonian",
+        "Polish",
+        "Romanian",
+        "Russian",
+        "Serbian",
+        "Slovak",
+        "Spanish",
+        "Tatar",
+        "Ukrainian",
+        "Uzbek"
+      ],
+      "observation": "Checked current native language modules include Serbian/Croatian but no exact Montenegrin, and none of the other seven gaps. Do not relabel Serbian as cnr."
+    },
+    {
+      "repository": "k2-fsa/OmniVoice",
+      "revision": "c8c0a6257b9b652dc7d239df9d911dbb1f9dabdf",
+      "path": "docs/languages.md",
+      "blob": "ac4cfedc4cf33e0589952ccf9f49b87bf970bbaf",
+      "sha256": "905385ab8991620a9cd05fc63166f44ef9b9b2130222ea81c2cda02b9df03109",
+      "observation": "Exact tet/tdt/nbl/aar/hmo/ton/ito/cnr/zdj/wni/swb/wlc codes were not listed in this original primary training table; unrelated-language prompts would not establish native support."
+    }
+  ],
+  "preferred_next": {
+    "selected_code": "tet",
+    "actual_publisher_standard": "Tetun Dili/tdt, not an automatic full tet/Terik/group claim",
+    "repository": "raphaelmerx/piper-voices",
+    "revision": "985bbb918a764710465f9df9afcdde5d86dd7b05",
+    "model_sha256": "4584d1d2ec321944380239a7f416044b348e7f794ca0363193cdcebe7aed0270",
+    "model_size_bytes": 77055182,
+    "primary_training_declaration_url": "https://huggingface.co/raphaelmerx/piper-voices/commit/985bbb918a764710465f9df9afcdde5d86dd7b05",
+    "publisher_declares": ">3k audios from3 recording speakers; model card calls it a Tetun Dili fine-tune of Portuguese tugao.",
+    "actual_architecture": {
+      "vocabulary_embedding": {
+        "name": "enc_p.emb.weight",
+        "dtype": "float32",
+        "shape": [
+          256,
+          192
+        ],
+        "sha256": "9d3aa1e541cc17be0766eb18b063571806a7a92f4cca9c92d585be0ef98bd214"
+      },
+      "speaker_embedding": {
+        "dtype": "float32",
+        "shape": [
+          4,
+          512
+        ]
+      },
+      "num_speakers_config": 4,
+      "registry_stale_speakers": 1,
+      "registry_stale_model_size_bytes": 63511038,
+      "unnamed_id3_language_identity_unverified": true
+    },
+    "actual_isolated_experiment": {
+      "platform": "Linux host research only, not packaged private Windows",
+      "ort": "1.27.0",
+      "piper_tts": "1.4.1",
+      "network": "Kernel seccomp denies sockets before native imports; extra Python audit guard; ORT telemetry disabled and native binary marker inspection.",
+      "original_default_cases": 12,
+      "actual_speaker_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "all_outputs_finite_nonzero": true,
+      "load_seconds": 1.093758249999155,
+      "warm_hau_seconds": [
+        0.02722793799966894,
+        0.019771201999901677,
+        0.02858841799934453,
+        0.025450289000218618
+      ],
+      "bounded_own_lexical_cases": 8,
+      "bounded_own_lexical_seconds": [
+        0.01817015899996477,
+        0.017892361000122037,
+        0.018266705000314687,
+        0.019598361999669578,
+        0.017140828000265174,
+        0.016475946999889857,
+        0.019429295999543683,
+        0.019655138000416628
+      ],
+      "peak_rss_bytes": 359763968,
+      "all_original_weights_unchanged": true,
+      "requantized": false
+    },
+    "measured_barrier": {
+      "original_frontend": "pt",
+      "native_hau_and_au_phone_ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "same_ids": true,
+      "zero_noise_waveforms_bit_identical": true,
+      "meaning": "Original text frontend removes a genuine native initial-h distinction before the model sees it."
+    },
+    "bounded_frontend_work": {
+      "module": "tools/research/tetun_joao_frontend.py",
+      "primary_doi": "10.15144/PL-528",
+      "source_sha256": "b53d86db59c82153af7f163cab1ac9740905ccf92384d7df45f4037ff788c80e",
+      "exact_complete_lexical_forms": 8,
+      "stress_homographs_reject_without_explicit_accent": true,
+      "unknown_words_and_ordinary_names_reject": true,
+      "foreign_text_frontend_invoked_for_these_cases": false,
+      "added_vocabulary_ids": 0,
+      "existing_h_token_changes_numeric_output": true,
+      "correct_native_h_frication_confirmed": false,
+      "learned_native_meaning_of_existing_rows_confirmed": false,
+      "unreleased_stop_surface_modifier_token_present": false
+    },
+    "source_identity_barriers": {
+      "model_card_dataset_url": "TBD",
+      "model_card_weights_licence": "TBD",
+      "space_source_MIT_does_not_license_weights": true,
+      "author_tetun_voice_dataset": {
+        "repository": "raphaelmerx/tetun-voice",
+        "revision": "24d3cd92323d0b33d3b177d176c2859e621b3b90",
+        "actual_files": [
+          ".gitattributes"
+        ],
+        "training_recordings_present": false
+      },
+      "native_training_corpus_independently_verified": false
+    },
+    "next_concrete_action": "Evaluate existing-phone output against genuine native primary listening references, then unchanged private Windows+actual retained-profile conversion if phonetic gates pass. Expand own native word/phonology coverage only with sources; do not ship the original pt frontend or invent missing vocabulary.",
+    "readiness": "Fast original model execution and eight existing-ID native lexical diagnostics proven; pronunciation, actual training corpus/weights rights, general Tetun frontend, retained-profile projection, Windows/NVDA and ordinary names remain unaccepted."
+  },
+  "other_gaps": [
+    {
+      "code": "to",
+      "next_priority": 2,
+      "existing_evidence": "evidence/tongan_p1_actual_45035136469.json and native_rule_gap_frontends_20261122.json",
+      "feasible_direction": "Own source-backed Tongan phoneme/config path on disclosed shared acoustic primitives, then exact same-carrier calibration and selected-profile conversion.",
+      "barrier": "Existing Spanish acoustic-table research is not a complete native Tongan voice/config acceptance. Native mora/nucleus, explicit stress and ordinary names need actual native/listener and Windows/NVDA checks. No related-language text frontend may count."
+    },
+    {
+      "code": "ho",
+      "next_priority": 3,
+      "existing_evidence": "evidence/hiri_motu_primary_frontend_20261122.json",
+      "current_fact": "26 primary lexical stress forms,15 strict semantic goldens,34 actual tests with exact1974/1977 PDFs; no acoustic carrier yet.",
+      "barrier": "Must represent native gʷ, unaspirated stops and selected β/ɾ/lexical-l contrasts; stress/vowel-grouping unknowns stop, never Motu/meu alias. Ordinary names unavailable."
+    },
+    {
+      "code": "aa",
+      "existing_evidence": "evidence/afar_native_candidate_verified.json and afar_deployment_candidates_20261122.json",
+      "current_fact": "Actual original Afar VoxCPM0.5B CPU evidence already exists; no duplicate large acquisition was performed here.",
+      "barrier": "Prior evaluated FP32 model has multi-GB deployment/latency burden. GGUF/ONNX conversion and native phonology require their own exact-weight/actual speed proof; don't equate a generic segmental map with full prosody."
+    },
+    {
+      "code": "nr",
+      "primary_source": "https://repo.sadilar.org/items/00e3400b-d1cc-4f65-b874-d803450af80a/full",
+      "source_identity": "Lwazi isiNdebele TTS corpus, iso nbl, official Meraka/CSIR release, not Northern Ndebele nde.",
+      "source_kind": "Corpus with orthographic/phonemic annotations, not a ready inference model",
+      "licence": "CC-BY-NC-ND3.0 South Africa per institutional metadata",
+      "barrier": "A corpus listing does not supply a deployable native model. No exact nr voice found in checked eSpeak/RHVoice inventories; nde/nd substitution remains invalid. Dataset and resulting-use rights must not be silently inferred."
+    },
+    {
+      "code": "cnr",
+      "primary_repository": "Balkansmedia/tts-ai-",
+      "revision": "05ea346695d3a50e56d1f07162a1ed3f33ea9997",
+      "readme_blob": "596a910283ce3a7da15ae5aac4fc8d5fc3d52415",
+      "observation": "Primary README says actual SpeechT5 training took Croatian VoxPopuli; Montenegrin/Serbian/Bosnian collection is a later plan.",
+      "barrier": "That advertised BCSM project is not verified native Montenegrin training. No cnr voice in checked native engine inventories; Serbian/Croatian alias is not support. Native ś/ź and lexical prosody still require authentic resources."
+    },
+    {
+      "code": "comorian",
+      "barrier": "The selected group needs an explicit authentic named variety and native phonology/data. Exact swb/zdj/wni/wlc public MMS model metadata requests returned401 in this bounded check, which is not proof of global nonexistence. Swahili or a different undisclosed Comorian variety cannot be silently relabeled."
+    },
+    {
+      "code": "ito",
+      "barrier": "No Itonama entry in the checked original Omni/eSpeak/RHVoice inventories; no verified compact public acoustic checkpoint was acquired. Begin with authentic Itonama phonology/lexicon rather than a Bolivia/neighbor-language voice alias. This is a bounded search result, not an impossibility claim."
+    }
+  ],
+  "no_promotion": {
+    "product_integrated": false,
+    "language_inventory_increment": 0,
+    "native_pronunciation_accepted": false,
+    "ordinary_names_accepted": false,
+    "windows_private_acceptance": false,
+    "nvda_acceptance": false
+  }
+}

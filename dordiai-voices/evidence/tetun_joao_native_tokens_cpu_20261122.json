@@ -1,0 +1,1751 @@
+{
+  "actual_config_speakers_executed": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "all_original_model_config_card_and_primary_source_unchanged": true,
+  "bounded_native_lexical_diagnostics": [
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.01817015899996477,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        120,
+        0,
+        20,
+        0,
+        14,
+        0,
+        30,
+        0,
+        18,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "háre",
+        "gloss": "uncooked rice",
+        "input": "háre",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "ˈ",
+          "h",
+          "a",
+          "r",
+          "e"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": false,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 10,
+        "stress_syllable": 0,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-0.wav",
+        "peak": 0.20997081696987152,
+        "raw_float_sha256": "01546b8ef2abaae0c81ccd5ee5c8adfcd0b9205bcf8c45f20834fa35c6dbffbf",
+        "rms": 0.02294759452342987,
+        "samples": 8448,
+        "seconds": 0.3831292517006803,
+        "sha256": "d7791b5d1f4c1cc37d863e73cc9842e5df2d06d9edfc79b58894e82da933decc",
+        "size_bytes": 16940
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.017892361000122037,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        20,
+        0,
+        14,
+        0,
+        120,
+        0,
+        30,
+        0,
+        18,
+        0,
+        122,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "haré",
+        "gloss": "see",
+        "input": "haré",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "h",
+          "a",
+          "ˈ",
+          "r",
+          "e",
+          "ː"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": true,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 1,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-1.wav",
+        "peak": 0.14576105773448944,
+        "raw_float_sha256": "25052490dafaf0487c8de1c11dc4382ef1f626fb6f6ec8570d89aa3fffe1ec2e",
+        "rms": 0.0187771525233984,
+        "samples": 9472,
+        "seconds": 0.4295691609977324,
+        "sha256": "a1148723d295ce9bae15fddd82f063db1c7ecc79acf40b5fc66c549ed0d1b99b",
+        "size_bytes": 18988
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.018266705000314687,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        120,
+        0,
+        23,
+        0,
+        14,
+        0,
+        15,
+        0,
+        14,
+        0,
+        31,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "kábas",
+        "gloss": "cotton",
+        "input": "kábas",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "ˈ",
+          "k",
+          "a",
+          "b",
+          "a",
+          "s"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": false,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 0,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-2.wav",
+        "peak": 0.37496086955070496,
+        "raw_float_sha256": "a445f799bdd29fe3858f8ba6424d4df1b8351786552e2d56329ee01633d9777b",
+        "rms": 0.049305509775877,
+        "samples": 12288,
+        "seconds": 0.5572789115646258,
+        "sha256": "d71f3e62d32655578e95da65b05585849daaa82c2d42a1dc60fef66bc3132818",
+        "size_bytes": 24620
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.019598361999669578,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        23,
+        0,
+        14,
+        0,
+        120,
+        0,
+        15,
+        0,
+        14,
+        0,
+        122,
+        0,
+        31,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "kabás",
+        "gloss": "shoulder",
+        "input": "kabás",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "k",
+          "a",
+          "ˈ",
+          "b",
+          "a",
+          "ː",
+          "s"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": true,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 1,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-3.wav",
+        "peak": 0.4496701955795288,
+        "raw_float_sha256": "de74987a79a88f894062ff8e2bc2ca79cca36bed5a954a788e4eb0486e15c014",
+        "rms": 0.05929847061634064,
+        "samples": 11520,
+        "seconds": 0.5224489795918368,
+        "sha256": "98ec7061b44ae42192134e627ffd3f7efe8453c91a3d6209330d8fe6e60950dc",
+        "size_bytes": 23084
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.017140828000265174,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        120,
+        0,
+        23,
+        0,
+        14,
+        0,
+        15,
+        0,
+        18,
+        0,
+        26,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "káben",
+        "gloss": "marry",
+        "input": "káben",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "ˈ",
+          "k",
+          "a",
+          "b",
+          "e",
+          "n"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": false,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 0,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-4.wav",
+        "peak": 0.31120267510414124,
+        "raw_float_sha256": "8806c561d97ca66587428019955c65b3c93233c12ca844da2ea73edca11e5fad",
+        "rms": 0.036237932741642,
+        "samples": 10752,
+        "seconds": 0.4876190476190476,
+        "sha256": "1f8cc4503b70cff2699777a5def883ee9e5067c649868b66804e8cca8da0ede5",
+        "size_bytes": 21548
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.016475946999889857,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        23,
+        0,
+        14,
+        0,
+        120,
+        0,
+        15,
+        0,
+        18,
+        0,
+        122,
+        0,
+        26,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "kabén",
+        "gloss": "saliva",
+        "input": "kabén",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "k",
+          "a",
+          "ˈ",
+          "b",
+          "e",
+          "ː",
+          "n"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": true,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 1,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-5.wav",
+        "peak": 0.33568745851516724,
+        "raw_float_sha256": "1785bb2c9cfcedaafcc75ee1a0569f931b437d1d1541d0c8a0fc221a45af46d9",
+        "rms": 0.046256788074970245,
+        "samples": 9984,
+        "seconds": 0.4527891156462585,
+        "sha256": "c30419db642c0b91f159a61ba63fd79448208a7c45970db65a51570ea9b9fbea",
+        "size_bytes": 20012
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.019429295999543683,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        20,
+        0,
+        14,
+        0,
+        120,
+        0,
+        23,
+        0,
+        14,
+        0,
+        30,
+        0,
+        14,
+        0,
+        23,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "hakárak",
+        "gloss": "want",
+        "input": "hakárak",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "h",
+          "a",
+          "ˈ",
+          "k",
+          "a",
+          "r",
+          "a",
+          "k"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": false,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 1,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation.",
+          "Final voiceless stop generally unreleased in this source; no dedicated release token is silently invented."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-6.wav",
+        "peak": 0.34324848651885986,
+        "raw_float_sha256": "a978d554a27608cdc6269020b72c4ca7b960e447ba8d4c4890fad1ccd05f3e0e",
+        "rms": 0.03209120035171509,
+        "samples": 11520,
+        "seconds": 0.5224489795918368,
+        "sha256": "e4fa59e3d27d03f8052fc56b0c77c4e437b290f9d24eff679e33b33ed358adf1",
+        "size_bytes": 23084
+      }
+    },
+    {
+      "existing_ids_only": true,
+      "generation_seconds": 0.019655138000416628,
+      "mode": "zero-noise phonetic capability diagnostic, not publisher quality setting",
+      "native_phonetic_fidelity_verified": false,
+      "original_ids": [
+        1,
+        0,
+        23,
+        0,
+        14,
+        0,
+        120,
+        0,
+        25,
+        0,
+        21,
+        0,
+        38,
+        0,
+        14,
+        0,
+        2
+      ],
+      "original_pt_text_frontend_invoked": false,
+      "own_semantic_plan": {
+        "annotated_word": "kamíza",
+        "gloss": "shirt",
+        "input": "kamíza",
+        "language": "tdt",
+        "language_inventory_increment": 0,
+        "native_sound_meaning_confirmed_in_carrier": false,
+        "ordinary_character_name": false,
+        "phone_tokens": [
+          "k",
+          "a",
+          "ˈ",
+          "m",
+          "i",
+          "z",
+          "a"
+        ],
+        "primary_doi": "10.15144/PL-528",
+        "product_integrated": false,
+        "selected_final_lengthening": false,
+        "source_facts_sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+        "source_printed_page": 12,
+        "stress_syllable": 1,
+        "unvalidated_acoustic_constraints": [
+          "Surface aspiration/release and native identity of every token require acoustic/listener validation."
+        ]
+      },
+      "speaker_id": 0,
+      "wave": {
+        "file": "native-lexical-7.wav",
+        "peak": 0.37795552611351013,
+        "raw_float_sha256": "6b5d8399223f5bd7ce2c9b589b75597494a6665f11da4622a22ce37734b72b78",
+        "rms": 0.06007221341133118,
+        "samples": 12800,
+        "seconds": 0.5804988662131519,
+        "sha256": "bf857fef000bddc9e24b28ea165483622ba60c3483fb045fb0820b48ef902ad0",
+        "size_bytes": 25644
+      }
+    }
+  ],
+  "cases": [
+    {
+      "generation_seconds": 0.02722793799966894,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.07106723874203362,
+      "speaker_id": 0,
+      "speaker_label": "Agostinho",
+      "text": "hau",
+      "wave": {
+        "file": "speaker0-hau.wav",
+        "peak": 0.6249175071716309,
+        "raw_float_sha256": "dc13b2255084c156712bb609c0b89a08280174633436ee2b9d3668c0a2989664",
+        "rms": 0.09949667751789093,
+        "samples": 8448,
+        "seconds": 0.3831292517006803,
+        "sha256": "00752de0dce6cfe014b19f6d3995987da3b8e343e02c1ce1391d9a2b00550d1c",
+        "size_bytes": 16940
+      }
+    },
+    {
+      "generation_seconds": 0.02589843399982783,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.05069783999433626,
+      "speaker_id": 0,
+      "speaker_label": "Agostinho",
+      "text": "au",
+      "wave": {
+        "file": "speaker0-au.wav",
+        "peak": 0.43661385774612427,
+        "raw_float_sha256": "22678e5eb80dd37eb0a725ff75b6f9f92b6d3a8b754c17d70c0ecd86c6f89e8c",
+        "rms": 0.06978379935026169,
+        "samples": 11264,
+        "seconds": 0.5108390022675737,
+        "sha256": "2b124b48495021a62f02b65a1e42d5a19f5bc26832942b21ef388499ccbe7631",
+        "size_bytes": 22572
+      }
+    },
+    {
+      "generation_seconds": 0.054605291000370926,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.03919422742702405,
+      "speaker_id": 0,
+      "speaker_label": "Agostinho",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker0-phrase.wav",
+        "peak": 0.6355276107788086,
+        "raw_float_sha256": "924b66f127220d69c336e0135d8197fc066f4b5ab4989320066e3215590f981e",
+        "rms": 0.08458159118890762,
+        "samples": 30720,
+        "seconds": 1.3931972789115645,
+        "sha256": "cc3f3c50f2937bc15faa19ca7ecd25adc4b5bd7bb7f5e59849ea09859be7ae12",
+        "size_bytes": 61484
+      }
+    },
+    {
+      "generation_seconds": 0.019771201999901677,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.047304145409921006,
+      "speaker_id": 1,
+      "speaker_label": "Estefanus",
+      "text": "hau",
+      "wave": {
+        "file": "speaker1-hau.wav",
+        "peak": 0.7056821584701538,
+        "raw_float_sha256": "6633c42b12468decb7762d5d4ef814514b75a8a42b4a866210e05f854c4deb20",
+        "rms": 0.16177107393741608,
+        "samples": 9216,
+        "seconds": 0.4179591836734694,
+        "sha256": "0a0931d8f50be926c47584dab2fd912a720ca434319c97e325bbf9b4bf902c79",
+        "size_bytes": 18476
+      }
+    },
+    {
+      "generation_seconds": 0.024280786999952397,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.03945985800036486,
+      "speaker_id": 1,
+      "speaker_label": "Estefanus",
+      "text": "au",
+      "wave": {
+        "file": "speaker1-au.wav",
+        "peak": 0.6238328218460083,
+        "raw_float_sha256": "a3f717973ca4b07d8051cbb0c9254d00bd0f1c7f986bb691038f915a93fe9b7a",
+        "rms": 0.13597795367240906,
+        "samples": 13568,
+        "seconds": 0.615328798185941,
+        "sha256": "6cb8fce705d2ca902b0a5dc66e0182c386da938b3bf99b4dee46c632f8556d7a",
+        "size_bytes": 27180
+      }
+    },
+    {
+      "generation_seconds": 0.043454667999867524,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.03633857059303242,
+      "speaker_id": 1,
+      "speaker_label": "Estefanus",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker1-phrase.wav",
+        "peak": 0.8133684396743774,
+        "raw_float_sha256": "83625eba3fd6841b27c0ee2fcb3390203b32e50a27a636c46eff2ce6ee1cf120",
+        "rms": 0.1780223548412323,
+        "samples": 26368,
+        "seconds": 1.195827664399093,
+        "sha256": "67e3273c85629b409813c49e9d36296c59587fbf45f961be718f939d597e2e0e",
+        "size_bytes": 52780
+      }
+    },
+    {
+      "generation_seconds": 0.02858841799934453,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.03847501323764324,
+      "speaker_id": 2,
+      "speaker_label": "Paulino",
+      "text": "hau",
+      "wave": {
+        "file": "speaker2-hau.wav",
+        "peak": 0.9128009676933289,
+        "raw_float_sha256": "d2010c50f97b3c7128df164816f7655370c43dd8d4741317d0e3997f02ef9099",
+        "rms": 0.12665845453739166,
+        "samples": 16384,
+        "seconds": 0.7430385487528345,
+        "sha256": "5615d9bce35d0091751c25db89b51223847fa9b95d75cf44e083afb89a97ce9b",
+        "size_bytes": 32812
+      }
+    },
+    {
+      "generation_seconds": 0.0238785210003698,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.04197396269596254,
+      "speaker_id": 2,
+      "speaker_label": "Paulino",
+      "text": "au",
+      "wave": {
+        "file": "speaker2-au.wav",
+        "peak": 0.8907200694084167,
+        "raw_float_sha256": "71299f07ab88c2dc0fc81c7068685ca27afea2a16f5afc5d5de14fbd8bdee228",
+        "rms": 0.11668451130390167,
+        "samples": 12544,
+        "seconds": 0.5688888888888889,
+        "sha256": "5a753bc5d577dab2cc22185e1ce219f3b34c0a4bf0e105e05047ad1460b446dd",
+        "size_bytes": 25132
+      }
+    },
+    {
+      "generation_seconds": 0.03998408899951755,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.037031634847083425,
+      "speaker_id": 2,
+      "speaker_label": "Paulino",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker2-phrase.wav",
+        "peak": 0.7026240229606628,
+        "raw_float_sha256": "64efcece6fc2ddee7d43105be42c57a504c08079ae2e28ba8d752638ae32949e",
+        "rms": 0.10580751299858093,
+        "samples": 23808,
+        "seconds": 1.0797278911564625,
+        "sha256": "c0251bb81caf4a64ba308b9c162ce1bb7a3814bb1f00fc4d16c407780a575fa5",
+        "size_bytes": 47660
+      }
+    },
+    {
+      "generation_seconds": 0.025450289000218618,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.03914473161654719,
+      "speaker_id": 3,
+      "speaker_label": "",
+      "text": "hau",
+      "wave": {
+        "file": "speaker3-hau.wav",
+        "peak": 0.5285837650299072,
+        "raw_float_sha256": "3d05827208ff1db114bb9c78ca950aca60b54dcd0bc36b0562f9addc9fef1d02",
+        "rms": 0.07893054187297821,
+        "samples": 14336,
+        "seconds": 0.6501587301587302,
+        "sha256": "d621efd8b1a5fd90875c13820c812cb7551d4733453671be9ea387524353168d",
+        "size_bytes": 28716
+      }
+    },
+    {
+      "generation_seconds": 0.0188589769995815,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ"
+      ],
+      "rtf": 0.04512157582907683,
+      "speaker_id": 3,
+      "speaker_label": "",
+      "text": "au",
+      "wave": {
+        "file": "speaker3-au.wav",
+        "peak": 0.6111400127410889,
+        "raw_float_sha256": "d688c7f2231a2327c1dfcd637909a20950ec9615b819c066cebb1ad5693d3ade",
+        "rms": 0.10180185735225677,
+        "samples": 9216,
+        "seconds": 0.4179591836734694,
+        "sha256": "fe0559bcb62a5884ef622dcb021d3bedcc629853261c49f6f12e20ffd365446d",
+        "size_bytes": 18476
+      }
+    },
+    {
+      "generation_seconds": 0.054261242000393395,
+      "ids": [
+        1,
+        0,
+        120,
+        0,
+        14,
+        0,
+        100,
+        0,
+        3,
+        0,
+        26,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        50,
+        0,
+        141,
+        0,
+        44,
+        0,
+        3,
+        0,
+        25,
+        0,
+        121,
+        0,
+        50,
+        0,
+        92,
+        0,
+        120,
+        0,
+        21,
+        0,
+        119,
+        0,
+        50,
+        0,
+        10,
+        0,
+        2
+      ],
+      "original_default_noise": {
+        "length_scale": 1,
+        "noise_scale": 0.667,
+        "noise_w": 0.8
+      },
+      "original_pt_phonemes": [
+        "ˈ",
+        "a",
+        "ʊ",
+        " ",
+        "n",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "ɐ",
+        "̃",
+        "ŋ",
+        " ",
+        "m",
+        "ˌ",
+        "ɐ",
+        "ɾ",
+        "ˈ",
+        "i",
+        "ʲ",
+        "ɐ",
+        "."
+      ],
+      "rtf": 0.03514040137772187,
+      "speaker_id": 3,
+      "speaker_label": "",
+      "text": "Hau naran Maria.",
+      "wave": {
+        "file": "speaker3-phrase.wav",
+        "peak": 0.6838012933731079,
+        "raw_float_sha256": "1bdfd6f7061954bf867f43770c3d86316d6e3b8201a23d55778babc2371d110c",
+        "rms": 0.12052976340055466,
+        "samples": 34048,
+        "seconds": 1.5441269841269842,
+        "sha256": "385a0dd4d79598e564ed514e690d2fe1a17bd3a60bb3f695fd3b73ceeb37c8a2",
+        "size_bytes": 68140
+      }
+    }
+  ],
+  "cpu_threads": 2,
+  "existing_h_token_diagnostic": {
+    "control": "synthetic deleted-h control, not asserted to be a second lexical native word",
+    "correct_native_h_frication_confirmed": false,
+    "distinct_input_ids": true,
+    "existing_h_id": [
+      20
+    ],
+    "interpretation": "Numerical use of existing h row only; no proof of learned native phonetic meaning.",
+    "native_h_wave": {
+      "file": "existing-h-token.wav",
+      "peak": 0.20997081696987152,
+      "raw_float_sha256": "01546b8ef2abaae0c81ccd5ee5c8adfcd0b9205bcf8c45f20834fa35c6dbffbf",
+      "rms": 0.02294759452342987,
+      "samples": 8448,
+      "seconds": 0.3831292517006803,
+      "sha256": "d7791b5d1f4c1cc37d863e73cc9842e5df2d06d9edfc79b58894e82da933decc",
+      "size_bytes": 16940
+    },
+    "outputs_bit_identical": false,
+    "source_native_form": "háre, uncooked rice, PL528printed10",
+    "synthetic_hless_control_wave": {
+      "file": "synthetic-hless-control.wav",
+      "peak": 0.2075597643852234,
+      "raw_float_sha256": "5a155972e8dbe0639a446059e3a3ab47ff0781addde6aeb4b82f546474fe29f0",
+      "rms": 0.022011253982782364,
+      "samples": 8192,
+      "seconds": 0.37151927437641724,
+      "sha256": "7ddb4af5d63f4f8557946477999e5c819b779a2d187a9a0f6deb81faf006bfe4",
+      "size_bytes": 16428
+    }
+  },
+  "files": {
+    "MODEL_CARD": {
+      "sha256": "e4ba9ef903a42a22479707c39fd5807c315a12eb275f384ba5f2e45d4d412bed",
+      "size_bytes": 242
+    },
+    "tdt_TL-joao-medium.onnx": {
+      "sha256": "4584d1d2ec321944380239a7f416044b348e7f794ca0363193cdcebe7aed0270",
+      "size_bytes": 77055182
+    },
+    "tdt_TL-joao-medium.onnx.json": {
+      "sha256": "b67d8d1699af69dcf77dadb8a54349aa68a7277483fe5a4d5fff918199157c7c",
+      "size_bytes": 7172
+    }
+  },
+  "format": "dordiai-original-tetun-joao-cpu-probe",
+  "format_version": 1,
+  "four_ids_do_not_prove_four_native_tetun_speakers": "Publisher claims3 recording speakers; config has4 IDs, including unnamed ID3 whose training/language identity remains unverified.",
+  "language_inventory_increment": 0,
+  "load_seconds": 1.093758249999155,
+  "native_pronunciation_verified": false,
+  "native_training_corpus_independently_verified": false,
+  "network_policy": {
+    "kernel": "libseccomp, errnoEPERM for socket/connect/bind/listen/accept/accept4/sendto/sendmsg",
+    "network_access_denied_before_native_imports": true,
+    "python_audit_guard": true
+  },
+  "nvda_verified": false,
+  "ordinary_letter_names_ready": false,
+  "original_embedding": {
+    "dtype": "float32",
+    "name": "enc_p.emb.weight",
+    "sha256": "9d3aa1e541cc17be0766eb18b063571806a7a92f4cca9c92d585be0ef98bd214",
+    "shape": [
+      256,
+      192
+    ]
+  },
+  "original_model_token_rows": [
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.8782399892807007,
+      "original_id": 20,
+      "row_sha256": "d4e3207ed01ad59483eafd833151d4d6a7c593520a5229cd55a242eb8a2e05ba",
+      "shape": [
+        192
+      ],
+      "symbol": "h"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.0814061164855957,
+      "original_id": 109,
+      "row_sha256": "2a8a84d3ba95c10eac326f87e370e512aeb3716376d592251fdd036c382b68a6",
+      "shape": [
+        192
+      ],
+      "symbol": "ʔ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.0514612197875977,
+      "original_id": 28,
+      "row_sha256": "e8b0fccf2e946ed2ca66e2d82a4409892be181b732ef01ef43ac37e28801490e",
+      "shape": [
+        192
+      ],
+      "symbol": "p"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.1528178453445435,
+      "original_id": 32,
+      "row_sha256": "f6c803bfc34c4d7db0fd6b241ce343006829eb21ff32ee29ad38d96762fea9b8",
+      "shape": [
+        192
+      ],
+      "symbol": "t"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9642282724380493,
+      "original_id": 23,
+      "row_sha256": "7a3e91288ab75f8685ccef21f4f5521a919df6b2aa4d8910e98ec56a8484b209",
+      "shape": [
+        192
+      ],
+      "symbol": "k"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.039922833442688,
+      "original_id": 15,
+      "row_sha256": "321cb7dcd780b13c8b95c87221076e29a07bc7cb8c1b278dee5176643bcd9e1c",
+      "shape": [
+        192
+      ],
+      "symbol": "b"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.0865740776062012,
+      "original_id": 17,
+      "row_sha256": "de0835b95ec47f85556e7b15670fb07cedd48a172fcbc90961fd2fe3c9c3c0eb",
+      "shape": [
+        192
+      ],
+      "symbol": "d"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9925956130027771,
+      "original_id": 66,
+      "row_sha256": "a7bc8b7fce0fefb13585e55bbfddf1ffb2b1e119df1307d37d6c71a569b9350e",
+      "shape": [
+        192
+      ],
+      "symbol": "ɡ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.069329023361206,
+      "original_id": 34,
+      "row_sha256": "88d532f7cfa61e8e1657ba51431bed0615d498eed2cdf02b00c62938e5b558a1",
+      "shape": [
+        192
+      ],
+      "symbol": "v"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9913526177406311,
+      "original_id": 31,
+      "row_sha256": "9af52409e98c31f1fcd5477704936f59701ed36660bc424407ba0b8279496575",
+      "shape": [
+        192
+      ],
+      "symbol": "s"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.015156626701355,
+      "original_id": 38,
+      "row_sha256": "816a71baeb6128c87c8720fb52a2423649651eea8833a47b65ef3ba398e282bd",
+      "shape": [
+        192
+      ],
+      "symbol": "z"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9207758903503418,
+      "original_id": 96,
+      "row_sha256": "66c6e153cdd0af00318cffaac50b73a7e2ff124fe15ec83a3bed49406d8df2ce",
+      "shape": [
+        192
+      ],
+      "symbol": "ʃ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9836536645889282,
+      "original_id": 108,
+      "row_sha256": "33bf80110072b250048cc9e8523988f33332e4d16b9b45d1c9782474aef74a28",
+      "shape": [
+        192
+      ],
+      "symbol": "ʒ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.0377833843231201,
+      "original_id": 25,
+      "row_sha256": "30f8a01fe8fc49e8d76cb7f49568628d736a5e7be4f82bc7de242f8b2c71d2ef",
+      "shape": [
+        192
+      ],
+      "symbol": "m"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.0850684642791748,
+      "original_id": 26,
+      "row_sha256": "8da0033842e3a8c5eb9ffde63e21f00d9f8c89ca85b6bc13a34ba918d18d03ae",
+      "shape": [
+        192
+      ],
+      "symbol": "n"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.737152636051178,
+      "original_id": 82,
+      "row_sha256": "2ce04d0f1f60a87416ca3bfaa28d204a93c4f04aa14b382ddc1c34e89b23aed3",
+      "shape": [
+        192
+      ],
+      "symbol": "ɲ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9940658807754517,
+      "original_id": 24,
+      "row_sha256": "d5e8152cb5f0ab161e75b6b8fb999bc6b440f64cca2002fbba83c16681e16680",
+      "shape": [
+        192
+      ],
+      "symbol": "l"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.7392030954360962,
+      "original_id": 104,
+      "row_sha256": "22b54004954e245b12f15d831d9e7e3075dfcc832ff3f1b93bc9bdfd43e0cb22",
+      "shape": [
+        192
+      ],
+      "symbol": "ʎ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.6632972359657288,
+      "original_id": 30,
+      "row_sha256": "3fe8a3c01334abe9f20a34ac19fbdfc9801c338a8cafd829bbcacee4dcced13e",
+      "shape": [
+        192
+      ],
+      "symbol": "r"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.01789128780365,
+      "original_id": 92,
+      "row_sha256": "92744bae42de8f8b77b35d812c85375c53a2d9c1c8eec65044a701f81980dfe5",
+      "shape": [
+        192
+      ],
+      "symbol": "ɾ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9899320006370544,
+      "original_id": 35,
+      "row_sha256": "a2f9c2a0c89bd7dcf7e1360724dfba0d2bbfe8cf2b69984fad57af9541e93fc7",
+      "shape": [
+        192
+      ],
+      "symbol": "w"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.085516333580017,
+      "original_id": 22,
+      "row_sha256": "1b6c09b9d625a559e9df3e6cc6f179556c670f8d5a71ff9fb9a6f0ef776e490d",
+      "shape": [
+        192
+      ],
+      "symbol": "j"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.8608953356742859,
+      "original_id": 14,
+      "row_sha256": "9d004d37c3b610bbca805cdc45e2f0f3aa5895b9946a9b127882eca1a6db605d",
+      "shape": [
+        192
+      ],
+      "symbol": "a"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9489611983299255,
+      "original_id": 18,
+      "row_sha256": "b4c77c16d6cf3034443773667f936c478d3ae0656cd527d80d2e09e54dee653b",
+      "shape": [
+        192
+      ],
+      "symbol": "e"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9329043030738831,
+      "original_id": 21,
+      "row_sha256": "e61b081bbad1e265fcdf275721903a46430af238022efb9b6df4e186525ae09a",
+      "shape": [
+        192
+      ],
+      "symbol": "i"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.9365690350532532,
+      "original_id": 27,
+      "row_sha256": "cd727152bb82c35189ba3c8ac4440a6f718581d640c9e520b7e0a9ca2cf14b5b",
+      "shape": [
+        192
+      ],
+      "symbol": "o"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.8597511649131775,
+      "original_id": 33,
+      "row_sha256": "b0e09c2f96b19f3ad94be22205134664c3615cb087453a09d0fe8c9c86f7e480",
+      "shape": [
+        192
+      ],
+      "symbol": "u"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.066009759902954,
+      "original_id": 120,
+      "row_sha256": "b1801335b21b98939a1fc50ec8b7f0ffa9bd86673ad0db56f8ea822dee3cbde3",
+      "shape": [
+        192
+      ],
+      "symbol": "ˈ"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 1.3055897951126099,
+      "original_id": 122,
+      "row_sha256": "c6a14bfc8b7149edafff913c7ce137085fb6c0e891bb38833568c31f81ee4027",
+      "shape": [
+        192
+      ],
+      "symbol": "ː"
+    },
+    {
+      "dtype": "float32",
+      "finite": true,
+      "learned_native_sound_meaning_verified": false,
+      "norm": 0.25257137417793274,
+      "original_id": 143,
+      "row_sha256": "4904470d2722e395cdcdff0abd769c59583bc55b01722504ea08a2a3cc5a59c9",
+      "shape": [
+        192
+      ],
+      "symbol": "̯"
+    }
+  ],
+  "original_pt_frontend_erases_native_initial_h_contrast": true,
+  "original_speaker_embedding": {
+    "name": "emb_g.weight",
+    "sha256": "3c93b26ef373ef260a82ba35a331ab22388fc80673d01829d8bcd1f69071c0ad",
+    "shape": [
+      4,
+      512
+    ]
+  },
+  "own_frontend_files": {
+    "/workspace/scratch/eb1194a9e557/tetun-piper-research/deliverables/tools/research/tetun_joao_frontend.py": {
+      "sha256": "3f9db93d59a5dce311485800352222da3ee9b204dda2fcc34b0716f8369f3ae4",
+      "size_bytes": 4400
+    },
+    "/workspace/scratch/eb1194a9e557/tetun-piper-research/deliverables/tools/research/tetun_joao_native_facts.json": {
+      "sha256": "e9ecd89510c709e6c3b28ca1f87c93c611b91de32daa67a9aeb82d88316079dc",
+      "size_bytes": 4842
+    }
+  },
+  "own_native_tetun_frontend_implemented": "Eight source-bounded complete lexical forms only; unknown/unmarked homographs reject; no broad regular-text support",
+  "peak_rss_bytes": 359763968,
+  "primary_native_source": {
+    "authors": [
+      "C. Williams-van Klinken",
+      "J. Hajek",
+      "R. Nordlinger"
+    ],
+    "doi": "10.15144/PL-528",
+    "licence": "Online edition2015 CC-BY-SA4.0 per PDF footer; only short linguistic facts retained.",
+    "sha256": "b53d86db59c82153af7f163cab1ac9740905ccf92384d7df45f4037ff788c80e",
+    "size_bytes": 14960132,
+    "title": "Tetun Dili: A grammar of an East Timorese language",
+    "url": "https://openresearch-repository.anu.edu.au/server/api/core/bitstreams/59d52d21-1125-4d13-92b0-702c768236ad/content",
+    "visually_verified_pages": [
+      {
+        "fact": "h is a voiceless glottal fricative; intervocalic variants do not imply obligatory initial deletion.",
+        "pdf_page": 24,
+        "printed_page": 10
+      },
+      {
+        "fact": "au is bamboo.",
+        "pdf_page": 38,
+        "printed_page": 24
+      },
+      {
+        "fact": "Hau naran Maria. is example7.42a; hau is first-person singular.",
+        "pdf_page": 75,
+        "printed_page": 61
+      }
+    ],
+    "year": 2002
+  },
+  "product_integrated": false,
+  "publisher_declaration": {
+    "actual_config_speaker_count": 4,
+    "actual_speaker_id_map": {
+      "": 3,
+      "Agostinho": 0,
+      "Estefanus": 1,
+      "Paulino": 2
+    },
+    "dataset_url": "TBD",
+    "declared_native_standard": "Tetun Dili (tdt), not every Tetun variety",
+    "genuine_native_pronunciation_verified": false,
+    "language_inventory_increment": 0,
+    "native_training_evidence": "Publisher commit985bbb... reports >3k audios from3 different speakers; no independent corpus audit claimed.",
+    "original_frontend_language": "pt",
+    "product_integrated": false,
+    "stale_voices_json_not_authoritative": {
+      "actual_model_size_bytes": 77055182,
+      "registry_model_size_bytes": 63511038,
+      "registry_speakers": 1
+    },
+    "weights_licence": "TBD; the Space code MIT marker does not license model weights"
+  },
+  "readiness_barriers": [
+    "Publisher original pt frontend collapses genuine native hau/au inputs if measured flag true; output audio cannot restore a distinction missing from identical input IDs.",
+    "Training data URL and model weights licence remainTBD; do not infer model rights from the Space code MIT licence.",
+    "Native phone/stress fidelity, retained selected-profile projection and unchanged private Windows/NVDA interaction are unverified."
+  ],
+  "repository": "raphaelmerx/piper-voices",
+  "revision": "985bbb918a764710465f9df9afcdde5d86dd7b05",
+  "runtime": {
+    "numpy": "2.3.5",
+    "original_product_private_runtime_used": false,
+    "ort": "1.27.0",
+    "ort_native_binaries": [
+      {
+        "file": "libonnxruntime_providers_shared.so",
+        "sha256": "086ec1d5388f64153d9c63470d126693db9a182c8ce236d3a1119068471b8a0d",
+        "size_bytes": 14632
+      },
+      {
+        "file": "onnxruntime_pybind11_state.cpython-312-x86_64-linux-gnu.so",
+        "sha256": "5703f8e7b5f3185b088fcad623b59620f39d79b8b71c84b28d52285fc875ae23",
+        "size_bytes": 25252752
+      }
+    ],
+    "piper_tts": "1.4.1",
+    "product_private_runtime_modified": false,
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]"
+  },
+  "selected_profile_projection_verified": false,
+  "status": "actual-original-model-executed-but-native-frontend-unaccepted",
+  "surface_unreleased_stop_modifier_token_available": false,
+  "weights_requantized": false,
+  "windows_verified": false,
+  "zero_noise_diagnostic": {
+    "au_raw_float_sha256": "f75db69ed3d6465171d87d663eb5880c9fe04fac121b3afd44769f8a4515a47d",
+    "au_wave": {
+      "file": "au-zero-noise.wav",
+      "peak": 0.4959096610546112,
+      "raw_float_sha256": "f75db69ed3d6465171d87d663eb5880c9fe04fac121b3afd44769f8a4515a47d",
+      "rms": 0.06762626022100449,
+      "samples": 9216,
+      "seconds": 0.4179591836734694,
+      "sha256": "c4ead112a3a61361c0dcb8b4b04c9bafc122bcdf1fc051b872f9d2c2e62a356c",
+      "size_bytes": 18476
+    },
+    "hau_raw_float_sha256": "f75db69ed3d6465171d87d663eb5880c9fe04fac121b3afd44769f8a4515a47d",
+    "hau_wave": {
+      "file": "hau-zero-noise.wav",
+      "peak": 0.4959096610546112,
+      "raw_float_sha256": "f75db69ed3d6465171d87d663eb5880c9fe04fac121b3afd44769f8a4515a47d",
+      "rms": 0.06762626022100449,
+      "samples": 9216,
+      "seconds": 0.4179591836734694,
+      "sha256": "c4ead112a3a61361c0dcb8b4b04c9bafc122bcdf1fc051b872f9d2c2e62a356c",
+      "size_bytes": 18476
+    },
+    "mode": "zero-noise diagnostic only; original default cases above remain unchanged",
+    "raw_waveforms_bit_identical": true,
+    "same_model_input_ids": true
+  }
+}

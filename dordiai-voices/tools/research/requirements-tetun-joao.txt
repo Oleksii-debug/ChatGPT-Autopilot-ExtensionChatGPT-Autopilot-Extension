@@ -1,0 +1,13 @@
+# Isolated Linux preparation/probe ONLY. Never install into product/private SDK.
+# ORT cp312 Linux official wheel SHA256:
+# 7c65a7438632d55dfbc8a02ee60bd6cf7dd9d1ba05a43d4b851452f32338e194
+onnxruntime==1.27.0
+# Original Piper API wheel SHA256:
+# 5aa533364c15248d2932bcc362eb0740de7cd28dc34233de8df2ee3c6f2adf00
+piper-tts==1.4.1
+numpy==2.3.5
+# ONNX is a read-only preparation inspector; not a client/runtime dependency.
+onnx==1.17.0
+flatbuffers==25.12.19
+packaging==26.3
+protobuf==7.36.2

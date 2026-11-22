@@ -1,0 +1,41 @@
+{
+  "format": "dordiai-personal-settings-actual-host-probe-candidate",
+  "format_version": 1,
+  "launch_tag": "[personal-settings-host]",
+  "production_files_changed": false,
+  "files": {
+    ".github/workflows/dordiai-personal-settings-host.yml": "f18b6c58b2919f4cabfdee8dd1062005aa3c6602",
+    "dordiai-voices/tools/windows_nvda_personal_settings_probe.py": "5cd4fe98316a74197700b333e8f6f99344bb77a6",
+    "dordiai-voices/tests/test_windows_nvda_personal_settings_probe.py": "c09bba0c541526daba8344373f7c39402fb88dc6",
+    "dordiai-voices/candidates/personal-language/host-inputs/driver.py": "06e9f652060dd78c9aae6b17d8d38692d58e9ec4",
+    "dordiai-voices/candidates/personal-language/host-inputs/personal_language.py": "c5c8d4dc2a0a666283c6ab6041df6228e5016d45",
+    "dordiai-voices/candidates/personal-language/host-inputs/preferences.py": "dc8aab9ba81a6a53d3e0bc9a7eb0edf7c46532d6",
+    "dordiai-voices/candidates/personal-language/host-inputs/language_codes.py": "1a86ca3cea4ab731a6a8a4979c7f729a1cb518ee",
+    "dordiai-voices/candidates/personal-language/host-inputs/language_iso_aliases.json": "431a3327fe2e1b8f6fdd16a3b1989b45050e8177"
+  },
+  "verification": {
+    "local_contract_tests": 12,
+    "passed": 12,
+    "actual_frozen_host": "pending launch",
+    "private_python_used": false,
+    "product_addon_used": false,
+    "acoustic_models_used": false,
+    "voice_support_claimed": false,
+    "metadata_only_fixture": true
+  },
+  "expected": {
+    "official_nvda_version": "2026.3.1",
+    "actual_MRO_and_classmethod_api": true,
+    "actual_useConfig_false": true,
+    "actual_profile_load_after_enabled_state": true,
+    "actual_disk_profile_isolation": true,
+    "missing_disabled_optional_default_resets": true,
+    "selected_builtin_silence_preserved": true,
+    "owned_profiles_removed": true
+  },
+  "limitations": [
+    "Exact superclass/profile API proof only; no optional language model or voice support",
+    "PERSONAL three-way intersection is not added to the public installed catalog by this candidate",
+    "No source13 full product runtime/read/physical acceptance"
+  ]
+}

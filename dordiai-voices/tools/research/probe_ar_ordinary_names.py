@@ -57,6 +57,20 @@ def candidate(path):
 def snapshot(root):
     return {str(p.relative_to(root)).replace('\\','/'):digest(p) for p in root.rglob('*') if p.is_file()}
 
+def shared_resource_contract(records,prefix):
+    # EXACT original acoustic_graph selection: prepared .ort first, otherwise
+    # the same named .onnx. No alternate weights/quantization/family fallback.
+    required=['capabilities.json','onnx/tts.json','onnx/unicode_indexer.json','voice_styles/F1.json','source.npy']
+    missing=[prefix+r for r in required if prefix+r not in records]
+    selected={}
+    for name in ['duration_predictor','text_encoder','vector_estimator.static-q8','vocoder']:
+        choices=[prefix+'onnx/'+name+suffix for suffix in ['.ort','.onnx']]
+        found=next((x for x in choices if x in records),None)
+        if found is None:missing.append(' | '.join(choices))
+        else:selected[name]=found
+    if missing:raise ValueError('Actual shared carrier resources incomplete: '+json.dumps(missing))
+    return selected
+
 def stage(args):
     helper=module('_ar29_release_helper',Path(__file__).with_name('source11_afri_integration.py'))
     helper.pinned(args.core,CORE_BYTES,CORE_SHA);helper.pinned(args.wide,WIDE_BYTES,WIDE_SHA);candidate(args.candidate)
@@ -82,9 +96,12 @@ def stage(args):
             if actual!=manifest['files'].get(i.filename):raise ValueError('Original shared resource bytes differ')
             records[i.filename]=actual
     inner.unlink()
-    required=['onnx/tts.json','onnx/unicode_indexer.json','onnx/duration_predictor.onnx','onnx/text_encoder.onnx','onnx/vector_estimator.static-q8.onnx','onnx/vocoder.onnx','voice_styles/F1.json','source.npy']
-    if not all(prefix+r in records for r in required):raise ValueError('Actual shared carrier resources incomplete')
-    write_json(args.output/'ar29-stage.json',{'format':'ar29-original-core12-shared-subset','core_sha256':CORE_SHA,'wide_outer_sha256':WIDE_SHA,'candidate_sha256':CANDIDATE_SHA,'shared_files':records,'existing_payload_hashes':snapshot(runtime),'scope':'Full immutable12 core plus original SharedAcoustic subset from original wide optional pack; no production registration or graph rewrite'})
+    write_json(args.output/'ar29-shared-resource-inventory.json',{'files':records,'scope':'All extracted shared files matched original immutable manifest; native execution not yet attempted'})
+    print('AR29_SHARED_VERIFIED_INVENTORY '+json.dumps(records),flush=True)
+    selected=shared_resource_contract(records,prefix)
+    capabilities=json.loads((runtime/'models/WideLanguages/SharedAcoustic/capabilities.json').read_text(encoding='utf-8'))
+    if 'ar' not in capabilities.get('languages',[]):raise ValueError('Original shared acoustic metadata does not declare Arabic')
+    write_json(args.output/'ar29-stage.json',{'format':'ar29-original-core12-shared-subset','core_sha256':CORE_SHA,'wide_outer_sha256':WIDE_SHA,'candidate_sha256':CANDIDATE_SHA,'shared_files':records,'selected_shared_graphs':selected,'capabilities':capabilities,'existing_payload_hashes':snapshot(runtime),'scope':'Full immutable12 core plus original SharedAcoustic subset from original wide optional pack; no production registration or graph rewrite'})
 
 def validate_names(processor,names):
     """A finite WAV cannot hide a dropped native letter/mark in preprocessing."""

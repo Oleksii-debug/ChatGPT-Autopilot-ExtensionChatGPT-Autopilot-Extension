@@ -1,0 +1,65 @@
+{
+  "format": "dordiai-actual-windows-voice-removal-candidate-proof",
+  "format_version": 1,
+  "source_commit": "a05463b0917c6fdc51807e79304e270819d0c301",
+  "run_id": 45045638961,
+  "job_id": 137279523961,
+  "artifact": {
+    "id": 14762299887,
+    "bytes": 119484,
+    "sha256": "17f12c7b344ea0af66960e3618b0e4c222c67ce6e4adb4df5510b7f39daa7296"
+  },
+  "success": true,
+  "windows": true,
+  "scope": "Actual Windows 21-case voice ownership/deletion/rollback/upgrade fault suite, followed by full matching isolated source regression",
+  "focused": {
+    "total": 21,
+    "passed": 21,
+    "skipped": 0,
+    "real_windows_mapped_file_case_passed": true,
+    "abrupt_process_exit_and_retry_passed": true
+  },
+  "full": {
+    "total": 1552,
+    "passed": 1499,
+    "skipped": 53,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 32.966
+  },
+  "checkout_production_unchanged": true,
+  "production12_archive_modified": false,
+  "actual_nvda_gui_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "candidate_packet": "081ed48fd2723d6e9105a7eeb8b074515af93478",
+  "windows_gate_packet": "5a397fd86b0e063a487a0d6dfc12a3940a2ed7e1",
+  "test_revision_git_sha": "c234162e5789e2e3c1e401ce19f64974dad9cd92",
+  "receipts": [
+    {
+      "path": "dordiai-voices/evidence/voice-removal-45045638961/gate.json.gz",
+      "bytes": 37100,
+      "sha256": "402674db88eeb04e1168a8159dd09249506bb27b9a6f91f59111ff36e41f6019",
+      "git_sha": "bacc84ab653d05115e831e883776def501d44493",
+      "decoded_bytes": 186654,
+      "decoded_sha256": "4bfec9ec41f8e6d396b8416adc5e05d57c0bd6362727239baf4e6c754262ac18"
+    },
+    {
+      "path": "dordiai-voices/evidence/voice-removal-45045638961/focused.json.gz",
+      "bytes": 724,
+      "sha256": "611943ea7f7b8ad0d0db7d9d91bcfb2c933338ee3cf8b39c02f7712c84150ec3",
+      "git_sha": "3fc83d0a901a6cc7c274c4b41a4485f8e0f43e5a",
+      "decoded_bytes": 2752,
+      "decoded_sha256": "37f42548bf35da315e785a50149afc7e9e47ff1cc0e8a5f35dc54dec059ecb66"
+    },
+    {
+      "path": "dordiai-voices/evidence/voice-removal-45045638961/full.json.gz",
+      "bytes": 35670,
+      "sha256": "8d5d4e07f45e858bab4dbb9c3ef5e66f813e6078b347e772db02ba72a5da2a8e",
+      "git_sha": "1eb24b2fce9cd8cc89c0ac7b0276ecbb74234054",
+      "decoded_bytes": 178876,
+      "decoded_sha256": "ed80f655249237fde113d12b5238ae9d75541fdc4f2fb3a29ea00892440a224d"
+    }
+  ],
+  "remaining": "Integrate reviewed candidate into a new immutable core13; actual NVDA GUI/worker/profile/upgrade lifecycle and audio acceptance remain separate."
+}

@@ -1,0 +1,76 @@
+{
+  "format": "dordiai-source13-builder-review",
+  "format_version": 1,
+  "files": [
+    {
+      "path": "dordiai-voices/tools/research/source13_integration.py",
+      "bytes": 22996,
+      "sha256": "855dacbdc4fe3575ebffbe303663a7ca0cfb935cd73dc164ece7458e2d57bbbb",
+      "git_sha": "bf218bb7bd591410cc417363b97b3fdc03647de9"
+    },
+    {
+      "path": "dordiai-voices/tests/test_source13_integration.py",
+      "bytes": 9347,
+      "sha256": "38d969e1a5ea9387cfa5ea75607b37e18e6fa925963a83256d737166313b4e51",
+      "git_sha": "44979779ff38f19557e92f5c34cb83023419b19a"
+    },
+    {
+      "path": ".github/workflows/dordiai-source13-integration.yml",
+      "bytes": 8559,
+      "sha256": "b882843461b36071c8ce2a90d722b807d4c69a7bbffb8887bd669e8207b3c885",
+      "git_sha": "cc8be0f31f7643eec3174075d0a488ef9d356a2d"
+    }
+  ],
+  "historical11_and12_unchanged": true,
+  "production_source_modified": false,
+  "refs_modified": false,
+  "not_launched": true,
+  "marker": "[source13-integration]",
+  "baseline": {
+    "version": "0.13.1-dev.12",
+    "run_id": 45040668513,
+    "artifact_id": 14761553443,
+    "artifact_name": "dordiai-source12-development-core-45040668513",
+    "bytes": 1992944744,
+    "sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2"
+  },
+  "preservation": {
+    "model_identity_files": 8510,
+    "banks_included_in_models": 180,
+    "private_files": 1596,
+    "voice_ids": 45,
+    "native_membership_binary_descriptor_notice_exact": true,
+    "character_name_model_exceptions": [],
+    "ay_fil_included_in_immutable_models": true,
+    "quantization_or_acoustic_regeneration": false,
+    "old_overlay_reapplied": false
+  },
+  "expected_checks": [
+    "Full matching Windows unit suite before2GB download",
+    "Cheap source manifest must be13 preflight before downloading immutable resources",
+    "Exact baseline12/archive SHA and inventory extraction",
+    "Exact unchanged Afri adapter/carrier source pins and six native optional packs",
+    "Core-only new13 build and release verifier",
+    "Five native carriers ×45 profiles actual225 distinct worker PCM outputs",
+    "All8 excluded identities rejected",
+    "Native cancellation acknowledgement and post-cancel recovery",
+    "Same persistent worker refuses removed ss source and recovers after same pack reinstall",
+    "Dependency removal guard",
+    "Default UK/EN/RU actual packaged engines",
+    "Clean private worker shutdown; no forced termination",
+    "Exact bounded gzip receipt preservation and separate core/evidence artifacts"
+  ],
+  "tests": {
+    "targeted_total": 17,
+    "passed": 17,
+    "linux": true,
+    "actual_build13": false,
+    "actual_windows13": false
+  },
+  "freeze_requirements": [
+    "Root commits reviewed final runtime/helper/driver/code hashes and manifest13 before launch",
+    "No AR29 data change allowed by this builder; any adopted exact AR exception requires separately reviewed pins/code update before freeze"
+  ],
+  "product_ready": false
+}

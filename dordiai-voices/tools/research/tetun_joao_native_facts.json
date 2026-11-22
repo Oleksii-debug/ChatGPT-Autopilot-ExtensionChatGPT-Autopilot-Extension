@@ -1,0 +1,170 @@
+{
+  "entries": [
+    {
+      "annotated_word": "háre",
+      "gloss": "uncooked rice",
+      "phone_tokens": [
+        "ˈ",
+        "h",
+        "a",
+        "r",
+        "e"
+      ],
+      "selected_final_lengthening": false,
+      "source_printed_page": 10,
+      "stress_syllable": 0
+    },
+    {
+      "annotated_word": "haré",
+      "gloss": "see",
+      "phone_tokens": [
+        "h",
+        "a",
+        "ˈ",
+        "r",
+        "e",
+        "ː"
+      ],
+      "selected_final_lengthening": true,
+      "source_printed_page": 12,
+      "stress_syllable": 1
+    },
+    {
+      "annotated_word": "kábas",
+      "gloss": "cotton",
+      "phone_tokens": [
+        "ˈ",
+        "k",
+        "a",
+        "b",
+        "a",
+        "s"
+      ],
+      "selected_final_lengthening": false,
+      "source_printed_page": 12,
+      "stress_syllable": 0
+    },
+    {
+      "annotated_word": "kabás",
+      "gloss": "shoulder",
+      "phone_tokens": [
+        "k",
+        "a",
+        "ˈ",
+        "b",
+        "a",
+        "ː",
+        "s"
+      ],
+      "selected_final_lengthening": true,
+      "source_printed_page": 12,
+      "stress_syllable": 1
+    },
+    {
+      "annotated_word": "káben",
+      "gloss": "marry",
+      "phone_tokens": [
+        "ˈ",
+        "k",
+        "a",
+        "b",
+        "e",
+        "n"
+      ],
+      "selected_final_lengthening": false,
+      "source_printed_page": 12,
+      "stress_syllable": 0
+    },
+    {
+      "annotated_word": "kabén",
+      "gloss": "saliva",
+      "phone_tokens": [
+        "k",
+        "a",
+        "ˈ",
+        "b",
+        "e",
+        "ː",
+        "n"
+      ],
+      "selected_final_lengthening": true,
+      "source_printed_page": 12,
+      "stress_syllable": 1
+    },
+    {
+      "annotated_word": "hakárak",
+      "gloss": "want",
+      "phone_tokens": [
+        "h",
+        "a",
+        "ˈ",
+        "k",
+        "a",
+        "r",
+        "a",
+        "k"
+      ],
+      "selected_final_lengthening": false,
+      "source_printed_page": 12,
+      "stress_syllable": 1
+    },
+    {
+      "annotated_word": "kamíza",
+      "gloss": "shirt",
+      "phone_tokens": [
+        "k",
+        "a",
+        "ˈ",
+        "m",
+        "i",
+        "z",
+        "a"
+      ],
+      "selected_final_lengthening": false,
+      "source_printed_page": 12,
+      "stress_syllable": 1
+    }
+  ],
+  "format": "dordiai-tetun-dili-bounded-primary-phone-facts",
+  "format_version": 1,
+  "identity_limits": [
+    "Original model declares a Tetun Dili fine-tune, but its actual training data URL and weights licence remainTBD.",
+    "Original 256-row token inventory includes required symbols, but existence/nonzero tensor rows do not prove learned native sound meanings.",
+    "Mechanical differing WAVs do not prove native phonetic contrasts. Primary listening/native-speaker review remains required.",
+    "All original model weights remain pinned and unchanged; no added IDs, substituted foreign phone, training or quantization."
+  ],
+  "language": "tdt",
+  "language_inventory_increment": 0,
+  "native_constraints": [
+    "Native h is a glottal fricative; do not drop initial h by Portuguese spelling rules.",
+    "Plain voiceless stops are unaspirated; final stops are generally unreleased. These surface features require actual carrier validation, not just token presence.",
+    "Stress is contrastive. Final stressed vowels are normally lengthened in the selected source realization; source also notes speaker variation and unresolved independent vowel length status.",
+    "No general penultimate-stress or all-vowels reduction rule is implemented.",
+    "Ordinary alphabet, punctuation and number names are not supplied."
+  ],
+  "native_pronunciation_verified": false,
+  "ordinary_names_ready": false,
+  "product_integrated": false,
+  "source": {
+    "doi": "10.15144/PL-528",
+    "licence": "Online edition2015 CC-BY-SA4.0; conservative source notice retained for brief factual lexical entries.",
+    "sha256": "b53d86db59c82153af7f163cab1ac9740905ccf92384d7df45f4037ff788c80e",
+    "size_bytes": 14960132,
+    "title": "Tetun Dili: A grammar of an East Timorese language",
+    "url": "https://openresearch-repository.anu.edu.au/server/api/core/bitstreams/59d52d21-1125-4d13-92b0-702c768236ad/content",
+    "visually_checked_pages": [
+      {
+        "pdf_page": 24,
+        "printed_page": 10
+      },
+      {
+        "pdf_page": 26,
+        "printed_page": 12
+      }
+    ],
+    "whole_raw_bytes_actually_verified": true,
+    "year": 2002
+  },
+  "standard": "Tetun Dili phonology in Williams-van Klinken/Hajek/Nordlinger2002; does not assert all Tetun standards or generic tet alias.",
+  "word_annotation": "Acute marks below disambiguate the source lexical stress. They are explicit research input annotations, not claimed as universal ordinary INL/DIT spelling."
+}

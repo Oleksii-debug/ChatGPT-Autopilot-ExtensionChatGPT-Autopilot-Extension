@@ -14,7 +14,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-PREPARER_BLOB = "53b96d13d2fb3a5e99c3c2098b2b058554d5595d"
+PREPARER_BLOB = "46e677cd20d3a873095485880dfdf80994f70ec4"
 MANAGER_BLOB = "960459711ee3af8976540fd4595489fb7f69aedb"
 
 
@@ -51,7 +51,7 @@ def measure(lookup, cases, count):
 
 
 def run(dataset, output):
-    preparer_path = ROOT / "tools/windows_nvda_word_unicode_probe.py"
+    preparer_path = ROOT / "tools/windows_nvda_resource_path_cache_probe.py"
     pinned(preparer_path, PREPARER_BLOB)
     preparer = load("_path_cache_owned_preparer", preparer_path)
     manager_source = ROOT / "experiments/native-resource-path-cache/native_membership_runtime.py"
@@ -68,7 +68,7 @@ def run(dataset, output):
                  "No OS cache eviction or installed-driver/audio acceptance.", "comparisons": []}
     with tempfile.TemporaryDirectory(prefix="dordiai-resource-path-profile-") as temporary:
         setting = preparer.prepare_owned_inputs(dataset, temporary)
-        folder = Path(setting["variants"]["candidate-default"]["folder"])
+        folder = Path(setting["variants"]["original"]["folder"])
         changed = folder.parent / "manager-path-cache"
         shutil.copytree(folder, changed)
         (changed / "native_membership_runtime.py").write_bytes(raw_manager)

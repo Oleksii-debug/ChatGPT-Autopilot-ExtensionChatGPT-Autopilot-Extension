@@ -64,6 +64,22 @@ class ArabicOrdinaryNames(unittest.TestCase):
         proc._preprocess_text=lambda name,language:original(name,language).replace('ar>','fa>')
         with self.assertRaisesRegex(ValueError,'unexpectedly changed'):
             p.validate_names(proc,p.candidate(CANDIDATE)['letter_names'])
+    def test_shared_graph_contract_uses_exact_original_ort_preference(self):
+        prefix='kx47Runtime/models/WideLanguages/SharedAcoustic/'
+        files={prefix+f:{} for f in ['capabilities.json','onnx/tts.json','onnx/unicode_indexer.json','voice_styles/F1.json','source.npy']}
+        for name in ['duration_predictor','text_encoder','vector_estimator.static-q8','vocoder']:files[prefix+'onnx/'+name+'.ort']={}
+        selected=p.shared_resource_contract(files,prefix)
+        self.assertEqual(len(selected),4)
+        self.assertTrue(all(v.endswith('.ort') for v in selected.values()))
+        files[prefix+'onnx/vocoder.onnx']={}
+        self.assertTrue(p.shared_resource_contract(files,prefix)['vocoder'].endswith('.ort'))
+        del files[prefix+'onnx/vocoder.ort']
+        self.assertTrue(p.shared_resource_contract(files,prefix)['vocoder'].endswith('.onnx'))
+    def test_shared_contract_refuses_unrelated_or_unquantized_substitute(self):
+        prefix='kx47Runtime/models/WideLanguages/SharedAcoustic/'
+        files={prefix+f:{} for f in ['capabilities.json','onnx/tts.json','onnx/unicode_indexer.json','voice_styles/F1.json','source.npy']}
+        for name in ['duration_predictor','text_encoder','vector_estimator','vocoder']:files[prefix+'onnx/'+name+'.onnx']={}
+        with self.assertRaisesRegex(ValueError,'vector_estimator.static-q8'):p.shared_resource_contract(files,prefix)
     def test_original_common_pcm_writer_22050_duration_and_no_silent_or_nan_files(self):
         import numpy as np
         common=load('_ar29_existing_pcm_helper',ROOT/'tools/research/ordinary_name_pcm_probe.py')

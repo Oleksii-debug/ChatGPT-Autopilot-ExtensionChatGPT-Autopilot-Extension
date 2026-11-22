@@ -1,0 +1,51 @@
+{
+  "format": "dordiai-personal-language-candidate",
+  "format_version": 1,
+  "target": "future source13 only; source12 immutable",
+  "base_driver_git_blob": "a2759e35a5091a7c2c0c1bc9a09c780eadad4b88",
+  "files": {
+    "source/0.12.2/kx47Runtime/personal_language.py": "c5c8d4dc2a0a666283c6ab6041df6228e5016d45",
+    "source/0.12.2/synthDrivers/kx47Preview.py": "06e9f652060dd78c9aae6b17d8d38692d58e9ec4",
+    "tests/test_personal_language.py": "739827edb61004ba66279785ebae36d1a1dcc45b"
+  },
+  "policy": {
+    "priority": [
+      "forced primary/enabled policy",
+      "genuine typed or authored locale",
+      "chosen optional default for unmarked text",
+      "ordinary automatic routing"
+    ],
+    "choice_filter": "verified PERSONAL registry intersect installed catalog intersect enabled languages",
+    "PRIVATE_empty_intersection_fact": "Current selected installed catalog does not import legacy external PERSONAL entries; this patch does not register or enable them. In the stock deployment the choice remains Auto.",
+    "profile": "Explicit config spec, DriverSetting useConfig=False, load choice after parent PreferencesMixin resolves enabled state, save/reset in active profile",
+    "sequence": "All source text and unrelated commands retain identity; no shared sequence or source command object mutation",
+    "same_locale_omission": "Original concrete locale tracked separately from overridden default; explicit markers restore observed original locale"
+  },
+  "verification": {
+    "kind": "Linux configuration/planner unit regressions only",
+    "targeted_tests": 19,
+    "total": 1311,
+    "passed": 1259,
+    "skipped": 52,
+    "seconds": 7.291,
+    "source_snapshot_commit": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+    "source_overlays": "Isolated source12 a275/381 bridge + associated tests/probe overlays, then this candidate. Not the latest complete root branch; root integration/full checks required.",
+    "actual_nvda_config_api": "pending dedicated private host probe",
+    "actual_optional_models_installed": false,
+    "actual_optional_language_audio": false,
+    "physical_audio": false,
+    "product_ready": false
+  },
+  "primary_api_research": [
+    {
+      "url": "https://github.com/nvaccess/nvda/blob/master/source/autoSettingsUtils/autoSettings.py",
+      "findings": "_getConfigSpecForSettings/_loadSpecificSettings/_saveSpecificSettings skip useConfig=False; methods are classmethods; saveSettings/loadSettings dispatch through actual instance",
+      "scope": "Upstream API research only; master is not proof of exact frozen2026.3.1"
+    },
+    {
+      "url": "https://github.com/nvaccess/nvda/blob/master/source/synthDriverHandler.py",
+      "findings": "SynthDriver.initSettings adds spec then calls loadSettings/saveSettings; loadSettings may call changeVoice/update settings ring, so actual-host probe must restore private host state",
+      "scope": "Exact frozen host confirmation pending"
+    }
+  ]
+}
