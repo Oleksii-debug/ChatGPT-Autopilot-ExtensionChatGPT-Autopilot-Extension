@@ -156,7 +156,7 @@ def embedding(path):
 
 def validate_output(path, protected, overwrite):
     path = path.resolve()
-    if any(path.is_relative_to(root) for root in protected):
+    if any(path.is_relative_to(Path(root).resolve()) for root in protected):
         raise ValueError("Evidence output must be outside runtime/model/reference directories")
     if path.exists() and not overwrite:
         raise FileExistsError("Evidence output already exists; use --overwrite explicitly: " + str(path))
