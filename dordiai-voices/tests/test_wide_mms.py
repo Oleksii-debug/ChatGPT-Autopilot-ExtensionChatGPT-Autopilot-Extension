@@ -210,7 +210,7 @@ class ProvenanceTests(unittest.TestCase):
             self.assertFalse(result["models"]["ha"]["models_executed"])
 
     def test_all_sources_are_exact_pinned_native_exports(self):
-        document = json.loads((ROOT / "tools/mms_model_sources.json").read_text())
+        document = json.loads((ROOT / "tools/mms_model_sources.json").read_text(encoding="utf-8"))
         self.assertEqual(set(document["models"]), set(mms.SUPPORTED))
         self.assertEqual(len(document["models"]), 29)
         for code, row in document["models"].items():
