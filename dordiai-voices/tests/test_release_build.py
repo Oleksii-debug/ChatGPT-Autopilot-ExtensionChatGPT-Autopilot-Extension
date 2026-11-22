@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import stat
@@ -151,6 +152,26 @@ class ResourcePackageTests(unittest.TestCase):
             manager.install_pack(self.make_pack(), self.addon)
         self.assertEqual(target.read_bytes(), b"core")
 
+    def test_identical_core_resource_not_claimed_or_deleted_on_pack_update(self):
+        name = "kx47Runtime/models/Test/model.bin"
+        target = self.addon / name
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"model")
+        first = manager.install_pack(self.make_pack(), self.addon)
+        self.assertEqual(first["installed_files"], 0)
+        self.assertEqual(first["provided_by_core_files"], 1)
+        second = manager.install_pack(self.make_pack(payload={name: b"model", "kx47Runtime/models/Test/extra.bin": b"extra"}), self.addon)
+        self.assertEqual(second["installed_files"], 1)
+        manager.uninstall_pack("demo", self.addon)
+        self.assertEqual(target.read_bytes(), b"model")
+
+    def test_update_cannot_create_indirect_dependency_cycle(self):
+        manager.install_pack(self.make_pack(), self.addon)
+        manager.install_pack(self.make_pack("dependent", {"kx47Runtime/models/Test/second.bin": b"b"}, ["demo"]), self.addon)
+        with self.assertRaises(manager.PackageError):
+            manager.install_pack(self.make_pack(dependencies=["dependent"]), self.addon)
+        self.assertEqual(manager._state(self.addon)["packs"]["demo"]["dependencies"], [])
+
     def test_missing_dependency_and_dependent_uninstall(self):
         dependent = self.make_pack("dependent", {"kx47Runtime/models/Test/second.bin": b"b"}, ["demo"])
         with self.assertRaises(manager.PackageError):
@@ -242,6 +263,20 @@ class ResourcePackageTests(unittest.TestCase):
                 self.assertFalse((self.addon / created).exists())
                 self.assertFalse(manager._journal_path(self.addon).exists())
                 self.assertFalse(directory.exists())
+        self.assertEqual(manager._state(self.addon), state)
+
+    def test_transaction_recovery_normalizes_relative_root(self):
+        try:
+            relative = Path(os.path.relpath(self.addon, Path.cwd()))
+        except ValueError:
+            self.skipTest("Temporary directory is on another Windows drive")
+        directory = self.addon / ".dordiai-pack-relative"
+        directory.mkdir()
+        state = {"format_version": 1, "packs": {}}
+        manager._begin_transaction(self.addon, directory, state, {}, {})
+        with manager._locked(relative):
+            self.assertFalse(manager._journal_path(self.addon).exists())
+            self.assertFalse(directory.exists())
         self.assertEqual(manager._state(self.addon), state)
 
     def test_excluded_voice_resource_rejected(self):

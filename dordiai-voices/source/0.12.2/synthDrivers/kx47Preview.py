@@ -449,6 +449,27 @@ class SpeechWorker:
 
     def fast_clip(self, request):
         """Read prepared speech without waiting for any neural model or worker."""
+        _voice_policy.require_voice_allowed(request["profile"])
+        if self._references is not None and not request.get("segments"):
+            language = (request.get("language") or "uk").lower().replace("_", "-")
+            if request.get("character"):
+                # Managed banks and the existing core-language banks use the
+                # same selected identity. Check them before legacy WAV caches
+                # or worker startup, including keyboard echo in core languages.
+                names = dict.fromkeys((request.get("preparedLetterName"), request["text"],
+                                       request.get("letterCacheText")))
+                for name in names:
+                    if name is None:
+                        continue
+                    pcm = self._letterBank.read(request["profile"], language, name)
+                    if pcm is None and language == "en-gb" and name != "zed":
+                        pcm = self._letterBank.read(request["profile"], "en-us", name)
+                    if pcm is not None:
+                        return self._control_prepared_clip(request, pcm, native=True)
+            elif len(request["text"]) <= 160:
+                pcm = self._commandBank.read(request["profile"], language, request["text"])
+                if pcm is not None:
+                    return self._control_prepared_clip(request, pcm, native=True)
         if request.get("danishCommands") and not request.get("character") and not request.get("segments"):
             pcm = self._commandBank.read(request["profile"], "da", request["text"])
             if pcm is not None:

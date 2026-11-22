@@ -114,7 +114,9 @@ class UpgradePackagesTests(unittest.TestCase):
         original = module._atomic_json
 
         def fail_registry(path, document):
-            if Path(path) == manager._state_path(self.new):
+            # The real upgrader resolves Windows 8.3 temp aliases to their
+            # long spelling before writing the destination registry.
+            if Path(path).resolve() == manager._state_path(self.new).resolve():
                 raise OSError("Windows file lock")
             return original(path, document)
 

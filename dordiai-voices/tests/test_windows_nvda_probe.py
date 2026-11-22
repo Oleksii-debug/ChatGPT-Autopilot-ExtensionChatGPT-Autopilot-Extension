@@ -64,7 +64,12 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
                 archive = root / "test.nvda-addon"
                 with zipfile.ZipFile(archive, "w") as output:
                     output.writestr("manifest.ini", 'name = "probe"')
-                    output.writestr(name, "unsafe")
+                    # ZipInfo's constructor rewrites Windows backslashes to
+                    # slashes. Set the raw member name afterward so this is
+                    # genuinely an unsafe ZIP fixture on every test host.
+                    info = zipfile.ZipInfo("placeholder")
+                    info.filename = name
+                    output.writestr(info, "unsafe")
                 with self.assertRaises(ValueError):
                     probe.extract_addon(archive, root / "config")
 

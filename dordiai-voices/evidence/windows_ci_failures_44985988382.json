@@ -1,0 +1,100 @@
+{
+  "format": "dordiai-windows-ci-failure-analysis",
+  "format_version": 1,
+  "workflow_run_id": 44985988382,
+  "workflow_url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44985988382",
+  "source": "GitHub workflow job logs retrieved through the connected GitHub tool",
+  "jobs": [
+    {
+      "id": 137096541822,
+      "name": "unit-tests",
+      "platform": "Linux",
+      "observed_status": "failure",
+      "tests_run": 196,
+      "errors": 1,
+      "failures": 0,
+      "skipped": 11
+    },
+    {
+      "id": 137096542017,
+      "name": "windows-probes",
+      "platform": "Windows",
+      "observed_status": "failure",
+      "tests_run": 196,
+      "errors": 3,
+      "failures": 2,
+      "skipped": 12
+    }
+  ],
+  "observed_failures_and_fixes": [
+    {
+      "test": "test_sources_splits_and_shared_labels_reproduce",
+      "platforms": [
+        "Linux",
+        "Windows"
+      ],
+      "error": "FileNotFoundError: packages/0.12.2/kx47Runtime/latin_dictionary.json.gz",
+      "cause": "Clean CI checkout intentionally lacks the multi-gigabyte restored baseline before unit tests.",
+      "fix": "Bundle exact two audited lexical gzip resources (1,843,222 bytes total), validate stored SHA256, and reproduce using that small fallback. Store source identities as POSIX paths on all hosts."
+    },
+    {
+      "test": "test_selected_scope_matches_authoritative_file",
+      "platforms": [
+        "Windows"
+      ],
+      "error": "UnicodeDecodeError from cp1252 while reading selected_languages.json",
+      "fix": "Read the UTF-8 catalogue explicitly as UTF-8."
+    },
+    {
+      "test": "test_crash_journal_recovers_previous_files_and_state",
+      "platforms": [
+        "Windows"
+      ],
+      "error": "PackageError caused by Unsafe transaction directory",
+      "cause": "Resolved long directory spelling compared against an unresolved Windows temporary-root alias.",
+      "fix": "Resolve roots at both transaction recovery and locking boundaries; add portable relative-root regression."
+    },
+    {
+      "test": "test_write_failure_rolls_back_new_payload_and_registry",
+      "platforms": [
+        "Windows"
+      ],
+      "error": "Expected injected OSError was not raised",
+      "cause": "Test injection compared resolved destination with unresolved Windows alias, so it never injected the write failure.",
+      "fix": "Compare both destination paths after resolve(); preserve rollback assertions."
+    },
+    {
+      "test": "test_archive_path_escape_rejected: inside\\escape",
+      "platforms": [
+        "Windows"
+      ],
+      "error": "Expected ValueError was not raised",
+      "cause": "ZipInfo constructor normalized the backslash to a slash when the fixture was built on Windows.",
+      "fix": "Set the raw ZipInfo.filename after construction so extraction sees the actual prohibited backslash; production rejection remains unchanged."
+    }
+  ],
+  "local_validation": {
+    "platform": "Linux",
+    "full_suite_before_final_two_new_regressions": {
+      "tests": 201,
+      "result": "passed",
+      "seconds": 9.444
+    },
+    "focused_word_classifier": {
+      "tests": 11,
+      "result": "passed",
+      "seconds": 3.833
+    },
+    "focused_release_build": {
+      "tests": 18,
+      "result": "passed"
+    },
+    "focused_upgrade_packages": {
+      "tests": 9,
+      "result": "passed"
+    }
+  },
+  "windows_rerun_after_fixes": "not_yet_observed",
+  "windows_engine_model_tests_in_failed_run": "not_executed; blocked by unit-test failure",
+  "nvda_audio_verification_in_failed_run": "not_executed"
+}

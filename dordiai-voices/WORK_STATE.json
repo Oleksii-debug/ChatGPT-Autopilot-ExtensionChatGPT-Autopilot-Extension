@@ -38,7 +38,7 @@
     "latency_targets_verified": false,
     "first_remote_ci": "Missing NumPy in clean runner; dependency pin added, rerun pending"
   },
-  "pending_decisions": [
-    "Whether noncommercial-only optional models may be included; async question pending, no such weights adopted"
-  ]
+  "pending_decisions": [],
+  "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
+  "next_work": "Integrate available missing-language model families as optional packs and run real Windows validation"
 }

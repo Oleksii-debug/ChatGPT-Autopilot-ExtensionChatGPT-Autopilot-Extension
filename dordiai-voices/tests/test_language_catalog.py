@@ -33,7 +33,7 @@ class CatalogTest(unittest.TestCase):
         (self.runtime / "wide_voice_index.json").write_text(json.dumps(entries))
 
     def test_selected_scope_matches_authoritative_file(self):
-        selected = json.loads((ROOT / "selected_languages.json").read_text())["languages"]
+        selected = json.loads((ROOT / "selected_languages.json").read_text(encoding="utf-8"))["languages"]
         self.assertEqual(135, len(selected))
         self.assertEqual([row["id"] for row in selected], [row["id"] for row in catalog._selected()])
 

@@ -1,0 +1,13 @@
+{
+  "kind": "real-resource-upgrade-roundtrip",
+  "result": {
+    "resource_packs": 3,
+    "voice_versions": 0,
+    "copied_files": 816,
+    "elapsed_seconds": 3.409
+  },
+  "old_registry_unchanged": true,
+  "new_packages_uninstalled_cleanly": true,
+  "old_packages_retained": true,
+  "windows_nvda_validation": false
+}

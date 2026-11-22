@@ -150,6 +150,7 @@ def migrate_installed_packages(old_root, new_root):
             migrated.update(files=owned, provided_by_core=provided)
             pending[identity] = migrated
 
+        manager._validate_dependencies(pending)
         resources = {identity: value["version"] for identity, value in pending.items()}
         manifest_text = (new_root / "manifest.ini").read_text(encoding="utf-8-sig")
         match = re.search(r'^version\s*=\s*[\"\']?([^\"\'\s]+)', manifest_text, re.MULTILINE)

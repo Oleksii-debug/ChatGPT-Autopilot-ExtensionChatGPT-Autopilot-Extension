@@ -1,0 +1,61 @@
+{
+  "onnxruntime": "1.32.0",
+  "sample": {
+    "kind": "deterministic-synthetic-harmonic-probe",
+    "sample_rate": 22050,
+    "samples": 44100
+  },
+  "encoders": {
+    "fp32": {
+      "shape": [
+        1,
+        256,
+        1
+      ],
+      "dtype": "float32",
+      "finite": true,
+      "norm": 11.958638191223145,
+      "deterministic_repeat": true,
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "input": {
+        "name": "spec",
+        "shape": [
+          "batch",
+          "time",
+          513
+        ]
+      }
+    },
+    "q8": {
+      "shape": [
+        1,
+        256,
+        1
+      ],
+      "dtype": "float32",
+      "finite": true,
+      "norm": 11.630775451660156,
+      "deterministic_repeat": true,
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "input": {
+        "name": "spec",
+        "shape": [
+          "batch",
+          "time",
+          513
+        ]
+      }
+    }
+  },
+  "fp32_q8_comparison": {
+    "cosine": 0.9664574265480042,
+    "max_abs_difference": 0.6605222225189209
+  },
+  "baseline_comparison": null,
+  "windows_nvda_audio_verified": false,
+  "interpretation": "real CPU graph execution and conditioning-vector validation; not native pronunciation or end-user audio acceptance"
+}

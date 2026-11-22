@@ -109,6 +109,9 @@ def _recover_transaction(root):
     the first rename and retained if a Windows file lock prevents recovery.
     Unknown or externally modified files are preserved rather than guessed at.
     """
+    # Normalize both sides of containment checks. Windows temp paths can use
+    # 8.3 aliases while resolve() returns the long directory spelling.
+    root = Path(root).resolve()
     journal = _journal_path(root)
     if not journal.exists():
         return
@@ -277,6 +280,7 @@ def _read_manifest(archive):
 
 @contextmanager
 def _locked(root):
+    root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
     lock = root / "kx47Runtime" / ".resource-install.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)
@@ -336,7 +340,7 @@ def _process_alive(pid):
 def list_installed_packs(addon_root=None):
     """Return metadata (without large file lists) suitable for an accessible UI."""
     state = _state(_root(addon_root))
-    return [{key: value for key, value in pack.items() if key != "files"}
+    return [{key: value for key, value in pack.items() if key not in {"files", "provided_by_core"}}
             for _, pack in sorted(state["packs"].items())]
 
 
@@ -362,6 +366,26 @@ def inspect_pack(archive_path):
         raise PackageError("Не вдалося відкрити пакет ресурсів.") from exc
 
 
+def _validate_dependencies(packs):
+    visiting, complete = set(), set()
+
+    def visit(identity):
+        if identity in visiting:
+            raise PackageError("Циклічна залежність пакетів: " + identity)
+        if identity in complete:
+            return
+        visiting.add(identity)
+        for dependency in packs[identity].get("dependencies", []):
+            if dependency not in packs:
+                raise PackageError("Спочатку встановіть залежність: " + dependency)
+            visit(dependency)
+        visiting.remove(identity)
+        complete.add(identity)
+
+    for identity in packs:
+        visit(identity)
+
+
 def install_pack(archive_path, addon_root=None):
     root = _root(addon_root)
     with _locked(root):
@@ -379,6 +403,8 @@ def install_pack(archive_path, addon_root=None):
                     raise PackageError("Спочатку встановіть залежність: " + dependency)
             previous = state["packs"].get(meta["id"], {})
             old_files = previous.get("files", {})
+            _validate_dependencies(dict(state["packs"], **{meta["id"]: meta}))
+            provided = {}
             owners = {name.casefold(): pack_id for pack_id, pack in state["packs"].items()
                       for name in pack.get("files", {})}
             for name in set(old_files) | set(meta["files"]):
@@ -387,9 +413,14 @@ def install_pack(archive_path, addon_root=None):
                 if owner is not None and owner != meta["id"]:
                     raise PackageError("Файл належить іншому пакету: " + name)
                 if target.exists() and name not in old_files:
-                    raise PackageError("Пакет не може замінити наявний файл ядра: " + name)
+                    record = meta["files"][name]
+                    if target.is_file() and target.stat().st_size == record["size_bytes"] and _hash(target) == record["sha256"]:
+                        provided[name] = record
+                    else:
+                        raise PackageError("Пакет не може замінити наявний файл ядра: " + name)
                 if name in old_files and (not target.is_file() or _hash(target) != old_files[name]["sha256"]):
                     raise PackageError("Встановлений файл змінено; автоматична заміна скасована: " + name)
+            meta = dict(meta, files={name: record for name, record in meta["files"].items() if name not in provided}, provided_by_core=provided)
             total = sum(value["size_bytes"] for value in meta["files"].values())
             if shutil.disk_usage(root).free < total + 32 * 1024 * 1024:
                 raise PackageError("Недостатньо вільного місця для перевірки та встановлення пакета.")
@@ -437,7 +468,8 @@ def install_pack(archive_path, addon_root=None):
                 if not _journal_path(root).exists():
                     shutil.rmtree(temporary, ignore_errors=True)
             return {"id": meta["id"], "version": meta["version"], "restart_required": True,
-                    "installed_files": len(meta["files"]), "installed_bytes": total}
+                    "installed_files": len(meta["files"]), "installed_bytes": total,
+                    "provided_by_core_files": len(provided)}
 
 
 def uninstall_pack(pack_id, addon_root=None):

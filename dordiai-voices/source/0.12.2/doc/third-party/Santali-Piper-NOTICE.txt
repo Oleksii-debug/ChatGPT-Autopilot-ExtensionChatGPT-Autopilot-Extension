@@ -1,0 +1,9 @@
+Santali Piper VITS and Ol Chiki phonemizer
+Author/model publisher: kaushalkrishnax
+Source: https://huggingface.co/kaushalkrishnax/santali-piper-vits
+Pinned revision: 50da29423065a25393d58d48d83de21ad85c4d4d
+Model-card license: Apache-2.0
+The runtime santali_phonemizer.py retains the upstream implementation and documentation.
+Model weights are installed as an optional resource, separately from the shared engine code.
+Model training source: AI4Bharat Rasa Santali Female corpus.
+This notice is not a claim of native-speaker or NVDA acoustic acceptance.

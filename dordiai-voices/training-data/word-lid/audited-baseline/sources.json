@@ -1,0 +1,24 @@
+{
+  "format": "dordiai-audited-lexical-sources",
+  "format_version": 1,
+  "source": "Exact recovered bytes from user-provided dordiai-voices-0.12.2.nvda-addon; no retraining or preprocessing applied here.",
+  "purpose": "Reproduce the compact word-language classifier in clean CI without restoring the multi-gigabyte speech engines.",
+  "attribution": "Recovered package identifies FrequencyWords 2018 by Hermit Dave, derived from OpenSubtitles, for its Latin lexical resource; original notice retained in source/0.12.2/doc/third-party/FrequencyWords.txt.",
+  "license": "Per-file notices below; copying recovered bytes does not establish additional upstream rights.",
+  "files": [
+    {
+      "path": "latin_dictionary.json.gz",
+      "bytes": 1730689,
+      "sha256": "cfd2b15e2e6893c4f9a07c18dc617fd3a8122477036f178ae7e078db3171efb9",
+      "license": "CC BY-SA 4.0",
+      "notice": "source/0.12.2/doc/third-party/FrequencyWords.txt"
+    },
+    {
+      "path": "models/WideLanguages/wide_words.json.gz",
+      "bytes": 112533,
+      "sha256": "cacae56b3af199580ee70ff2a8bb3cc683427955e84c2eb676709c645036b0f5",
+      "license": "Not separately identified in recovered package; retain recovered-package provenance.",
+      "notice": "Recovered runtime WideLanguages lexical resource; no new authorship or license claimed."
+    }
+  ]
+}

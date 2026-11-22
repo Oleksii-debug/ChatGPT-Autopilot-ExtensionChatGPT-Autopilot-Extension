@@ -1,0 +1,111 @@
+{
+  "sat": {
+    "repository": "kaushalkrishnax/santali-piper-vits",
+    "revision": "50da29423065a25393d58d48d83de21ad85c4d4d",
+    "license": "Apache-2.0",
+    "files": {
+      "README.md": {
+        "size_bytes": 7197,
+        "sha256": null,
+        "git_blob": "6a897d5c2d39453d4de65a89374f989809494337"
+      },
+      "model/santali_piper_vits.onnx": {
+        "size_bytes": 63502227,
+        "sha256": "4b77ff657567a9163f99e7128fd832e2db95bba1aedf44310e6e60ebf3c11970",
+        "git_blob": "5d4e8ae5425fdb1b65b1e2a6660724e7ce925232"
+      },
+      "model/santali_piper_vits.onnx.json": {
+        "size_bytes": 7225,
+        "sha256": null,
+        "git_blob": "710618753c1efb638e197904deae32e70cff7d48"
+      },
+      "phoneme_id_map.json": {
+        "size_bytes": 5363,
+        "sha256": null,
+        "git_blob": "e88aa192665510eadda1e5865ab25bb8e8ac6022"
+      },
+      "runtime_config.json": {
+        "size_bytes": 561,
+        "sha256": null,
+        "git_blob": "58c86db095b27d194a26c5691c2d3acde1953083"
+      },
+      "santali_phonemizer.py": {
+        "size_bytes": 6324,
+        "sha256": null,
+        "git_blob": "940152c93c91c67070250b6ea0a8b80cdf656247"
+      }
+    }
+  },
+  "omni": {
+    "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+    "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+    "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
+    "files": {
+      "README.md": {
+        "size_bytes": 4247,
+        "sha256": null,
+        "git_blob": "9cc7495d540dc7aa86084bf596aaaa221e93182f"
+      },
+      "LICENSE-HIGGS-AUDIO-2.txt": {
+        "size_bytes": 9171,
+        "sha256": null,
+        "git_blob": "000139f87ffdc03106fc422a3bd3cebebb9808b3"
+      },
+      "SHA256SUMS": {
+        "size_bytes": 844,
+        "sha256": null,
+        "git_blob": "402bad7ab9970c15e733155fedf4ae7376c2c879"
+      },
+      "backbone.int8.onnx": {
+        "size_bytes": 993287060,
+        "sha256": "241610742675b990eb1cc50b32a86d7088762e43f070a8db36a501227ff855b7",
+        "git_blob": "a3d76c854a63b4b23889ab1265790963f750258a"
+      },
+      "config.json": {
+        "size_bytes": 2238,
+        "sha256": null,
+        "git_blob": "dd518e816a5c4c8eba90820bb7efa49ceafbe223"
+      },
+      "tokenizer.json": {
+        "size_bytes": 11423986,
+        "sha256": "408f669b7e2b045fdf54201d815bd364e6667dbd845115da81239c40bc6dcfd1",
+        "git_blob": "4bd3453b51a69da3095ad7f5d41c6492bfa8b161"
+      },
+      "tokenizer_config.json": {
+        "size_bytes": 533,
+        "sha256": null,
+        "git_blob": "a7fb6f8558cce2a23d4cbb186a4a740bd2d9d481"
+      },
+      "chat_template.jinja": {
+        "size_bytes": 4168,
+        "sha256": null,
+        "git_blob": "01be9b307daa2d425f7c168c9fb145a286e0afb4"
+      },
+      "preprocessor_config.json": {
+        "size_bytes": 206,
+        "sha256": null,
+        "git_blob": "aa7431e986f9e13157c60e04be8f52501b718254"
+      },
+      "vocoder.fp32.onnx": {
+        "size_bytes": 803873,
+        "sha256": "cfea73af6cf8fe93d16f18e4f8c4a54c9bf37389d5c296e49a896dc3a04c9e4c",
+        "git_blob": "6a858f50d07d682ee1ca15b24b66181c648a16ca"
+      },
+      "vocoder.fp32.onnx.data": {
+        "size_bytes": 86310912,
+        "sha256": "ebbdf1cf7ddb8502fa02abf13be9ca0554657954b455cffd839440238da8ffc3",
+        "git_blob": "8d3a5a7198ac53fa670d925e48e630e5e5233338"
+      },
+      "encoder.fp32.onnx": {
+        "size_bytes": 654395766,
+        "sha256": "8e9697cf64ad4a2b66b6ae8cf2eedc2e3d80732568fde0ee6177164d8b32fbb9",
+        "git_blob": "470e01f0d9e05c89b877d37312b6ae62ba01c2f1"
+      },
+      "LICENSE-LLAMA3.txt": {
+        "size_bytes": 12403,
+        "sha256": null,
+        "git_blob": "1fec50c8afa68c72420930e6712c88780426457b"
+      }
+    }
+  }
+}

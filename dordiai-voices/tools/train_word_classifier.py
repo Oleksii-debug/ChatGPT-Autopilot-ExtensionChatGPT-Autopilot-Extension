@@ -24,6 +24,26 @@ SEED = "dordiai-word-split-v1:"
 LATIN_CODES = ("en", "sk", "pl", "de", "fr", "da", "it", "es")
 
 
+def lexical_source(relative, baseline=BASELINE, bundled=None):
+    """Use audited restored resources or their small, exact CI copies.
+
+    The acoustic models are deliberately absent from git. Reproducing word
+    splits needs only these two lexical gzip files, not the entire add-on.
+    """
+    original = Path(baseline) / relative
+    if original.is_file():
+        return original.read_bytes()
+    directory = Path(bundled) if bundled is not None else ROOT / "training-data/word-lid/audited-baseline"
+    manifest = json.loads((directory / "sources.json").read_text(encoding="utf-8"))
+    expected = next((row for row in manifest.get("files", []) if row.get("path") == relative), None)
+    if expected is None:
+        raise ValueError("No audited lexical source record: " + relative)
+    blob = (directory / relative).read_bytes()
+    if len(blob) != expected["bytes"] or sha256(blob).hexdigest() != expected["sha256"]:
+        raise ValueError("Audited lexical source checksum mismatch: " + relative)
+    return blob
+
+
 @lru_cache(maxsize=1)
 def load_runtime():
     spec = importlib.util.spec_from_file_location("training_word_classifier", RUNTIME / "word_classifier.py")
@@ -48,8 +68,7 @@ def gather(runtime, baseline=BASELINE, training_data=None):
     corpus = defaultdict(set)
     sources = []
     for relative in ("latin_dictionary.json.gz", "models/WideLanguages/wide_words.json.gz"):
-        path = baseline / relative
-        blob = path.read_bytes()
+        blob = lexical_source(relative, baseline)
         sources.append({"path": relative, "sha256": sha256(blob).hexdigest(), "bytes": len(blob)})
         data = json.loads(gzip.decompress(blob))
         for raw_word, labels in data.items():
@@ -82,7 +101,7 @@ def gather(runtime, baseline=BASELINE, training_data=None):
         if sha256(original).hexdigest() != row["source_sha256"]:
             raise ValueError("Original training source checksum mismatch: " + str(path))
         code = canonical(row["language"])
-        sources.append(dict(row, path=str(path.relative_to(ROOT))))
+        sources.append(dict(row, path=path.relative_to(ROOT).as_posix()))
         if code not in allowed:
             continue
         word_frequencies = Counter()

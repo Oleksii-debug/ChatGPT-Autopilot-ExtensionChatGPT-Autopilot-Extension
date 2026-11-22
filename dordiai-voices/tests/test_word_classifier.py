@@ -4,6 +4,7 @@ from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +59,23 @@ class RuntimePolicyTests(unittest.TestCase):
         self.assertEqual(classifier.predict("helloпривіт"), (None, 0.))
 
 
+class LexicalInputTests(unittest.TestCase):
+    def test_bundled_lexical_inputs_are_checked_before_use(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundled = root / "bundled"
+            bundled.mkdir()
+            blob = b"audited lexical bytes"
+            (bundled / "fixture.gz").write_bytes(blob)
+            (bundled / "sources.json").write_text(json.dumps({"files": [{
+                "path": "fixture.gz", "bytes": len(blob), "sha256": sha256(blob).hexdigest(),
+            }]}), encoding="utf-8")
+            self.assertEqual(trainer.lexical_source("fixture.gz", root / "absent", bundled), blob)
+            (bundled / "fixture.gz").write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+                trainer.lexical_source("fixture.gz", root / "absent", bundled)
+
+
 @unittest.skipUnless((RUNTIME / "models/WordLanguage/word-lid.json.gz").is_file(), "Train compact model first")
 class ReproducibilityTests(unittest.TestCase):
     @classmethod
@@ -70,7 +88,11 @@ class ReproducibilityTests(unittest.TestCase):
         self.assertLess(path.stat().st_size, 2 * 1024 * 1024)
 
     def test_sources_splits_and_shared_labels_reproduce(self):
-        corpus, sources, lexicon = trainer.gather(runtime)
+        # A clean checkout has no multi-gigabyte restored speech package.
+        # Reproduce using the small exact audited lexical inputs committed
+        # with the trainer, even when a local baseline happens to exist.
+        with tempfile.TemporaryDirectory() as absent_baseline:
+            corpus, sources, lexicon = trainer.gather(runtime, baseline=Path(absent_baseline))
         self.assertTrue({"uk", "ru"} <= lexicon["голос"])
         partitions = {name: set() for name in ("train", "validation", "test")}
         trained_codes = set(self.report["languages"])

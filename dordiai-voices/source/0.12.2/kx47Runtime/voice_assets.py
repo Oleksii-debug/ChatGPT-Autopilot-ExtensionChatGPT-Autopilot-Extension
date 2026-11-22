@@ -95,6 +95,10 @@ def validate_adapter(document):
         raise PackageError("An adapter asset role must identify exactly one file")
     if not REQUIRED_ROLES[engine] <= set(roles):
         raise PackageError("The voice is missing required engine profile data")
+    for prefix in ("native_letters", "native_commands"):
+        pair = {prefix + "_index", prefix + "_audio"}
+        if pair.intersection(roles) and not pair <= set(roles):
+            raise PackageError("The prepared voice bank must include both index and audio")
     if not set(document.get("styles", ["neutral"])) <= SUPPORTED_STYLES[engine]:
         raise PackageError("This adapter currently supports neutral speech only")
     for name, value in document["files"].items():
