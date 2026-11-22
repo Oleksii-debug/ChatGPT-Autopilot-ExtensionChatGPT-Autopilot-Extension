@@ -1,0 +1,172 @@
+{
+  "format": "dordiai-source14-local-artifact-receipt",
+  "run_id": 45069226971,
+  "artifact_id": 14773140319,
+  "zip_bytes": 1741650,
+  "zip_sha256": "21f99f49a2e0ca395cca27913ea4e5d2fd7973977c2d67e1252df2081913bb76",
+  "all_member_crc_verified": true,
+  "members": {
+    "build.json": {
+      "bytes": 42833,
+      "sha256": "bbf03060ffaf3a94ab1840d0c8df0fbd044bda7e82e9e543902298babe0df5a6"
+    },
+    "default-engines/en-sara-1.wav": {
+      "bytes": 204418,
+      "sha256": "06efe947896c3e02a32331c1dbcfd4fd4a52a50e1f7f7ea6b4bcc243727861b8"
+    },
+    "default-engines/cancel-recovery.wav": {
+      "bytes": 175004,
+      "sha256": "20aff4af87ef2d0560ae64067f7e79b9cf802a8e00d7f4ec56352d497b7911de"
+    },
+    "default-engines/native-extension-inherited-stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "default-engines/native-extension-reset-stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "default-engines/report.json": {
+      "bytes": 21330,
+      "sha256": "96880a3c34b345c495aee7fa4c3a7dfca17882d2a2e5898452dabef1c7725071"
+    },
+    "default-engines/ru-sara-1.wav": {
+      "bytes": 171098,
+      "sha256": "793c68b4e5c18979d5eaebb027124ecd31325073653d0369dfac3c4dfb74fb44"
+    },
+    "default-engines/uk-dictionary-regression.wav": {
+      "bytes": 239324,
+      "sha256": "d60958813ec04e20bb611db9146ebbd3af7871c3a927186f0116c955a26c7733"
+    },
+    "default-engines/uk-sara-1.wav": {
+      "bytes": 285884,
+      "sha256": "4c9a9c86f98a06ade934aa22ac48a7ffa6e7b2d37bcc052fa66e2acf6c6bb171"
+    },
+    "default-engines/worker-stderr.log": {
+      "bytes": 1360,
+      "sha256": "4c3adcaccfb667ad12df175c124d3c8cbbb6622fd322f64f915196c868398979"
+    },
+    "network-policy.json": {
+      "bytes": 490,
+      "sha256": "b86259438b5b1ff833271e0637c26f90d83ac5e8b0704daa8c20d3b026703bee"
+    },
+    "nvda-core-menus/nvda-console.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-core-menus/nvda-probe.json": {
+      "bytes": 44930,
+      "sha256": "3dc8c6581773ac7999360ad01bdc1192711aa12cefab2b288c29839429af5459"
+    },
+    "nvda-core-menus/nvda.log": {
+      "bytes": 41675,
+      "sha256": "7781767788f6210dba22fa70f18fa994bd5fd353f01b2d815f844ae2ed477052"
+    },
+    "nvda-core-menus/pcm-api_latency.wav": {
+      "bytes": 384044,
+      "sha256": "6e29a92ca2cd0a237f686ab8b907c07d829b96131e85c978acf5678de6beaaa3"
+    },
+    "nvda-core-menus/pcm-character.wav": {
+      "bytes": 8924,
+      "sha256": "915042a6a15b04b089298809c0bbbc8e8bd1ce9b717073383744a01602fe911b"
+    },
+    "nvda-core-menus/pcm-phrase.wav": {
+      "bytes": 144834,
+      "sha256": "58b5be443fc45d8a4446aacd41a192289ae9723e39b3142795b676dc62a3cd77"
+    },
+    "nvda-core-menus/portable-creation-console.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-core-menus/portable-creation.log": {
+      "bytes": 5040,
+      "sha256": "24720effd2fb13a2072066f5bde7b9f53084ffb3a83156f460ba56d11a3418ee"
+    },
+    "nvda-core-menus/windows-nvda-probe.json": {
+      "bytes": 51654,
+      "sha256": "9b4031426c9b17f738efd9c57a5e23060800bb35ff4c1d6200ba37b70a98ec88"
+    },
+    "nvda-functional.json": {
+      "bytes": 204245,
+      "sha256": "0d6bed65556e8cfb9898d0c42c10d8620be52565d1431ade12791fc8ecb17145"
+    },
+    "nvda-typing/nvda-console.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-typing/nvda-probe.json": {
+      "bytes": 73621,
+      "sha256": "4ab8216700397dd557095c84dfbc1a88363bce68336b26290b4b872bf1cfc24c"
+    },
+    "nvda-typing/nvda.log": {
+      "bytes": 51811,
+      "sha256": "df48f31b378472e7512cbb65911d3a56e04dd506ee5db753bbe8eef1a609eb8f"
+    },
+    "nvda-typing/pcm-typing-en-2.wav": {
+      "bytes": 19244,
+      "sha256": "7f4f26e8cf2a115f4ae719a0ced10c15f6954afd9582a6e35cab62f14dde3ecd"
+    },
+    "nvda-typing/pcm-typing-en-3.wav": {
+      "bytes": 14204,
+      "sha256": "cd2bb4a79056d3372d4f29f5289b33095e0fa2dc1fd8a943f15490e31e926999"
+    },
+    "nvda-typing/pcm-typing-en-4.wav": {
+      "bytes": 37162,
+      "sha256": "2102aa688035c53c145c5ce067767ec7e897c0fa0fb3119640b4d90f2682dbfe"
+    },
+    "nvda-typing/pcm-typing-layout-en.wav": {
+      "bytes": 81510,
+      "sha256": "838cb8aa27b5e1c626275b1e29ab0970c346f6ee5e484f7c39d665f12a5a417a"
+    },
+    "nvda-typing/pcm-typing-layout-ru.wav": {
+      "bytes": 74300,
+      "sha256": "8d9a30d93f6bdc86cb405e6abdec5d57df65a2b2c311a83d436db58ac075f6e7"
+    },
+    "nvda-typing/pcm-typing-layout-uk.wav": {
+      "bytes": 25012,
+      "sha256": "0b24f9a2189284418caf04f8cef5e6221bb8c42391fa96c1375aa67a781a8fd7"
+    },
+    "nvda-typing/pcm-typing-ru-5.wav": {
+      "bytes": 11804,
+      "sha256": "cad3178a7462dd3a91c0fbafa560842adaad991d1af1493fe7545dea750bad3b"
+    },
+    "nvda-typing/pcm-typing-ru-6.wav": {
+      "bytes": 15164,
+      "sha256": "66ef97b60c563f8e01c9ff27d6ea6f1a6255d37159cde198295a84e879094617"
+    },
+    "nvda-typing/pcm-typing-ru-7.wav": {
+      "bytes": 14924,
+      "sha256": "40d5e27c219e1bec246e9ca9eba1e704a064a3209cb7c6b38c3f198d7aafe29e"
+    },
+    "nvda-typing/pcm-typing-ru-8.wav": {
+      "bytes": 51740,
+      "sha256": "eaf5a8d9302086fdc56c072b8ed8feadac4be13419175820b253fa48213b657c"
+    },
+    "nvda-typing/pcm-typing-uk-0.wav": {
+      "bytes": 8924,
+      "sha256": "915042a6a15b04b089298809c0bbbc8e8bd1ce9b717073383744a01602fe911b"
+    },
+    "nvda-typing/pcm-typing-uk-1.wav": {
+      "bytes": 20924,
+      "sha256": "73c549851bcfb79953efffc3108bc27f4a1835788a2a8fe41c9e8a98542fd1a6"
+    },
+    "nvda-typing/portable-creation-console.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-typing/portable-creation.log": {
+      "bytes": 5032,
+      "sha256": "938fbebd9ab85f9f7e49b291da0a41e694e7f513742627391dfba56ab1cc9967"
+    },
+    "nvda-typing/windows-nvda-probe.json": {
+      "bytes": 82107,
+      "sha256": "ff38f3a845781bba514fe7460c7b00a9bff2c2f9e97a5fb18ae4be7b17218af0"
+    },
+    "worker-default3.json": {
+      "bytes": 62321,
+      "sha256": "2bdb15087512cd25ce155467f5d8ff2aadaaff97d961db49194a8b83ba549d53"
+    }
+  },
+  "scope": "Exact same Actions artifact archive locally verified; no acoustic or physical latency claim",
+  "product_ready": false
+}

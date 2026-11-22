@@ -1,0 +1,1183 @@
+{
+  "format": "dordiai-source13-native-QPC-cancel-diagnostics",
+  "format_version": 1,
+  "source_groups": [
+    {
+      "name": "baseline-12-24-32",
+      "run_id": 45061544904,
+      "artifact_id": 14770561254,
+      "zip_bytes": 30299443,
+      "zip_sha256": "a9005dbf902ca92402044d8b4754c0ab32da863208a075c9baa68d1d09808258",
+      "directory": "source13-prefetch-45061544904",
+      "zip": "source13-prefetch-45061544904.zip",
+      "indexed_files_verified": 121,
+      "evidence_index_sha256": "0c478fcbaa3edc16b0d81b4dd37d991c9763c9130ea25049b71336e30082f3bd"
+    },
+    {
+      "name": "extended-32-64-128",
+      "run_id": 45064826804,
+      "artifact_id": 14771821304,
+      "zip_bytes": 30172616,
+      "zip_sha256": "49e09fb53aabb45b0610f45131ec9dee50889e9c68ec76d9570e2ba0e42befae",
+      "directory": "source13-prefetch-extended-45064826804",
+      "zip": "source13-prefetch-extended-45064826804.zip",
+      "indexed_files_verified": 121,
+      "evidence_index_sha256": "a4984856f4bf5fecf9c4f1caac1f6989e1ff191b65062979cff9f7e05f8b04c0"
+    }
+  ],
+  "actual_trials": 12,
+  "rows": [
+    {
+      "experiment": "baseline-12-24-32",
+      "source_run_id": 45061544904,
+      "folder": "nvda-6014bebeb992453b88f42c20238ab625",
+      "ordinal": 1,
+      "pending_count": 12,
+      "owned_nvda_pid": 3120,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 52803,
+          "sha256": "64bab10bf01b892cef3e7f701de3c365b462cdd290648771c87f7d1c9251935c"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12139,
+          "sha256": "9a37e50a01a45d080157dd38572ea6d72255f7fda9c1bcb4bbd0a0a743cba259"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "15fc0d423b2f660fc325a1554d6e0bbcd2ad158b89998212b1ca40cc22b6a70f"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146237,
+          "sha256": "b47413a819761d1bc4878c5ca6bd0aa2429ee46e1cdc1f3d256ba8e2f86da906"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "420dd13ac7e5315fbf946804b572de9409ae0a67d581f7373b8827f144c06bb2"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 26364,
+          "sha256": "79163b52d8c1cdd669df2a5d31fde57716e30a2466c6fc32c3c58922265eff45"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 446559735000,
+          "perf_before_cancel_ns": 446559181900,
+          "qpc_after_cancel": 4465597336,
+          "qpc_before_cancel": 4465591832,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5504,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 33,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7240.0,
+        "software_signal_tail_interval_ms": [
+          41.5109,
+          52.0613
+        ],
+        "last_active_window": {
+          "packet": 73,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 17520,
+          "first_sample_API_QPC_100ns_fraction": [
+            4466012445,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            4466112445,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "baseline-12-24-32",
+      "source_run_id": 45061544904,
+      "folder": "nvda-ca474f586d9846738e210fa03f76d622",
+      "ordinal": 2,
+      "pending_count": 24,
+      "owned_nvda_pid": 2644,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40442,
+          "sha256": "bfd4812a0da5703d2c3e1a59abb8e08f59e647320f9c34087a7b80b90b0dd3db"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12139,
+          "sha256": "534583f259c9e2e9b379f6ac43c1e22550758f301484ba8289a8e096d13a2388"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "44b2b3a0454823de80675191fa1b052874553f6d971f4c3de5fc17715ebcad4e"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146231,
+          "sha256": "2af6e982a0b0fd3b937304ba4c20ad2f913f79c689ac06896084f04947b07513"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "e9220571d07cf88ddc65b413b9d0f72946f815675bccc59934cc79c8200c8007"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 26364,
+          "sha256": "79163b52d8c1cdd669df2a5d31fde57716e30a2466c6fc32c3c58922265eff45"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 591257624400,
+          "perf_before_cancel_ns": 591257070300,
+          "qpc_after_cancel": 5912576226,
+          "qpc_before_cancel": 5912570724,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5502,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 33,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7300.0,
+        "software_signal_tail_interval_ms": [
+          36.3699,
+          46.9201
+        ],
+        "last_active_window": {
+          "packet": 67,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 16080,
+          "first_sample_API_QPC_100ns_fraction": [
+            5912939925,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            5913039925,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "baseline-12-24-32",
+      "source_run_id": 45061544904,
+      "folder": "nvda-f9677a76a1594463b0ae125133aafe1f",
+      "ordinal": 3,
+      "pending_count": 32,
+      "owned_nvda_pid": 5508,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 52248,
+          "sha256": "5617ff8750f85c541dfc08dcaaf7f6ba4af547db34b831aaf67244d18880a9fc"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12005,
+          "sha256": "5e16172dc5e47e660ab7fa3c2b8d647ca74b6f7fad722b319d29c007b38c448b"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "0a2b38b02ed893f628590e3cfd122465389d4ea91742612cb71cb0af10607005"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146231,
+          "sha256": "734d6e84de74feb5ae176f71ed6d3ac8b65296f704fc78036e9bb3a995448eef"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "8008e616012b14a68aec14af39833cbca35ad62b01362d42085dadcb5c69831d"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25884,
+          "sha256": "40a6bc195b35d2e19913e98cd1b270a2ac21b4320f23f6fcdb36f00203d5f8da"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 737841436000,
+          "perf_before_cancel_ns": 737840878500,
+          "qpc_after_cancel": 7378414347,
+          "qpc_before_cancel": 7378408800,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5547,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 34,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7250.0,
+        "software_signal_tail_interval_ms": [
+          45.6031,
+          56.1578
+        ],
+        "last_active_window": {
+          "packet": 72,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 17280,
+          "first_sample_API_QPC_100ns_fraction": [
+            7378870378,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            7378970378,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "baseline-12-24-32",
+      "source_run_id": 45061544904,
+      "folder": "nvda-14de97147c1a4a7e86c735a3108acf79",
+      "ordinal": 4,
+      "pending_count": 32,
+      "owned_nvda_pid": 8188,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40439,
+          "sha256": "1d815536730c5cb0a54c398313dd5ef93f249c46cc5b1e9db7a0cf7fae15f616"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12005,
+          "sha256": "6d45b1788c3c19d54d55d75a5f1dcb201a3b946965b21c43e7ef35680ea00616"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "2eab544a196e510020bc152fd2b5d91bd79dfeee0edfc7349737f1e8b15922a7"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146237,
+          "sha256": "9a259a1d7e5a81ad95613b6d92d8c773c1767eba9682e3e2b3e2b1a216676201"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "391294e6d4d6def5f1c99cc0ac8934a4a7c8cbfa4a6885711b782d75ff73b2c8"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25884,
+          "sha256": "40a6bc195b35d2e19913e98cd1b270a2ac21b4320f23f6fcdb36f00203d5f8da"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 882543812600,
+          "perf_before_cancel_ns": 882543200100,
+          "qpc_after_cancel": 8825438110,
+          "qpc_before_cancel": 8825432018,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.6092,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 33,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7300.0,
+        "software_signal_tail_interval_ms": [
+          36.3662,
+          46.9754
+        ],
+        "last_active_window": {
+          "packet": 67,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 16080,
+          "first_sample_API_QPC_100ns_fraction": [
+            8825801772,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            8825901772,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "baseline-12-24-32",
+      "source_run_id": 45061544904,
+      "folder": "nvda-7c883197561445dea0f2e6ae71a9771e",
+      "ordinal": 5,
+      "pending_count": 24,
+      "owned_nvda_pid": 1264,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 52376,
+          "sha256": "d50df80b499a9f4d8c3594001e36e0aa881c720281d089f74dde742300e6510f"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12117,
+          "sha256": "2e0a7ff2279e651fef7197a722d0ddbbb1ee1a5458898288e1b843bedc3b15d3"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6132,
+          "sha256": "e72af56f7007b746b8d8bb3b85ee07ec0add61d9a3bbf0f6fbba371412443cb0"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 147835,
+          "sha256": "9cfc3ffe99691a5a6c84df4bd0ce5295f674511eef6238d1e20e2ddc229f2416"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "5c5d59068d64e3a6f7c47e40d22be954a327b3aff5e898dfb243c501d2219107"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25884,
+          "sha256": "40a6bc195b35d2e19913e98cd1b270a2ac21b4320f23f6fcdb36f00203d5f8da"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 1027741714700,
+          "perf_before_cancel_ns": 1027741133600,
+          "qpc_after_cancel": 10277417130,
+          "qpc_before_cancel": 10277411346,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5784,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 32,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7280.0,
+        "software_signal_tail_interval_ms": [
+          29.905,
+          40.4834
+        ],
+        "last_active_window": {
+          "packet": 69,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 16560,
+          "first_sample_API_QPC_100ns_fraction": [
+            10277716180,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            10277816180,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "baseline-12-24-32",
+      "source_run_id": 45061544904,
+      "folder": "nvda-05719f171a5048e4a31449ff9d932f7c",
+      "ordinal": 6,
+      "pending_count": 12,
+      "owned_nvda_pid": 1672,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 52776,
+          "sha256": "56ee1fb88dbecfe6e658f9c016534de92c568d72f2eddac25e3a81f4f744c1c1"
+        },
+        "plugin-cancel.json": {
+          "bytes": 11981,
+          "sha256": "dc7a2eb78b6515b08c687693cb25da0a20a8c57655c98e5ebd350e8da39eb7c1"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6132,
+          "sha256": "1bab1d67d0ddf7a427e9d96bf10530f23c0d28cf552a7ac1a3910d66aaaee502"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 147829,
+          "sha256": "c787095bcbab1368b85af28c2c8780b68a18a087586b183ab849405893051cfa"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "de2f043f491ebce9e463a9132303ddda43e7cb30ce98634777ba72ae62f6a093"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25404,
+          "sha256": "e779332066f6c2948bb99352cfd714ee93c137d00bb2e4efc4cb33725033d8f2"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 1173351425500,
+          "perf_before_cancel_ns": 1173350777200,
+          "qpc_after_cancel": 11733514232,
+          "qpc_before_cancel": 11733507790,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.6442,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 31,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7290.0,
+        "software_signal_tail_interval_ms": [
+          32.2711,
+          42.9153
+        ],
+        "last_active_window": {
+          "packet": 68,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 16320,
+          "first_sample_API_QPC_100ns_fraction": [
+            11733836943,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            11733936943,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "extended-32-64-128",
+      "source_run_id": 45064826804,
+      "folder": "nvda-e88f143a86fb42f687efebc4b4cc8a18",
+      "ordinal": 1,
+      "pending_count": 32,
+      "owned_nvda_pid": 1064,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40597,
+          "sha256": "9e79dac7ba1e1fc8e6847333b4d1d61a2753058bb2196c1e4645c3692a30c717"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12138,
+          "sha256": "f3752bc8035bbcf2562a4a47d1faa43a03c2510c13e8e664016459a1f77ddc24"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "f23df23437ecbb315b5572241729b4e165c3b1455885fc550ccaa1add3b750e9"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146249,
+          "sha256": "e8b40ecab5ea3c2240e42d10e520ac0beb09f590ec2b73deb65f321973663ac5"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "dd34e5672ce7171240a31382c1ddcd984101f3152fa35486cf96076f7048ecc8"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 26084,
+          "sha256": "35c422a5dd078364d767a8b8c9fea5780928c1feb7f81b7ecf8473064039bcf5"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 354665051200,
+          "perf_before_cancel_ns": 354664407100,
+          "qpc_after_cancel": 3546650499,
+          "qpc_before_cancel": 3546644084,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.6415,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 34,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7200.0,
+        "software_signal_tail_interval_ms": [
+          29.084,
+          39.7255
+        ],
+        "last_active_window": {
+          "packet": 77,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 18480,
+          "first_sample_API_QPC_100ns_fraction": [
+            3546941339,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            3547041339,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "extended-32-64-128",
+      "source_run_id": 45064826804,
+      "folder": "nvda-19c6010ef3a84e1d853c8d851e4697e2",
+      "ordinal": 2,
+      "pending_count": 64,
+      "owned_nvda_pid": 1296,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40611,
+          "sha256": "1ed2d189d17afa288616fc97af1100b642050c1f6e4a59b877737b6ad485073d"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12004,
+          "sha256": "7613b4783ee25b1429255d9012134e4cf02c82fe8c2953847055957014a382a5"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "eda5f96c3d8400c551dce35274fe47595f4c9d12b373ef3546add3c15adebe00"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146249,
+          "sha256": "c773f1283632acc563b80c6ecd5256279877913474117749fad83c3c0d55de65"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "1bcd25dc686e651de91f9191d70b581baed14c98bef07ddb6e682fa078135613"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25604,
+          "sha256": "0ae1fdd1e965d350f7a7adfaaa8998807f7410e18b19dd368e5120c99d7fe679"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 501177891900,
+          "perf_before_cancel_ns": 501177303400,
+          "qpc_after_cancel": 5011778901,
+          "qpc_before_cancel": 5011773051,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.585,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 33,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7160.0,
+        "software_signal_tail_interval_ms": [
+          29.693,
+          40.278
+        ],
+        "last_active_window": {
+          "packet": 81,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 19440,
+          "first_sample_API_QPC_100ns_fraction": [
+            5012075831,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            5012175831,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "extended-32-64-128",
+      "source_run_id": 45064826804,
+      "folder": "nvda-41f19c3f13cf4b20a2184b1d1c739769",
+      "ordinal": 3,
+      "pending_count": 128,
+      "owned_nvda_pid": 8008,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40602,
+          "sha256": "552742cd1df86c89fa19dd099bacf787204c40c3920b6a9db4cf925d94b95198"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12004,
+          "sha256": "df6553d4271e88cfb084adb74eb3f19409abfce0b1248dbd6fdda671bca78ca9"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "2f8fb846d3a4e50b814b2e5173583f27d3aa3bb0cff45266ab39403af6e6b219"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146255,
+          "sha256": "e269bb6040d4b704e1473b2078ae0741966a5c336a680a67dd2641e71ec5a3db"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "b654d48d1023da4706b53e09ac01c095336d6c8319a0735279bea6f2c9ad6632"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25604,
+          "sha256": "0ae1fdd1e965d350f7a7adfaaa8998807f7410e18b19dd368e5120c99d7fe679"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 649038218200,
+          "perf_before_cancel_ns": 649037685200,
+          "qpc_after_cancel": 6490382169,
+          "qpc_before_cancel": 6490376870,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5299,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 33,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7170.0,
+        "software_signal_tail_interval_ms": [
+          25.3421,
+          35.872
+        ],
+        "last_active_window": {
+          "packet": 80,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 19200,
+          "first_sample_API_QPC_100ns_fraction": [
+            6490635590,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            6490735590,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "extended-32-64-128",
+      "source_run_id": 45064826804,
+      "folder": "nvda-0cdb223918ab4b1a8f68f37f5b709f25",
+      "ordinal": 4,
+      "pending_count": 128,
+      "owned_nvda_pid": 6916,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40611,
+          "sha256": "b2d3067cade02fdc44b65cff9b142621748699dbae8191d5b8c4da56cae254dd"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12272,
+          "sha256": "c404a93d05b9e11df2adc44a5c91e29a13863bb6ed6720e509234c2405af1cfc"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "7e78a351f462bd9740817a54e3cbc2f2ac3b9ee6b4e240af3d1ff992667159a5"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146255,
+          "sha256": "3a4ab55ff1e22b496ac98e1385954087b98108b02175073ca43b51904f80d138"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "4e4b2955adb74f01f32410df72bffca9daa792fe1ea1f6e6e701a76788ac8321"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 26564,
+          "sha256": "a668a602cdd44a7b78d6c561c9354e7bd12192d0a5d55c528f72a41a244b6a9d"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 809091438500,
+          "perf_before_cancel_ns": 809090798500,
+          "qpc_after_cancel": 8090914371,
+          "qpc_before_cancel": 8090908002,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.6369,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 34,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7120.0,
+        "software_signal_tail_interval_ms": [
+          33.3916,
+          44.0285
+        ],
+        "last_active_window": {
+          "packet": 85,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 20400,
+          "first_sample_API_QPC_100ns_fraction": [
+            8091248287,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            8091348287,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "extended-32-64-128",
+      "source_run_id": 45064826804,
+      "folder": "nvda-c23853cb36924e85a122dd36b5968ee2",
+      "ordinal": 5,
+      "pending_count": 64,
+      "owned_nvda_pid": 7628,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40616,
+          "sha256": "1c0462916a4c35e7b79b6a0dd1881f64ce07cfc0c223a93e79b8063a2b4d0c73"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12004,
+          "sha256": "ea5adc1d42be2ce4297fb80d91f5d87996569832d00a7eebe10a6c1f9693d7c9"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6128,
+          "sha256": "4bd9bb10e1367fb0ab8a9ecda3c975d54eab5d97d42dec8448d3049f36ab53f6"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 146249,
+          "sha256": "f0f64afc073016deee386e8839de154e001773887c02a15c7b49c9f04ac8b7fe"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "db36ba41965b22fb80dfb7f3b56100d4a638f70c95eb1428f41851826f80ccb4"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 25604,
+          "sha256": "0ae1fdd1e965d350f7a7adfaaa8998807f7410e18b19dd368e5120c99d7fe679"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 955866350100,
+          "perf_before_cancel_ns": 955865791900,
+          "qpc_after_cancel": 9558663487,
+          "qpc_before_cancel": 9558657935,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5552,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 33,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7140.0,
+        "software_signal_tail_interval_ms": [
+          30.3761,
+          40.9313
+        ],
+        "last_active_window": {
+          "packet": 83,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 19920,
+          "first_sample_API_QPC_100ns_fraction": [
+            9558967248,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            9559067248,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "experiment": "extended-32-64-128",
+      "source_run_id": 45064826804,
+      "folder": "nvda-10f7d095cc964ec9a28d71b47bccb340",
+      "ordinal": 6,
+      "pending_count": 32,
+      "owned_nvda_pid": 7896,
+      "raw_inputs": {
+        "trial.json": {
+          "bytes": 40601,
+          "sha256": "bb012699521a3e75b119535eb0f4fe9dbbaf31876b73c5d07508b5b400fec084"
+        },
+        "plugin-cancel.json": {
+          "bytes": 12252,
+          "sha256": "1a53918ec7a4ac8b49cc71d034e3cff630dcf43482aa759952af66a505df5b72"
+        },
+        "cancel-analysis.json": {
+          "bytes": 6132,
+          "sha256": "3bd8b737348b9ed0bcde1545177a3165de1eb910106e57df6b652cae9f5ce6fc"
+        },
+        "cancel-capture/capture.json": {
+          "bytes": 147858,
+          "sha256": "494d2ca0619acb5ca2334ec32ee72e6538a3ed57be8a21845d37fa5668277035"
+        },
+        "cancel-capture/captured.pcm": {
+          "bytes": 383040,
+          "sha256": "c13199d046975b82f3d02dad2e164c6f71100a97d6d5d1719167792e1472c74f"
+        },
+        "cancel-reference.pcm": {
+          "bytes": 26084,
+          "sha256": "35c422a5dd078364d767a8b8c9fea5780928c1feb7f81b7ecf8473064039bcf5"
+        }
+      },
+      "old_strict_gate_status": "open",
+      "old_strict_result_recomputed_identically": true,
+      "diagnostic": {
+        "format": "dordiai-separate-native-packet-QPC-cancel-diagnostic",
+        "format_version": 1,
+        "diagnostic_status": "packet-QPC-software-signal-interval",
+        "strict_cancellation_gate_untouched": true,
+        "physical_audio_verified": false,
+        "actual_NVDA_latency_acceptance": false,
+        "product_ready": false,
+        "sample_rate": 24000,
+        "captured_frames": 191520,
+        "packets": 798,
+        "buffer_flags_counts": {
+          "0": 798
+        },
+        "raw_device_positions_unique": [
+          0
+        ],
+        "capture_device_position_axis_available": false,
+        "device_positions_or_timestamps_replaced": false,
+        "QPC_conversion_count_for_raw_cancel": 1,
+        "packet_API_QPC_converted_again": false,
+        "packet_QPC_step_max_error_100ns": 0.0,
+        "encoded_step_tolerance_100ns": 1,
+        "step_tolerance_is_absolute_timestamp_accuracy_guarantee": false,
+        "cancel_bracket": {
+          "perf_after_cancel_ns": 1101747479800,
+          "perf_before_cancel_ns": 1101746885900,
+          "qpc_after_cancel": 11017474782,
+          "qpc_before_cancel": 11017468878,
+          "qpc_frequency": 10000000
+        },
+        "cancel_bracket_width_ms": 0.5904,
+        "activity_threshold_pcm_LSB": 2,
+        "RMS_window_ms": 10,
+        "all_packet_remainders_examined": true,
+        "complete_capture_examined": true,
+        "active_windows": 34,
+        "active_before_cancel": true,
+        "post_last_active_or_cancel_observation_ms": 7160.0,
+        "software_signal_tail_interval_ms": [
+          32.5462,
+          43.1366
+        ],
+        "last_active_window": {
+          "packet": 81,
+          "offset_in_packet_frames": 0,
+          "window_frames": 240,
+          "capture_array_offset_frames": 19440,
+          "first_sample_API_QPC_100ns_fraction": [
+            11017800244,
+            1
+          ],
+          "end_API_QPC_100ns_fraction": [
+            11017900244,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostic_intervals_available": 12,
+  "interval_envelope_ms": [
+    25.3421,
+    56.1578
+  ],
+  "existing_strict_cancellation_gate_status": "open in all12; not replaced or waived",
+  "strict_analysis_source_sha256_unchanged": "23898840695abb3363f34723152402e739be1be3cd8107729f0d86c410937dbf",
+  "official_sources": {
+    "GetBuffer": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudiocaptureclient-getbuffer",
+    "flags": "https://learn.microsoft.com/en-us/windows/win32/api/audioclient/ne-audioclient-_audclnt_bufferflags",
+    "process_loopback": "https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/"
+  },
+  "interpretation_uk": [
+    "Це окрема діагностична вісь GetBuffer firstframeQPC+offset/sample_rate проти rawQPC bracket навколо справжнього speech.cancelSpeech. RawQPC конвертується одинраз; packetAPIQPC вже100ns і не конвертується вдруге.",
+    "Уся PCM і metadata перевірені по pinnedZIP/index SHA; flags timestamp-error/discontinuity, missing/trimmed packets, не монотонний або frame-inconsistent QPC відхиляються. DevicePosition не підміняється cumulativeframes чиQPC.",
+    "Детектор незмінний: RMS10ms >2PCM LSB, усі packet remainder samples; потрібні activitybeforecancel та ≥500ms подальшого спостереження. Дані/сигнал/offsets старих перевірок не редагувались.",
+    "Інтервали описують captured signal/process-endpoint software timing; неDAC, не фізичну чутність і не приймання NVDA P95/P99. Дванадцять observations не сертифікують tails.",
+    "Strict cancellation_tail залишаєтьсяopen через rawDevicePosition0. Новий аналіз не перетворює старий fail/open наpass і не встановлює продуктготовим. Rawpositions0 спостерігалися й наlocalhardware, тому пояснення лишеCI virtualdriver необґрунтоване."
+  ],
+  "new_NVDA_or_audio_execution": false,
+  "physical_audible_verified": false,
+  "actual_NVDA_latency_acceptance": false,
+  "P95_P99_acceptance": false,
+  "product_ready": false
+}

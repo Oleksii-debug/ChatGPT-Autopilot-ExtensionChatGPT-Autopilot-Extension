@@ -1,7 +1,7 @@
 {
   "product": "dordiai-voices",
   "authorization": "User authorized start, subagents and automatic decisions without additional questions on 2026-11-22",
-  "status": "active_source14_candidate_assembly",
+  "status": "active_source14_built_functional_checks_passed_full_acceptance_open",
   "product_ready": false,
   "base_version": "0.12.2",
   "target_version": "0.13.1-dev.14",
@@ -1542,11 +1542,10 @@
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
   "next_work": [
-    "Complete actual source13 Windows build and all225 packaged profile/native/default3 checks with strict preservation.",
-    "Fill actual13 build pin only from real successful run/archive receipts; execute nine actual NVDA modes and real package lifecycle.",
-    "Diagnose frozen12 longread probe through bounded phase snapshots, then assess real continuous output/cancellation without changing workload.",
-    "Prepare optional authenticated Arabic45-profile name banks and compare explicitly trained shared UK/RU carrier performance without production changes.",
-    "Complete genuine missing resources, native quality and selected-language character/input coverage; retain product_ready=false while open."
+    "Extend memory accounting to whole owned worker family and actual NVDA; parent-only and job-commit observation is complete",
+    "Continue true pronunciation/character-name/longreading acceptance and missing native-resource delivery",
+    "Prepared-letter/cancel/transition physical audible P95/P99 remain separate mandatory gates; no target relaxation",
+    "Persist authorized old-copy cleanup proof and protect complete single-voice project and unique originals"
   ],
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
@@ -1710,14 +1709,14 @@
   },
   "codex_resume": {
     "date": "2026-11-22",
-    "source_branch_head": "d69f3b32d7bbf0df4f001b1f774a2610bf8d540f",
+    "source_branch_head": "fa7aea2f5cb92f80f641f575eaae2f8fbea7e882",
     "owned_checkout": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій",
     "immutable_baseline": "0.13.1-dev.13",
     "next_tasks": [
-      "Commit frozen14 source and assemble from exact13 resources with no model/bank changes",
-      "Actual same14 packaged-worker and NVDA core/typing checks",
-      "Actual worker/NVDA memory observations with held handles",
-      "Native QPC cancel diagnostics remain separate from physical audible acceptance"
+      "Extend memory accounting to whole owned worker family and actual NVDA; parent-only and job-commit observation is complete",
+      "Continue true pronunciation/character-name/longreading acceptance and missing native-resource delivery",
+      "Prepared-letter/cancel/transition physical audible P95/P99 remain separate mandatory gates; no target relaxation",
+      "Persist authorized old-copy cleanup proof and protect complete single-voice project and unique originals"
     ],
     "resource_transfer_limitation": "Resolved with five verified bounded Actions transport parts; exact original whole ZIP SHA/CRC verified on D.",
     "product_ready": false,
@@ -1735,6 +1734,17 @@
       "evidence/local_source14_final_regression_20261122.json"
     ],
     "source13_settings_restart": "evidence/source13_settings_keyboard_45064826893.exact.json",
-    "local_hardware_clock": "evidence/local_hardware_clock_actual_20261122.json"
+    "local_hardware_clock": "evidence/local_hardware_clock_actual_20261122.json",
+    "source14_actual_build": "evidence/source14_actual_integration_45069226971.json",
+    "source14_local_build": "evidence/local_source14_build_20261122.json",
+    "source14_worker_memory": "evidence/core14_owned_worker_memory_20261122.json"
+  },
+  "storage_cleanup_20261122": {
+    "evidence": "evidence/storage_cleanup_20261122.json",
+    "targets_removed": 160,
+    "logical_bytes_removed": 133889368815,
+    "single_voice_preserved": true,
+    "original_archives_preserved": true,
+    "installed_nvda_modified": false
   }
 }

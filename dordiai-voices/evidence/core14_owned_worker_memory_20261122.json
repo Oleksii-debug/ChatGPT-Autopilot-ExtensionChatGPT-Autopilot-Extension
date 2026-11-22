@@ -1,0 +1,356 @@
+{
+  "format": "dordiai-local-core14-owned-worker-memory",
+  "format_version": 1,
+  "status": "completed-software-memory-observation",
+  "controller_sha256": "31e03f1028d3bcf551ba82d6b5eca92b7a70a42c1c896bb7bbaebe2dbb6cc46c",
+  "sampler_sha256": "178e39b280ea6f394d15129c0a320cc941a8290d35ef6841879ccf3bdbf9b5e8",
+  "archive_sha256": "9024506b8250d18868801b5f061d570204ad713d0cfae2a67d77a97df2eb5820",
+  "archive_bytes": 1992990978,
+  "phases": [
+    {
+      "name": "cold-session-first-uk",
+      "language": "uk",
+      "started_ns": 117754084747000,
+      "worker_result": {
+        "pcm_sha256": "a7814738a808289e6e5e70b68fbac4eaefd236fb74f3344fe1492e31d1642e97",
+        "pcm_bytes": 285840,
+        "audio": {
+          "frames": 142920,
+          "duration_seconds": 5.955,
+          "peak": 0.504608154296875,
+          "rms": 0.08070593228282283,
+          "nonzero_samples": 138334
+        },
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117760292897100,
+      "memory": {
+        "samples": 25,
+        "parent_working_set_max_bytes": 468373504,
+        "parent_os_peak_working_set_max_bytes": 468373504,
+        "parent_private_commit_max_bytes": 508194816,
+        "job_os_peak_commit_max_bytes": 509493248,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "first-en-in-same-session",
+      "language": "en",
+      "started_ns": 117760293703100,
+      "worker_result": {
+        "pcm_sha256": "ce520bdbe2c450acf2f1e6ef9570e64d7eab751b48f5046ed5e1b9753b6b4447",
+        "pcm_bytes": 176126,
+        "audio": {
+          "frames": 88063,
+          "duration_seconds": 3.6692916666666666,
+          "peak": 0.603240966796875,
+          "rms": 0.07021639942405127,
+          "nonzero_samples": 85880
+        },
+        "renderers": [
+          {
+            "engine": "profile",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117762323900800,
+      "memory": {
+        "samples": 8,
+        "parent_working_set_max_bytes": 575557632,
+        "parent_os_peak_working_set_max_bytes": 575557632,
+        "parent_private_commit_max_bytes": 643506176,
+        "job_os_peak_commit_max_bytes": 644837376,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "first-ru-in-same-session",
+      "language": "ru",
+      "started_ns": 117762324511900,
+      "worker_result": {
+        "pcm_sha256": "808a07e5f9812100b6ac950c81fbac06f66029f57b49647b328b5aec00a10a29",
+        "pcm_bytes": 262460,
+        "audio": {
+          "frames": 131230,
+          "duration_seconds": 5.4679166666666665,
+          "peak": 0.806121826171875,
+          "rms": 0.07738139301202782,
+          "nonzero_samples": 129023
+        },
+        "renderers": [
+          {
+            "engine": "profile",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117768503068100,
+      "memory": {
+        "samples": 24,
+        "parent_working_set_max_bytes": 792756224,
+        "parent_os_peak_working_set_max_bytes": 801210368,
+        "parent_private_commit_max_bytes": 862773248,
+        "job_os_peak_commit_max_bytes": 1444376576,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "prepared-uk",
+      "language": "uk",
+      "started_ns": 117768503843000,
+      "worker_result": {
+        "pcm_sha256": "a7814738a808289e6e5e70b68fbac4eaefd236fb74f3344fe1492e31d1642e97",
+        "pcm_bytes": 285840,
+        "audio": {
+          "frames": 142920,
+          "duration_seconds": 5.955,
+          "peak": 0.504608154296875,
+          "rms": 0.08070593228282283,
+          "nonzero_samples": 138334
+        },
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117773381325600,
+      "memory": {
+        "samples": 19,
+        "parent_working_set_max_bytes": 809365504,
+        "parent_os_peak_working_set_max_bytes": 809365504,
+        "parent_private_commit_max_bytes": 871194624,
+        "job_os_peak_commit_max_bytes": 1444376576,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "prepared-en",
+      "language": "en",
+      "started_ns": 117773382340600,
+      "worker_result": {
+        "pcm_sha256": "ce520bdbe2c450acf2f1e6ef9570e64d7eab751b48f5046ed5e1b9753b6b4447",
+        "pcm_bytes": 176126,
+        "audio": {
+          "frames": 88063,
+          "duration_seconds": 3.6692916666666666,
+          "peak": 0.603240966796875,
+          "rms": 0.07021639942405127,
+          "nonzero_samples": 85880
+        },
+        "renderers": [
+          {
+            "engine": "profile",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117774417356600,
+      "memory": {
+        "samples": 4,
+        "parent_working_set_max_bytes": 813727744,
+        "parent_os_peak_working_set_max_bytes": 813727744,
+        "parent_private_commit_max_bytes": 875479040,
+        "job_os_peak_commit_max_bytes": 1444376576,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "prepared-ru",
+      "language": "ru",
+      "started_ns": 117774418415800,
+      "worker_result": {
+        "pcm_sha256": "0d1b8829dd435441f04dc274b707f802f9b93003efe3d4c962dbcb7d4bf3d526",
+        "pcm_bytes": 262704,
+        "audio": {
+          "frames": 131352,
+          "duration_seconds": 5.473,
+          "peak": 0.806121826171875,
+          "rms": 0.07734544568161063,
+          "nonzero_samples": 129145
+        },
+        "renderers": [
+          {
+            "engine": "profile",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117778819387100,
+      "memory": {
+        "samples": 17,
+        "parent_working_set_max_bytes": 813805568,
+        "parent_os_peak_working_set_max_bytes": 813805568,
+        "parent_private_commit_max_bytes": 875479040,
+        "job_os_peak_commit_max_bytes": 1556811776,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "cancel-uk",
+      "language": "uk",
+      "started_ns": 117778820384700,
+      "worker_result": {
+        "status": "passed",
+        "cancel_delay_after_request_ms": 30,
+        "cancel_and_drop_ack_ms": 2.089799992972985,
+        "first_reply_was_already_buffered_audio": false,
+        "scope": "worker protocol only; not NVDA audible stop latency"
+      },
+      "finished_ns": 117779082456800,
+      "memory": {
+        "samples": 1,
+        "parent_working_set_max_bytes": 813940736,
+        "parent_os_peak_working_set_max_bytes": 813940736,
+        "parent_private_commit_max_bytes": 875479040,
+        "job_os_peak_commit_max_bytes": 1556811776,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    },
+    {
+      "name": "post-cancel-recovery-uk",
+      "language": "uk",
+      "started_ns": 117779083196200,
+      "worker_result": {
+        "pcm_sha256": "a7814738a808289e6e5e70b68fbac4eaefd236fb74f3344fe1492e31d1642e97",
+        "pcm_bytes": 285840,
+        "audio": {
+          "frames": 142920,
+          "duration_seconds": 5.955,
+          "peak": 0.504608154296875,
+          "rms": 0.08070593228282283,
+          "nonzero_samples": 138334
+        },
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "adam"
+          }
+        ],
+        "loading_stages": []
+      },
+      "finished_ns": 117782985558200,
+      "memory": {
+        "samples": 15,
+        "parent_working_set_max_bytes": 813936640,
+        "parent_os_peak_working_set_max_bytes": 813940736,
+        "parent_private_commit_max_bytes": 875479040,
+        "job_os_peak_commit_max_bytes": 1556811776,
+        "children_resident_ram_bytes": null,
+        "family_resident_ram_bytes": null
+      }
+    }
+  ],
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "performance_benchmark": false,
+  "scope": "Actual14 worker parent RAM and parent/job COMMIT under affinity2; children/family RSS unknown. No installed NVDA or playback.",
+  "preparation": {
+    "changed_files": [
+      "kx47Runtime/native_multilingual.py",
+      "kx47Runtime/nvda_worker.py",
+      "kx47Runtime/wide_warmup.py",
+      "manifest.ini",
+      "synthDrivers/kx47Preview.py"
+    ],
+    "all_other_payload_files_byte_identical": 10255,
+    "exact_payload_set_unchanged": true,
+    "allowed45_voice_ids_unchanged": true,
+    "excluded_ids_unchanged": true,
+    "model_identity_files_byte_identical": 8511,
+    "prepared_bank_files_byte_identical": 180,
+    "private_runtime_files_byte_identical": 1596,
+    "hardlinked_payload_files": 10255,
+    "new_payload_bytes_written": 134190,
+    "model_copy_or_regeneration": false,
+    "overlay_created_without_writing_shared_inode": true
+  },
+  "before_worker_payload_verification": {
+    "all_payload_sha256_verified": true,
+    "verified_files": 10260,
+    "verified_payload_bytes": 2408771804,
+    "version": "0.13.1-dev.14"
+  },
+  "owned_worker_pid": 26764,
+  "affinity": {
+    "original_mask": 4095,
+    "selected_mask": 3,
+    "effective_logical_cpu_count": 2,
+    "internal_ort_threads": "Unchanged explicit3/4 runtime pools; affinity is NOT a thread-count2 claim"
+  },
+  "private_python": "D:\\DordiaiTestTemp\\core14-owned-memory-20261122-a\\actual14-hardlink-stage\\kx47Runtime\\python\\python.exe",
+  "constructor_preload": "mixed, unchanged; first EN/RU requests may already be preloaded",
+  "owned_job_cleanup": {
+    "active_before_cleanup": 0,
+    "active_after_cleanup": 0,
+    "forced_tree_termination": false,
+    "all_owned_workers_reaped": true
+  },
+  "owned_worker_exit_code": 0,
+  "owned_call_threads_joined": true,
+  "owned_pipe_reader_joined": true,
+  "cleanup_errors": [],
+  "all_owned_processes_reaped": true,
+  "normal_owned_cleanup": true,
+  "after_worker_payload_verification": {
+    "all_payload_sha256_verified": true,
+    "verified_files": 10260,
+    "verified_payload_bytes": 2408771804,
+    "version": "0.13.1-dev.14"
+  },
+  "own_hardlink_stage_removed_after_reaping": true,
+  "raw_gzip": {
+    "path": "evidence\\core14_owned_worker_memory_raw_20261122.json.gz",
+    "bytes": 8209,
+    "sha256": "45ca571546f391073ee8350ea68fdd861747b585af51d622183f6d6299d08a71"
+  },
+  "parent_ram_bytes": {
+    "maximum_observed_working_set": 813940736,
+    "maximum_observed_os_peak_working_set": 813940736
+  },
+  "parent_commit_bytes": {
+    "maximum_observed_private_usage": 875479040,
+    "maximum_observed_os_peak_pagefile_usage": 875479040
+  },
+  "owned_job_commit_bytes": {
+    "maximum_observed_os_peak_job_memory_used": 1556811776
+  },
+  "family_resident_ram_bytes": null,
+  "memory_semantics": {
+    "working_set": "Resident pages of the held parent process, including shared pages; OS peak is process-lifetime peak",
+    "private_usage_and_peak_pagefile": "Process COMMIT counters, not RAM",
+    "peak_job_memory_used": "OS peak aggregate job COMMIT, not resident working set; not current RAM",
+    "children_rss": "Not measured. Never infer it from job commit or add overlapping shared working sets.",
+    "sampling_overhead": "Periodic observer API time is recorded separately; these observations are not a CPU or acoustic latency benchmark",
+    "units": "All memory counters are integer bytes; no MiB/MB conversion is applied to raw values"
+  },
+  "sampler": {
+    "sample_count": 113,
+    "max_samples": 600,
+    "sample_quota_reached": false,
+    "sampler_thread_joined": true,
+    "handles_observed_held_at_stop": true
+  },
+  "minimum_observed_available_physical_bytes": 3064070144
+}

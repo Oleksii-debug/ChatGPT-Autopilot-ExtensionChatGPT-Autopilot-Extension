@@ -1,0 +1,100 @@
+{
+  "format": "dordiai-authorized-storage-cleanup-result",
+  "format_version": 1,
+  "created_utc": "2026-11-22T21:40:18.834464+00:00",
+  "root": "D:\\Синтезатор мовлення KX-47",
+  "status": "verified-targets-removed-protected-roots-retained",
+  "root_logical_bytes_before": 228866565069,
+  "root_logical_bytes_last_scan": 95058467100,
+  "root_logical_scan_scope": "No traversal of reparse points; inaccessible paths are enumerated in private local inventory. Not allocated-volume measurement.",
+  "selected_deleted_logical_bytes": 133889368815,
+  "distinct_deleted_targets": 160,
+  "all_targets_absent": true,
+  "failed_targets": 0,
+  "volume_free_before_deletion": 29971083264,
+  "volume_free_observed_after": 156909936640,
+  "volume_net_free_increase": 126938853376,
+  "volume_delta_scope": "Observed whole-volume free-space difference; includes concurrent system/application activity. Logical bytes and actual volume delta are deliberately distinct.",
+  "protected_roots": [
+    {
+      "path": "Другий синтезатор",
+      "logical_bytes": 15589607972,
+      "files": 7163,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "Моделі",
+      "logical_bytes": 15687678116,
+      "files": 788,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "голоси",
+      "logical_bytes": 486126979,
+      "files": 647,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "Готовий додаток",
+      "logical_bytes": 3182031266,
+      "files": 1,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "архів для драйв",
+      "logical_bytes": 7855409305,
+      "files": 5,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "Особисті мовні моделі",
+      "logical_bytes": 1489215900,
+      "files": 117,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "Багатомовне ядро",
+      "logical_bytes": 1298140368,
+      "files": 2588,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "Перенесення голосу",
+      "logical_bytes": 255835482,
+      "files": 88,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": "Експеримент",
+      "logical_bytes": 1949649115,
+      "files": 1,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": ".venv",
+      "logical_bytes": 3468928256,
+      "files": 16569,
+      "file_count_and_total_size_unchanged": true
+    },
+    {
+      "path": ".venv-host",
+      "logical_bytes": 1691603086,
+      "files": 35232,
+      "file_count_and_total_size_unchanged": true
+    }
+  ],
+  "single_voice_latest_package_and_unique_unified_patch_preserved": true,
+  "published0121_and_candidate0122_preserved": true,
+  "live_installed_nvda_modified": false,
+  "processes_terminated": false,
+  "source_archives_preserved": true,
+  "historical_installer_deltas": {
+    "zip_bytes": 56752794,
+    "sha256": "a4315a887d1438be51c32919eac6cc805741914d75df9ed7d6833e5983d85d0a",
+    "scope": "Unique entry contents and manifests preserved; old generated installers intentionally deleted; original-byte ZIP reconstruction not claimed"
+  },
+  "local_audit_directory": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\storage-cleanup-20261122",
+  "privacy": "Full filename inventory and historical private delta contents stay locally on D; this public receipt contains aggregate sizes and project folder names only.",
+  "remaining_data_policy": "The complete exempt single-voice project/test variants, required offline models, original recordings/archives, current development and preparation dependencies remain. Unknown unique variants were not classified as trash.",
+  "acceptance_scope": "Storage cleanup only; no claim that full multilingual product is complete"
+}

@@ -284,9 +284,19 @@
     "Drive": "Original link retained; no claim of upload of current work back to Drive."
   },
   "resume_20261122": {
-    "status": "active_source14_candidate_assembly",
+    "status": "active_source14_built_functional_checks_passed_acceptance_open",
     "current_state": "WORK_STATE.json",
     "original_transfer_preserved": true,
-    "product_ready": false
+    "product_ready": false,
+    "source14_actual_build": "evidence/source14_actual_integration_45069226971.json",
+    "source14_run": 45069226971
+  },
+  "storage_cleanup_20261122": {
+    "evidence": "evidence/storage_cleanup_20261122.json",
+    "targets_removed": 160,
+    "logical_bytes_removed": 133889368815,
+    "single_voice_preserved": true,
+    "original_archives_preserved": true,
+    "installed_nvda_modified": false
   }
 }

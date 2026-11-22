@@ -1,0 +1,543 @@
+{
+  "format": "dordiai-source14-actual-integration-independent-audit",
+  "format_version": 1,
+  "created_utc": "2026-11-22T21:28:34.005470+00:00",
+  "status": "ci-functional-integration-passed-with-open-acceptance",
+  "run": {
+    "run_id": 45069226971,
+    "job_id": 137352212745,
+    "conclusion": "success",
+    "url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/45069226971",
+    "source_commit": "fa7aea2f5cb92f80f641f575eaae2f8fbea7e882",
+    "source_snapshot_sha256": "c92378895a9ad1cb01af15cd20e12faf286ee2b151dfd9643848f84a4b29bec7"
+  },
+  "actions_artifact": {
+    "id": 14773140319,
+    "name": "dordiai-source14-integration-evidence-45069226971",
+    "size_in_bytes": 1741650,
+    "digest": "sha256:21f99f49a2e0ca395cca27913ea4e5d2fd7973977c2d67e1252df2081913bb76",
+    "expires_at": "2026-12-22T21:04:01Z",
+    "api_url": "https://api.github.com/repos/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/artifacts/14773140319"
+  },
+  "artifact_digest_scope": "GitHub Actions metadata fetched independently through the read-only GitHub connector. Extracted report/log hashes below were computed locally; this audit does not claim a separate local rehash of the enclosing1.74MB download ZIP.",
+  "installer": {
+    "filename": "dordiai-voices-0.13.1-dev.14.nvda-addon",
+    "size_bytes": 1992990978,
+    "sha256": "9024506b8250d18868801b5f061d570204ad713d0cfae2a67d77a97df2eb5820",
+    "payload_files": 10260,
+    "installed_bytes": 2408771804,
+    "group": "core",
+    "local_archive_sha256_independently_recomputed": true,
+    "local_build_receipt_matches_ci": true,
+    "local_and_ci_source_snapshot_match": true,
+    "local_build_receipt_sha256": "bc21b1e3d6f7c8a3a3697040d0c067e1326db9b004c4ff83cfd5e500cae3ef2d"
+  },
+  "build_preservation": {
+    "changed_files": [
+      "kx47Runtime/native_multilingual.py",
+      "kx47Runtime/nvda_worker.py",
+      "kx47Runtime/wide_warmup.py",
+      "manifest.ini",
+      "synthDrivers/kx47Preview.py"
+    ],
+    "all_other_payload_files_byte_identical": 10255,
+    "exact_payload_set_unchanged": true,
+    "allowed45_voice_ids_unchanged": true,
+    "excluded_ids_unchanged": true,
+    "model_identity_files_byte_identical": 8511,
+    "prepared_bank_files_byte_identical": 180,
+    "private_runtime_files_byte_identical": 1596
+  },
+  "bounded_driver_candidate": {
+    "original_driver_sha256": "17eeda6106858c4eb14ede91dd2a698cae0abaa9894d3df3e3d445d374a042ee",
+    "original_driver_bytes": 93785,
+    "candidate_driver_sha256": "72d4526804111d66e5786da60542e9effbb91a84a7c00a2d785e6e30bbf0acf7",
+    "candidate_driver_bytes": 93803,
+    "only_outer_keyword_ast_difference_verified": true,
+    "all_non_insertion_bytes_identical": true,
+    "outer_pending_count": 64,
+    "original_helper_default_unchanged": 12,
+    "explicit_inner_counts_unchanged": [
+      2
+    ],
+    "generation_and_cancellation_unchanged": true,
+    "first_ready_delivery_helper_ast_unchanged": true,
+    "startup_reserve_or_word_warmup_added": false,
+    "maximum_outer_queued_pcm_bytes": 30720,
+    "candidate_evidence_run": 45064826804,
+    "candidate_selection_scope": "Bounded headroom candidate; not a proven optimum or source14 acceptance",
+    "source14_waveform_or_cancel_acceptance_proved": false
+  },
+  "ci_unit_suite": {
+    "ran": 2010,
+    "passed": 1955,
+    "skipped": 55,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 41.308,
+    "source": "Read-only job137352212745 log",
+    "exact_summary_lines": [
+      "2026-11-22T20:58:08.8458816Z Ran 2010 tests in 41.308s",
+      "2026-11-22T20:58:08.8459021Z OK (skipped=55)"
+    ]
+  },
+  "worker": {
+    "status": "passed-pipe-functional-only",
+    "checks_by_status": {
+      "passed": 15
+    },
+    "checks_total": 15,
+    "languages": [
+      "uk",
+      "en",
+      "ru"
+    ],
+    "installed_language_count": 3,
+    "catalog_voice_count": 45,
+    "profiles_actually_synthesized": [
+      "sara"
+    ],
+    "real_process_returncode": 0,
+    "worker_shutdown": {
+      "exit_code": 0,
+      "forced_termination": false
+    },
+    "owned_cleanup": {
+      "jobs": [
+        {
+          "pid": 7780,
+          "returncode": 0,
+          "active_before_cleanup": 0,
+          "active_after_cleanup": 0,
+          "forced_tree_termination": false,
+          "all_owned_workers_reaped": true
+        }
+      ],
+      "errors": [],
+      "all_owned_workers_reaped": true,
+      "normal_shutdown_verified": true
+    },
+    "network_policy": {
+      "action": "Block",
+      "rules": [
+        "Dordiai-source14-d7a44c4e6aac41de85011348eeaead42",
+        "Dordiai-source14-3ddd05d62d1e425a80a44faf8a45e560"
+      ],
+      "scope": "owned-ephemeral-CI-only",
+      "physical_audio_verified": false,
+      "restored": true,
+      "direction": "Outbound",
+      "programs": [
+        "C:\\hostedtoolcache\\windows\\Python\\3.13.9\\x64\\python.exe",
+        "D:\\a\\_temp\\dordiai-source14-worker-45069226971\\assembled-source14\\kx47Runtime\\python\\python.exe"
+      ]
+    }
+  },
+  "nvda": {
+    "version_actual": "2026.3.1",
+    "environment": "Windows-2025Server-10.0.26100-SP0",
+    "functional_status": "passed-functional-only",
+    "recording_pcm_sink_test_double": true,
+    "phases": [
+      {
+        "phase": "core-menus",
+        "functional_status": "passed-functional-only",
+        "raw_controller_returncode": 2,
+        "raw_controller_status": "partial",
+        "raw_probe_status": "partial",
+        "checks_by_status": {
+          "blocked": 3,
+          "passed": 12
+        },
+        "functional_required_check_count": 9,
+        "functional_required_checks": [
+          "allowed_voice_catalog",
+          "character_pcm_submission",
+          "fresh_default_languages",
+          "keyboard_checkbox_space",
+          "keyboard_tab",
+          "phrase_pcm_submission",
+          "select_dordiai",
+          "settings_dialog",
+          "settings_hotkey_binding"
+        ],
+        "blocked_checks": [
+          {
+            "name": "physical_audio_output",
+            "status": "blocked",
+            "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+          },
+          {
+            "name": "warm_letter_predevice_target",
+            "status": "blocked",
+            "measurements": {
+              "count": 100,
+              "p50_ms": 1.9959,
+              "p95_ms": 2.5417,
+              "p99_ms": 2.6084,
+              "minimum_ms": 1.8724,
+              "maximum_ms": 2.9078
+            },
+            "reason": "Recording sink double: internal queue measurements cannot satisfy WavePlayer/device or acoustic acceptance"
+          },
+          {
+            "name": "cancel_api_target",
+            "status": "blocked",
+            "measurements": {
+              "count": 100,
+              "p50_ms": 0.0088,
+              "p95_ms": 0.2315,
+              "p99_ms": 0.2806,
+              "minimum_ms": 0.0081,
+              "maximum_ms": 0.3222
+            },
+            "reason": "Recording sink double: internal queue measurements cannot satisfy WavePlayer/device or acoustic acceptance"
+          }
+        ],
+        "owned_process_cleanup": {
+          "children": [
+            {
+              "pid": 5620,
+              "executable": "dordiai-source14-nvda-45069226971.exe",
+              "returncode": 0,
+              "reaped": true
+            },
+            {
+              "pid": 4416,
+              "executable": "nvda.exe",
+              "returncode": 0,
+              "reaped": true
+            }
+          ],
+          "errors": [],
+          "all_reaped_before_device_cleanup": true,
+          "owned_nvda_jobs": [
+            {
+              "pid": 4416,
+              "active_before_cleanup": 0,
+              "active_after_cleanup": 0,
+              "forced_tree_termination": false,
+              "all_owned_workers_reaped": true
+            }
+          ],
+          "all_owned_nvda_descendants_reaped": true,
+          "actual_nvda_process_count": 1
+        }
+      },
+      {
+        "phase": "typing",
+        "functional_status": "passed-functional-only",
+        "raw_controller_returncode": 2,
+        "raw_controller_status": "partial",
+        "raw_probe_status": "partial",
+        "checks_by_status": {
+          "blocked": 1,
+          "passed": 13
+        },
+        "functional_required_check_count": 6,
+        "functional_required_checks": [
+          "actual_typing_cleanup",
+          "actual_typing_keyboard_pipeline",
+          "actual_typing_language_routes",
+          "allowed_voice_catalog",
+          "fresh_default_languages",
+          "select_dordiai"
+        ],
+        "blocked_checks": [
+          {
+            "name": "physical_audio_output",
+            "status": "blocked",
+            "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+          }
+        ],
+        "owned_process_cleanup": {
+          "children": [
+            {
+              "pid": 6720,
+              "executable": "dordiai-source14-nvda-45069226971.exe",
+              "returncode": 0,
+              "reaped": true
+            },
+            {
+              "pid": 5760,
+              "executable": "nvda.exe",
+              "returncode": 0,
+              "reaped": true
+            }
+          ],
+          "errors": [],
+          "all_reaped_before_device_cleanup": true,
+          "owned_nvda_jobs": [
+            {
+              "pid": 5760,
+              "active_before_cleanup": 0,
+              "active_after_cleanup": 0,
+              "forced_tree_termination": false,
+              "all_owned_workers_reaped": true
+            }
+          ],
+          "all_owned_nvda_descendants_reaped": true,
+          "actual_nvda_process_count": 1
+        }
+      }
+    ],
+    "fresh_default_languages": [
+      "en",
+      "ru",
+      "uk"
+    ],
+    "visible_catalog_profiles": 45,
+    "excluded_profiles_present": [],
+    "settings_pages": [
+      "Мовлення",
+      "Голоси",
+      "Мови",
+      "Пакети"
+    ],
+    "settings_voice_rows": 45,
+    "missing_settings_controls": [],
+    "settings_binding_check": {
+      "name": "settings_hotkey_binding",
+      "status": "passed",
+      "scripts": [
+        "script_preferences"
+      ]
+    },
+    "typing": {
+      "input_scope": "real SendInput to owned wx.TextCtrl through unchanged NVDA typing handlers",
+      "input_injection": "scan-code SendInput, not WM_CHAR or direct speech calls",
+      "scenario": "standard",
+      "cases": 9,
+      "cases_by_status": {
+        "passed": 9
+      },
+      "actually_routed_profiles": [
+        "adam"
+      ],
+      "no_manual_language_commands": true,
+      "glyphs_by_language": {
+        "uk": [
+          "а",
+          "ї"
+        ],
+        "en": [
+          "a",
+          "b",
+          "!"
+        ],
+        "ru": [
+          "а",
+          "б",
+          "ы",
+          " "
+        ]
+      },
+      "route_mismatches": [],
+      "cleanup": {
+        "attempted": true,
+        "errors": [],
+        "keyboard_config_restored": true,
+        "keyboard_layout_restored": true,
+        "speech_mode_restored": true
+      }
+    }
+  },
+  "extracted_report_sha256": {
+    "build.json": "bbf03060ffaf3a94ab1840d0c8df0fbd044bda7e82e9e543902298babe0df5a6",
+    "network-policy.json": "b86259438b5b1ff833271e0637c26f90d83ac5e8b0704daa8c20d3b026703bee",
+    "worker-default3.json": "2bdb15087512cd25ce155467f5d8ff2aadaaff97d961db49194a8b83ba549d53",
+    "nvda-functional.json": "0d6bed65556e8cfb9898d0c42c10d8620be52565d1431ade12791fc8ecb17145",
+    "default-engines/report.json": "96880a3c34b345c495aee7fa4c3a7dfca17882d2a2e5898452dabef1c7725071",
+    "nvda-core-menus/windows-nvda-probe.json": "9b4031426c9b17f738efd9c57a5e23060800bb35ff4c1d6200ba37b70a98ec88",
+    "nvda-core-menus/nvda-probe.json": "3dc8c6581773ac7999360ad01bdc1192711aa12cefab2b288c29839429af5459",
+    "nvda-typing/windows-nvda-probe.json": "ff38f3a845781bba514fe7460c7b00a9bff2c2f9e97a5fb18ae4be7b17218af0",
+    "nvda-typing/nvda-probe.json": "4ab8216700397dd557095c84dfbc1a88363bce68336b26290b4b872bf1cfc24c"
+  },
+  "all_extracted_artifact_file_digests": {
+    "build.json": {
+      "size_bytes": 42833,
+      "sha256": "bbf03060ffaf3a94ab1840d0c8df0fbd044bda7e82e9e543902298babe0df5a6"
+    },
+    "network-policy.json": {
+      "size_bytes": 490,
+      "sha256": "b86259438b5b1ff833271e0637c26f90d83ac5e8b0704daa8c20d3b026703bee"
+    },
+    "nvda-functional.json": {
+      "size_bytes": 204245,
+      "sha256": "0d6bed65556e8cfb9898d0c42c10d8620be52565d1431ade12791fc8ecb17145"
+    },
+    "worker-default3.json": {
+      "size_bytes": 62321,
+      "sha256": "2bdb15087512cd25ce155467f5d8ff2aadaaff97d961db49194a8b83ba549d53"
+    },
+    "default-engines/cancel-recovery.wav": {
+      "size_bytes": 175004,
+      "sha256": "20aff4af87ef2d0560ae64067f7e79b9cf802a8e00d7f4ec56352d497b7911de"
+    },
+    "default-engines/en-sara-1.wav": {
+      "size_bytes": 204418,
+      "sha256": "06efe947896c3e02a32331c1dbcfd4fd4a52a50e1f7f7ea6b4bcc243727861b8"
+    },
+    "default-engines/native-extension-inherited-stderr.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "default-engines/native-extension-reset-stderr.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "default-engines/report.json": {
+      "size_bytes": 21330,
+      "sha256": "96880a3c34b345c495aee7fa4c3a7dfca17882d2a2e5898452dabef1c7725071"
+    },
+    "default-engines/ru-sara-1.wav": {
+      "size_bytes": 171098,
+      "sha256": "793c68b4e5c18979d5eaebb027124ecd31325073653d0369dfac3c4dfb74fb44"
+    },
+    "default-engines/uk-dictionary-regression.wav": {
+      "size_bytes": 239324,
+      "sha256": "d60958813ec04e20bb611db9146ebbd3af7871c3a927186f0116c955a26c7733"
+    },
+    "default-engines/uk-sara-1.wav": {
+      "size_bytes": 285884,
+      "sha256": "4c9a9c86f98a06ade934aa22ac48a7ffa6e7b2d37bcc052fa66e2acf6c6bb171"
+    },
+    "default-engines/worker-stderr.log": {
+      "size_bytes": 1360,
+      "sha256": "4c3adcaccfb667ad12df175c124d3c8cbbb6622fd322f64f915196c868398979"
+    },
+    "nvda-core-menus/nvda-console.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-core-menus/nvda-probe.json": {
+      "size_bytes": 44930,
+      "sha256": "3dc8c6581773ac7999360ad01bdc1192711aa12cefab2b288c29839429af5459"
+    },
+    "nvda-core-menus/nvda.log": {
+      "size_bytes": 41675,
+      "sha256": "7781767788f6210dba22fa70f18fa994bd5fd353f01b2d815f844ae2ed477052"
+    },
+    "nvda-core-menus/pcm-api_latency.wav": {
+      "size_bytes": 384044,
+      "sha256": "6e29a92ca2cd0a237f686ab8b907c07d829b96131e85c978acf5678de6beaaa3"
+    },
+    "nvda-core-menus/pcm-character.wav": {
+      "size_bytes": 8924,
+      "sha256": "915042a6a15b04b089298809c0bbbc8e8bd1ce9b717073383744a01602fe911b"
+    },
+    "nvda-core-menus/pcm-phrase.wav": {
+      "size_bytes": 144834,
+      "sha256": "58b5be443fc45d8a4446aacd41a192289ae9723e39b3142795b676dc62a3cd77"
+    },
+    "nvda-core-menus/portable-creation-console.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-core-menus/portable-creation.log": {
+      "size_bytes": 5040,
+      "sha256": "24720effd2fb13a2072066f5bde7b9f53084ffb3a83156f460ba56d11a3418ee"
+    },
+    "nvda-core-menus/windows-nvda-probe.json": {
+      "size_bytes": 51654,
+      "sha256": "9b4031426c9b17f738efd9c57a5e23060800bb35ff4c1d6200ba37b70a98ec88"
+    },
+    "nvda-typing/nvda-console.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-typing/nvda-probe.json": {
+      "size_bytes": 73621,
+      "sha256": "4ab8216700397dd557095c84dfbc1a88363bce68336b26290b4b872bf1cfc24c"
+    },
+    "nvda-typing/nvda.log": {
+      "size_bytes": 51811,
+      "sha256": "df48f31b378472e7512cbb65911d3a56e04dd506ee5db753bbe8eef1a609eb8f"
+    },
+    "nvda-typing/pcm-typing-en-2.wav": {
+      "size_bytes": 19244,
+      "sha256": "7f4f26e8cf2a115f4ae719a0ced10c15f6954afd9582a6e35cab62f14dde3ecd"
+    },
+    "nvda-typing/pcm-typing-en-3.wav": {
+      "size_bytes": 14204,
+      "sha256": "cd2bb4a79056d3372d4f29f5289b33095e0fa2dc1fd8a943f15490e31e926999"
+    },
+    "nvda-typing/pcm-typing-en-4.wav": {
+      "size_bytes": 37162,
+      "sha256": "2102aa688035c53c145c5ce067767ec7e897c0fa0fb3119640b4d90f2682dbfe"
+    },
+    "nvda-typing/pcm-typing-layout-en.wav": {
+      "size_bytes": 81510,
+      "sha256": "838cb8aa27b5e1c626275b1e29ab0970c346f6ee5e484f7c39d665f12a5a417a"
+    },
+    "nvda-typing/pcm-typing-layout-ru.wav": {
+      "size_bytes": 74300,
+      "sha256": "8d9a30d93f6bdc86cb405e6abdec5d57df65a2b2c311a83d436db58ac075f6e7"
+    },
+    "nvda-typing/pcm-typing-layout-uk.wav": {
+      "size_bytes": 25012,
+      "sha256": "0b24f9a2189284418caf04f8cef5e6221bb8c42391fa96c1375aa67a781a8fd7"
+    },
+    "nvda-typing/pcm-typing-ru-5.wav": {
+      "size_bytes": 11804,
+      "sha256": "cad3178a7462dd3a91c0fbafa560842adaad991d1af1493fe7545dea750bad3b"
+    },
+    "nvda-typing/pcm-typing-ru-6.wav": {
+      "size_bytes": 15164,
+      "sha256": "66ef97b60c563f8e01c9ff27d6ea6f1a6255d37159cde198295a84e879094617"
+    },
+    "nvda-typing/pcm-typing-ru-7.wav": {
+      "size_bytes": 14924,
+      "sha256": "40d5e27c219e1bec246e9ca9eba1e704a064a3209cb7c6b38c3f198d7aafe29e"
+    },
+    "nvda-typing/pcm-typing-ru-8.wav": {
+      "size_bytes": 51740,
+      "sha256": "eaf5a8d9302086fdc56c072b8ed8feadac4be13419175820b253fa48213b657c"
+    },
+    "nvda-typing/pcm-typing-uk-0.wav": {
+      "size_bytes": 8924,
+      "sha256": "915042a6a15b04b089298809c0bbbc8e8bd1ce9b717073383744a01602fe911b"
+    },
+    "nvda-typing/pcm-typing-uk-1.wav": {
+      "size_bytes": 20924,
+      "sha256": "73c549851bcfb79953efffc3108bc27f4a1835788a2a8fe41c9e8a98542fd1a6"
+    },
+    "nvda-typing/portable-creation-console.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvda-typing/portable-creation.log": {
+      "size_bytes": 5032,
+      "sha256": "938fbebd9ab85f9f7e49b291da0a41e694e7f513742627391dfba56ab1cc9967"
+    },
+    "nvda-typing/windows-nvda-probe.json": {
+      "size_bytes": 82107,
+      "sha256": "ff38f3a845781bba514fe7460c7b00a9bff2c2f9e97a5fb18ae4be7b17218af0"
+    }
+  },
+  "retained_raw_reports": {
+    "path": "source14_actual_integration_45069226971.raw.json.gz",
+    "size_bytes": 158354,
+    "sha256": "1c8a067107befe591856489db70cf6b8fd3484ad8e698b61ea9572ca142e754f",
+    "reopened_all_report_bytes_and_sha256_verified": true
+  },
+  "report_envelope_and_extracted_subreport_equality_verified": true,
+  "limits": [
+    "The successful CI job establishes build/regression/pipe and labelled headless NVDA functional integration only.",
+    "Raw NVDA controllers exit2/partial because physical output and latency acceptance remain explicitly blocked; the functional wrapper does not convert these into physical passes.",
+    "RecordingSink replaces WavePlayer in the isolated headless GUI test; zero Windows output devices were available. There is no physical microphone or native-listener quality certification.",
+    "The45profile count proves catalog visibility, not speech quality or typing coverage of45profiles. Worker utterances use sara; the nine typing cases route to adam.",
+    "Three installed core language engine checks do not prove the full135-entry product catalog or every permitted voice/language combination.",
+    "Text/route/name-match checks and nonzero PCM do not prove correct acoustic letter pronunciation, native pronunciation, perceived speaker identity or emotion.",
+    "Internal100-sample queue/API percentiles do not satisfy prepared-letter, audible cancellation or inter-language P95/P99 acceptance. Physical/acoustic timing remains unaccepted.",
+    "Menu visibility, binding checks and nine injected-key cases are not complete keyboard accessibility, profile-save/restart or long-read acceptance.",
+    "Cold model/preload delays and the source14 outer64-item queue candidate are not certified optimal or delay-free by this functional run."
+  ],
+  "physical_audio_verified": false,
+  "native_pronunciation_quality_verified": false,
+  "acoustic_latency_verified": false,
+  "p95_p99_acceptance_verified": false,
+  "all45_profile_acoustic_quality_verified": false,
+  "all_selected_languages_verified": false,
+  "product_ready": false
+}

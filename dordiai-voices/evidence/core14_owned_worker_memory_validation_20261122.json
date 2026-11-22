@@ -1,0 +1,62 @@
+{
+  "format": "dordiai-core14-memory-controller-validation",
+  "status": "passed",
+  "python": "3.13.9",
+  "tests": {
+    "controller": {
+      "passed": 10,
+      "failed": 0
+    },
+    "held_handle_sampler": {
+      "passed": 15,
+      "failed": 0,
+      "includes_actual_owned_32MiB_child": true
+    }
+  },
+  "evidence_checks": {
+    "completed": true,
+    "raw_gzip_hash": true,
+    "eight_phases": true,
+    "all_phases_have_samples": true,
+    "before_after_payload_identity": true,
+    "normal_cleanup": true,
+    "sampler_joined_before_close": true,
+    "all_samples_measured": true,
+    "quota_bounded": true,
+    "available_guard_not_crossed": true,
+    "own_stage_removed": true,
+    "no_false_family_ram": true,
+    "protocol_cancel_passed": true,
+    "recovery_same_uk_pcm": true,
+    "not_latency_acceptance": true
+  },
+  "files": {
+    "tools/research/core14_memory_probe.py": {
+      "bytes": 17598,
+      "sha256": "31e03f1028d3bcf551ba82d6b5eca92b7a70a42c1c896bb7bbaebe2dbb6cc46c"
+    },
+    "tests/test_core14_memory_probe.py": {
+      "bytes": 6559,
+      "sha256": "62b7939fd848e7668f49b17560b2aec1d458afa36756be3c6bff2076ed1c987a"
+    },
+    "tools/windows_owned_memory.py": {
+      "bytes": 13391,
+      "sha256": "178e39b280ea6f394d15129c0a320cc941a8290d35ef6841879ccf3bdbf9b5e8"
+    },
+    "evidence/core14_owned_worker_memory_20261122.json": {
+      "bytes": 12458,
+      "sha256": "686936d77d7c7edac830838e3cc6d054db2999dd256a0bd57743217a6ce2b71d"
+    },
+    "evidence/core14_owned_worker_memory_raw_20261122.json.gz": {
+      "bytes": 8209,
+      "sha256": "45ca571546f391073ee8350ea68fdd861747b585af51d622183f6d6299d08a71"
+    }
+  },
+  "limitations": [
+    "One local core14 default-profile worker; not NVDA process memory.",
+    "Parent working set is RAM; job aggregate peak COMMIT is not RAM.",
+    "Child and aggregate family resident RAM remain unknown.",
+    "Affinity restricted to two logical CPUs; internal ORT pools unchanged.",
+    "No physical playback, pronunciation or audible latency acceptance."
+  ]
+}

@@ -1,0 +1,982 @@
+{
+  "format": "dordiai-source14-integration-build",
+  "format_version": 1,
+  "status": "actual-source14-built-from-immutable-source13",
+  "version": "0.13.1-dev.14",
+  "artifact": {
+    "filename": "dordiai-voices-0.13.1-dev.14.nvda-addon",
+    "size_bytes": 1992990978,
+    "sha256": "9024506b8250d18868801b5f061d570204ad713d0cfae2a67d77a97df2eb5820",
+    "payload_files": 10260,
+    "installed_bytes": 2408771804,
+    "group": "core"
+  },
+  "resource_baseline": {
+    "format": "dordiai-source13-build-pin",
+    "format_version": 1,
+    "status": "actual-build-verified",
+    "version": "0.13.1-dev.13",
+    "source_run_id": 45049806570,
+    "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+    "source_workflow_path": ".github/workflows/dordiai-source13-integration.yml",
+    "archive_name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+    "archive_bytes": 1992990314,
+    "archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "artifact_id": 14765535864,
+    "artifact_name": "dordiai-source13-development-core-45049806570",
+    "artifact_bytes": 1992992808,
+    "artifact_sha256": "cb63dadbab699a1c90309a39e3fe77a5adc9e1c2488ba10b30cefb13d83ad0a4",
+    "source_build_proof_git_blob": "9d8f44e88cb2a2c126318dd4f2496b9340d19710",
+    "product_ready": false
+  },
+  "source_provenance": {
+    "source_commit": "fa7aea2f5cb92f80f641f575eaae2f8fbea7e882",
+    "source_tree_base_commit": "fa7aea2f5cb92f80f641f575eaae2f8fbea7e882",
+    "source_inputs_committed_and_clean": true,
+    "uncommitted_status": "",
+    "actual_source_snapshot_sha256": "c92378895a9ad1cb01af15cd20e12faf286ee2b151dfd9643848f84a4b29bec7",
+    "source_files": {
+      "doc/en/readme.html": {
+        "size_bytes": 1858,
+        "sha256": "75820a51eaa82cc5b2975e61aa83ea7ef2d8867238187195d0955823621c4795"
+      },
+      "doc/third-party/DordiaiNative/COPYING.APACHE": {
+        "size_bytes": 11362,
+        "sha256": "03379001a7b12a2ec997a25554247d985270b353c10d5bafee9ac8d6519820b7"
+      },
+      "doc/third-party/DordiaiNative/COPYING.BSD": {
+        "size_bytes": 1517,
+        "sha256": "51928dce36213c5333ba3172e847d735d4c6e9b7ff2722a326c49067155b82eb"
+      },
+      "doc/third-party/DordiaiNative/COPYING.MINPACK": {
+        "size_bytes": 2193,
+        "sha256": "c87b7f8ee88f6195e91743820c00354833583aef091b72e2d4a49c8e28e798a0"
+      },
+      "doc/third-party/DordiaiNative/COPYING.MPL2": {
+        "size_bytes": 16727,
+        "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+      },
+      "doc/third-party/DordiaiNative/COPYING.README": {
+        "size_bytes": 264,
+        "sha256": "db640ff2bd90c6abd6a4d3fbb351e0ee4d555417cf840492054d1cbb2ea85644"
+      },
+      "doc/third-party/DordiaiNative/Eigen-MPL-2.0.txt": {
+        "size_bytes": 16727,
+        "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+      },
+      "doc/third-party/DordiaiNative/NOTICE.txt": {
+        "size_bytes": 598,
+        "sha256": "1e3bf913db683d86c0c382c92eba5dce3e5714b8ab6f12c9852e0b624ea55df7"
+      },
+      "doc/third-party/DordiaiNative/ONNX-Runtime-MIT.txt": {
+        "size_bytes": 1073,
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      "doc/third-party/DordiaiNative/snake.cpp": {
+        "size_bytes": 4303,
+        "sha256": "5d3aefd85f5c4e5ef6466ff6498323f2e74fb027c079e3290373b626196fe5ab"
+      },
+      "doc/third-party/FrequencyWords.txt": {
+        "size_bytes": 282,
+        "sha256": "c2a4b62c5c0e331c0eba94150d9b76d3ad5416e6762f235084ebdd9f8ac0b4bd"
+      },
+      "doc/third-party/langdetect/LICENSE": {
+        "size_bytes": 11358,
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      "doc/third-party/langdetect/NOTICE": {
+        "size_bytes": 655,
+        "sha256": "bc22bad5907339e12834d91f7809ec35c3c44fa4b812f274ebfefa38de080869"
+      },
+      "doc/third-party/OmniVoice-NOTICE.txt": {
+        "size_bytes": 1062,
+        "sha256": "c562cce131e4164b0aa18840f901fcceaeb49a20dc788ade7359172d02580211"
+      },
+      "doc/third-party/Pronunciation-NOTICE.txt": {
+        "size_bytes": 505,
+        "sha256": "9b48321ebcf0d6e8c342ddc44ca4509c0b05792afc0fb5c3df1df626724083e7"
+      },
+      "doc/third-party/RHVoice-Jasietka.txt": {
+        "size_bytes": 870,
+        "sha256": "b38798b5822546bd539471525c81b4f36322ef9cada7fb2efbb85bd2d54b97fa"
+      },
+      "doc/third-party/RHVoice-Ukrainian/COPYING.LESSER": {
+        "size_bytes": 26419,
+        "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+      },
+      "doc/third-party/RHVoice-Ukrainian/dictionary.txt": {
+        "size_bytes": 60808,
+        "sha256": "144be10ed023d3fe797059731ece0f0c49f169b2d18b7fbf4f1e989592f53db7"
+      },
+      "doc/third-party/RHVoice-Ukrainian/english_phone_mapping.foma": {
+        "size_bytes": 2895,
+        "sha256": "7d602a4cc7fab92676d7079eb799fa0849d3ea7df7ddeadb5696a0babfa8399f"
+      },
+      "doc/third-party/RHVoice-Ukrainian/NOTICE.txt": {
+        "size_bytes": 682,
+        "sha256": "0dcad81fba99f2e225ca1bda998649134215d9a75358eeda4aa7909c3bd20855"
+      },
+      "doc/third-party/Santali-Piper-NOTICE.txt": {
+        "size_bytes": 555,
+        "sha256": "6bc3be0a89771ec747e2cdaf76f5fd5dc7712d547422a7ca8a599cc95b70d3ef"
+      },
+      "doc/third-party/Sonic/LICENSE": {
+        "size_bytes": 11358,
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      "doc/third-party/Sonic/NOTICE.txt": {
+        "size_bytes": 445,
+        "sha256": "08cf0f09f3bb65941a3220cad590572dcc6029952907837225835b87b944a1e7"
+      },
+      "doc/third-party/Sonic/sonic.c": {
+        "size_bytes": 44899,
+        "sha256": "4a21d8086f844e3e68cb4f85961623a69d35da8ca93cf6ea704ccd125e64eaf5"
+      },
+      "doc/third-party/Sonic/sonic.h": {
+        "size_bytes": 13465,
+        "sha256": "a2fc087b68c25141e2fb7ab56e71b111bee79cf311fcc850d492eb574c0eeffe"
+      },
+      "doc/uk/languages.txt": {
+        "size_bytes": 5533,
+        "sha256": "ee852f1cf917a9e87d54b55a6f89e6488a5795a4bcb8e62866b943e496b90ee0"
+      },
+      "doc/uk/readme.html": {
+        "size_bytes": 3984,
+        "sha256": "f6253f473d714ed3d176aaa1a36d63d6d68d5f209da26ddb4e7591b093d4542b"
+      },
+      "globalPlugins/dordiaiLanguages.py": {
+        "size_bytes": 1576,
+        "sha256": "cf147cd2e96182a4a1ef5472290595adff64457d884d7e26ae2fcc42f658869d"
+      },
+      "globalPlugins/dordiaiMainPreferences.py": {
+        "size_bytes": 1604,
+        "sha256": "b1e5f7c3d1d49918568bea36864cbd674fa0c92cd96d6b0be842a0037bc4f5e3"
+      },
+      "globalPlugins/dordiaiTyping.py": {
+        "size_bytes": 1825,
+        "sha256": "0c11829114efdfe6813cb72c3367927bcdc7f1bb298240562a21296f2b73191d"
+      },
+      "installTasks.py": {
+        "size_bytes": 2347,
+        "sha256": "76eb9e764f110af077dc7d0cdbda931576ad149ea9d3032891556fe6fa4e896a"
+      },
+      "kx47Runtime/character_names.py": {
+        "size_bytes": 3447,
+        "sha256": "0c20fcfc088cf11b11b3cf1db2ed238237408205843e72ca45627b1ded5d85d9"
+      },
+      "kx47Runtime/clean_voice_audio.py": {
+        "size_bytes": 2576,
+        "sha256": "57ae7714ccf63442edd6fcfecc1ce6229754bf4436ca3db8d0b387e23d5e936e"
+      },
+      "kx47Runtime/converted_voices.py": {
+        "size_bytes": 11812,
+        "sha256": "32de0cf843b32a30b3fb45bb519a810af5500f8b09deb4ba3ac17b7919346bd7"
+      },
+      "kx47Runtime/cyrillic_ngrams.json": {
+        "size_bytes": 46872,
+        "sha256": "af35ea13b2304c1b7c7a73f8dddd9ebe6ce09b8c18c580c68554bf4c2a653655"
+      },
+      "kx47Runtime/download_models.py": {
+        "size_bytes": 2829,
+        "sha256": "c726b2fe2708da1c8c263ffec0ec8b1c986654cbde62593cafba435c2c635453"
+      },
+      "kx47Runtime/english_phonetics.py": {
+        "size_bytes": 3306,
+        "sha256": "3a93bbadec3eca4f271014b2fa4542f241965ae137e410b5dab3ec3bba323471"
+      },
+      "kx47Runtime/error_diagnostics.py": {
+        "size_bytes": 1576,
+        "sha256": "b3363bd82c4252a2e6f9555128dbf7d5caf7cd35436a0a41ea79aac9c0595bff"
+      },
+      "kx47Runtime/experiment_letters.py": {
+        "size_bytes": 2498,
+        "sha256": "652e525cc4cf221e950ac351a929f5754e884365cb1d18eda0fe5e52e646aeff"
+      },
+      "kx47Runtime/host_paths.py": {
+        "size_bytes": 1710,
+        "sha256": "c66f4aba1db4072cfd9123cb5675b161b580c48e40bc5e62cb26d68c1fd7e6f0"
+      },
+      "kx47Runtime/kx47.py": {
+        "size_bytes": 8813,
+        "sha256": "41e2b8476df17117745729630c2f2bf0e16c0fb576c26cb576835fbbda13e028"
+      },
+      "kx47Runtime/language_catalog.json": {
+        "size_bytes": 25019,
+        "sha256": "56f8b4a3fac5e9595e8598e631982b86a1b91c0dae6fcc69cd05c9dda66192a8"
+      },
+      "kx47Runtime/language_catalog.py": {
+        "size_bytes": 36411,
+        "sha256": "e4b8bdf5a785210f79d31c72596fc297325e47132149302c669bab11e756846c"
+      },
+      "kx47Runtime/language_codes.py": {
+        "size_bytes": 2576,
+        "sha256": "c622589170fa0964b889531673e55c00e2ee530892c680cd37b21c5b0587a365"
+      },
+      "kx47Runtime/language_iso_aliases.json": {
+        "size_bytes": 3048,
+        "sha256": "f47233320a9a6a8dc578e7f1488f3c3a1a38117f7c7287b69256ae280ed7938e"
+      },
+      "kx47Runtime/language_origin.py": {
+        "size_bytes": 3888,
+        "sha256": "0faff0d29d68ce28373a6ca431792ae846cdcf4c5ca26c1e81798a2ece5912b5"
+      },
+      "kx47Runtime/language_routing.py": {
+        "size_bytes": 4785,
+        "sha256": "17e102d1b0a2dc49cfdc7f5b998f99637643abd682e1680f7c704f2f7721f851"
+      },
+      "kx47Runtime/latin_languages.py": {
+        "size_bytes": 6366,
+        "sha256": "7e440d6fda9f1f690380a1294bca678f80b1883844b5689b6a299c152da14b6a"
+      },
+      "kx47Runtime/latin_phonetics.py": {
+        "size_bytes": 1453,
+        "sha256": "f25357473a4b10d93cae1efe61628e3eb44338737196a6c685b583063ab08f56"
+      },
+      "kx47Runtime/legacy_data_path.py": {
+        "size_bytes": 7444,
+        "sha256": "7b634658c5cc3eb6ac4bfca65afd870dbe59fcc36bbec9c24ef213a55c4cb050"
+      },
+      "kx47Runtime/mms_family_sessions.py": {
+        "size_bytes": 20740,
+        "sha256": "0f84f29c526d30d0affd8ddf5434abafa12e91863ac63b766ecce1115d8c4e95"
+      },
+      "kx47Runtime/models/CharacterNames/ak.json": {
+        "size_bytes": 266234,
+        "sha256": "68a57cbf8676e4a05cd28fd12da58d61f0e171eb26cd0eba250aac49f34c2009"
+      },
+      "kx47Runtime/models/CharacterNames/ar.json": {
+        "size_bytes": 296127,
+        "sha256": "5966d74af4bcf9e3a7be2221e7d3a04b481b5598332c32a3cc70ec2097092bb8"
+      },
+      "kx47Runtime/models/CharacterNames/ay.json": {
+        "size_bytes": 28931,
+        "sha256": "e22079378e0dcc4c531369bfbbf1aa6da772dd835c3c7a66098ecfd0071225bd"
+      },
+      "kx47Runtime/models/CharacterNames/bm.json": {
+        "size_bytes": 2620,
+        "sha256": "04ce1afc516a02f94ad4d973050f903e3c486852d2396173fcb3561571482bb7"
+      },
+      "kx47Runtime/models/CharacterNames/brx.json": {
+        "size_bytes": 3498,
+        "sha256": "6660cf1fcf8596e9e602a19df2851b8fe946e49d5848af4b0765bcf86c239f13"
+      },
+      "kx47Runtime/models/CharacterNames/CLDR-Unicode-3.0.txt": {
+        "size_bytes": 2033,
+        "sha256": "220ba0e1c43b99530d2d5bdb892a99dca0989414f51ab695ecd90163eaa1ec3b"
+      },
+      "kx47Runtime/models/CharacterNames/doi.json": {
+        "size_bytes": 7163,
+        "sha256": "5341ae2dbae723a15c914978fbfea4ee9eba3dd308e9092cfe4d94b000b23cf6"
+      },
+      "kx47Runtime/models/CharacterNames/dv.json": {
+        "size_bytes": 1834,
+        "sha256": "79ed35594417cbd6781279af93ad8a58369dccc99c3aea3b4e91d559e56fecf5"
+      },
+      "kx47Runtime/models/CharacterNames/dyu.json": {
+        "size_bytes": 1835,
+        "sha256": "c1cb73eccc151bb0ba520265ef69a7c694199075fe22211edcb1cea885068b7b"
+      },
+      "kx47Runtime/models/CharacterNames/dz.json": {
+        "size_bytes": 3402,
+        "sha256": "212d998272142b0903c55b745301dce38415133270a0800c739f904eddfb14af"
+      },
+      "kx47Runtime/models/CharacterNames/el.json": {
+        "size_bytes": 326435,
+        "sha256": "fc7f99f2b64e4884bfb9a46091f1fd840d29451c0517542455f1c135cdeeb94a"
+      },
+      "kx47Runtime/models/CharacterNames/en.json": {
+        "size_bytes": 280088,
+        "sha256": "3cb874530141306cf5f43894e402a50151d70cab3813bfd01ecb76e7d822206d"
+      },
+      "kx47Runtime/models/CharacterNames/es.json": {
+        "size_bytes": 338227,
+        "sha256": "484fa76dfa56193181bb5c3ac503d7ebcf2847a0227defa6a66f21e4546404a8"
+      },
+      "kx47Runtime/models/CharacterNames/ff.json": {
+        "size_bytes": 2923,
+        "sha256": "b583018002831887cfe07deeec60758bf51ab85940c689b4cee8f20eb9dbee89"
+      },
+      "kx47Runtime/models/CharacterNames/fi.json": {
+        "size_bytes": 299334,
+        "sha256": "c7d3d4fae3fdff0f29b405846d10647e15c9b9ea3ca7227aa1263582bd486275"
+      },
+      "kx47Runtime/models/CharacterNames/fil.json": {
+        "size_bytes": 336264,
+        "sha256": "aeb30e2e2705ac132e2389dc57904313046c00950c8334206990a0f67b7dbf68"
+      },
+      "kx47Runtime/models/CharacterNames/fj.json": {
+        "size_bytes": 1834,
+        "sha256": "c305f5895dc01d79a7ccf5c19dfcce4725b72156c5d76498fb335cbaa4b3aa2a"
+      },
+      "kx47Runtime/models/CharacterNames/gil.json": {
+        "size_bytes": 1835,
+        "sha256": "748c3dbc2c00e145a77c763b54617bc47e591fd31ef6ac31bac2480a1e8e081e"
+      },
+      "kx47Runtime/models/CharacterNames/ha.json": {
+        "size_bytes": 286769,
+        "sha256": "0aad80199308a79a30e91c51def3a8a755ba4843205383d678204cd1408907d8"
+      },
+      "kx47Runtime/models/CharacterNames/hr.json": {
+        "size_bytes": 298982,
+        "sha256": "efcf1f59c01078cf3e5267ec464c4333d03faa1b8443779d4db11ad6465e27a5"
+      },
+      "kx47Runtime/models/CharacterNames/ig.json": {
+        "size_bytes": 279215,
+        "sha256": "2591dac4949029275a6479246d8734334ef3fee9f043f868a82f89ee862d06f8"
+      },
+      "kx47Runtime/models/CharacterNames/it.json": {
+        "size_bytes": 339941,
+        "sha256": "aab9e3f7de79d3d2c94037ce041a15f353ccf8e5453169df15ae9b8df7aa0af7"
+      },
+      "kx47Runtime/models/CharacterNames/kab.json": {
+        "size_bytes": 3074,
+        "sha256": "9d498bca9548dfc61597226ae3c0dabdfe9968aa8f21a43b10cacf4ed51e99ed"
+      },
+      "kx47Runtime/models/CharacterNames/km.json": {
+        "size_bytes": 361173,
+        "sha256": "c0b42a7c3743dc1bb7c1dad8b52bfa56145d27535104cce389bc09c6936ddda2"
+      },
+      "kx47Runtime/models/CharacterNames/ks.json": {
+        "size_bytes": 3046,
+        "sha256": "4f47eaf08fa8eaf53582be4d80fee64380b3107ec4e8dd1450042fc0c6097528"
+      },
+      "kx47Runtime/models/CharacterNames/ln.json": {
+        "size_bytes": 3184,
+        "sha256": "fdfc42bbecd574e0945c17244d6ad619576ba3b72c912f9d9738188bf11436cd"
+      },
+      "kx47Runtime/models/CharacterNames/lo.json": {
+        "size_bytes": 330349,
+        "sha256": "cc1871364a665fbf8060370e5f96c4a2e72fc0279444bcfd7bbd9a6ab7311a39"
+      },
+      "kx47Runtime/models/CharacterNames/mai.json": {
+        "size_bytes": 5088,
+        "sha256": "0a3f19b2d899686facd34fb1ad74a33bb1bf49341f7f0f4c657c96d10e233349"
+      },
+      "kx47Runtime/models/CharacterNames/mg.json": {
+        "size_bytes": 2626,
+        "sha256": "b192feb8534a727ae5c6e7bef90b5ba5a3f1b9f0ec6037fc8a3016f871e509be"
+      },
+      "kx47Runtime/models/CharacterNames/mni.json": {
+        "size_bytes": 8582,
+        "sha256": "3dae8f5865db3da3faaeaccd8985f45fa95665e7385f3e1da098793b0021aa92"
+      },
+      "kx47Runtime/models/CharacterNames/mos.json": {
+        "size_bytes": 1835,
+        "sha256": "edea6179fbb314f7bbc369a744f5eba283936e6da9b91a167356fda246ffb776"
+      },
+      "kx47Runtime/models/CharacterNames/nd.json": {
+        "size_bytes": 2576,
+        "sha256": "cf38d2b638349f5cd9f5f530aa23a283e950ca48d22f0a58d7315edd9eae9402"
+      },
+      "kx47Runtime/models/CharacterNames/nso.json": {
+        "size_bytes": 235795,
+        "sha256": "7bdfcab0cf7bf7e32bcd7ecc2e77cee34a8b63cf97645acb574dc950e65a21a4"
+      },
+      "kx47Runtime/models/CharacterNames/NVDA-GPL.txt": {
+        "size_bytes": 53408,
+        "sha256": "59380ebf6a0483ad98b1dcca4b4d236f1a6212dc42b9845faf0ff0627405c8c0"
+      },
+      "kx47Runtime/models/CharacterNames/ny.json": {
+        "size_bytes": 1834,
+        "sha256": "e578c00747232216d51e5de1f558582ee170d07d2d4e6562cded9d841f2ff1e2"
+      },
+      "kx47Runtime/models/CharacterNames/pl.json": {
+        "size_bytes": 302187,
+        "sha256": "f6c48e0d8fd089be787aeee788b2678230b94ab357aa8b1c16b6414dcd87297a"
+      },
+      "kx47Runtime/models/CharacterNames/pt.json": {
+        "size_bytes": 302682,
+        "sha256": "0e40d0cff3790c68976ef59cacf3330a865545f522181aeab56d6a7650366e83"
+      },
+      "kx47Runtime/models/CharacterNames/rm.json": {
+        "size_bytes": 289638,
+        "sha256": "9a67781d8c1a61f424a0776f242074f596983a9c63bd30a2c371b8f91ca7b416"
+      },
+      "kx47Runtime/models/CharacterNames/rn.json": {
+        "size_bytes": 2594,
+        "sha256": "d1fd0186544605c344b45714c9da3013805e3fb985465549365b1403fce05754"
+      },
+      "kx47Runtime/models/CharacterNames/ro.json": {
+        "size_bytes": 345607,
+        "sha256": "aab2272a047ba625f16392c3d43c18887333a70bae351bc4781ff6fdad0aa17a"
+      },
+      "kx47Runtime/models/CharacterNames/ru.json": {
+        "size_bytes": 361535,
+        "sha256": "c7ee85805584bf61a15b6da1e2f12eb9b47eb556a1c8ef7545985c7b5be101fe"
+      },
+      "kx47Runtime/models/CharacterNames/rw.json": {
+        "size_bytes": 232552,
+        "sha256": "28fec707cf2be153b29c548d41a6d3dda2a47e007f9642a9358a26357835cbb3"
+      },
+      "kx47Runtime/models/CharacterNames/sat.json": {
+        "size_bytes": 13798,
+        "sha256": "3e438df2dc2b20fe5200ee11e644e1cce83dec9f2b34f26807c1b1294640f234"
+      },
+      "kx47Runtime/models/CharacterNames/sg.json": {
+        "size_bytes": 2760,
+        "sha256": "84d73043b9022a9de0278d8e0532ae3600c6ab853c3813271ff9e11298ee5487"
+      },
+      "kx47Runtime/models/CharacterNames/sm.json": {
+        "size_bytes": 1834,
+        "sha256": "a71b93692d7b1cdd0411fc053cb3ef8a942c386ff9b0cc3dff2b60339847a089"
+      },
+      "kx47Runtime/models/CharacterNames/sn.json": {
+        "size_bytes": 2558,
+        "sha256": "9e623dc0670c74c11de8b5353c9239626bf13af5f462db602bd67b995a6d26f6"
+      },
+      "kx47Runtime/models/CharacterNames/so.json": {
+        "size_bytes": 289399,
+        "sha256": "d3594a02d824bee90f41ec2362feaa4caf7b7bc7ffe87efa4f700e7ccb3d5d34"
+      },
+      "kx47Runtime/models/CharacterNames/SOURCE-NOTICE.txt": {
+        "size_bytes": 675,
+        "sha256": "72a44824fa1b5ced250e29cd00d6b0b92f3406dce95080bccf924a01e8ac84d3"
+      },
+      "kx47Runtime/models/CharacterNames/st.json": {
+        "size_bytes": 2522,
+        "sha256": "2f0bb8b7b6f1a4045bd6bcb72f56b23c46b702e8447065f0c52292dbaff8a2e4"
+      },
+      "kx47Runtime/models/CharacterNames/tg.json": {
+        "size_bytes": 255087,
+        "sha256": "38d11fdb36b2b7f29dc9b86054d57192d50b68757fcacd609a490d1a3c04a970"
+      },
+      "kx47Runtime/models/CharacterNames/tpi.json": {
+        "size_bytes": 1835,
+        "sha256": "46aeb71dc4283a84019fee390eeef8a57409901715b60705c2093c736a0402e2"
+      },
+      "kx47Runtime/models/CharacterNames/ts.json": {
+        "size_bytes": 1834,
+        "sha256": "f2e30ae97d8a8d085b1090c650ca63b17310972ed3b725382b19eace3e21faed"
+      },
+      "kx47Runtime/models/CharacterNames/uk.json": {
+        "size_bytes": 339290,
+        "sha256": "32c0a24b3e11aabd81b2f8620542fcd278a3160729f2073a21f9d35fa5f3f6eb"
+      },
+      "kx47Runtime/models/CharacterNames/wo.json": {
+        "size_bytes": 227670,
+        "sha256": "db16f534c09c4511abd1865d4129e7cfe44ad967b383e401ad790983aff8af51"
+      },
+      "kx47Runtime/models/CharacterNames/xh.json": {
+        "size_bytes": 230010,
+        "sha256": "b199bd4ab89ee602878f9118ed0475826984fb88de0628133f3547c5717b250b"
+      },
+      "kx47Runtime/models/CharacterNames/yo.json": {
+        "size_bytes": 288155,
+        "sha256": "871d4aadc8d605ad3e6af8924c978c573aa93c1aef4f017444a9823bb633b05c"
+      },
+      "kx47Runtime/models/CharacterNames/zu.json": {
+        "size_bytes": 296731,
+        "sha256": "d30c816cbd9b99b955e6ed93067fdb965f54b6e179e27a3657daa8acd3c400d7"
+      },
+      "kx47Runtime/models/Holos/holos_onnx.json": {
+        "size_bytes": 2725,
+        "sha256": "a9480fa95168180683d5502694227ffa6518743f3ef2352ae02aac46bb6c407d"
+      },
+      "kx47Runtime/models/MMSShared/graph.onnx": {
+        "size_bytes": 927175,
+        "sha256": "d883f15134dafb68b33acf514deac3c87c2684632fed992a8857570d12db7ec6"
+      },
+      "kx47Runtime/models/MMSShared/index.json": {
+        "size_bytes": 144600,
+        "sha256": "919ff7937a8f3f61506bd01c374b4368cd310697a4c68a4dc8a773384230af73"
+      },
+      "kx47Runtime/models/MMSShared/NOTICE.txt": {
+        "size_bytes": 802,
+        "sha256": "f17fbf8de8626baef5c82e4f5e1ed6f7c0d1b858d03f1a5dcd671dbb693c1988"
+      },
+      "kx47Runtime/models/voices/catalog.json": {
+        "size_bytes": 1331,
+        "sha256": "c711fe0606bb2fad300793862bf60ee902b48d9dc4aa60460fe7d38dfaa83dd9"
+      },
+      "kx47Runtime/models/voices/classmate_locales/languages.json": {
+        "size_bytes": 678,
+        "sha256": "1cc22954a2735f81aeb561204593a79e06db4994c32c9ba52e35d4f81173fb68"
+      },
+      "kx47Runtime/models/WordLanguage/cyrillic-lexicon.json.gz": {
+        "size_bytes": 268689,
+        "sha256": "ce1b5a4333f8b2498f7970390b72a26f6a8a239086aeb2f91afb8046715ce3ba"
+      },
+      "kx47Runtime/models/WordLanguage/MODEL_CARD_UK.md": {
+        "size_bytes": 9914,
+        "sha256": "542461dd86adee304274799737565a7a279189fb8441a4af3ffbe049f71cbe79"
+      },
+      "kx47Runtime/models/WordLanguage/word-lid.json.gz": {
+        "size_bytes": 296117,
+        "sha256": "19c9f7c9c3d63c20dc6f8f1f2cc12384aa29fb565710c886d84f4244eb159d64"
+      },
+      "kx47Runtime/native_locale.py": {
+        "size_bytes": 9579,
+        "sha256": "ebc426b44e00685340d0bc730fd2f85227a9bc7f7807c45880f89a7712987bbe"
+      },
+      "kx47Runtime/native_lookahead.py": {
+        "size_bytes": 4962,
+        "sha256": "5475d58fe296824d84db41c921ed3abddcf246cc61d6ec80c25595ec74231530"
+      },
+      "kx47Runtime/native_membership_runtime.py": {
+        "size_bytes": 12988,
+        "sha256": "6641a19317d28330ba87078b92d5b8d70b239fef290f9c2dbba70363fef347cd"
+      },
+      "kx47Runtime/native_multilingual.py": {
+        "size_bytes": 15269,
+        "sha256": "f86ef71491b0a8ad3292c7a7a5061b284bdb0d70c2b197cba7cc68901319fa99"
+      },
+      "kx47Runtime/native_word_membership.py": {
+        "size_bytes": 20041,
+        "sha256": "13ba429470ab0f795d1485bdddcd9edf31026d71b3e2747b1a6b9ac0dcae2ccc"
+      },
+      "kx47Runtime/navigation_cache.py": {
+        "size_bytes": 3117,
+        "sha256": "25d078060158484e4cea9513f75ab712f8e4b1dde34cd21a22986d2dcd273e65"
+      },
+      "kx47Runtime/nvda_worker.py": {
+        "size_bytes": 20855,
+        "sha256": "8b8860c97f2fdd87bf42b476e803a7f4ac756718afc5e70816268bcd5085123b"
+      },
+      "kx47Runtime/omnivoice_duration.py": {
+        "size_bytes": 11641,
+        "sha256": "3a0b468e89eb2a109a270fe4386ce1afe57305c08375a524a1af08399dfaf772"
+      },
+      "kx47Runtime/package_manager.py": {
+        "size_bytes": 27357,
+        "sha256": "bf8d7b4c53d0749f8e59411b8dfcf819ed1b3c987b78620e407e6662dc6a6641"
+      },
+      "kx47Runtime/personal_catalog.py": {
+        "size_bytes": 5675,
+        "sha256": "d9eb0e1ba731f938cd0f2d1e651e54de7bbef36ee27d3a05f73bd18f96c3730d"
+      },
+      "kx47Runtime/personal_language.py": {
+        "size_bytes": 2317,
+        "sha256": "2f9a72f2f91592c731c8fb6edca6d1b2a7cf75519c097fd50622a5a4bfdfe190"
+      },
+      "kx47Runtime/personal_orthography.py": {
+        "size_bytes": 992,
+        "sha256": "018a2da967633129174887e9816bd375acc5c52cb6fdc91f17b052548935405a"
+      },
+      "kx47Runtime/personal_voice.py": {
+        "size_bytes": 6526,
+        "sha256": "93e47f1d93a401637529c9e79e333993d963526a1eea2d256c04b69467de6f34"
+      },
+      "kx47Runtime/piper_family_sessions.py": {
+        "size_bytes": 1565,
+        "sha256": "7a320440a7720fc4e6e5cb4095b7a20b1d0143773fde066b8e0a870c7297ad1c"
+      },
+      "kx47Runtime/pocket_english.py": {
+        "size_bytes": 9253,
+        "sha256": "870aa2e2e6e36a2692844638f255dd2316e96a6f806534ea15d160c9ac51609a"
+      },
+      "kx47Runtime/preferences.py": {
+        "size_bytes": 54325,
+        "sha256": "8ca42af7cbaeb7f842fa6ad8858c18e2d0b4f7c7aa17eed6bd9b10f2086fe050"
+      },
+      "kx47Runtime/reference_prosody.py": {
+        "size_bytes": 1034,
+        "sha256": "83b5b10ed5c473dcf3de609526df76bf97bcb9cf7d9c9eec9db266810754fa69"
+      },
+      "kx47Runtime/reference_voices.py": {
+        "size_bytes": 2556,
+        "sha256": "07ee879c3a67c4b17968c7d0895be7cabe1f034313d5ff9878e7fc97d81d0e9c"
+      },
+      "kx47Runtime/requirements.txt": {
+        "size_bytes": 57,
+        "sha256": "b83cbb1d48bea521f53d0128219e839d4a9667a84926eef16bd2f2f07d724e05"
+      },
+      "kx47Runtime/rhvoice_carrier.py": {
+        "size_bytes": 3653,
+        "sha256": "b589018a35539ba75f216a69b74008090dfef69e68fd5befa4b376b8434fc900"
+      },
+      "kx47Runtime/rhvoice_stress.json": {
+        "size_bytes": 47294,
+        "sha256": "b260a380e47482c8cbcc26729c131a097a22664536f8db65861fd1c5c1b7080d"
+      },
+      "kx47Runtime/russian_phonetics.py": {
+        "size_bytes": 728,
+        "sha256": "02b0300583799367b8b464adf3de2b28fab88ff26b0ce369aaeeb61cd9a58ce3"
+      },
+      "kx47Runtime/santali_phonemizer.py": {
+        "size_bytes": 6528,
+        "sha256": "1424f604dccc88b96fcc8b65df6b733741fc7485c3482728b9e246be2c94a733"
+      },
+      "kx47Runtime/session_control.py": {
+        "size_bytes": 2515,
+        "sha256": "f9a7a121465ec19a1ec6f4847cbff1bbb0e88860ecd590cc1ad16004152086bf"
+      },
+      "kx47Runtime/speech_tempo.py": {
+        "size_bytes": 3325,
+        "sha256": "100218779ee930079c9742169caa90a58b6150e99920025385a1545a7fa66a9d"
+      },
+      "kx47Runtime/speech_text.py": {
+        "size_bytes": 19220,
+        "sha256": "3334924e97059a9dbd43a42252ecd91044b7cca466d626a77c82d5d68c107df6"
+      },
+      "kx47Runtime/spelling_audio.py": {
+        "size_bytes": 3832,
+        "sha256": "6a8579f2d3f3f569e10452e7e4c3b06aed02c865fb88606b0b771306895dae05"
+      },
+      "kx47Runtime/streaming_resample.py": {
+        "size_bytes": 1770,
+        "sha256": "8c4953670bc0d15598c6b878aa5942324c824c5606f8fd8739daea1102e08760"
+      },
+      "kx47Runtime/typing_locale.py": {
+        "size_bytes": 1206,
+        "sha256": "508e2de4e80210bb70dcdfb8b3cf9f0ca9af5add4aa40fd8411002c282aca3c0"
+      },
+      "kx47Runtime/ukrainian_stress.py": {
+        "size_bytes": 7989,
+        "sha256": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933"
+      },
+      "kx47Runtime/ukrainian_voices.py": {
+        "size_bytes": 16881,
+        "sha256": "ace27177938aef3e9a5b5fc958a412b64f4c8b1e9548c0cc9c25285a5a3d696b"
+      },
+      "kx47Runtime/upgrade_packages.py": {
+        "size_bytes": 15557,
+        "sha256": "20a6463d12eb85f5859fd3522a998bd62208c948e426fddc9d1b15e4aa5acf7a"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/__init__.py": {
+        "size_bytes": 1390,
+        "sha256": "5754d6c335710f06e6715a4fc581b075acc2c9ab93a77766585c49102886be72"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/convert.py": {
+        "size_bytes": 43529,
+        "sha256": "c85069083b556f6793661609fe0a2e0bbb151a6ed4f97db34982dd9757b96117"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/data/ipa_universal_graphemes.json": {
+        "size_bytes": 429875,
+        "sha256": "720c631b812f1f8de3b150ef01205a0c83cc77595cfef0577e1ec58c7284544f"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/data/plain_latin_languages.json": {
+        "size_bytes": 1074,
+        "sha256": "488ec9367249d4ba22e62399521f944c28e89a867722a7b385becef845d7345f"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/data/proxy_escapes.json": {
+        "size_bytes": 20089,
+        "sha256": "a3d44fcc08a75fc108c896634edb7c294418885994f5546597b4be7a92cdae8a"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/data/proxy_fidelity.json": {
+        "size_bytes": 91354,
+        "sha256": "707d7395ba281585844fd4c1a3d6edf8aa88ae3185cc867b23160ee5acc4f252"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/data/registry.json": {
+        "size_bytes": 143399,
+        "sha256": "5a83dcc08b887308a0d782c9e9e5841f293c337620a8bece83c9ab43ee194e66"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/data/universal_fallback.json": {
+        "size_bytes": 48144,
+        "sha256": "dd50bf66ba479484cf4caacb2dfea8b7be1e19b71387752d3b0a0a9949383ac9"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/english.py": {
+        "size_bytes": 5174,
+        "sha256": "d98e7b9382d07b976718b579720a0158bee637ee05439ad9160b4c63ed64b134"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/fallback.py": {
+        "size_bytes": 4279,
+        "sha256": "f34b62cc80426b2c1051a1bd9fde80774f9744f8d02c4bed9ec297d1e1a05567"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/g2p.py": {
+        "size_bytes": 14511,
+        "sha256": "33bfbf1f20db8b7de5dca3aec918bdf1081167d481553650ac983486f4520ef2"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/languages/nso.json": {
+        "size_bytes": 2090,
+        "sha256": "297af9083116012c7a49cb1b5a9e8ab5e28e77a1817f139507eec93192650bfd"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/languages/ssw.json": {
+        "size_bytes": 2579,
+        "sha256": "f47fbfad8384391b4b768c72a43dc3d803e2120a7ea4bbe833c999a4db645349"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/languages/ven.json": {
+        "size_bytes": 2625,
+        "sha256": "de7b4d42bafd59d43b51651c371bfdc783cd49be423eac5bc17bed0058de6faa"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/languages/wol.json": {
+        "size_bytes": 2877,
+        "sha256": "fdfc01743e5554d2243d2e951b8d977b946dab1838493c39b6b6029efdd27956"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/languages/zul.json": {
+        "size_bytes": 2456,
+        "sha256": "826363fbd77710a62493cdd9a02c34893fb9ac3653cab958aaf6cf7fe15357e5"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/loader.py": {
+        "size_bytes": 1655,
+        "sha256": "b37fa01aaf77c2dd32196c30c15d8a2d6a20c7d9ce96c877787010af32478723"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/normalizer.py": {
+        "size_bytes": 6888,
+        "sha256": "b2417ca6e47c290bc618e4c0e71dbc091b55ab062fc5cbb8e6da11e96a70ce78"
+      },
+      "kx47Runtime/vendor_afri_g2p/africa_g2p/pipeline.py": {
+        "size_bytes": 2166,
+        "sha256": "363bbbacb56ebbbe4c82faed861f1f9ace9a44c859a65605d2f74b9da2271b98"
+      },
+      "kx47Runtime/vendor_afri_g2p/DATA_LICENSE.md": {
+        "size_bytes": 1831,
+        "sha256": "d5df0dc8c9cb391c27e606606263e62b33da4bcc11b2949a2961fbf214d3764d"
+      },
+      "kx47Runtime/vendor_afri_g2p/dordiai-vendor.json": {
+        "size_bytes": 3229,
+        "sha256": "aa8942975d8957957bd245215bd2c79de3c30facb5d4013e2e93b5547ab4c624"
+      },
+      "kx47Runtime/vendor_afri_g2p/UPSTREAM-PYPROJECT.toml": {
+        "size_bytes": 2181,
+        "sha256": "0fac49f70149a49d28cf29cb377a06d69949ea9889490cda54ba908b57fa13fa"
+      },
+      "kx47Runtime/voice_assets.py": {
+        "size_bytes": 11203,
+        "sha256": "27e8da00fbe4bc55314ff93e8362a9add21be0701d506f46fe2340e15ec6d153"
+      },
+      "kx47Runtime/voice_catalog.py": {
+        "size_bytes": 2331,
+        "sha256": "a87bd24451fa43f66a93b25f584e773fc7d6fa373a74fb46387251a792bced62"
+      },
+      "kx47Runtime/voice_controls.py": {
+        "size_bytes": 3468,
+        "sha256": "d464e5a2a03a0b60911033277d38f00d9f256792219444d44a6ca1e1b4898eff"
+      },
+      "kx47Runtime/voice_delivery.py": {
+        "size_bytes": 7398,
+        "sha256": "2d5a1877622f6d7e95babc12685f88f69999263fa0a6fd32748f2093cda2ea93"
+      },
+      "kx47Runtime/voice_packages.py": {
+        "size_bytes": 25023,
+        "sha256": "9af25b73977fd91b8147fcb9abf90d6897122d77458e57131e2c1ece95794a20"
+      },
+      "kx47Runtime/voice_policy.py": {
+        "size_bytes": 2049,
+        "sha256": "a4440452751b66ed7500b23031fc4590c57dc74e76bcc95fc452d4a79382887f"
+      },
+      "kx47Runtime/wide_afri_frontend.py": {
+        "size_bytes": 2939,
+        "sha256": "7d12d940290380e997dd0f61f553bd08ece7b20d788af9eef4c0453cf54556d8"
+      },
+      "kx47Runtime/wide_afri_six.py": {
+        "size_bytes": 20370,
+        "sha256": "62faef83dd6428d3a9b30c098dc67a37ff1cb0e909253adfb901c3109ee9593a"
+      },
+      "kx47Runtime/wide_breton.py": {
+        "size_bytes": 2538,
+        "sha256": "6699f2aea9f0139669a77d751aff5441f07a90279f5cf8b554c595323b82294b"
+      },
+      "kx47Runtime/wide_carrier.py": {
+        "size_bytes": 5360,
+        "sha256": "d070848cb5684cd1f151fa45ae93035f3fb9dd8533821b7326d38cfe96ae4bc4"
+      },
+      "kx47Runtime/wide_common.py": {
+        "size_bytes": 1169,
+        "sha256": "55eea8508b15e4c3c8a6845f02617a66a00fd71b89ec26001df7312b81700e2a"
+      },
+      "kx47Runtime/wide_common_carrier.py": {
+        "size_bytes": 3092,
+        "sha256": "59ed90e97016feb090bfed0f80d5720187a24c687fafe5dc54a4fdd56840b558"
+      },
+      "kx47Runtime/wide_common_helpers.py": {
+        "size_bytes": 15781,
+        "sha256": "41e69f2bfd2de02bb15915f141459bc47e61b06ddd690bec10849a0f8a80e7b7"
+      },
+      "kx47Runtime/wide_coqui_onnx.py": {
+        "size_bytes": 7195,
+        "sha256": "c261e6a8640952989e43326f4323f5018b8cdbaa373389510da82ae313184d9d"
+      },
+      "kx47Runtime/wide_extra.py": {
+        "size_bytes": 6427,
+        "sha256": "ec71557f3e0b7315c9b84b62537ef4e71a23460a4dc06b1d2b388aaab0286e00"
+      },
+      "kx47Runtime/wide_extra_models.py": {
+        "size_bytes": 6667,
+        "sha256": "e0b72f7d0236551852d89d5eebb7e8e85630ac5e36e8e2666e636475891f33df"
+      },
+      "kx47Runtime/wide_hebrew.py": {
+        "size_bytes": 4587,
+        "sha256": "2a346efe61bc4c2861ab9221ea830d89dd9904c8d6226cfc9b86a3ef19bdcad5"
+      },
+      "kx47Runtime/wide_hebrew_niqqud.py": {
+        "size_bytes": 15521,
+        "sha256": "df4705b1da04d76bfc7e3e2a8472b4603ab4ecd6c6bd51b658556a487ee85d27"
+      },
+      "kx47Runtime/wide_japanese.py": {
+        "size_bytes": 1758,
+        "sha256": "b75d54d901ea9da1a3683bce14252ef0f03dccffeeb52154f78a31027f9f7795"
+      },
+      "kx47Runtime/wide_languages.py": {
+        "size_bytes": 23863,
+        "sha256": "67e45b0993655dbd5d84ae1ce6dd5817debd5f3ecf4e51b3772f6ecb09be7b0b"
+      },
+      "kx47Runtime/wide_loading.py": {
+        "size_bytes": 1958,
+        "sha256": "0c0c1855ddc88e25e9adbcd8ea54629af713c5e34dc2186383becd2d3d2972ae"
+      },
+      "kx47Runtime/wide_matcha.py": {
+        "size_bytes": 5305,
+        "sha256": "24428af9431f4b0f6d2ea38e0ac6993b5a75f22cf9571746a7e7abe9fd7c1ee7"
+      },
+      "kx47Runtime/wide_matcha_frontend.py": {
+        "size_bytes": 3630,
+        "sha256": "665b4f2f12dd7488138918b8ffdee9c03eb0d682aab61486f7020ecd0051dddc"
+      },
+      "kx47Runtime/wide_mms.py": {
+        "size_bytes": 14034,
+        "sha256": "ca65e236c392cb46d8683098f83b1a6a401a5ad84abb3ec4de2cd125ce46a874"
+      },
+      "kx47Runtime/wide_nordic.py": {
+        "size_bytes": 1678,
+        "sha256": "19ca7c92b4112bd82a98ea07a6c3bc62ae07fc240b3f3787ffc101d4bc62ebd9"
+      },
+      "kx47Runtime/wide_number_words.json": {
+        "size_bytes": 5622,
+        "sha256": "ec9d02676ac64c7c0101728ed455cae7a5e937830bdc009c28199a89e7677c0b"
+      },
+      "kx47Runtime/wide_numbers.py": {
+        "size_bytes": 5030,
+        "sha256": "1e195fa81d578369682e861855f8654f713c20515af89602031c273cca244fdf"
+      },
+      "kx47Runtime/wide_omnivoice_onnx.py": {
+        "size_bytes": 13633,
+        "sha256": "5cc2ec060f82f1d31ff32b357706fcea8c9365450330f3d18ae97a093d5576ff"
+      },
+      "kx47Runtime/wide_phonetics.py": {
+        "size_bytes": 2963,
+        "sha256": "6c496542013385b93873451e68c9e966726d0c593071bfc8ebdcbee944366f0c"
+      },
+      "kx47Runtime/wide_profiles.py": {
+        "size_bytes": 5527,
+        "sha256": "13c979be734ccee298864b26db7c08d158cbd320d06e401692b2aebea9eef18a"
+      },
+      "kx47Runtime/wide_rasa.py": {
+        "size_bytes": 8572,
+        "sha256": "d3358559ef8aeb23d4862306349884ff3d01c5b43b9df17f571882bdb4aa7d01"
+      },
+      "kx47Runtime/wide_simba.py": {
+        "size_bytes": 6584,
+        "sha256": "00dc995afe223d7f2c073b5f6c26e4869899bda963518ff948d97dac4596d648"
+      },
+      "kx47Runtime/wide_voice.py": {
+        "size_bytes": 20637,
+        "sha256": "22fd778cb2e479e3d9280696ab9c3c11c1afbcad877140a4e0ce9c069d5055e5"
+      },
+      "kx47Runtime/wide_voice_index.json": {
+        "size_bytes": 29939,
+        "sha256": "2958cbf02745339678159fdb54942f207d45237fe9cd0c9fe6b0034285d8e31d"
+      },
+      "kx47Runtime/wide_warmup.py": {
+        "size_bytes": 3845,
+        "sha256": "a5c51ce277842c148ff956f934ca758e4519f58592a8b7cf9ddb10241426a478"
+      },
+      "kx47Runtime/windows_runtime.py": {
+        "size_bytes": 4081,
+        "sha256": "71457f59258d2e21686eadb13d276dba6b7946249df3cc4a824b5de5afbffe4a"
+      },
+      "kx47Runtime/word_classifier.py": {
+        "size_bytes": 7475,
+        "sha256": "53de0f1111c10ed3db4c020fe6500d58307ab28e697818cb5679eba113dda785"
+      },
+      "manifest.ini": {
+        "size_bytes": 354,
+        "sha256": "c60c9b3836865b8cba4e8b4b9b86c68843f8e40fe386dceb66c8072eabc243e4"
+      },
+      "synthDrivers/_dordiai_audio.py": {
+        "size_bytes": 3204,
+        "sha256": "e60ab5ab2ca3d4eebe19336e36ce41b41c842983890282a52e96873caff72330"
+      },
+      "synthDrivers/_dordiai_letter_bank.py": {
+        "size_bytes": 6376,
+        "sha256": "b242f983076cb9a19d85f9fd5da90a9fa973af53d0f7c8f28f21a3adc8db5ebd"
+      },
+      "synthDrivers/kx47Preview.py": {
+        "size_bytes": 93803,
+        "sha256": "72d4526804111d66e5786da60542e9effbb91a84a7c00a2d785e6e30bbf0acf7"
+      }
+    },
+    "build_tools": {
+      "tools\\research\\source14_integration.py": {
+        "size_bytes": 27137,
+        "sha256": "54f1987634c3aa5a16f68a3618d00b0180f7d5129e4c3d0a745a60f9b7effe0a"
+      },
+      "tools\\build_release.py": {
+        "size_bytes": 14319,
+        "sha256": "2509f5601d4e5a6674de1a9a95b153f42043fd2e731dc53bc56cde1f167a3ddd"
+      },
+      "tools\\verify_release.py": {
+        "size_bytes": 4417,
+        "sha256": "b8daf5e4c0fd2d5868c521ffaecdd107b27c0450249f34dda275342b3842a3af"
+      },
+      "tools\\research\\source13_integration.py": {
+        "size_bytes": 26914,
+        "sha256": "4624fd80aed1e7812911c6c4a16f7c6c8ccff00e2047866d3d229511e803b9db"
+      },
+      "tools\\vendor\\stressonnx-download-original.txt": {
+        "size_bytes": 2886,
+        "sha256": "2455937e7aeb88be4324f5bd507f579793f9ef9861662e3deaa348b463603424"
+      },
+      "tools\\vendor\\NOTICE-stressonnx.txt": {
+        "size_bytes": 875,
+        "sha256": "8fe3d7a823732e9f39090934fab4a3e6c2bca696ec584d522b74b6b32f1e410a"
+      }
+    }
+  },
+  "source_overlay_changed_files": [
+    "kx47Runtime/native_multilingual.py",
+    "kx47Runtime/nvda_worker.py",
+    "kx47Runtime/wide_warmup.py",
+    "manifest.ini",
+    "synthDrivers/kx47Preview.py"
+  ],
+  "preservation": {
+    "changed_files": [
+      "kx47Runtime/native_multilingual.py",
+      "kx47Runtime/nvda_worker.py",
+      "kx47Runtime/wide_warmup.py",
+      "manifest.ini",
+      "synthDrivers/kx47Preview.py"
+    ],
+    "all_other_payload_files_byte_identical": 10255,
+    "exact_payload_set_unchanged": true,
+    "allowed45_voice_ids_unchanged": true,
+    "excluded_ids_unchanged": true,
+    "model_identity_files_byte_identical": 8511,
+    "prepared_bank_files_byte_identical": 180,
+    "private_runtime_files_byte_identical": 1596
+  },
+  "archive_verification": {
+    "filename": "dordiai-voices-0.13.1-dev.14.nvda-addon",
+    "verified_files": 10260,
+    "installed_bytes": 2408771804,
+    "download_bytes": 1992990978,
+    "voice_count": 45,
+    "windows_nvda_validation": "not_performed_by_packaging_verifier"
+  },
+  "generated_old_inventory_omitted": true,
+  "bounded_driver_candidate": {
+    "original_driver_sha256": "17eeda6106858c4eb14ede91dd2a698cae0abaa9894d3df3e3d445d374a042ee",
+    "original_driver_bytes": 93785,
+    "candidate_driver_sha256": "72d4526804111d66e5786da60542e9effbb91a84a7c00a2d785e6e30bbf0acf7",
+    "candidate_driver_bytes": 93803,
+    "only_outer_keyword_ast_difference_verified": true,
+    "all_non_insertion_bytes_identical": true,
+    "outer_pending_count": 64,
+    "original_helper_default_unchanged": 12,
+    "explicit_inner_counts_unchanged": [
+      2
+    ],
+    "generation_and_cancellation_unchanged": true,
+    "first_ready_delivery_helper_ast_unchanged": true,
+    "startup_reserve_or_word_warmup_added": false,
+    "maximum_outer_queued_pcm_bytes": 30720,
+    "candidate_evidence_run": 45064826804,
+    "candidate_selection_scope": "Bounded headroom candidate; not a proven optimum or source14 acceptance",
+    "source14_waveform_or_cancel_acceptance_proved": false
+  },
+  "build_environment": {
+    "python_full_version": "3.13.9 (tags/v3.13.9:8183fa5, Oct 14 2025, 14:09:13) [MSC v.1944 64 bit (AMD64)]",
+    "python_executable": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Python 3.13\\python.exe",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "zlib_compile_version": "1.3.1",
+    "zlib_runtime_version": "1.3.1"
+  },
+  "source13_extractor_git_blob": "92f0937a79e613efef087bb68ad5530ee01c70cd",
+  "model_download_performed": false,
+  "acoustic_model_preparation_performed": false,
+  "bank_regeneration_performed": false,
+  "nvda_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false
+}

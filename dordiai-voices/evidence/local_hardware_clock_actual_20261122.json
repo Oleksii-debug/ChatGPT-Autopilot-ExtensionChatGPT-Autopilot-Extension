@@ -1,0 +1,271 @@
+{
+  "format": "dordiai-local-hardware-clock-actual-independent-review",
+  "format_version": 1,
+  "created_utc": "2026-11-22T20:49:20.999791+00:00",
+  "status": "owned-marker-and-real-render-stream-clock-observed; process-capture-position-axis-unavailable",
+  "additional_helper_execution_performed_by_reviewer": false,
+  "artifact_pins": {
+    "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+    "commit": "c2fb3b9c3336e62acb3c6400f133115e55fbb928",
+    "run_id": "45066502844",
+    "artifact_id": 14771417822,
+    "artifact_bytes": 250008,
+    "artifact_sha256": "9c4f17d96b128c1ea1998e920170388a4d1207193a1f342f3868882631900fbd",
+    "source_sha256": "dea9c3c9e54b09ec9622400f8448ec9b2ee478c7cdc366109cd5e8d878edbbac",
+    "frozen_source_sha256": "eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012"
+  },
+  "owned_process": {
+    "pid": 9344,
+    "process_start_filetime": 134398537593815329,
+    "executable_sha256": "f963428e2037656f55e41686f03a957773a8c9b1d56a5691f09a4bb92ef97b60",
+    "exit_code": 0,
+    "reaped": true,
+    "forced_kill": false,
+    "permit_ms": 0.31310001213569194,
+    "all_native_COM_released": true,
+    "cleanup_errors": [],
+    "exact_int_FILETIME_verified": true
+  },
+  "hardware_endpoint": {
+    "id": "{0.0.0.00000000}.{fc1f7846-3543-4cff-aaee-de24d7de09b4}",
+    "name": "Explicit inventoried hardware endpoint (not selected by default role)"
+  },
+  "unchanged_native_format": {
+    "average_bytes_per_second": 384000,
+    "bits_per_sample": 32,
+    "block_align": 8,
+    "channels": 2,
+    "extra_bytes": 22,
+    "format_tag": 65534,
+    "native_encoding": "float32le",
+    "raw_format_hex": "feff020080bb000000dc05000800200016002000030000000300000000001000800000aa00389b71",
+    "sample_rate": 48000
+  },
+  "default_roles_unchanged_before_after_both_operations": true,
+  "default_restoration_performed": false,
+  "marker": {
+    "reference_frames": 4800,
+    "captured_frames": 65760,
+    "reference_peak": 0.029999999329447746,
+    "reference_sha256": "d2826cfeae77c0334a52f640d0a80480cecf8f383ad2e14df8f988549e4b5486",
+    "captured_sha256": "f2d71ab785b2f34453288b9237f5f54620a30324d80ecff3bbae399d00631936",
+    "render_readback_sha_matches_reference": true,
+    "single_common_capture_array_offset_frames": 1984,
+    "array_offset_ms": 41.333333333333336,
+    "array_offset_is_latency": false,
+    "independent_direct_full_and_ordinary_window_results": [
+      {
+        "window": "full",
+        "channel": 0,
+        "pearson_ncc": 1.0,
+        "gain": 1.0000000000082516
+      },
+      {
+        "window": "full",
+        "channel": 1,
+        "pearson_ncc": 1.0,
+        "gain": 0.9999999999970589
+      },
+      {
+        "window": 1,
+        "channel": 0,
+        "pearson_ncc": 1.0,
+        "gain": 0.9999999999978202
+      },
+      {
+        "window": 1,
+        "channel": 1,
+        "pearson_ncc": 1.0,
+        "gain": 0.9999999999848798
+      },
+      {
+        "window": 2,
+        "channel": 0,
+        "pearson_ncc": 1.0,
+        "gain": 1.000000000011522
+      },
+      {
+        "window": 2,
+        "channel": 1,
+        "pearson_ncc": 1.0,
+        "gain": 1.0000000000027722
+      },
+      {
+        "window": 3,
+        "channel": 0,
+        "pearson_ncc": 1.0,
+        "gain": 1.0000000000112952
+      },
+      {
+        "window": 3,
+        "channel": 1,
+        "pearson_ncc": 0.9999999999999999,
+        "gain": 0.9999999999918386
+      },
+      {
+        "window": 4,
+        "channel": 0,
+        "pearson_ncc": 1.0,
+        "gain": 1.000000000004523
+      },
+      {
+        "window": 4,
+        "channel": 1,
+        "pearson_ncc": 1.0,
+        "gain": 0.9999999999926245
+      },
+      {
+        "window": 5,
+        "channel": 0,
+        "pearson_ncc": 1.0,
+        "gain": 1.0000000000208613
+      },
+      {
+        "window": 5,
+        "channel": 1,
+        "pearson_ncc": 0.9999999999999998,
+        "gain": 1.0000000000157265
+      }
+    ],
+    "independent_full_search_replay_exact_matches_parent": true,
+    "matched_window_max_abs_waveform_difference": 1.1641532182693481e-09,
+    "matched_window_is_byte_identical": false,
+    "no_time_framewarp_or_window_specific_offsets": true
+  },
+  "render_clock": {
+    "S_OK_readings": 680,
+    "HRESULT_counts": {
+      "0x00000000": 680
+    },
+    "frequency_device_units_per_second": 384000,
+    "native_sample_rate_frames_per_second": 48000,
+    "frequency_equals_native_average_bytes_per_second": true,
+    "device_units_not_assumed_to_be_frames": true,
+    "monotonic_position_and_API_QPC": true,
+    "API_QPC_inside_observed_raw_QPC_bracket_count": 680,
+    "QPC_frequency_raw_ticks_per_second": 10000000,
+    "initial_zero_position_readings": 2,
+    "positive_position_readings": 678,
+    "all_readings_position_span_seconds": 1.379,
+    "all_readings_API_QPC_span_seconds": 1.3990361,
+    "positive_phase_position_span_seconds": 1.377125,
+    "positive_phase_API_QPC_span_seconds": 1.3771915,
+    "positive_phase_span_difference_ms": -0.0665,
+    "adjacent_positive_phase_delta_difference_ms": {
+      "n": 677,
+      "minimum": -0.6669333333333334,
+      "median": -0.00013333333333333334,
+      "maximum": 0.6718,
+      "p95_nearest_quantile": 0.0292
+    },
+    "GetPosition_call_duration_ms": {
+      "n": 680,
+      "minimum": 9.999999999999999e-05,
+      "median": 0.0012,
+      "maximum": 0.009300000000000001,
+      "p95_nearest_quantile": 0.0031
+    }
+  },
+  "process_tap_capture": {
+    "packets": 137,
+    "frames_each": {
+      "480": 137
+    },
+    "flags_counts": {
+      "0": 137
+    },
+    "TIMESTAMP_ERROR_packets": 0,
+    "DATA_DISCONTINUITY_packets": 0,
+    "all_device_position_frames_zero": true,
+    "device_position_axis_available": false,
+    "packet_API_QPC_steps_minus_previous_packet_duration_ms": {
+      "n": 136,
+      "minimum": 0.0,
+      "median": 0.0,
+      "maximum": 0.0,
+      "p95_nearest_quantile": 0.0
+    },
+    "packet_API_QPC_progress_consistent_with_packet_frames": true,
+    "packet_read_call_after_packet_QPC_ms": {
+      "n": 137,
+      "minimum": 10.5033,
+      "median": 10.9412,
+      "maximum": 11.8451,
+      "p95_nearest_quantile": 11.5036
+    },
+    "packet_frame_sum_matches_captured_PCM": true,
+    "positions_or_timestamps_replaced": false
+  },
+  "session": {
+    "native_loop_wall_seconds": 1.401663,
+    "through_both_native_Stop_seconds": 1.4025907,
+    "parent_total_seconds": 1.5742319999990286,
+    "native_limit_seconds": 1.5,
+    "render_GetStreamLatency_maximum_100ns": 0,
+    "zero_stream_latency_means_zero_audible_latency": false
+  },
+  "interpretation_uk": [
+    "Реальний USB shared render stream надав зростаючу IAudioClock вісь із680S_OK читань і частотою384000deviceunits/с. Не ділити ці позиції на48000frames/с: це інша одиниця; у цьому stream частота дорівнює average bytes/с native format, але загальний API не гарантує bytes units для інших streams.",
+    "Перші два render clock спостереження мають нульову позицію. Показані як повний span, так і окремо678positive-position readings; початковий період не вилучено ізraw. Positive span відрізняється відQPC на−0.0665ms за~1.377s, проте окремі кроки мають відхилення до~0.672ms. Дані не підганялись.",
+    "137process-tap packets мають по480frames і точно10ms міжAPI QPC. Усі flags0, але всі DevicePosition досі0; це не надає capture-position proof. Такий самий результат на local hardware означає, що попередні нулі не можна приписувати лишеCI virtual driver.",
+    "Marker знайдено на1984frames retained software array:41.333ms від початку цього масиву, не від фізичного початку звуку, клавіші чиNVDA. Fullmarker і всі5звичайних windows обох каналів мають NCC≈1 при одномуoffset; мала float різниця існує, byte-identical не заявляється.",
+    "GetStreamLatency повернув0. Це записаний maximum latency stream API, а не доказ нульової затримки слухового сигналу. Process loopback tap і stream clock не є microphone/DAC/acoustic вимірюванням.",
+    "Ownprocess9344 вийшовexit0/reaped безforce, COM resources звільнені, default render IDs незмінні; цей reviewer лише читав/копіював попередні докази. NVDA, volume/defaults/drivers не змінювались і новий marker не запускався."
+  ],
+  "raw_exact_files": {
+    "run/parent-report.json": {
+      "source_path": "D:\\DordiaiTestTemp\\owned-clock-70ab694b8c0cfe6e3442106b342a9e68\\parent-report.json",
+      "bytes": 305135,
+      "sha256": "c817f551fe4991cdc6933d60775d68f2e23d042453b4fd18e1051ec9e0eb3924"
+    },
+    "run/clock.json": {
+      "source_path": "D:\\DordiaiTestTemp\\owned-clock-70ab694b8c0cfe6e3442106b342a9e68\\clock.json",
+      "bytes": 133053,
+      "sha256": "c0295b216359e91097d5249018d81757801f76ccb5242f17488f5b7c12e803c4"
+    },
+    "run/reference.pcm": {
+      "source_path": "D:\\DordiaiTestTemp\\owned-clock-70ab694b8c0cfe6e3442106b342a9e68\\reference.pcm",
+      "bytes": 38400,
+      "sha256": "d2826cfeae77c0334a52f640d0a80480cecf8f383ad2e14df8f988549e4b5486"
+    },
+    "run/captured.pcm": {
+      "source_path": "D:\\DordiaiTestTemp\\owned-clock-70ab694b8c0cfe6e3442106b342a9e68\\captured.pcm",
+      "bytes": 526080,
+      "sha256": "f2d71ab785b2f34453288b9237f5f54620a30324d80ecff3bbae399d00631936"
+    },
+    "describe/parent-report.json": {
+      "source_path": "D:\\DordiaiTestTemp\\owned-clock-eb47409178429221233c231d23e2971f\\parent-report.json",
+      "bytes": 5539,
+      "sha256": "1a8523cac2af565f370df9acd0b5146b51fb09523f31f2e99f52745ddc1b647c"
+    },
+    "build/artifact.zip": {
+      "source_path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\downloads\\owned-clock-build-45066502844.zip",
+      "bytes": 250008,
+      "sha256": "9c4f17d96b128c1ea1998e920170388a4d1207193a1f342f3868882631900fbd"
+    },
+    "analysis-source.py": {
+      "source_path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\analyze-local-hardware-clock-20261122.py",
+      "bytes": 14790,
+      "sha256": "fe54a9c665f4f224f50f42b110d8b2852515e9a7b1b4b90b7cc48dd3f6ff9d38"
+    },
+    "controller-source.py": {
+      "source_path": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\tools\\windows_owned_audio_clock_probe.py",
+      "bytes": 24923,
+      "sha256": "8fdaf1c7a4ae2cbf25cfa7ec3d82b9959142d8b7eeba7d64e4aec7c6b1db4d5b"
+    }
+  },
+  "ignored_local_backup_directory": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій\\dordiai-voices\\windows-evidence\\local-hardware-clock-20261122",
+  "git_raw_backup": {
+    "path": "evidence\\local_hardware_clock_actual_20261122.raw.json.gz",
+    "bytes": 518313,
+    "sha256": "15cbf1986d2c2b799f86e0a9ad802e0a958a01139b0e897fab967d0a60349eb3",
+    "files": 8,
+    "base64_file_size_sha_verified": true
+  },
+  "physical_audible_onset_or_stop_verified": false,
+  "actual_NVDA_acceptance": false,
+  "character_echo_or_P95_P99_targets_verified": false,
+  "product_ready": false,
+  "diagnostic_quantile_method": "Order statistic at zero-based round((n-1)*0.95), nearest quantile; diagnostics only, not an NVDA latency percentile acceptance.",
+  "exact_raw_backup_independently_decoded_and_rehashed_members": 8
+}
