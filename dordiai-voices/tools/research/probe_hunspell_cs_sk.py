@@ -202,9 +202,9 @@ def run(directory, library, output):
                 words.add(word)
                 valid += 1
         source_counts[locale] = {"declared_entries": declared, "canonical_entry_candidates": valid}
+    output.mkdir()
     native = NativeDictionaries(library, directory)
     counts = {"cs": 0, "sk": 0, "shared": 0, "rejected_by_both": 0}
-    output.mkdir()
     started = time.perf_counter()
     examples = {}
     try:

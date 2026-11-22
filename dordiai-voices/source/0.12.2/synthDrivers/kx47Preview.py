@@ -61,6 +61,7 @@ _host_paths = _runtime_module("host_paths")
 RUNTIME = _host_paths.filesystem_path(RUNTIME)
 _typing_locale = _runtime_module("typing_locale")
 _language_origin = _runtime_module("language_origin")
+_personal_language = _runtime_module("personal_language")
 LanguageOriginCommand = _language_origin.command_type(SynthParamCommand)
 _voice_policy = _runtime_module("voice_policy")
 _error_diagnostics = _runtime_module("error_diagnostics")
@@ -1117,7 +1118,8 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         _wide.refresh_personal(True)
         if _wide.PERSONAL:
             self.supportedSettings=(*type(self).supportedSettings,DriverSetting(
-                "personalLanguage","Мова тексту без позначки",availableInSettingsRing=True,defaultVal="auto"))
+                "personalLanguage","Мова тексту без позначки",availableInSettingsRing=True,
+                defaultVal="auto",useConfig=False))
         runtime = self._runtime_config()
         if runtime is None:
             raise RuntimeError("Prepare the KX-47 runtime before selecting this synthesizer.")
@@ -1326,11 +1328,47 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
     def _getAvailableVoices(self):
         return self._dordiai_filter_voices(OrderedDict((key, VoiceInfo(key, value[0], "uk")) for key, value in self._voices.items()))
 
+    def _dordiai_personal_languages(self):
+        return _personal_language.available(_wide.PERSONAL, self._dordiai_all_languages(),
+                                            self._dordiai_enabled_languages)
+
     def _get_availablePersonallanguages(self):
         _wide.refresh_personal(True)
-        choices=OrderedDict(auto=VoiceInfo("auto","Автоматично"))
-        choices.update((key,VoiceInfo(key,item["name"],key)) for key,item in _wide.PERSONAL.items())
+        choices = OrderedDict(auto=VoiceInfo("auto", "Автоматично"))
+        choices.update((code, VoiceInfo(code, entry["name"], code))
+                       for code, entry in self._dordiai_personal_languages().items())
         return choices
+
+    _cache_personalLanguage = False
+
+    def _get_personalLanguage(self):
+        current = getattr(self, "_personalLanguage", "auto")
+        if current != "auto":
+            current = _personal_language.normalized_choice(current, self._dordiai_personal_languages())
+            self._personalLanguage = current
+        return current
+
+    def _set_personalLanguage(self, value):
+        self._personalLanguage = ("auto" if value == "auto" else
+            _personal_language.normalized_choice(value, self._dordiai_personal_languages()))
+
+    @classmethod
+    def _getConfigSpecForSettings(cls, settings):
+        spec = super()._getConfigSpecForSettings(settings)
+        # Keep profile migration defined even if optional resources are absent.
+        spec["personalLanguage"] = "string(default='auto')"
+        return spec
+
+    def loadSettings(self, onlyChanged=False):
+        # Enabled/installed profile state must be applied before validating the
+        # selected optional default, rather than against constructor defaults.
+        super().loadSettings(onlyChanged=onlyChanged)
+        self._set_personalLanguage(config.conf["speech"][self.name].get("personalLanguage", "auto"))
+
+    def saveSettings(self):
+        selected = self._get_personalLanguage()
+        super().saveSettings()
+        config.conf["speech"][self.name]["personalLanguage"] = selected
 
     def _get_availableLanguages(self):
         installed = set(self._dordiai_all_languages())
@@ -1570,10 +1608,11 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             if not self._closed:
                 controls = dict(pitch=self._pitch, volume=self._volume, timbre=self._timbre)
                 roles = self._speech_roles() if self._canJoin else {}
-                if self.personalLanguage!="auto" and self.personalLanguage in _wide.PERSONAL:
-                    chosen=self.personalLanguage
-                    speechSequence=(LangChangeCommand(chosen),*(LangChangeCommand(chosen)
-                        if isinstance(item,LangChangeCommand) and not item.lang else item for item in speechSequence))
+                chosen = self._get_personalLanguage()
+                if chosen != "auto":
+                    speechSequence = _personal_language.apply_default(
+                        speechSequence, chosen, self._dordiai_selection[2],
+                        LangChangeCommand, LanguageOriginCommand)
 
                 from speech import sayAll
                 continuous = bool(sayAll.SayAllHandler and sayAll.SayAllHandler.isRunning())

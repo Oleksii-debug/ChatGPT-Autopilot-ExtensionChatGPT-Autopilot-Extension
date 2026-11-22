@@ -159,6 +159,7 @@ def migrate_installed_packages(old_root, new_root):
         old_index = packages._load_index(old_voices)
         destination_index = packages._load_index(new_voices)
         active = dict(destination_index["active"])
+        inactive = dict(destination_index.get("inactive", {}))
         versions = 0
         found = set()
         if old_voices.exists():
@@ -195,11 +196,20 @@ def migrate_installed_packages(old_root, new_root):
                 raise UpgradeError("Не знайдено активної версії голосу: " + voice)
             if voice in active and active[voice] != version:
                 raise UpgradeError("Конфлікт активної версії голосу: " + voice)
+            if voice in inactive:
+                raise UpgradeError("Конфлікт активного та неактивного голосу: " + voice)
             active[voice] = version
+        for voice, version in old_index.get("inactive", {}).items():
+            if voice in active or (voice in inactive and inactive[voice] != version):
+                raise UpgradeError("Конфлікт неактивного голосу: " + voice)
+            inactive[voice] = version
 
         metadata = {manager._state_path(new_root): {"format_version": 1, "packs": pending}}
-        if old_index["active"] or versions:
-            metadata[new_voices / packages.INDEX_NAME] = {"format_version": 1, "active": active}
+        if old_index["active"] or old_index.get("inactive") or versions:
+            voice_index = {"format_version": 2 if inactive else 1, "active": active}
+            if inactive:
+                voice_index["inactive"] = inactive
+            metadata[new_voices / packages.INDEX_NAME] = voice_index
         originals = {path: path.read_bytes() if path.exists() else None for path in metadata}
         needed = sum(record["size_bytes"] for _, record in planned.values())
         if shutil.disk_usage(new_root).free < needed + 32 * 1024 * 1024:

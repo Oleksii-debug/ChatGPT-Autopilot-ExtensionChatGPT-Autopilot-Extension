@@ -29,6 +29,12 @@ class Longread(unittest.TestCase):
     def test_middle_word_audio_drop_fails(self):
         r=voice();c=np.concatenate((np.zeros(500),r,np.zeros(500)));c[500+RATE:500+RATE+RATE//20]=0
         p=self.check_signal(r,c);self.assertTrue(p['active_drop_windows']);self.assertFalse(p['no_new_transport_gap_verified'])
+    def test_exact_twenty_ms_drop_off_grid_near_tail_is_detected(self):
+        r=voice();c=np.concatenate((np.zeros(555),r,np.zeros(1000)))
+        first=3*RATE+7;c[555+first:555+first+RATE//50]=0
+        p=self.check_signal(r,c)
+        self.assertTrue(p['full_reference_transport_verified'])
+        self.assertTrue(p['active_drop_windows']);self.assertFalse(p['no_new_transport_gap_verified'])
     def test_periodic_ambiguous_anchors_cannot_pass_gap(self):
         r=np.sin(np.arange(RATE*4)*2*np.pi*200/RATE)*4000;p=self.check_signal(r,np.concatenate((np.zeros(500),r,np.zeros(500))))
         self.assertTrue(p['full_reference_transport_verified']);self.assertFalse(p['no_new_transport_gap_verified']);self.assertEqual(p['gap_gate_status'],'open-clock-or-anchor-ambiguity')

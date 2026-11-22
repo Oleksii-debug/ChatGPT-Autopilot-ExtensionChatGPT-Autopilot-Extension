@@ -4,7 +4,7 @@
   "status": "implementation_in_progress",
   "product_ready": false,
   "base_version": "0.12.2",
-  "target_version": "0.13.1-dev.12",
+  "target_version": "0.13.1-dev.13",
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
@@ -1290,15 +1290,54 @@
       "missing_identified_explicit_tables": 116,
       "missing_table_but_existing_engine_route_candidates": 67,
       "scope": "Static explicit table audit; missing table is not equivalent to unsupported native spelling. Full135 typing/pronunciation unverified."
+    },
+    "source13_candidate": {
+      "status": "integrated_for_actual_build_not_product_ready",
+      "baseline_source12": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+      "runtime_blobs": {
+        "word_leaf": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+        "resource_manager": "960459711ee3af8976540fd4595489fb7f69aedb",
+        "driver": "06e9f652060dd78c9aae6b17d8d38692d58e9ec4",
+        "personal_language": "c5c8d4dc2a0a666283c6ab6041df6228e5016d45",
+        "voice_packages": "2abe2a50bcf58aea423764ef15acc04538ee2f9b",
+        "preferences": "adbb32c6c6858bc7aee4cad5c116bd456cc8173f",
+        "upgrade": "ffb73001ca1036dec1ec4ae66f257398b87308e2"
+      },
+      "new_model_files": [
+        "kx47Runtime/models/CharacterNames/ar.json"
+      ],
+      "old_model_files_must_remain_byte_identical": 8510,
+      "old_bank_files": 180,
+      "private_files": 1596,
+      "allowed_ids": 45,
+      "actual_personal_config_host_run": 45046562415,
+      "actual_ar29_native_projection_run": 45046562273,
+      "updated_voice_ownership_focused_tests": 29,
+      "updated_voice_ownership_actual_windows_verified": false,
+      "archive_exists": false,
+      "actual_nvda_verified": false,
+      "product_ready": false
+    },
+    "longread_source12": {
+      "run": 45045436146,
+      "status": "probe_timeout_before_complete_reference; diagnosis_retry_pending",
+      "verified_original100_delivery": false,
+      "underruns_established": false,
+      "deadline_seconds": 80,
+      "capture_seconds": 90,
+      "cleanup_verified": true,
+      "evidence": "evidence/longread_failed_45045436146.json",
+      "note": "Do not infer renderer underruns from absent reference; retry observes public queue/mode/driver/producer counters."
     }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
   "next_work": [
-    "Verify remaining actual12 keyboard scenarios and personalLanguage enabled/installed priority semantics.",
-    "Match real12 WavePlayer phrase capture and preserve original exact evidence.",
-    "Advance unprepared-read performance with guarded equivalence tests; keep experimental changes out of frozen12.",
-    "Complete missing genuine resources, ordinary-character coverage and broad quality tests without language aliases or readiness inflation."
+    "Complete actual source13 Windows build and all225 packaged profile/native/default3 checks with strict preservation.",
+    "Fill actual13 build pin only from real successful run/archive receipts; execute nine actual NVDA modes and real package lifecycle.",
+    "Diagnose frozen12 longread probe through bounded phase snapshots, then assess real continuous output/cancellation without changing workload.",
+    "Prepare optional authenticated Arabic45-profile name banks and compare explicitly trained shared UK/RU carrier performance without production changes.",
+    "Complete genuine missing resources, native quality and selected-language character/input coverage; retain product_ready=false while open."
   ],
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
@@ -1446,5 +1485,5 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Immutable12 sourcebe7f4e: actual Windows1330/1280pass/50skip, worker225, all5actualNVDAmodes pass; future production changes require13."
+  "working_source_target_version": "Source13 integration: reviewed V2 leaf/bounded path manager, profile-language policy, durable voice ownership, new Arabic29 data. Actual13 archive/build/NVDA verification pending; immutable actual12 remains available."
 }

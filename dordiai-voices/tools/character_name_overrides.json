@@ -742,6 +742,74 @@
           "endyi"
         ]
       }
+    },
+    "ar": {
+      "source": {
+        "url": "https://library.ksaa.gov.sa/links/epubs/manzumat_alhuruf_alearabia_.pdf",
+        "bytes": 5475624,
+        "sha256": "940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385",
+        "sha256_scope": "Original complete PDF bytes actually downloaded; printed169/PDF170 diagram visually inspected",
+        "title": "منظومة الحروف العربية",
+        "author": "زكي البنداري",
+        "publisher": "King Salman Global Academy for Arabic Language",
+        "edition": "1446 AH",
+        "location": "Printed page169, PDF page170, Figure1 قائمة حروف اللغة العربية الفصيحة وتشكالتها",
+        "license_note": "Original book explicitly reserves rights. Only independently transcribed factual letter/name correspondences; no PDF, images, extended prose, font or audio redistributed.",
+        "role": "Diagram explicitly pairs letters and their ordinary names, not sound values, phonetic example words or CLDR symbol labels",
+        "native_pronunciation_verified": false,
+        "caution": "28 base alphabet letters plus independent hamza. Do not infer contextual/hamza-seat/taa-marbuta/alif-maqsura disambiguating names from this base table. Arabic native model here is original shared neural carrier, not MMS.",
+        "technical_name_pcm_proof": {
+          "run_id": 45046562273,
+          "raw_report_git_blob": "870e6d96d091e83f275b0666de2ef074ad6ca053",
+          "source_names_rendered": 29,
+          "native_and_viktoriia_finite_pcm": true,
+          "scope": "Isolated literal names as ordinary text, exact immutable12/private3.14.5/ORT1.26 + original SharedAcoustic optional resources; not production glyph dispatch, prepared banks or NVDA typing acceptance",
+          "native_pronunciation_verified": false,
+          "listener_pronunciation_verified": false,
+          "windows_nvda_verified": false,
+          "typing_verified": false,
+          "physical_audio_verified": false
+        }
+      },
+      "letter_names": {
+        "ا": "ألف",
+        "ب": "باء",
+        "ت": "تاء",
+        "ث": "ثاء",
+        "ج": "جيم",
+        "ح": "حاء",
+        "خ": "خاء",
+        "د": "دال",
+        "ذ": "ذال",
+        "ر": "راء",
+        "ز": "زاي",
+        "س": "سين",
+        "ش": "شين",
+        "ص": "صاد",
+        "ض": "ضاد",
+        "ط": "طاء",
+        "ظ": "ظاء",
+        "ع": "عين",
+        "غ": "غين",
+        "ف": "فاء",
+        "ق": "قاف",
+        "ك": "كاف",
+        "ل": "لام",
+        "م": "ميم",
+        "ن": "نون",
+        "ه": "هاء",
+        "و": "واو",
+        "ي": "ياء",
+        "ء": "همزة"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "exclusions": {
+        "أ إ ؤ ئ آ": "Chart groups hamza forms, but ordinary full-glyph disambiguating names are not established here; do not automatically rename every seated/length form as hamza.",
+        "ة": "Chart under taa does not establish desired disambiguating name taa marbuta. Keep unresolved by this candidate.",
+        "ى": "Chart under alif does not establish desired disambiguating name alif maqsura. Keep unresolved by this candidate.",
+        "ـ": "Tatweel is formatting, not a base alphabet letter. No new label invented."
+      }
     }
   }
 }

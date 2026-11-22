@@ -41,7 +41,9 @@ jobs:
           root=pathlib.Path("dordiai-voices")
           spec=importlib.util.spec_from_file_location("source13_preflight",root/"tools/research/source13_integration.py")
           helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
-          print({"reviewed_source_version":helper.check_source_version(root/"source/0.12.2"),"product_ready":False},flush=True)
+          version=helper.check_source_version(root/"source/0.12.2")
+          reviewed=helper.character_name_review(root/"source/0.12.2",root/"tools/data/source13_character_name_pins.json")
+          print({"reviewed_source_version":version,"exact_new_arabic29_paths":sorted(reviewed),"product_ready":False},flush=True)
       - name: Define owned short staging paths
         shell: pwsh
         run: |
@@ -65,7 +67,7 @@ jobs:
       - name: Build actual source13 with exact core12 embedded banks and private runtime
         shell: pwsh
         run: |
-          python dordiai-voices/tools/research/source13_integration.py build --baseline-addon "$env:SOURCE13_INPUTS/core12/dordiai-voices-0.13.1-dev.12.nvda-addon" --source dordiai-voices/source/0.12.2 --packs "$env:SOURCE13_INPUTS/afri-packs" --work "$env:SOURCE13_BUILD" --output dordiai-voices/dist/source13 --report dordiai-voices/source13-results/build.json
+          python dordiai-voices/tools/research/source13_integration.py build --baseline-addon "$env:SOURCE13_INPUTS/core12/dordiai-voices-0.13.1-dev.12.nvda-addon" --source dordiai-voices/source/0.12.2 --character-name-pins dordiai-voices/tools/data/source13_character_name_pins.json --packs "$env:SOURCE13_INPUTS/afri-packs" --work "$env:SOURCE13_BUILD" --output dordiai-voices/dist/source13 --report dordiai-voices/source13-results/build.json
           if ($LASTEXITCODE -ne 0) { throw "Source13 assembly failed; no acceptance inferred" }
           Remove-Item -LiteralPath "$env:SOURCE13_INPUTS/core12/dordiai-voices-0.13.1-dev.12.nvda-addon" -Force
       - name: Actual packaged source13 native worker225 with outbound traffic blocked

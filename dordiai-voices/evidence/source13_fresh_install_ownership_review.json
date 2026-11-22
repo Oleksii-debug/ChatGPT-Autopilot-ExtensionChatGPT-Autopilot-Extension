@@ -1,0 +1,65 @@
+{
+  "format": "dordiai-source13-fresh-install-ownership-fix",
+  "format_version": 1,
+  "supersedes_production_candidate_manager": "4ffcba11049f707090f6749598dc3996158ebcf6",
+  "supersedes_test_candidate": "c234162e5789e2e3c1e401ce19f64974dad9cd92",
+  "historical_staging_and_windows21_proofs_unchanged": true,
+  "files": [
+    {
+      "path": "dordiai-voices/source/0.12.2/kx47Runtime/voice_packages.py",
+      "bytes": 25023,
+      "sha256": "9af25b73977fd91b8147fcb9abf90d6897122d77458e57131e2c1ece95794a20",
+      "git_sha": "2abe2a50bcf58aea423764ef15acc04538ee2f9b"
+    },
+    {
+      "path": "dordiai-voices/tests/test_voice_package_retention.py",
+      "bytes": 25898,
+      "sha256": "091de793aee19cb5872962c418500ea52bf8a71d35bb6bc3280a1252f4f5f2b2",
+      "git_sha": "5e504272790bda31b42860e28c313efb97ddb919"
+    }
+  ],
+  "unchanged_companion_candidates": {
+    "preferences": "adbb32c6c6858bc7aee4cad5c116bd456cc8173f",
+    "upgrade": "ffb73001ca1036dec1ec4ae66f257398b87308e2"
+  },
+  "scope": "Only close the new-ID first-install promotion/index orphan gap before source13 freeze",
+  "behavior": [
+    "After the archive is fully staged and checked, and any existing same-version directory is verified, atomically record inactive ownership for an ID absent from BOTH active and inactive maps, before directory promotion.",
+    "Initial ownership failure cleans staging and leaves no newly promoted payload. Promotion/final activation failure retains a listed inactive entry; retry install, explicit activation or cleanup remains possible.",
+    "An existing active ID is never deactivated to perform an upgrade. Failed final activation leaves its original index and original version bytes untouched; new version remains available for explicit verified activation.",
+    "Existing inactive IDs retain ownership of the entire ID subtree. Invalid/unverified staging never claims ownership."
+  ],
+  "validation": {
+    "focused": {
+      "total": 29,
+      "passed": 28,
+      "skipped": 1,
+      "skip": "Actual Windows mapped-file semantics on Linux"
+    },
+    "new_fault_cases": 8,
+    "real_abrupt_exit_after_promotion": 24,
+    "isolated_full_snapshot": {
+      "base": "09f4 snapshot + reviewed candidate package/UI/upgrade + new29 tests; not the current full13 branch",
+      "total": 1269,
+      "passed": 1216,
+      "skipped": 53,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 6.835
+    },
+    "actual_matching_windows13_run": false,
+    "actual_nvda_gui": false,
+    "product_ready": false
+  },
+  "new_tests": [
+    "Initial ownership commit failure leaves no promoted/staged files",
+    "Promotion failure persists administrative unavailable ownership and successful retry",
+    "Final activation failure leaves promoted files listed and install retry succeeds",
+    "Promoted but inactive fresh install can be removed without reimport",
+    "Real child os._exit24 after promotion leaves durable ownership and retry succeeds after OS lock release",
+    "Failed upgrade preserves original active index/all existing bytes and permits explicit version2 activation",
+    "Already-inactive ID upgrade failure retains ownership and full subtree cleanup",
+    "Wrong staged checksum never receives ownership"
+  ],
+  "remaining": "Parent review and matching actual source13 Windows full suite. Prior21 Windows pass remains historical evidence of the prior manager, not proof for this updated manager."
+}

@@ -1,0 +1,61 @@
+{
+  "format": "dordiai-independent-cs-sk-finite-dictionary-review",
+  "format_version": 1,
+  "reviewed_historical_tool": {
+    "size_bytes": 12809,
+    "sha256": "8638816361e899c11bdc9a2412d0c38de4867b7ea7241e148843c1024e73907c"
+  },
+  "source_revision": "c0865a85eb67dc377f2cf8e8fe2c4fa9e53f0dcb",
+  "primary_c_abi_reference": "https://github.com/hunspell/hunspell/blob/master/src/hunspell/hunspell.h",
+  "native_library_sha256": "7dc4e1d423b3e2c976359ae84a9bd8f6e2c19816322ceeddace6313244c50958",
+  "independent_actual_check": {
+    "format": "independent-finite-cs-sk-native-and-compact-review",
+    "format_version": 1,
+    "all_source_pins_matched": true,
+    "report_executed_tool_bytes_and_sha_matched": true,
+    "format_reader_bytes_and_sha_matched": true,
+    "all_native_candidate_checks": 391414,
+    "all_compact_membership_checks": 286013,
+    "all_memberships_matched": true,
+    "counts": {
+      "cs": 165210,
+      "sk": 152225,
+      "shared": 31422,
+      "rejected_by_both": 105401
+    },
+    "full_reader_validation": {
+      "validated_blocks": 1118,
+      "validated_words": 286013,
+      "dataset_sha256": "d1a6d1b688b1440f0be1d411883f82c9ff3c9dc00fe0567c7306f9c8276c4bc4"
+    },
+    "native_handles_closed": true,
+    "stdlib_reader_closed": true,
+    "seconds": 9.521847557000001,
+    "production_changed": false,
+    "nvda_verified": false,
+    "pronunciation_verified": false,
+    "other_languages_absence_inferred": false,
+    "scope": "Read-only independent actual C-ABI calls using report-pinned library/source files, plus full existing compact dataset comparison; finite root-candidate canonical spell memberships only"
+  },
+  "assessment": {
+    "c_api": "Pointer widths, argtypes/restype, UTF-8 bytes, nonzero spell acceptance and handle destruction match the official C interface. No suggestion-list ownership is involved.",
+    "normalization": "Canonical casefold/NFC normalization is applied BEFORE querying BOTH native dictionaries. Latin acute marks are retained. Case-sensitive/proper-name and generated inflection coverage is deliberately not complete.",
+    "primary_sources": "All seven size/Git-blob/SHA256 pins reproduced; local acquisition records agree. Original dictionary and affix counts matched. No source-origin-only language labeling.",
+    "compact": "All286013 exact native-accepted rows, including31422 shared spellings, survived sorted DMLX compaction and full1118block validation; direct source-to-compact lookup comparison passed.",
+    "meaningful_limits": "Finite canonical dictionary-root candidates only. Pair-exclusive means accepted by one of these two engines, never absence from every other language, author intent, complete morphology or native pronunciation.",
+    "failure_path": "Historical tool constructs NativeDictionaries before output.mkdir outside try/finally. Root reports moving mkdir before native construction; independent successful historical proof is unaffected."
+  },
+  "minimal_optional_integration": {
+    "preserve_primary": "Retain currentUKRU binary/descriptor hashes and existingUKRU query contract. Do not widen its hard-coded CODES or replace its dataset.",
+    "separate_resource": "Add an optional independently authenticated cs-sk-v1 DMLX plus descriptor/source notices, read through the existing generic stdlib MembershipLexicon. No Hunspell shared library/network at runtime.",
+    "trusted_spec": "Pin resource ID, codes(cs,sk), normalization, byte count,286013word count, and full digest d1a6d1b688b1440f0be1d411883f82c9ff3c9dc00fe0567c7306f9c8276c4bc4 in a trusted package manifest; reuse ownership, live identity checks and integrity failure distinction.",
+    "evidence_contract": "Return positive memberships together with examined domain(cs,sk) and finite-source scope. Shared stays both, unknown stays unknown. A missing uninstalled optional pack yields no evidence; an installed configured corrupt pack is a resource error.",
+    "routing": "Explicit NVDA/forced language keeps priority. Permit strong CS-versusSK choice only when the user's active allowed Latin candidate domain is restricted to that pair. If other Latin languages remain possible, pair-only membership cannot eliminate them or force a globally unique voice.",
+    "lifecycle_memory": "Open only selected installed resources; retain bounded aggregate block/word-cache budgets. Use an owned optional-resource lease with cancellation, producer join and quiescence before package replacement; close every mapping on release. Avoid automatically multiplying default4MiB caches across hundreds of inactive packs.",
+    "acceptance": "Before publication: same fullsource comparison, unchanged UKRU hashes, shared/unknown/other-Latin ambiguity tests, explicit-language priority, missing/corrupt pack distinction, Windows long-path and mapped-file replacement, actual NVDA routing/typing/queue checks. Waveform/finite dictionary proof alone does not establish pronunciation."
+  },
+  "production_changed": false,
+  "nvda_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false
+}

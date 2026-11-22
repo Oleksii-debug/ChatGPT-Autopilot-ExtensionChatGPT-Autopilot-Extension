@@ -13,6 +13,9 @@ builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 
 
+AR_REVIEW = {"kx47Runtime/models/CharacterNames/ar.json": {"sha256": "1" * 64, "size_bytes": 1024}}
+
+
 def inventories():
     profiles = ["profile" + str(index) for index in range(45)]
     files = {}
@@ -30,7 +33,7 @@ def inventories():
         "kx47Runtime/models/voices/allowed.npy": {"sha256": "d" * 64, "size_bytes": 1152},
         "kx47Runtime/models/OpenVoiceV2/decoder.onnx": {"sha256": "e" * 64, "size_bytes": 1000},
     })
-    for code in ("ay", "fil", "ar"):
+    for code in ("ay", "fil"):
         files["kx47Runtime/models/CharacterNames/" + code + ".json"] = {"sha256": "f" * 64, "size_bytes": 512}
     missing = 8510 - sum(name.startswith(builder.IMMUTABLE_MODELS) for name in files)
     for index in range(missing):
@@ -38,6 +41,7 @@ def inventories():
     old = {"version": "0.13.1-dev.12", "voice_ids": profiles, "files": files}
     new = copy.deepcopy(old)
     new["version"] = "0.13.1-dev.13"
+    new["files"].update(copy.deepcopy(AR_REVIEW))
     return old, new
 
 
@@ -46,17 +50,17 @@ class PreservationTests(unittest.TestCase):
         self.old, self.new = inventories()
 
     def test_exact_resources_and_all45_identities_pass_with_explicit_counts(self):
-        proof = builder.verify_preservation(self.old, self.new)
+        proof = builder.verify_preservation(self.old, self.new, AR_REVIEW)
         self.assertEqual(proof["existing_prepared_bank_files_byte_identical"], 180)
         self.assertEqual(proof["existing_private_files_byte_identical"], 1596)
         self.assertEqual(proof["existing_model_identity_files_byte_identical"], 8510)
-        self.assertTrue(proof["character_name_payloads_byte_identical"])
+        self.assertTrue(proof["existing_character_name_payloads_byte_identical"])
         self.assertTrue(proof["native_membership_data_descriptor_notice_byte_identical"])
 
     def test_new_driver_code_can_change_without_altering_resources(self):
         self.new["files"]["synthDrivers/kx47Preview.py"] = {"sha256": "1" * 64, "size_bytes": 1500}
         self.new["files"]["kx47Runtime/language_origin.py"] = {"sha256": "2" * 64, "size_bytes": 500}
-        self.assertTrue(builder.verify_preservation(self.old, self.new)["allowed_voice_identity_set_unchanged"])
+        self.assertTrue(builder.verify_preservation(self.old, self.new, AR_REVIEW)["allowed_voice_identity_set_unchanged"])
 
     def test_mutated_or_missing_prepared_audio_is_rejected(self):
         for remove in (False, True):
@@ -67,30 +71,30 @@ class PreservationTests(unittest.TestCase):
             else:
                 new["files"][key]["sha256"] = "0" * 64
             with self.subTest(remove=remove), self.assertRaisesRegex(ValueError, "prepared bank"):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_mutated_private_runtime_package_or_dll_is_rejected(self):
         key = next(name for name in self.old["files"] if name.startswith(builder.PRIVATE_PREFIX))
         self.new["files"][key]["size_bytes"] += 1
         with self.assertRaisesRegex(ValueError, "private runtime"):
-            builder.verify_preservation(self.old, self.new)
+            builder.verify_preservation(self.old, self.new, AR_REVIEW)
 
     def test_mutated_acoustic_graph_or_voice_identity_is_rejected(self):
         for key in ("kx47Runtime/models/OpenVoiceV2/decoder.onnx", "kx47Runtime/models/voices/allowed.npy"):
             old, new = inventories()
             new["files"][key]["sha256"] = "0" * 64
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, "model/identity"):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_unreviewed_new_model_payload_is_not_an_implicit_exception(self):
         self.new["files"]["kx47Runtime/models/new-model.onnx"] = {"sha256": "1" * 64, "size_bytes": 100}
         with self.assertRaisesRegex(ValueError, "Unreviewed new model"):
-            builder.verify_preservation(self.old, self.new)
+            builder.verify_preservation(self.old, self.new, AR_REVIEW)
 
     def test_new_private_package_cannot_be_silently_added(self):
         self.new["files"]["kx47Runtime/python/Lib/site-packages/new-package.py"] = {"sha256": "1" * 64, "size_bytes": 100}
         with self.assertRaisesRegex(ValueError, "New private runtime"):
-            builder.verify_preservation(self.old, self.new)
+            builder.verify_preservation(self.old, self.new, AR_REVIEW)
 
     def test_dataset_descriptor_and_source_notice_cannot_be_replaced(self):
         for suffix in ("bin", "json", "NOTICE.json"):
@@ -98,28 +102,28 @@ class PreservationTests(unittest.TestCase):
             key = "kx47Runtime/models/WordLanguage/native-word-membership." + suffix
             new["files"][key]["sha256"] = "0" * 64
             with self.subTest(suffix=suffix), self.assertRaises(ValueError):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_wrong_trusted_dictionary_in_both_manifests_still_fails(self):
         key = "kx47Runtime/models/WordLanguage/native-word-membership.bin"
         self.old["files"][key]["sha256"] = "0" * 64
         self.new["files"][key]["sha256"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "dictionary/descriptor"):
-            builder.verify_preservation(self.old, self.new)
+            builder.verify_preservation(self.old, self.new, AR_REVIEW)
 
     def test_identity_set_and_duplicate_profile_changes_fail(self):
         for replacement in ("new-profile", self.old["voice_ids"][0]):
             old, new = inventories()
             new["voice_ids"][-1] = replacement
             with self.subTest(replacement=replacement), self.assertRaisesRegex(ValueError, "identity set"):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_wrong_baseline_or_output_version_is_rejected(self):
         for target, version in (("old", "0.13.1-dev.10"), ("new", "0.13.1-dev.12")):
             old, new = inventories()
             (old if target == "old" else new)["version"] = version
             with self.subTest(target=target), self.assertRaises(ValueError):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_incomplete_original_bank_or_private_inventory_is_rejected(self):
         for prefix in (builder.BANK_PREFIXES, builder.PRIVATE_PREFIX):
@@ -128,7 +132,7 @@ class PreservationTests(unittest.TestCase):
             del old["files"][key]
             del new["files"][key]
             with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, "bank/private"):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
 
 class Exact13BaselineTests(unittest.TestCase):
@@ -150,11 +154,11 @@ class Exact13BaselineTests(unittest.TestCase):
         self.assertEqual(builder.VERSION, "0.13.1-dev.13")
 
     def test_all_character_name_payloads_stay_immutable_without_a_reviewed_exception(self):
-        for code in ("ay", "fil", "ar"):
+        for code in ("ay", "fil"):
             old, new = inventories()
             new["files"]["kx47Runtime/models/CharacterNames/" + code + ".json"]["sha256"] = "0" * 64
             with self.subTest(code=code), self.assertRaisesRegex(ValueError, "model/identity"):
-                builder.verify_preservation(old, new)
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_missing_original_model_inventory_is_not_hidden_by_matching_output(self):
         old, new = inventories()
@@ -162,12 +166,100 @@ class Exact13BaselineTests(unittest.TestCase):
         del old["files"][key]
         del new["files"][key]
         with self.assertRaisesRegex(ValueError, "complete immutable source12"):
-            builder.verify_preservation(old, new)
+            builder.verify_preservation(old, new, AR_REVIEW)
+
+    def test_only_one_new_reviewed_ar_file_can_be_added(self):
+        old, new = inventories()
+        proof = builder.verify_preservation(old, new, AR_REVIEW)
+        self.assertEqual(proof["new_model_identity_file_count"], 1)
+        self.assertEqual(proof["output_model_identity_file_count"], 8511)
+        for approved in ({}, {**AR_REVIEW, "kx47Runtime/models/other.json": {"sha256": "2" * 64, "size_bytes": 1}}):
+            with self.subTest(approved=approved), self.assertRaisesRegex(ValueError, "one NEW"):
+                builder.verify_preservation(old, new, approved)
+
+    def test_ar_must_not_replace_an_existing_baseline_payload(self):
+        old, new = inventories()
+        old["files"].update(copy.deepcopy(AR_REVIEW))
+        with self.assertRaisesRegex(ValueError, "one NEW"):
+            builder.verify_preservation(old, new, AR_REVIEW)
+
+    def test_missing_or_wrong_new_ar_bytes_are_rejected(self):
+        for mode in ("missing", "hash"):
+            old, new = inventories()
+            name = next(iter(AR_REVIEW))
+            if mode == "missing":
+                del new["files"][name]
+            else:
+                new["files"][name]["sha256"] = "0" * 64
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                builder.verify_preservation(old, new, AR_REVIEW)
 
     def test_same_worker225_recipe_preserves_all_five_native_languages_and_exact_six_packs(self):
         self.assertEqual(set(builder.WORDS), {"ss", "ve", "zu", "wo", "nso"})
         self.assertEqual(len(builder.PACKS), 6)
         self.assertEqual(len(builder.WORDS) * 45, 225)
+
+
+
+
+class ArabicReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.pin = self.root / "review.json"
+        count, source_sha = builder.CHARACTER_NAME_SOURCES["ar"]
+        repertoire = ["glyph" + str(i) for i in range(count)]
+        self.document = {"format": "dordiai-character-name-sources", "format_version": 1,
+            "language": "ar", "ordinary_alphabet_source_complete": True,
+            "ordinary_alphabet_source_repertoire": repertoire,
+            "letter_names": {glyph: "native-name" for glyph in repertoire},
+            "sources": {"curated_primary_alphabet_names": {"sha256": source_sha}},
+            "letter_names_ready": False, "semantics": {"native_pronunciation_verified": False}}
+        self.write()
+
+    def write(self):
+        name = next(iter(builder.CHARACTER_NAME_PATHS))
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        raw = (json.dumps(self.document) + "\n").encode()
+        path.write_bytes(raw)
+        count, source_sha = builder.CHARACTER_NAME_SOURCES["ar"]
+        self.records = {name: {"sha256": sha256(raw).hexdigest(), "size_bytes": len(raw),
+            "source_repertoire_count": count, "primary_source_sha256": source_sha}}
+        self.pin.write_text(json.dumps({"format": "dordiai-source13-character-name-review",
+            "format_version": 1, "files": self.records}), encoding="utf-8")
+
+    def test_exact_new_ar_bytes_source29_and_false_quality_flags_pass(self):
+        self.assertEqual(builder.character_name_review(self.root, self.pin),
+                         {name: {key: row[key] for key in ("sha256", "size_bytes")} for name, row in self.records.items()})
+
+    def test_modified_payload_or_another_path_is_rejected(self):
+        name = next(iter(self.records))
+        path = self.root / name
+        path.write_bytes(path.read_bytes() + b" ")
+        with self.assertRaisesRegex(ValueError, "size/SHA"):
+            builder.character_name_review(self.root, self.pin)
+        self.write()
+        self.records["kx47Runtime/models/CharacterNames/other.json"] = self.records[name]
+        self.pin.write_text(json.dumps({"format": "dordiai-source13-character-name-review",
+            "format_version": 1, "files": self.records}), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Exactly one"):
+            builder.character_name_review(self.root, self.pin)
+
+    def test_wrong_source_count_and_false_quality_promotion_fail_even_with_fresh_byte_hash(self):
+        original = copy.deepcopy(self.document)
+        for defect in ("source", "count", "quality"):
+            self.document = copy.deepcopy(original)
+            if defect == "source":
+                self.document["sources"]["curated_primary_alphabet_names"]["sha256"] = "0" * 64
+            elif defect == "count":
+                self.document["ordinary_alphabet_source_repertoire"].pop()
+            else:
+                self.document["semantics"]["native_pronunciation_verified"] = True
+            self.write()
+            with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, "facts/source/counts"):
+                builder.character_name_review(self.root, self.pin)
 
 if __name__ == "__main__":
     unittest.main()

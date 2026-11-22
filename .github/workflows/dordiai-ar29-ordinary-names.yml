@@ -111,7 +111,7 @@ jobs:
           try {
             New-NetFirewallRule -Name $rule -DisplayName $rule -Direction Outbound -Action Block -Enabled True -Profile Any -Program $private | Out-Null
             @{scope='owned ephemeral CI VM and exact private Python only';network='outbound blocked before ML imports';physical_audio_verified=$false;production_registered=$false} | ConvertTo-Json | Set-Content -Encoding utf8 dordiai-voices/ar29-results/network-policy.json
-            & $private -B (Resolve-Path dordiai-voices/tools/research/probe_ar_ordinary_names.py).Path probe --runtime "$env:AR29_STAGE/core12/kx47Runtime" --candidate (Resolve-Path dordiai-voices/tools/research/ar_ordinary_name_candidate.json).Path --output dordiai-voices/ar29-results/pcm
+            & $private -X utf8 -B (Resolve-Path dordiai-voices/tools/research/probe_ar_ordinary_names.py).Path probe --runtime "$env:AR29_STAGE/core12/kx47Runtime" --candidate (Resolve-Path dordiai-voices/tools/research/ar_ordinary_name_candidate.json).Path --output dordiai-voices/ar29-results/pcm
             if ($LASTEXITCODE -ne 0) { throw 'Actual29 native/shared and selected-profile PCM proof failed' }
           } finally {
             Remove-NetFirewallRule -Name $rule -ErrorAction Continue

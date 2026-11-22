@@ -1,0 +1,17 @@
+{
+  "format": "dordiai-source13-build-pin",
+  "format_version": 1,
+  "version": "0.13.1-dev.13",
+  "status": "awaiting-actual-build",
+  "source_run_id": null,
+  "source_commit": null,
+  "source_workflow_path": null,
+  "artifact_id": null,
+  "artifact_name": null,
+  "artifact_bytes": null,
+  "artifact_sha256": null,
+  "archive_name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+  "archive_bytes": null,
+  "archive_sha256": null,
+  "product_ready": false
+}

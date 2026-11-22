@@ -47,6 +47,7 @@ DEFAULT_WORD_CACHE_BYTES = 512 * 1024
 # Conservative entry-link/dict/integer allowance, in addition to measured key,
 # result and pair sizes. Shared language-code strings are owned by self.codes.
 WORD_CACHE_ENTRY_OVERHEAD = 256
+_APOSTROPHE_TRANSLATION = str.maketrans({"’": "'", "‘": "'", "ʼ": "'"})
 
 
 class LexiconError(ValueError):
@@ -67,8 +68,19 @@ def _check_cancel(cancelled):
 
 
 def normalize_word(value):
-    value = unicodedata.normalize("NFC", value.casefold().translate(
-        str.maketrans({"’": "'", "‘": "'", "ʼ": "'"})))
+    folded = value.casefold()
+    # A str subclass may override translate and mutate its mapping argument.
+    # Only a genuine ordinary string can receive the shared private table;
+    # overridable objects retain the baseline's fresh mapping for every call.
+    table = (_APOSTROPHE_TRANSLATION if type(folded) is str else
+             str.maketrans({"’": "'", "‘": "'", "ʼ": "'"}))
+    value = unicodedata.normalize("NFC", folded.translate(table))
+    # The original per-character loop only transforms U+0301. Retain it
+    # unchanged for every marked spelling, while normal strings without that
+    # character already have the exact final value. This does not skip any
+    # canonical source-word validation in _block.
+    if type(value) is str and "\u0301" not in value:
+        return value
     output = []
     for char in value:
         if char == "\u0301" and output and unicodedata.name(output[-1], "").startswith("CYRILLIC"):
@@ -78,8 +90,14 @@ def normalize_word(value):
 
 
 def valid_word(value):
-    return (1 <= len(value) <= 96 and value[0] not in "'-" and value[-1] not in "'-" and
-            any(char.isalpha() for char in value) and
+    if not (1 <= len(value) <= 96 and value[0] not in "'-" and value[-1] not in "'-"):
+        return False
+    # For an ordinary string, builtin isalpha establishes BOTH original
+    # predicates (at least one letter; every character a letter) in C.
+    # Punctuation, combining marks and subclasses keep the original checks.
+    if type(value) is str and value.isalpha():
+        return True
+    return (any(char.isalpha() for char in value) and
             all(char.isalpha() or unicodedata.category(char).startswith("M") or char in "'-" for char in value))
 
 

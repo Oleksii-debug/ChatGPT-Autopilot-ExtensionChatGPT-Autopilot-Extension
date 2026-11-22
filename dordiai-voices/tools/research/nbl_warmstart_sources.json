@@ -1,0 +1,279 @@
+{
+  "format": "dordiai-nbl-warmstart-source-feasibility",
+  "format_version": 1,
+  "date": "2026-11-22",
+  "status": "native-corpus-found-read-only-audit-complete-not-trained",
+  "language": {
+    "iso639_1": "nr",
+    "iso639_3": "nbl",
+    "name": "Southern Ndebele / isiNdebele",
+    "not_aliases": [
+      "nd",
+      "nde"
+    ]
+  },
+  "production_changed": false,
+  "existing_five_afri_models_changed": false,
+  "training_executed": false,
+  "native_model_ready": false,
+  "new_language_count_increase": 0,
+  "actual_audit": {
+    "report_name": "evidence/nbl_lwazi_feasibility_20261122.json",
+    "report_sha256": "cf9675fba98f75704085cfa5af5b2ced87d81858e4384ffdf4223c563a81b2bb",
+    "tool": "tools/research/audit_nbl_lwazi.py",
+    "tool_sha256": "6b6db243e9e8d72f3c2eb42c5cbdf92e256a2e239ebf5443f55aab706a7bb52b",
+    "synthetic_unit_tests_passed": 17,
+    "scope": "All WAVs/alignments/transcripts and ZIP CRCs read; original archive hashes verified before and after audit. No acoustic model run or listener judgement."
+  },
+  "sources": [
+    {
+      "id": "lwazi1-nbl",
+      "handle": "https://hdl.handle.net/20.500.12185/459",
+      "item_uuid": "00e3400b-d1cc-4f65-b874-d803450af80a",
+      "language_iso": "nbl",
+      "publisher": "Meraka Institute, CSIR",
+      "archive": {
+        "name": "tts.lwazi.nbl.1.2.zip",
+        "size_bytes": 70228518,
+        "sha256": "8a657adfd0ccdbc493d017afd1c9fc1af1c612177bb6c7ef863665ca533b5f2e",
+        "md5": "9b87650b2bf5e8791e14ccb6d43a194d",
+        "url": "https://repo.sadilar.org/server/api/core/bitstreams/df92e046-b8be-4e30-b925-9fc950490a18/content"
+      },
+      "actual_wavs": 329,
+      "actual_paired_wavs_text_alignment": 329,
+      "actual_pcm_seconds": 2506.1114374999993,
+      "actual_pcm_hours": 0.6961420659722221,
+      "mechanically_eligible_1_30s_utterances": 312,
+      "mechanically_eligible_hours": 0.6923253298611111,
+      "pcm": "16000Hz mono signed16-bit RIFF PCM",
+      "documented_distinct_speaker_count": null,
+      "licence": "CC-BY-NC-ND3.0 SouthAfrica",
+      "catalogue_and_enclosed_notice_agree": true,
+      "warmstart_default_include": false,
+      "reason": "Separate ND-restricted corpus,244 exact normalized transcripts overlapII; no need to combine for initial experiment."
+    },
+    {
+      "id": "lwazi2-nbl",
+      "handle": "https://hdl.handle.net/20.500.12185/447",
+      "item_uuid": "106d8b89-39d9-47d7-b9fc-6b7417b9de55",
+      "language_iso": "nbl",
+      "publisher": "Meraka Institute, CSIR",
+      "archive": {
+        "name": "lwazi_ii_isindebele_tts_corpus.zip",
+        "size_bytes": 236594963,
+        "sha256": "36e3f72aef72bf00244c415761892d8cd40bfd828989e884e20fb1fb6182fef3",
+        "md5": "deab4ce45a7a578c74d0060db37a4b99",
+        "url": "https://repo.sadilar.org/server/api/core/bitstreams/c8cca8d4-1e74-42c9-bcce-e520a2188665/content"
+      },
+      "actual_wavs": 1389,
+      "actual_native_nbl_utterances": 994,
+      "actual_native_nbl_seconds": 7011.638374999997,
+      "actual_native_nbl_hours": 1.947677326388888,
+      "actual_English_secondary_utterances_not_nr_training": 395,
+      "actual_English_seconds": 1220.7160624999979,
+      "pcm": "16000Hz mono signed16-bit RIFF PCM; upsampling to frozenMimi24k does not recreate original high-frequency bandwidth",
+      "documented_voice_artists": 1,
+      "speaker_documentation_scope": "One questionnaire and consent document; self-report first/primary languageNdebele, SouthAfrican origin. Personal name/ID/DOB/address/signatures not republished. No per-file speaker IDs and no biometric speaker-count verification.",
+      "licence_conflict": {
+        "catalogue": "CC-BY-NC-ND3.0",
+        "archive_LICENSE_txt": "CC-BY3.0, explicit adaptation/commercial-use wording",
+        "consent_notice": "Research/speech-technology/noncommercial use described; separate commercial sale/international-exposure fee conditions and rights addressed toCSIR.",
+        "project_report_printed157": "TTS voices/application prompts not for commercial purposes because artists did not consent.",
+        "resolution": "Unresolved source/rights inconsistency retained verbatim in original sources. Do not mark trained checkpoint redistribution or commercial voice clearance asapproved from LICENSE alone. No third-party outreach performed."
+      },
+      "metadata_documents": {
+        "questionnaire": {
+          "size_bytes": 224659,
+          "sha256": "cf0111c783a5290a6b064564cce3632cf2e6034d3a073b3a89bd7d0963443889"
+        },
+        "consent": {
+          "size_bytes": 724191,
+          "sha256": "6168f95b43989867ab961e795b47a8a7af8fc0cddfa123730488bbd675fc8d4f"
+        }
+      },
+      "alignment_caveats": [
+        "Phone/word alignments are automatic forced alignments/predicted G2P, not native-listener gold.",
+        "Five free-text tier lines contain unescaped interiorquotes; bounded literal audit tolerates them, canonical preparation must record any rewrite.",
+        "OriginalII native segment serialization includes l+U0292 (lʒ); native NCHLT phone chart maps XSAMPA K-backslash to U026E(ɮ). Reconcile through the actual primary dictionary/chart; do not silently treat arbitrary labels as equivalent."
+      ],
+      "native_segment_label_count": 47,
+      "prospective_partition": {
+        "method": "SHA256(dordiai-nbl-prospective-v1+NUL+NFC casefold Unicode letter/mark word sequence), first32bits big endian modulo10:0..7 train,8 validation,9 test",
+        "distinct_native_word_sequence_groups": 987,
+        "partition": {
+          "train": {
+            "groups": 800,
+            "utterances": 804,
+            "seconds": 5709.066812499999
+          },
+          "validation": {
+            "groups": 92,
+            "utterances": 94,
+            "seconds": 648.3976875000003
+          },
+          "test": {
+            "groups": 95,
+            "utterances": 96,
+            "seconds": 654.1738750000001
+          }
+        },
+        "training_executed": false,
+        "not_a_training_manifest": true,
+        "scope": "Prospective text-group partition; no individual-word, speaker or pretrained-base independence claim."
+      }
+    },
+    {
+      "id": "nchlt-nbl-pronunciation",
+      "handle": "https://hdl.handle.net/20.500.12185/365",
+      "item_uuid": "295ff0fa-908e-4e8d-a8f1-ba00aa93c6a9",
+      "archive": {
+        "name": "nchlt.speech.pronunciation.dictionaries.zip",
+        "size_bytes": 1197143,
+        "sha256": "96c7b5f9c220eb51f3bbff552596255ce6a9175dd489166f829ef6a4484f2215",
+        "md5": "5b158192a366243bf4cbce40c1248bc1",
+        "url": "https://repo.sadilar.org/server/api/core/bitstreams/a0749c49-e54d-4d43-b2e2-628f8b82c0ad/content"
+      },
+      "language_iso": "nbl",
+      "licence": "CC-BY3.0",
+      "actual_entries": 15000,
+      "actual_distinct_normalized_words": 15000,
+      "actual_xsampa_labels": 46,
+      "native_files": {
+        "release/rules/nchlt_nbl.rules": {
+          "size_bytes": 1450,
+          "sha256": "5109116ab65db9e8690aafcbad7aa7194d8a18e58c268b0b554957faa930115c"
+        },
+        "release/rules/nchlt_nbl.gnulls": {
+          "size_bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "release/rules/nchlt_nbl.map.graphs": {
+          "size_bytes": 4,
+          "sha256": "e32c5096c4135fce7aa56805effe26e1982798c8a47f5aef87c8cb4307514cf2"
+        },
+        "release/rules/nchlt_nbl.map.phones": {
+          "size_bytes": 244,
+          "sha256": "343e7ef2203dcc07f518730e7887ee2ca89823ae6955bfce42de361e6846a863"
+        }
+      },
+      "phonemic_chart": {
+        "size_bytes": 79018,
+        "sha256": "6ed638f97bae77e03f71a1e204228e989317cbfe059c86c36fd7a369e68a3d55"
+      },
+      "scope": "Original within-language broad-phonemic dictionary plus native Default&Refine G2P rules. Native practitioners verified rules per publisherREADME; not a TTS acoustic model, tone dictionary or ordinary letter-name table."
+    },
+    {
+      "id": "nchlt-nbl-speech",
+      "handle": "https://hdl.handle.net/20.500.12185/272",
+      "item_uuid": "7069f7b4-eadb-4029-b71b-5ea59f6ee825",
+      "language_iso": "nbl",
+      "publisher_advertised_hours": 56,
+      "publisher_heldout_speakers": 8,
+      "archive_name": "nchlt.speech.corpus.nbl.zip",
+      "size_bytes_from_publisher": 4669151540,
+      "publisher_md5": "5ee325b42700db25cf631ff3a7253140",
+      "url": "https://repo.sadilar.org/server/api/core/bitstreams/340d8c5b-a353-49f8-951c-e49731a8446c/content",
+      "licence": "CC-BY3.0",
+      "pcm_from_metadata": "16kHz16bit broadband smartphone read speech, orthographic transcriptions",
+      "archive_downloaded": false,
+      "usable_hours_verified": false,
+      "distinct_speakers_verified": false,
+      "role": "Larger genuine native optional training foundation, not studioTTS quality by assumption. Preserve published speaker-disjoint test set; QC actual clips/transcript quality before inclusion."
+    }
+  ],
+  "primary_project_report": {
+    "url": "https://researchspace.csir.co.za/bitstreams/b533b26c-77a4-47a2-9a66-d3ae2e361704/download",
+    "size_bytes": 8920778,
+    "sha256": "062455bd82235bf2af663965e7c9b1a8a1cdd8d4c738a2daadc03e41280e14bc",
+    "title": "LwaziII FinalReport:Increasing the impact of speechtechnologies in SouthAfrica",
+    "date": "2013-02",
+    "printed_pages": [
+      130,
+      131,
+      157
+    ],
+    "verified_facts": "Table42 printed131:994primary117min+395secondary20min. Printed130/131 explains English secondary recordings for embeddedwords/numbers/dates. Printed157 states noncommercial TTSvoice restriction. These agree with actual archive language separation."
+  },
+  "base_model": {
+    "repository": "AfriSpeech/africa-tts",
+    "revision": "d47667a3bb03d0d6db924e789648abd7d55d828b",
+    "source_revision": "b4508ae979dd34eea2597d420d67176ef55a21a0",
+    "pocket_revision": "a922b912dfa366975294afb568d815b305acde5d",
+    "g2p_revision": "76b53a8fa2a688812e369837d179d4710c111a7a",
+    "model": {
+      "bytes": 438033312,
+      "sha256": "b4cdf2cb62674145fe83ba661041d8180faa543ff9ae1906ae3bb59c9a03171c"
+    },
+    "dtype": "F32",
+    "total_parameters_from_original_header": 109502146,
+    "lm_layers": 6,
+    "mimi_sample_rate": 24000,
+    "mimi_frame_rate": 12.5,
+    "licence": "CC-BY-NC4.0 model/defaultvoices; MIT code with third-party notices",
+    "nbl_in_published_trained_languages": false,
+    "trained_languages_blob": "a2d547853bd1b3b8c6db110b42e23e0f76c43000",
+    "nbl_native_g2p_table_at_pinned_revision": false,
+    "do_not_use_closest_language_map": true,
+    "tokenizer": {
+      "size_bytes": 247366,
+      "sha256": "4a3a30d989f7e18484af44aa87a9e1fd0bd37b1bf4de98401d6ef20e8543e7ac",
+      "pieces": 4000,
+      "byte_fallback": true,
+      "actual_byte_tokens": 256,
+      "native_phone_labels_exact_whole_pieces": 31,
+      "native_phone_labels_observed": 47,
+      "native_characters_missing_standalone_piece": [
+        "U+032C COMBINING CARON BELOW"
+      ],
+      "scope": "All original-label bytes are representable; this is NOT evidence that native NR phonology/voiced clicks are learned. Keep voicing/aspiration/ejection distinctions; no mark deletion or neighbouring-language token substitution."
+    }
+  },
+  "bounded_experiment_design": {
+    "not_executed": true,
+    "candidate_name": "nbl-native-warmstart-isolated-v1",
+    "old_five_policy": "Never replace oldfive checkpoints, frontend tables, voices, caches or registry. Create independently named checkpoint+optional resource only after native proof.",
+    "prerequisites": [
+      "Resolve/retain source licensing/consent scope for intended outputs; research facts alone do not mark distribution clearance.",
+      "Build exact nbl lexicon/rule->source-chart IPA mapping and strict token/phoneme coverage receipt; preserve word boundaries and voiced-click marks.",
+      "Copy pinned six-layer model+config+original tokenizer to new isolated run, rewrite all HFfloatingpaths to hash-verifiedlocal paths, and strict-load complete original tensors before any update.",
+      "Use only994nativeII clips initially;395Englishsecondary are never labellednbl. Do not mix originalI into initial test.",
+      "Freeze prospective987whole-utterance word-sequence groups before optimization; speaker generalization unproved from one documented artist.",
+      "Prepare word timestamps from original word tiers and match exact orthographic word sequence; reconcile quotes/metadata; bounded16k->24k resampling with provenance, no upsampled-high-quality claim."
+    ],
+    "minimum_probe": "No corpus-scale training first: strict-load/codec/one-batchF32forward and finitegradient/parameter-update sanity in isolatednewcheckpoint; max5optimizersteps or10wallminutes. Reject shape/state/IPA/alignment mismatches rather than unsafe pickleloads.",
+    "bounded_pilot": "Only after cheapsanity succeeds: maximum200optimizersteps OR30wallminutes, whichever first; microbatch1-2, <=8second crops, compilefalse, loaderprocs1. Fixed seed; heldouttext untouched by optimization and sample-selection. These are feasibility bounds, NOT promisedquality or a trainedlanguage acceptance target.",
+    "initial_options": "Keep original4000-pieceIPA tokenizer/text embeddings; no reset to newEnglish spellingtable. start_from_pretrainedtrue, frozenMimi, freeze_headtrue to preserve distilled-head latentgeometry, lowLRproposal2e-5. Direct sixlayer supervised adaptation is an experimental extension of published warmstart code, not an existing provenNR recipe.",
+    "precision": "Originalweights stayF32 and base hashes unchanged; training intentionally creates NEWweights. UpstreamGPUtrainer enablesBF16autocast andTF32 bydefault, so a trueF32reference probe needs explicit audited preparation-only precisionoverride and actualdtype receipt. No posttraining quantization/pruning proposed.",
+    "stop_rules": [
+      "Nonfinite loss/gradient or violated originalhash -> immediatefailure.",
+      "No valimprovement or clear memorization/instability withinpilot -> stopandreport, do not launch100kblindsteps.",
+      "Native47phoneme distinctions, native listener intelligibility and unseen-text reliability remain unaccepted until realaudio proof.",
+      "If studio1.95h cannot generalize, audit bounded NCHLT native speakerdiverse subset; do not infer56h usable from catalogue alone."
+    ],
+    "later_acceptance": [
+      "Strict safecheckpoint export, nativeF32speech and separate numericONNXparity receipts.",
+      "Native words/phrases with actual NR phoneme contrasts including clicks/aspiration/ejection and glottal sounds; no Zulu/NorthernNdebele alias.",
+      "Same retained-profile conversion, privateWindows/NVDA, cancellation/warmwordtiming and no oldfive regression before product use.",
+      "Ordinary letter names remain separate missing source task; phoneme labels are never renamed letter names."
+    ]
+  },
+  "compute": {
+    "current_host_observed_cpus": 9,
+    "current_host_gpu_devices": false,
+    "gpu_training_performed": false,
+    "parameter_state_budget_example_bytes_all109502146_params_times20": 2190042920,
+    "budget_explanation": "Illustrative FP32weights+gradients+twoAdam moments+EMA if all109.5M tensors were trainable. FrozenMimi/head reduce actualtrainable storage; activations/workspaces addunknown memory. This is NOT a measuredVRAMrequirement.",
+    "planning_gpu": "A single16GB NVIDIA GPU is a conservative short-crop/microbatch planning target, not verified minimum; actualpeakmemory must be measured by the boundedprobe. No GPU acquired and no paidjob started.",
+    "published_comparison": "Pinned upstreamtrainingREADME reports consumer16GB for24layer microbatch16/accum4 andH100 distillation9.8GiB atbatch64; these are publisher measurements of different workloads, not predictions forNR.",
+    "elapsed_cost": "No honest fulltraining-time estimate before actualseconds/step. Report times for the5-step probe first; a successful200-step pilot proves only mechanical feasibility, not nativequality.",
+    "disk": "Actual three small archives308020624B total; rawTTS WAV/text contents359991745B total. NativeII audio at24kHz occupies336558642B inS16 or673117284B inF32mono, withoutrestoring16kHzsourcebandwidth. ProcessedMimi/checkpoint sizes must be measured. Plan an8GB boundedpilotworkingbudget withone retainedcheckpoint, without acquiring4.669GBNCHLT."
+  },
+  "privacy": "Public questionnaire/consent contain identifying personaldetails. This packet records hashes, sourcepaths and nonidentifying technicalfacts only; no PDFimage, signature, DOB, identitynumber, homeaddress or corpusvoice audio is republished.",
+  "claims": {
+    "trained_nr_model_exists": false,
+    "native_nr_pronunciation_validated": false,
+    "ordinary_letter_names_ready": false,
+    "windows_nvda_ready": false,
+    "distribution_rights_cleared": false
+  }
+}

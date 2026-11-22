@@ -1,0 +1,1689 @@
+{
+  "format": "dordiai-ar29-ordinary-name-actual-pcm-v1",
+  "status": "passed-isolated-native-and-selected-profile-pcm",
+  "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+  "wide_outer_sha256": "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262",
+  "source_pdf_sha256": "940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385",
+  "candidate_sha256": "17ec9499b5e685b4385d0f1c0b1aa3fe6ca7beb9725d4300bb0336c142513ecc",
+  "scope": "Literal ordinary names through actual Arabic-conditioned shared neural carrier, original calibrated shared source and original Viktoriia OpenVoice graphs; not eSpeak, MMS, production raw-glyph dispatch, listening or NVDA typing proof",
+  "cases": [
+    {
+      "glyph": "ا",
+      "ordinary_name": "ألف",
+      "native": {
+        "samples": 29770,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3501133786848072,
+        "peak": 0.484823077917099,
+        "wav_sha256": "15ea12c02309aa0a85c505a5ed0eee74e7921e0107685054c55f25258516af48",
+        "file": "00-native.wav"
+      },
+      "native_render_seconds": 0.169223699999975,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.42428043484687805,
+        "wav_sha256": "e1d5a09e0e2ae57d54389d5e0bf3c422ea6239e8de9af0687a3e99c70b186aa0",
+        "file": "00-viktoriia.wav"
+      },
+      "projection_seconds": 0.23455259999997224
+    },
+    {
+      "glyph": "ب",
+      "ordinary_name": "باء",
+      "native": {
+        "samples": 29614,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3430385487528345,
+        "peak": 0.4727795422077179,
+        "wav_sha256": "d8e034ec87734515aacbbe636cabead21223dccd9dd557626431f6715a58a997",
+        "file": "01-native.wav"
+      },
+      "native_render_seconds": 0.15362530000004426,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.3120576739311218,
+        "wav_sha256": "9183b60e48821030bdfecb354275b84f347651c51eb9471c2f46ab9c2171d223",
+        "file": "01-viktoriia.wav"
+      },
+      "projection_seconds": 0.24202779999995983
+    },
+    {
+      "glyph": "ت",
+      "ordinary_name": "تاء",
+      "native": {
+        "samples": 29608,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3427664399092971,
+        "peak": 0.331075519323349,
+        "wav_sha256": "f3103f5540a759fd700cc35e0dcc788a30f7a5c20031d85fb9875eff21087d27",
+        "file": "02-native.wav"
+      },
+      "native_render_seconds": 0.14988800000003266,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.24935027956962585,
+        "wav_sha256": "c4fc7e64f77e638ef840f5e98f14a5f91323a639f2373ea03a40cc1d70a8c1cf",
+        "file": "02-viktoriia.wav"
+      },
+      "projection_seconds": 0.24829840000001013
+    },
+    {
+      "glyph": "ث",
+      "ordinary_name": "ثاء",
+      "native": {
+        "samples": 29708,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3473015873015872,
+        "peak": 0.3701600134372711,
+        "wav_sha256": "bc4175388bccdab470b3842d8ab58c0fa3e071254e0d47cab163a558c7e5fbd7",
+        "file": "03-native.wav"
+      },
+      "native_render_seconds": 0.15366990000001124,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.28672152757644653,
+        "wav_sha256": "5868d6618bb797482b2605faeb6336389e19ec308d86da15bbd32cf5f8a4e53a",
+        "file": "03-viktoriia.wav"
+      },
+      "projection_seconds": 0.23374260000002778
+    },
+    {
+      "glyph": "ج",
+      "ordinary_name": "جيم",
+      "native": {
+        "samples": 29654,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3448526077097505,
+        "peak": 0.21393908560276031,
+        "wav_sha256": "921eca972a4c0b749637c123b58941d7be3a4bf3149cbeb4f26a524817ccb095",
+        "file": "04-native.wav"
+      },
+      "native_render_seconds": 0.15492480000000342,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.17827072739601135,
+        "wav_sha256": "a6ff2845dd2c38a0d21bda4e753ae588d8833f68e988b341bfc288e933df5a19",
+        "file": "04-viktoriia.wav"
+      },
+      "projection_seconds": 0.22555629999999383
+    },
+    {
+      "glyph": "ح",
+      "ordinary_name": "حاء",
+      "native": {
+        "samples": 29684,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3462131519274376,
+        "peak": 0.3009372055530548,
+        "wav_sha256": "8b1725afd3ec28dd35b16ee56aff5595603b4e8428b5ccb3997c78daa98e27f6",
+        "file": "05-native.wav"
+      },
+      "native_render_seconds": 0.14694100000002663,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.2788250148296356,
+        "wav_sha256": "da89cf2714cfc8ca3486bb672915ec97f57fe11483b63b4cb246ecbf907ec987",
+        "file": "05-viktoriia.wav"
+      },
+      "projection_seconds": 0.23891539999999623
+    },
+    {
+      "glyph": "خ",
+      "ordinary_name": "خاء",
+      "native": {
+        "samples": 29624,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3434920634920635,
+        "peak": 0.23525439202785492,
+        "wav_sha256": "172ffb52d3ed08b05b62674f713619558c9e19904ceff4ff87ee7966c75e80c8",
+        "file": "06-native.wav"
+      },
+      "native_render_seconds": 0.14336499999996022,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.2780623435974121,
+        "wav_sha256": "c85e91db7acd9d11c1d3fffea80170489ca1f5ce6292951c903230bd9d147269",
+        "file": "06-viktoriia.wav"
+      },
+      "projection_seconds": 0.2322790999999711
+    },
+    {
+      "glyph": "د",
+      "ordinary_name": "دال",
+      "native": {
+        "samples": 29649,
+        "sample_rate": 22050,
+        "audio_seconds": 1.344625850340136,
+        "peak": 0.33495479822158813,
+        "wav_sha256": "231d32dcfa8a826ac56184d624021bc31a59d6e62ac427c5ac931b532b4f5dce",
+        "file": "07-native.wav"
+      },
+      "native_render_seconds": 0.15684859999998935,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.2775665819644928,
+        "wav_sha256": "f027d65ff166337219b3d23e22f3952a310036537977eba7f457a9fad5258832",
+        "file": "07-viktoriia.wav"
+      },
+      "projection_seconds": 0.2335564999999633
+    },
+    {
+      "glyph": "ذ",
+      "ordinary_name": "ذال",
+      "native": {
+        "samples": 29597,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3422675736961451,
+        "peak": 0.30722105503082275,
+        "wav_sha256": "9a892475b40dd7a8a2423f421cddaee7ba8e72f043d781abb010db0daccde12b",
+        "file": "08-native.wav"
+      },
+      "native_render_seconds": 0.15113009999998894,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.211211696267128,
+        "wav_sha256": "02dd788312a6fa5f88ca0f5b580fa657626c922e5621e1ab91b86d190bbc581b",
+        "file": "08-viktoriia.wav"
+      },
+      "projection_seconds": 0.23954120000001922
+    },
+    {
+      "glyph": "ر",
+      "ordinary_name": "راء",
+      "native": {
+        "samples": 29542,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3397732426303854,
+        "peak": 0.38706690073013306,
+        "wav_sha256": "9f8c7ee3b930b22e833719dda63992892af3429e5849b121a163777467cf6405",
+        "file": "09-native.wav"
+      },
+      "native_render_seconds": 0.1473819000000276,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.3217916190624237,
+        "wav_sha256": "ad3eea5dc47eefa24046d38004c80e679c52109f6bdf6305a0e74c7d5621e098",
+        "file": "09-viktoriia.wav"
+      },
+      "projection_seconds": 0.24069609999997965
+    },
+    {
+      "glyph": "ز",
+      "ordinary_name": "زاي",
+      "native": {
+        "samples": 29652,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3447619047619048,
+        "peak": 0.31015729904174805,
+        "wav_sha256": "cfd5faf3170b2e2d7250c76da769abd586071ae38642c0cede607087a499c928",
+        "file": "10-native.wav"
+      },
+      "native_render_seconds": 0.21579179999997677,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.26451095938682556,
+        "wav_sha256": "aab60bdf6b9ab11d46f32170ba2d0a4830cb9eb2c909fe3ecdbaeceb5cb7efba",
+        "file": "10-viktoriia.wav"
+      },
+      "projection_seconds": 0.23487400000004754
+    },
+    {
+      "glyph": "س",
+      "ordinary_name": "سين",
+      "native": {
+        "samples": 29679,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3459863945578232,
+        "peak": 0.23158793151378632,
+        "wav_sha256": "f52dd0aa9dd489914353895c1c3c226483f2cec49675deb7fa3a4bf17eb3e32a",
+        "file": "11-native.wav"
+      },
+      "native_render_seconds": 0.17674399999998514,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.19948747754096985,
+        "wav_sha256": "d1a501802e4408946f39bd18de5c4ca6081257c0c267b927993f8cc9ba80bb63",
+        "file": "11-viktoriia.wav"
+      },
+      "projection_seconds": 0.24116319999995994
+    },
+    {
+      "glyph": "ش",
+      "ordinary_name": "شين",
+      "native": {
+        "samples": 29654,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3448526077097505,
+        "peak": 0.22698457539081573,
+        "wav_sha256": "9f097964a7c8023443ae131e31140b706a27a480bea3c5a4384f3d165d45ba75",
+        "file": "12-native.wav"
+      },
+      "native_render_seconds": 0.16114780000003748,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.2490670531988144,
+        "wav_sha256": "29d8c1e48e20ddd96987b705b83276cd6ca94444899fbec624c454f16013e701",
+        "file": "12-viktoriia.wav"
+      },
+      "projection_seconds": 0.23521680000004608
+    },
+    {
+      "glyph": "ص",
+      "ordinary_name": "صاد",
+      "native": {
+        "samples": 29751,
+        "sample_rate": 22050,
+        "audio_seconds": 1.349251700680272,
+        "peak": 0.3043542206287384,
+        "wav_sha256": "782ca14f8666923577201b1171ed1c6d53e0e9037672e3aa9a26ba7d773d0c19",
+        "file": "13-native.wav"
+      },
+      "native_render_seconds": 0.14973070000002053,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.21866199374198914,
+        "wav_sha256": "79992594c7f415b6df11ecf016db5460334e1aabf2f899229eedd6124818a152",
+        "file": "13-viktoriia.wav"
+      },
+      "projection_seconds": 0.24142599999998993
+    },
+    {
+      "glyph": "ض",
+      "ordinary_name": "ضاد",
+      "native": {
+        "samples": 29664,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3453061224489795,
+        "peak": 0.29981285333633423,
+        "wav_sha256": "96ebf24928bade854249f3ca1960f6aa41152d81ea0b5626c915dd7247de028f",
+        "file": "14-native.wav"
+      },
+      "native_render_seconds": 0.14734529999998358,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.3082290589809418,
+        "wav_sha256": "a91cd7183996114f48cc203cac005009d46bb57ac70566e13d6386b9631930ce",
+        "file": "14-viktoriia.wav"
+      },
+      "projection_seconds": 0.2312150999999858
+    },
+    {
+      "glyph": "ط",
+      "ordinary_name": "طاء",
+      "native": {
+        "samples": 29640,
+        "sample_rate": 22050,
+        "audio_seconds": 1.34421768707483,
+        "peak": 0.5083497166633606,
+        "wav_sha256": "56806254e603dec8c691f1e1b3d6779294f3470c966ea6730c5f8ea8397d6cee",
+        "file": "15-native.wav"
+      },
+      "native_render_seconds": 0.1539617999999905,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.41004329919815063,
+        "wav_sha256": "89e9286883d62816ae7e9a1c89cbee0f6f0f025547d7ebb8b45a8ea8fe279408",
+        "file": "15-viktoriia.wav"
+      },
+      "projection_seconds": 0.23539310000001024
+    },
+    {
+      "glyph": "ظ",
+      "ordinary_name": "ظاء",
+      "native": {
+        "samples": 29662,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3452154195011339,
+        "peak": 0.36884549260139465,
+        "wav_sha256": "dcff4573fa18fbf6852654d41dd4dd59c4572a84c0d62171982cec2c8ff8b89a",
+        "file": "16-native.wav"
+      },
+      "native_render_seconds": 0.1519408999999996,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.3186889886856079,
+        "wav_sha256": "8dd4e914f869591bde38dfe08bfc8a1e00c7249294a61d5928def2165b4853d3",
+        "file": "16-viktoriia.wav"
+      },
+      "projection_seconds": 0.2526127999999517
+    },
+    {
+      "glyph": "ع",
+      "ordinary_name": "عين",
+      "native": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.5585013628005981,
+        "wav_sha256": "cf14d48a5b321619942b3a581c7592dd8112ce5abc7e389bfaa0d22042861e39",
+        "file": "17-native.wav"
+      },
+      "native_render_seconds": 0.15934170000002723,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.38324111700057983,
+        "wav_sha256": "c7483158bbbc05967b25973ed880952989f3e3068e6e2811e3baf6af9b054499",
+        "file": "17-viktoriia.wav"
+      },
+      "projection_seconds": 0.26237310000004754
+    },
+    {
+      "glyph": "غ",
+      "ordinary_name": "غين",
+      "native": {
+        "samples": 29682,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3461224489795918,
+        "peak": 0.3130468428134918,
+        "wav_sha256": "329e78b0a4fe1b06d6b391dae5523f8ac6d9a9e59a31e70405f3171ce0e9d6bd",
+        "file": "18-native.wav"
+      },
+      "native_render_seconds": 0.14819740000001502,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.31735652685165405,
+        "wav_sha256": "1a73bb0c51bd97ae487c1f9369e6c6852c2e5894465034f15dce6ff07c467658",
+        "file": "18-viktoriia.wav"
+      },
+      "projection_seconds": 0.23387460000003557
+    },
+    {
+      "glyph": "ف",
+      "ordinary_name": "فاء",
+      "native": {
+        "samples": 29699,
+        "sample_rate": 22050,
+        "audio_seconds": 1.346893424036281,
+        "peak": 0.23570699989795685,
+        "wav_sha256": "df0cf88c97803bb5d8403b437953efc6585eda6ead828a720b62771c6f1325aa",
+        "file": "19-native.wav"
+      },
+      "native_render_seconds": 0.1588102000000049,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.24820995330810547,
+        "wav_sha256": "2ef6d30643c0bb298f6ab4ff86330b5dceadb4ea82fbee59acb3e0672636bbd5",
+        "file": "19-viktoriia.wav"
+      },
+      "projection_seconds": 0.23413610000000062
+    },
+    {
+      "glyph": "ق",
+      "ordinary_name": "قاف",
+      "native": {
+        "samples": 29751,
+        "sample_rate": 22050,
+        "audio_seconds": 1.349251700680272,
+        "peak": 0.3278038799762726,
+        "wav_sha256": "3302062f306b8a0497f7ba9006abf2d6bf114ff70c6487e394a9f96d35bc1333",
+        "file": "20-native.wav"
+      },
+      "native_render_seconds": 0.147615500000029,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.30021265149116516,
+        "wav_sha256": "81bd6ad9e31b72c2d02905e96fc5fee4e398a9afda2c759d48e885a60de67149",
+        "file": "20-viktoriia.wav"
+      },
+      "projection_seconds": 0.2512726000000498
+    },
+    {
+      "glyph": "ك",
+      "ordinary_name": "كاف",
+      "native": {
+        "samples": 29737,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3486167800453515,
+        "peak": 0.4088248312473297,
+        "wav_sha256": "0491149848f30fd80063c33c41a9a945d9a85650eb3f9ffeb8fae20a79a84489",
+        "file": "21-native.wav"
+      },
+      "native_render_seconds": 0.15138289999998733,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.45744213461875916,
+        "wav_sha256": "8f0e572be790b7c1c32b77519ba633400de66228c5be672ba8022a5b0ab1d67f",
+        "file": "21-viktoriia.wav"
+      },
+      "projection_seconds": 0.23160150000001067
+    },
+    {
+      "glyph": "ل",
+      "ordinary_name": "لام",
+      "native": {
+        "samples": 29617,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3431746031746032,
+        "peak": 0.3663810193538666,
+        "wav_sha256": "4ee8c4df32d97036e1061a8e8aaa6a798e4efdaac66f7d137ab26004770a4fb8",
+        "file": "22-native.wav"
+      },
+      "native_render_seconds": 0.15502670000000762,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.31028860807418823,
+        "wav_sha256": "caf91b4708891e1d5094fcf8258852f3ac84c6864ab0a48ed03b794f9ed79120",
+        "file": "22-viktoriia.wav"
+      },
+      "projection_seconds": 0.2273341000000073
+    },
+    {
+      "glyph": "م",
+      "ordinary_name": "ميم",
+      "native": {
+        "samples": 29655,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3448979591836734,
+        "peak": 0.3151800334453583,
+        "wav_sha256": "5598da7fc04c8a92af6a99ec6a73d391d89546f45f541a344605cfc16e11b002",
+        "file": "23-native.wav"
+      },
+      "native_render_seconds": 0.15182229999999208,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.29840192198753357,
+        "wav_sha256": "14a34ef3e2cfdc3e73a3acbc35044961b7c0bf7b33b782611b293826ea77c9cb",
+        "file": "23-viktoriia.wav"
+      },
+      "projection_seconds": 0.24185019999998758
+    },
+    {
+      "glyph": "ن",
+      "ordinary_name": "نون",
+      "native": {
+        "samples": 29720,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3478458049886621,
+        "peak": 0.31708598136901855,
+        "wav_sha256": "3efe3e246b67b9b4bd59d7e018136b898a1b0c3896bd412ff910fb0e4fc5eac5",
+        "file": "24-native.wav"
+      },
+      "native_render_seconds": 0.14703459999998358,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.33296406269073486,
+        "wav_sha256": "d0ac1756a337511ec81ce442a4a5a93325aafdbd37b88bf50a5d71b8f6f3d10c",
+        "file": "24-viktoriia.wav"
+      },
+      "projection_seconds": 0.24610840000002554
+    },
+    {
+      "glyph": "ه",
+      "ordinary_name": "هاء",
+      "native": {
+        "samples": 29553,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3402721088435374,
+        "peak": 0.27806875109672546,
+        "wav_sha256": "47b37c458217fbbb2bca6c0f146f4203c081a819045800336bf611a4dd6aa38c",
+        "file": "25-native.wav"
+      },
+      "native_render_seconds": 0.14923559999999725,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.24587588012218475,
+        "wav_sha256": "58502d25692c5b4d2de37f5b7e4e64f936f1b2310a12615dbc5fd68c4f79979b",
+        "file": "25-viktoriia.wav"
+      },
+      "projection_seconds": 0.23226670000002514
+    },
+    {
+      "glyph": "و",
+      "ordinary_name": "واو",
+      "native": {
+        "samples": 29628,
+        "sample_rate": 22050,
+        "audio_seconds": 1.343673469387755,
+        "peak": 0.31065019965171814,
+        "wav_sha256": "452eb012a852af28b6b37dcedf707e64a06067422ffd38b1f001d817ce2420af",
+        "file": "26-native.wav"
+      },
+      "native_render_seconds": 0.1585062999999991,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.29897981882095337,
+        "wav_sha256": "496214a2b30b082747a76af3f5d1881a309e97b15fd6d559b234f19b2f228c8f",
+        "file": "26-viktoriia.wav"
+      },
+      "projection_seconds": 0.2643180999999686
+    },
+    {
+      "glyph": "ي",
+      "ordinary_name": "ياء",
+      "native": {
+        "samples": 29626,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3435827664399094,
+        "peak": 0.22318150103092194,
+        "wav_sha256": "389ed45824dd9c48744f3271ca86a74ed633c913c18627106480cda52b35584e",
+        "file": "27-native.wav"
+      },
+      "native_render_seconds": 0.14848779999999806,
+      "projection": {
+        "samples": 29440,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3351473922902495,
+        "peak": 0.21811498701572418,
+        "wav_sha256": "f028bbb2af1f1e5498e60fc89d2a9b0b808a02685c9eaa54facddd5bd85cb422",
+        "file": "27-viktoriia.wav"
+      },
+      "projection_seconds": 0.24239829999999074
+    },
+    {
+      "glyph": "ء",
+      "ordinary_name": "همزة",
+      "native": {
+        "samples": 29907,
+        "sample_rate": 22050,
+        "audio_seconds": 1.356326530612245,
+        "peak": 0.2648067772388458,
+        "wav_sha256": "b0b02a691fa8fecbe14082a0b9afba37d619cd6760cc4bf193e1a185838bbcde",
+        "file": "28-native.wav"
+      },
+      "native_render_seconds": 0.15229520000002594,
+      "projection": {
+        "samples": 29696,
+        "sample_rate": 22050,
+        "audio_seconds": 1.3467573696145125,
+        "peak": 0.3103601336479187,
+        "wav_sha256": "034634bcc7aa193cd6ebba87eee9a44e95c3baac285bdbab2636969c6e132c5f",
+        "file": "28-viktoriia.wav"
+      },
+      "projection_seconds": 0.23097419999999147
+    }
+  ],
+  "utf8_mode": 1,
+  "stdout_encoding": "utf-8",
+  "letter_names_ready": false,
+  "native_pronunciation_verified": false,
+  "listener_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "typing_verified": false,
+  "production_registered": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "prepared_names": {
+    "ا": {
+      "source_text": "ألف",
+      "nfkd_text": "ألف",
+      "marked_text": "<ar>ألف</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        290,
+        330,
+        314,
+        311,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ب": {
+      "source_text": "باء",
+      "nfkd_text": "باء",
+      "marked_text": "<ar>باء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        291,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ت": {
+      "source_text": "تاء",
+      "nfkd_text": "تاء",
+      "marked_text": "<ar>تاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        293,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ث": {
+      "source_text": "ثاء",
+      "nfkd_text": "ثاء",
+      "marked_text": "<ar>ثاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        294,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ج": {
+      "source_text": "جيم",
+      "nfkd_text": "جيم",
+      "marked_text": "<ar>جيم</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        295,
+        320,
+        315,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ح": {
+      "source_text": "حاء",
+      "nfkd_text": "حاء",
+      "marked_text": "<ar>حاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        296,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "خ": {
+      "source_text": "خاء",
+      "nfkd_text": "خاء",
+      "marked_text": "<ar>خاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        297,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "د": {
+      "source_text": "دال",
+      "nfkd_text": "دال",
+      "marked_text": "<ar>دال</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        298,
+        290,
+        314,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ذ": {
+      "source_text": "ذال",
+      "nfkd_text": "ذال",
+      "marked_text": "<ar>ذال</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        299,
+        290,
+        314,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ر": {
+      "source_text": "راء",
+      "nfkd_text": "راء",
+      "marked_text": "<ar>راء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        300,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ز": {
+      "source_text": "زاي",
+      "nfkd_text": "زاي",
+      "marked_text": "<ar>زاي</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        301,
+        290,
+        320,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "س": {
+      "source_text": "سين",
+      "nfkd_text": "سين",
+      "marked_text": "<ar>سين</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        302,
+        320,
+        316,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ش": {
+      "source_text": "شين",
+      "nfkd_text": "شين",
+      "marked_text": "<ar>شين</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        303,
+        320,
+        316,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ص": {
+      "source_text": "صاد",
+      "nfkd_text": "صاد",
+      "marked_text": "<ar>صاد</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        304,
+        290,
+        298,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ض": {
+      "source_text": "ضاد",
+      "nfkd_text": "ضاد",
+      "marked_text": "<ar>ضاد</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        305,
+        290,
+        298,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ط": {
+      "source_text": "طاء",
+      "nfkd_text": "طاء",
+      "marked_text": "<ar>طاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        306,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ظ": {
+      "source_text": "ظاء",
+      "nfkd_text": "ظاء",
+      "marked_text": "<ar>ظاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        307,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ع": {
+      "source_text": "عين",
+      "nfkd_text": "عين",
+      "marked_text": "<ar>عين</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        308,
+        320,
+        316,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "غ": {
+      "source_text": "غين",
+      "nfkd_text": "غين",
+      "marked_text": "<ar>غين</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        309,
+        320,
+        316,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ف": {
+      "source_text": "فاء",
+      "nfkd_text": "فاء",
+      "marked_text": "<ar>فاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        311,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ق": {
+      "source_text": "قاف",
+      "nfkd_text": "قاف",
+      "marked_text": "<ar>قاف</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        312,
+        290,
+        311,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ك": {
+      "source_text": "كاف",
+      "nfkd_text": "كاف",
+      "marked_text": "<ar>كاف</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        313,
+        290,
+        311,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ل": {
+      "source_text": "لام",
+      "nfkd_text": "لام",
+      "marked_text": "<ar>لام</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        314,
+        290,
+        315,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "م": {
+      "source_text": "ميم",
+      "nfkd_text": "ميم",
+      "marked_text": "<ar>ميم</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        315,
+        320,
+        315,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ن": {
+      "source_text": "نون",
+      "nfkd_text": "نون",
+      "marked_text": "<ar>نون</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        316,
+        318,
+        316,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ه": {
+      "source_text": "هاء",
+      "nfkd_text": "هاء",
+      "marked_text": "<ar>هاء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        317,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "و": {
+      "source_text": "واو",
+      "nfkd_text": "واو",
+      "marked_text": "<ar>واو</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        318,
+        290,
+        318,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ي": {
+      "source_text": "ياء",
+      "nfkd_text": "ياء",
+      "marked_text": "<ar>ياء</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        320,
+        290,
+        289,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ء": {
+      "source_text": "همزة",
+      "nfkd_text": "همزة",
+      "marked_text": "<ar>همزة</ar>",
+      "native_input_ids": [
+        29,
+        60,
+        77,
+        31,
+        317,
+        315,
+        301,
+        292,
+        29,
+        16,
+        60,
+        77,
+        31
+      ],
+      "native_input_mask": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "ordinary_names_native_vocabulary_valid": true,
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "onnxruntime": "1.26.0",
+  "input_hashes": {
+    "source": "643fd8c683786aa4af6619ac59f2227588034b214db05ef94137e5743b598447",
+    "flow": "831fe762c0b47137e20753b9023b3901fc229bbc05bd6644ddce7073d7015404",
+    "decoder": "9d57879aff5d3d50ae810b4e4791170b3fd1d27004be71fc2ae3f90afd588d36",
+    "target": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+  },
+  "shared_resource_hashes": {
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/CODE_LICENSE.txt": {
+      "size_bytes": 1070,
+      "sha256": "0dfe0d0ba84416fe3879d9a34f4909d8d0137c78d1e95834177b0414ac096fa2"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/LICENSE": {
+      "size_bytes": 15007,
+      "sha256": "0d944a9110fed9a9602d60e0423a272903e7bd21ab060490774efc77c2275e9f"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/README.md": {
+      "size_bytes": 9189,
+      "sha256": "d414e4b085fb9989ebfd2b64f868ff861694022b4bdb805b09e702386dbdc7d5"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/capabilities.json": {
+      "size_bytes": 367,
+      "sha256": "159a7f418ae089a2a47bd32017f5465a5ec31235d479731121f85dc5a97bcbe1"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/onnx/duration_predictor.ort": {
+      "size_bytes": 3763008,
+      "sha256": "c6662a6bcec74bc9fa76287ed9559d8efe2090a401ea2e3a60d09f3c258c1f33"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/onnx/text_encoder.ort": {
+      "size_bytes": 36043912,
+      "sha256": "eafadd1bb6abe46f31705f41935e198c0bc01f4d7b5b6ebd2382967b17ccb19e"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/onnx/tts.json": {
+      "size_bytes": 8253,
+      "sha256": "42078d3aef1cd43ab43021f3c54f47d2d75ceb4e75f627f118890128b06a0d09"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/onnx/unicode_indexer.json": {
+      "size_bytes": 277676,
+      "sha256": "9bf7346e43883a81f8645c81224f786d43c5b57f3641f6e7671a7d6c493cb24f"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/onnx/vector_estimator.static-q8.ort": {
+      "size_bytes": 66389752,
+      "sha256": "291a133e22af9beabc74cc680465d7d1b363e08f49a69349a3e6c9ff367efde1"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/onnx/vocoder.onnx": {
+      "size_bytes": 101424195,
+      "sha256": "085de76dd8e8d5836d6ca66826601f615939218f90e519f70ee8a36ed2a4c4ba"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/source.npy": {
+      "size_bytes": 1152,
+      "sha256": "643fd8c683786aa4af6619ac59f2227588034b214db05ef94137e5743b598447"
+    },
+    "kx47Runtime/models/WideLanguages/SharedAcoustic/voice_styles/F1.json": {
+      "size_bytes": 292046,
+      "sha256": "bbdec6ee00231c2c742ad05483df5334cab3b52fda3ba38e6a07059c4563dbc2"
+    }
+  },
+  "native_graph_sample_rate": 44100,
+  "native_common_output_rate": 22050,
+  "native_output_resampled_by_original_core": true,
+  "actual_cases": 29,
+  "all_source_names_native_and_projected_finite_nonzero": true,
+  "existing_payloads_unchanged": 10230,
+  "projected_sample_rate": 22050,
+  "production_character_resources_unchanged": true
+}

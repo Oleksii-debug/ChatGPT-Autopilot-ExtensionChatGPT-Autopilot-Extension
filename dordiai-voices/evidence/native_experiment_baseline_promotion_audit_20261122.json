@@ -1,0 +1,127 @@
+{
+  "format": "dordiai-historical-experiment-baseline-promotion-isolation-check",
+  "format_version": 1,
+  "scope": "LocalLinux3.12 disposable overlay, not production/NVDA proof",
+  "simulated_production_leaf": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+  "simulated_production_manager": "960459711ee3af8976540fd4595489fb7f69aedb",
+  "tests_run": 118,
+  "skipped": 2,
+  "errors": 0,
+  "failures": 0,
+  "preparers": [
+    {
+      "filename": "windows_nvda_word_cache_probe.py",
+      "plain_path_characters": 290,
+      "source_cases": 97,
+      "variants": [
+        {
+          "variant": "original",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "0eec65f898977bbd1c1de6561ddbff2014c0eea2"
+        },
+        {
+          "variant": "candidate-cache0",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813"
+        },
+        {
+          "variant": "candidate-default",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813"
+        }
+      ]
+    },
+    {
+      "filename": "windows_nvda_word_unicode_probe.py",
+      "plain_path_characters": 290,
+      "source_cases": 97,
+      "variants": [
+        {
+          "variant": "original",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813"
+        },
+        {
+          "variant": "candidate-cache0",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e"
+        },
+        {
+          "variant": "candidate-default",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e"
+        }
+      ]
+    },
+    {
+      "filename": "windows_nvda_resource_path_cache_probe.py",
+      "plain_path_characters": 290,
+      "source_cases": 97,
+      "variants": [
+        {
+          "variant": "original",
+          "manager_git_blob": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+          "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e"
+        },
+        {
+          "variant": "candidate-cache0",
+          "manager_git_blob": "960459711ee3af8976540fd4595489fb7f69aedb",
+          "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e"
+        },
+        {
+          "variant": "candidate-default",
+          "manager_git_blob": "960459711ee3af8976540fd4595489fb7f69aedb",
+          "leaf_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e"
+        }
+      ]
+    }
+  ],
+  "original_word_cache_experiment_leaf": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+  "unchanged_original11_baseline": "0eec65f898977bbd1c1de6561ddbff2014c0eea2",
+  "archive_manager": "7a620a2af548a64d909c907cbc206c4cb6c7a07c",
+  "root_production_changed": false,
+  "audit_findings": {
+    "word_cache_baseline": "Standalone matched runner explicitly consumes immutable experiments/native-word-cache/baseline_source11.py (0eec); candidate1738 remains immutable experimental file.",
+    "unicode_baseline": "Unicode audit/tests and workflow already consume immutable experimental1738, not production. V2candidate7fadc remains separate experimental file. No duplicate1738archive required.",
+    "historical_frozen_managers": "Only two problematic frozen preparers pinned7a620 while copying mutable productionmanager. Both now explicitly copy already-archived experiments/native-resource-path-cache/baseline_source12.py.",
+    "path_cache_followup": "Current path-cache tests and normal profile runner use archived7a620 via reviewed46e677 preparer, preserving production13 comparison.",
+    "intentional_current_production_consumers": "build_native_word_membership.py, probe_native_membership.py, baseline source reader compatibility tests, and original standalone windows_nvda_membership_host_probe.py intentionally measure/validate current production reader, record its observed digest, and do not assert a frozen comparison baseline. Their source paths are appropriate.",
+    "workflow_overlay_scope": "Native cache/Unicode compatibility workflows copy candidate bytes only into disposable overlays. Historical records remain unchanged."
+  },
+  "ready_blobs": [
+    {
+      "path": "tools/windows_nvda_word_cache_probe.py",
+      "git_blob": "f16e0ba3992e54371078b7a6a190833b6bdc5080"
+    },
+    {
+      "path": "tools/windows_nvda_word_unicode_probe.py",
+      "git_blob": "60692a22fdd410b7f7ce8854f949fb29eb3863b8"
+    }
+  ],
+  "workflow_audit": [
+    {
+      "path": ".github/workflows/dordiai-native-resource-path-cache.yml",
+      "git_blob": "6cd8a4099547eaabdfadc07b7f5d8f32e47fc16d"
+    },
+    {
+      "path": ".github/workflows/dordiai-native-resource-path-nvda.yml",
+      "git_blob": "fedff72132c878805e20af1794d00b19b58c4622"
+    },
+    {
+      "path": ".github/workflows/dordiai-native-word-cache-nvda.yml",
+      "git_blob": "17876e6fef6903e7e46c55b1a950c3354575bff4"
+    },
+    {
+      "path": ".github/workflows/dordiai-native-word-cache.yml",
+      "git_blob": "f9f5e6c14835fbb54a1b66161dd7f17394a0bae2"
+    },
+    {
+      "path": ".github/workflows/dordiai-native-word-unicode-nvda.yml",
+      "git_blob": "58ecb077232008e7cf4ce46b9a430c93a4db0af1"
+    },
+    {
+      "path": ".github/workflows/dordiai-native-word-unicode.yml",
+      "git_blob": "b0a380a29245b3a759545d81c02bc35ce4394653"
+    }
+  ]
+}

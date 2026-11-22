@@ -713,7 +713,7 @@ def open_dialog(synth):
                                                     choices=[], size=(510, 180))
             self.install_package = wx.Button(panel, label="Установити пакет із ZIP-файла…")
             self.remove_package = wx.Button(panel, label="Видалити вибраний пакет…")
-            self.rollback_package = wx.Button(panel, label="Вибрати попередню версію голосу…")
+            self.rollback_package = wx.Button(panel, label="Вибрати встановлену версію голосу…")
             self.install_package.Bind(wx.EVT_BUTTON, self._install_package)
             self.remove_package.Bind(wx.EVT_BUTTON, self._remove_package)
             self.rollback_package.Bind(wx.EVT_BUTTON, self._rollback_voice_package)
@@ -734,10 +734,11 @@ def open_dialog(synth):
             try:
                 self.package_entries = list_extra_packages(self._package_root(), references=self._voice_reference_root())
                 self.packages.SetItems([
-                    "%s: %s%s%s" % (
+                    "%s: %s%s%s%s" % (
                         "Голос" if entry.get("kind") == "voice" else "Мовні ресурси",
                         entry.get("name", entry.get("id", "Пакет")),
                         " — " + str(entry["version"]) if entry.get("version") else "",
+                        " — неактивний" if entry.get("active") is False else "",
                         " — потребує відновлення" if entry.get("status") == "unavailable" else "",
                     ) for entry in self.package_entries
                 ])
@@ -806,7 +807,8 @@ def open_dialog(synth):
             assets = _package_component("voice_assets")
             try:
                 versions = [document["version"] for document in assets.voice_versions(
-                    self._voice_reference_root(), entry["id"]) if document["version"] != entry.get("version")]
+                    self._voice_reference_root(), entry["id"])
+                    if entry.get("active") is False or document["version"] != entry.get("version")]
             except Exception as error:
                 gui.messageBox(str(error), self.title, wx.OK | wx.ICON_ERROR)
                 return

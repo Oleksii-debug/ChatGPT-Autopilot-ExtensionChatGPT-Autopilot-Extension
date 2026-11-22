@@ -1,0 +1,169 @@
+{
+  "format": "dordiai-real-frozen-personal-settings",
+  "format_version": 1,
+  "run_id": "81e2b991951343ff93b86de3dba49597",
+  "status": "passed-actual-settings-api",
+  "nvda_version": "2026.3.1",
+  "frozen": true,
+  "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+  "checks": [
+    {
+      "name": "actual_frozen_nvda",
+      "status": "passed"
+    },
+    {
+      "name": "actual_host_python_313",
+      "status": "passed"
+    },
+    {
+      "name": "builtin_silence_only",
+      "status": "passed"
+    },
+    {
+      "name": "payload_driver.py",
+      "status": "passed"
+    },
+    {
+      "name": "payload_personal_language.py",
+      "status": "passed"
+    },
+    {
+      "name": "payload_preferences.py",
+      "status": "passed"
+    },
+    {
+      "name": "payload_language_codes.py",
+      "status": "passed"
+    },
+    {
+      "name": "payload_language_iso_aliases.json",
+      "status": "passed"
+    },
+    {
+      "name": "exact_candidate_methods_selected",
+      "status": "passed"
+    },
+    {
+      "name": "actual_driver_setting_useconfig_false",
+      "status": "passed"
+    },
+    {
+      "name": "actual_host_auto_properties",
+      "status": "passed"
+    },
+    {
+      "name": "actual_super_config_spec",
+      "status": "passed"
+    },
+    {
+      "name": "fresh_base_optional_default_auto",
+      "status": "passed"
+    },
+    {
+      "name": "actual_classmethod_config_api",
+      "status": "passed"
+    },
+    {
+      "name": "profile_a_load_after_enabled_state",
+      "status": "passed"
+    },
+    {
+      "name": "actual_available_control_info",
+      "status": "passed"
+    },
+    {
+      "name": "profile_a_saved_choice",
+      "status": "passed"
+    },
+    {
+      "name": "profile_a_saved_to_owned_file",
+      "status": "passed"
+    },
+    {
+      "name": "profile_a_written_choice",
+      "status": "passed"
+    },
+    {
+      "name": "fresh_profile_inherits_base_auto",
+      "status": "passed"
+    },
+    {
+      "name": "profile_b_independent_auto",
+      "status": "passed"
+    },
+    {
+      "name": "profile_b_save_did_not_rewrite_profile_a",
+      "status": "passed"
+    },
+    {
+      "name": "profile_a_choice_survives_profile_b_save",
+      "status": "passed"
+    },
+    {
+      "name": "absent_optional_resource_profile_loads",
+      "status": "passed"
+    },
+    {
+      "name": "unavailable_choice_saved_as_auto",
+      "status": "passed"
+    },
+    {
+      "name": "saved_auto_does_not_resurrect",
+      "status": "passed"
+    },
+    {
+      "name": "disabled_choice_reset_in_actual_profile",
+      "status": "passed"
+    },
+    {
+      "name": "profile_b_remains_unchanged",
+      "status": "passed"
+    },
+    {
+      "name": "global_synth_never_selected_fixture",
+      "status": "passed"
+    }
+  ],
+  "scope": "Actual NVDA configuration APIs with candidate methods and metadata-only optional-language fixtures",
+  "product_addon_installed": false,
+  "product_archive_modified": false,
+  "optional_language_model_installed": false,
+  "optional_language_speech_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false,
+  "fake_production_audio": false,
+  "actual_api": {
+    "driver_setting_signature": "(id: str, displayNameWithAccelerator: str, availableInSettingsRing: bool = False, defaultVal: object = None, displayName: str | None = None, useConfig: bool = True)",
+    "mro": [
+      "_dordiai_owned_personal_settings.PrivateSettingsDriver",
+      "_dordiai_owned_personal_preferences.PreferencesMixin",
+      "synthDriverHandler.SynthDriver",
+      "driverHandler.Driver",
+      "autoSettingsUtils.autoSettings.AutoSettings",
+      "baseObject.AutoPropertyObject",
+      "garbageHandler.TrackedObject",
+      "builtins.object"
+    ],
+    "base_load_function": "synthDriverHandler",
+    "base_save_function": "autoSettingsUtils.autoSettings",
+    "base_configspec_classmethod": true,
+    "candidate_method_names": [
+      "_dordiai_personal_languages",
+      "_getConfigSpecForSettings",
+      "_get_availablePersonallanguages",
+      "_get_personalLanguage",
+      "_set_personalLanguage",
+      "loadSettings",
+      "saveSettings"
+    ],
+    "useConfig": false
+  },
+  "cleanup": {
+    "errors": [],
+    "owned_profiles_removed": true,
+    "original_synth_preserved": true,
+    "config_scope": "Fresh private portable NVDA profile only"
+  }
+}

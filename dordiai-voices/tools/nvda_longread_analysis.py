@@ -80,7 +80,7 @@ def analyze_longread(reference_raw,captured_raw,rate,packets):
         anchors.append({"reference_frame":start,"capture_frame":actual,"lag_from_global_frames":actual-(offset+start),
             "ncc":float(v[best]),"competing_peak_ncc":second,"confident_unique":confident})
     stable=bool(anchors) and all(a["confident_unique"] and abs(a["lag_from_global_frames"])<=1 for a in anchors)
-    aligned=signal[offset:offset+len(reference)];window=max(1,int(rate*.020));step=max(1,int(rate*.005));drops=[]
+    aligned=signal[offset:offset+len(reference)];window=max(1,int(rate*.020));step=1;drops=[]
     def rms_windows(x):
         summed=np.concatenate(([0.],np.cumsum(x*x)))
         positions=np.arange(0,len(x)-window+1,step)

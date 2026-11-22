@@ -247,7 +247,7 @@ jobs:
           stage=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-nvda-longread-evidence-"+os.environ["GITHUB_RUN_ID"])
           if stage.exists():raise ValueError("Fresh evidence stage required")
           stage.mkdir();paths=[root/"nvda-longread-capture.json"]
-          names=("plugin-ready.json","plugin-complete.json","plugin-longread.json","plugin-cancel.json","owned-launch.json","longread-reference.pcm","cancel-reference.pcm","original100.txt","longread-analysis.json","cancel-analysis.json","longread-capture/ready.json","longread-capture/capture.json","longread-capture/captured.pcm","cancel-capture/ready.json","cancel-capture/capture.json","cancel-capture/captured.pcm","nvda.log","nvda-console.log","bootstrap.log")
+          names=("plugin-ready.json","plugin-complete.json","plugin-longread.json","plugin-cancel.json","owned-launch.json","longread-reference.pcm","cancel-reference.pcm","partial-reference.pcm","original100.txt","longread-analysis.json","cancel-analysis.json","longread-capture/ready.json","longread-capture/capture.json","longread-capture/captured.pcm","cancel-capture/ready.json","cancel-capture/capture.json","cancel-capture/captured.pcm","nvda.log","nvda-console.log","bootstrap.log")
           for run in root.glob("nvda-*"):paths.extend(run/name for name in names)
           total=0;index=[]
           for source in paths:

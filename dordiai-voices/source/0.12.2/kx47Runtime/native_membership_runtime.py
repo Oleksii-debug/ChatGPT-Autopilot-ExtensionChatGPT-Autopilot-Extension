@@ -3,7 +3,7 @@ from functools import lru_cache
 from hashlib import sha256
 import importlib.util
 import json
-from pathlib import Path
+from pathlib import Path, PosixPath, WindowsPath
 import stat
 from threading import RLock
 
@@ -49,8 +49,27 @@ def _unique(pairs):
     return result
 
 
+@lru_cache(maxsize=16)
+def _plain_path_ancestry(path_type, spelling):
+    # Cache only immutable ordinary Path spelling. Every filesystem fact is
+    # still fetched on every _signature call in the original order.
+    # Use exact spelling, not Path equality: WindowsPath equality folds case
+    # even in a case-sensitive directory, where two spellings can differ.
+    path = path_type(spelling)
+    return (path, *path.parents)
+
+
 def _signature(path):
-    for parent in (path, *path.parents):
+    # Eligibility bounds retained ancestor objects and their string spellings.
+    # Overflow keeps the original uncached traversal and all live checks.
+    if type(path) in (PosixPath, WindowsPath):
+        spelling = str(path)
+        cacheable = len(spelling) <= 1024 and len(path.parts) <= 64
+    else:
+        cacheable = False
+    parents = (_plain_path_ancestry(type(path), spelling) if cacheable
+               else (path, *path.parents))
+    for parent in parents:
         if parent.is_symlink() or getattr(parent, "is_junction", lambda: False)():
             raise NativeMembershipResourceError("Посилання замість файлу словника не дозволене.")
     try:

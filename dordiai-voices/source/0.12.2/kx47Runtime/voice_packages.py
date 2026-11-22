@@ -315,16 +315,36 @@ def _load_index(root):
     if path.is_symlink() or path.stat().st_size > MAX_MANIFEST_BYTES:
         raise PackageError("Invalid installed voice index")
     result = json.loads(path.read_text(encoding="utf-8"))
-    if (not isinstance(result, dict) or result.get("format_version") != 1
+    if (not isinstance(result, dict) or type(result.get("format_version")) is not int
+            or result.get("format_version") not in (1, 2)
             or not isinstance(result.get("active"), dict)):
         raise PackageError("Unsupported installed voice index")
-    for voice, version in result["active"].items():
-        if not IDENTIFIER.fullmatch(voice) or not isinstance(version, str) or not VERSION.fullmatch(version):
-            raise PackageError("Invalid installed voice index entry")
+    version = result["format_version"]
+    if (version == 1 and "inactive" in result) or (version == 2 and "inactive" not in result):
+        raise PackageError("Inactive ownership requires index format version 2")
+    inactive = result.get("inactive", {})
+    if not isinstance(inactive, dict) or set(result["active"]) & set(inactive):
+        raise PackageError("Invalid inactive voice ownership")
+    for entries in (result["active"], inactive):
+        for voice, version in entries.items():
+            if (not isinstance(voice, str) or not IDENTIFIER.fullmatch(voice)
+                    or not isinstance(version, str) or not VERSION.fullmatch(version)):
+                raise PackageError("Invalid installed voice index entry")
+            validate_member_path(voice)
+            try:
+                require_voice_allowed(voice)
+            except ValueError as error:
+                raise PackageError("Excluded installed voice ownership: " + voice) from error
     return result
 
 
 def _write_index(root, document):
+    document = dict(document)
+    if document.get("inactive"):
+        document["format_version"] = 2
+    else:
+        document.pop("inactive", None)
+        document["format_version"] = 1
     descriptor, temporary = tempfile.mkstemp(prefix=".voice-index-", dir=root)
     try:
         with os.fdopen(descriptor, "wb") as stream:
@@ -380,15 +400,24 @@ def install_package(package, root, *, engines=None, resources=None, max_bytes=MA
                 if count != entry["size_bytes"] or digest.hexdigest() != entry["sha256"]:
                     raise PackageError("Voice asset checksum or size differs: " + name)
             (stage / MANIFEST_NAME).write_bytes(_json_bytes(document))
-            if final.exists():
+            already_installed = final.exists()
+            if already_installed:
                 previous = load_manifest(final / MANIFEST_NAME)
                 if _json_bytes(previous) != _json_bytes(document):
                     raise PackageError("The installed version has different contents; use a new version")
                 verify_assets(final, previous)
-            else:
+            # A new ID must remain administratively owned if promotion or the
+            # final activation commit fails. Never retire a working old active
+            # version merely to stage an upgrade under its already-owned ID.
+            if (document["id"] not in index["active"]
+                    and document["id"] not in index.get("inactive", {})):
+                index.setdefault("inactive", {})[document["id"]] = document["version"]
+                _write_index(root, index)
+            if not already_installed:
                 final.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(stage, final)
             index["active"][document["id"]] = document["version"]
+            index.get("inactive", {}).pop(document["id"], None)
             _write_index(root, index)
         finally:
             if stage.exists():
@@ -411,6 +440,7 @@ def activate_version(root, voice, version, *, engines=None, resources=None):
         verify_assets(directory, document)
         index = _load_index(root)
         index["active"][voice] = version
+        index.get("inactive", {}).pop(voice, None)
         _write_index(root, index)
     return directory
 
@@ -439,11 +469,11 @@ def installed_versions(root, voice):
 
 
 def uninstall_package(root, voice, *, keep_files=False):
-    """Deactivate first; delete only the selected immutable voice subtree.
+    """Deactivate durably, retaining ownership until disk cleanup succeeds.
 
-    The caller must cancel speech before removing an in-use voice and restart
-    its workers afterwards. If Windows still locks data, the inactive files are
-    retained and the OSError is reported instead of claiming disk was freed.
+    An inactive tombstone is administrative only: speech discovery never reads
+    it. Failed or interrupted deletion can therefore be retried without making
+    a partially deleted voice active or losing its entry from the package UI.
     """
     if not isinstance(voice, str) or not IDENTIFIER.fullmatch(voice):
         raise PackageError("Invalid voice identifier")
@@ -453,12 +483,21 @@ def uninstall_package(root, voice, *, keep_files=False):
     with _installation_lock(root):
         index = _load_index(root)
         directory = _asset_path(root, voice)
-        if voice not in index["active"] and not directory.exists():
-            raise PackageError("The voice package is not installed")
+        version = index["active"].get(voice, index.get("inactive", {}).get(voice))
+        if version is None:
+            raise PackageError("The voice package is not registered")
+        # Commit ownership before touching data. A failure here leaves the
+        # previously active installation completely unchanged.
         index["active"].pop(voice, None)
+        index.setdefault("inactive", {})[voice] = version
         _write_index(root, index)
-        if not keep_files and directory.exists():
-            shutil.rmtree(directory)
+        if not keep_files:
+            if directory.exists():
+                shutil.rmtree(directory)
+            # If this commit fails, the durable inactive record still allows
+            # an idempotent retry even when every data file is already gone.
+            index["inactive"].pop(voice)
+            _write_index(root, index)
     return directory
 
 
@@ -489,8 +528,11 @@ def list_installed_packages(root):
     root = Path(root).resolve()
     index = _load_index(root)
     result = []
-    for voice, version in index["active"].items():
-        entry = {"id": voice, "version": version, "name": voice, "status": "unavailable"}
+    entries = {**index["active"], **index.get("inactive", {})}
+    for voice, version in entries.items():
+        active = voice in index["active"]
+        entry = {"id": voice, "version": version, "name": voice,
+                 "status": "unavailable", "active": active}
         try:
             directory = _asset_path(root, voice + "/" + version)
             document = load_manifest(directory / MANIFEST_NAME)
@@ -498,7 +540,8 @@ def list_installed_packages(root):
                 raise PackageError("Installed voice identity differs")
             entry.update({key: value for key, value in document.items() if key != "files"})
             verify_assets(directory, document, hashes=False)
-            entry["status"] = "installed"
+            entry["status"] = "installed" if active else "inactive"
+            entry["active"] = active
         except (OSError, ValueError, TypeError):
             pass
         result.append(entry)

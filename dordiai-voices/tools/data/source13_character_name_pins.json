@@ -1,0 +1,12 @@
+{
+  "format": "dordiai-source13-character-name-review",
+  "format_version": 1,
+  "files": {
+    "kx47Runtime/models/CharacterNames/ar.json": {
+      "sha256": "5966d74af4bcf9e3a7be2221e7d3a04b481b5598332c32a3cc70ec2097092bb8",
+      "size_bytes": 296127,
+      "source_repertoire_count": 29,
+      "primary_source_sha256": "940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385"
+    }
+  }
+}

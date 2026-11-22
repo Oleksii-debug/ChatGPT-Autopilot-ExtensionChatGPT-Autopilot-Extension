@@ -4,21 +4,27 @@
   "files": [
     {
       "path": "dordiai-voices/tools/research/source13_integration.py",
-      "bytes": 22996,
-      "sha256": "855dacbdc4fe3575ebffbe303663a7ca0cfb935cd73dc164ece7458e2d57bbbb",
-      "git_sha": "bf218bb7bd591410cc417363b97b3fdc03647de9"
+      "bytes": 26914,
+      "sha256": "4624fd80aed1e7812911c6c4a16f7c6c8ccff00e2047866d3d229511e803b9db",
+      "git_sha": "92f0937a79e613efef087bb68ad5530ee01c70cd"
     },
     {
       "path": "dordiai-voices/tests/test_source13_integration.py",
-      "bytes": 9347,
-      "sha256": "38d969e1a5ea9387cfa5ea75607b37e18e6fa925963a83256d737166313b4e51",
-      "git_sha": "44979779ff38f19557e92f5c34cb83023419b19a"
+      "bytes": 14306,
+      "sha256": "ae03ad2d6376355169c1d00d24342c17166a5bd1abed67639adfade789dc5dbb",
+      "git_sha": "bf13e49c1935c6b5bed29f211f7dc1801080b84d"
     },
     {
       "path": ".github/workflows/dordiai-source13-integration.yml",
-      "bytes": 8559,
-      "sha256": "b882843461b36071c8ce2a90d722b807d4c69a7bbffb8887bd669e8207b3c885",
-      "git_sha": "cc8be0f31f7643eec3174075d0a488ef9d356a2d"
+      "bytes": 8833,
+      "sha256": "782b8509e190f77e9b753c58672296d064fef0028dda7f65e763adb997ba3a80",
+      "git_sha": "a1fb28e40e104e0aa57915f465138077d72ce5b7"
+    },
+    {
+      "path": "dordiai-voices/tools/build_release.py",
+      "bytes": 14319,
+      "sha256": "1c9a15866c78f876efb730e035fa23d3cc047376cdfd4411cc19022104a0e370",
+      "git_sha": "a3c64eec72276c929eedab33917b1dbdfee3b86a"
     }
   ],
   "historical11_and12_unchanged": true,
@@ -36,12 +42,23 @@
     "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2"
   },
   "preservation": {
-    "model_identity_files": 8510,
+    "existing_model_identity_files": 8510,
+    "existing_models_all_byte_identical": true,
     "banks_included_in_models": 180,
     "private_files": 1596,
     "voice_ids": 45,
     "native_membership_binary_descriptor_notice_exact": true,
-    "character_name_model_exceptions": [],
+    "new_model_files_only": [
+      {
+        "path": "kx47Runtime/models/CharacterNames/ar.json",
+        "bytes": 296127,
+        "sha256": "5966d74af4bcf9e3a7be2221e7d3a04b481b5598332c32a3cc70ec2097092bb8",
+        "git_blob": "8033638d55b431498a4bedccebaa4acf9293c754",
+        "must_be_absent_in_baseline12": true
+      }
+    ],
+    "output_model_identity_files": 8511,
+    "existing_model_exceptions": [],
     "ay_fil_included_in_immutable_models": true,
     "quantization_or_acoustic_regeneration": false,
     "old_overlay_reapplied": false
@@ -62,15 +79,34 @@
     "Exact bounded gzip receipt preservation and separate core/evidence artifacts"
   ],
   "tests": {
-    "targeted_total": 17,
-    "passed": 17,
+    "targeted_preservation_total": 23,
+    "targeted_preservation_passed": 23,
+    "generic_existing_release_checks": 24,
+    "generic_existing_release_checks_passed": 24,
+    "actual_ar_data_preflight_passed": true,
     "linux": true,
     "actual_build13": false,
     "actual_windows13": false
   },
   "freeze_requirements": [
-    "Root commits reviewed final runtime/helper/driver/code hashes and manifest13 before launch",
-    "No AR29 data change allowed by this builder; any adopted exact AR exception requires separately reviewed pins/code update before freeze"
+    "Root commits final reviewed runtime/helper/driver hashes, manifest13, exact new AR payload and pin before launch",
+    "Retain all historical11/12 scripts; separate reviewed historical12workflow guard201a prevents source relabel"
   ],
-  "product_ready": false
+  "product_ready": false,
+  "revision": 2,
+  "supersedes": "c3771265b60073fd8577c7d8c1f093c3cc0c377e",
+  "ar_review": {
+    "actual_data_preflight_passed_locally": true,
+    "pin_path": "dordiai-voices/tools/data/source13_character_name_pins.json",
+    "pin_git_blob": "676874a956c819a7e76252276dacf20b7676c0c8",
+    "count": 29,
+    "primary_source_sha256": "940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385",
+    "native29_projected29_run": 45046562273,
+    "original_runtime_files_unchanged": 10230,
+    "report_blob": "870e6d96d091e83f275b0666de2ef074ad6ca053",
+    "source_complete": true,
+    "letter_names_ready": false,
+    "native_pronunciation_verified": false
+  },
+  "generic_default13": "One-line default VERSION12→13 only; all24 existing release tests passed; explicit --version paths unchanged"
 }

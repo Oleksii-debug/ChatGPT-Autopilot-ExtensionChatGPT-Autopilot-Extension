@@ -23,6 +23,9 @@ USER=None
 RATE=24000
 CLOCK={}
 CASE=None
+SNAPSHOTS=[]
+HIGH_LEVEL=[]
+COUNTERS={'feed_entered':0,'feed_returned':0,'planner_requests':0,'public_read_dispatches':0,'public_read_returns':0,'wx_heartbeats':0}
 REPORT={'format':'dordiai-owned-nvda-longread','status':'running','probe_id':SETTINGS['probe_id'],
     'pid':os.getpid(),'controller_pid':SETTINGS['controller_pid'],'recording_pcm_sink_test_double':False,
     'physical_audio_verified':False,'acoustic_latency_verified':False,'native_pronunciation_verified':False,
@@ -46,19 +49,82 @@ def guarded(function):
     return wrapped
 
 
+def state_snapshot(label):
+    public_state=speech.getState();mode=public_state.speechMode
+    row={'label':label,'when_ns':time.perf_counter_ns(),'phase':PHASE,
+        'speech_mode':getattr(mode,'name',str(mode)),'speech_is_speaking':bool(speech.isSpeaking()),
+        'speech_been_canceled':bool(public_state.beenCanceled),'speech_is_paused':bool(public_state.isPaused),
+        'selected_synth_is_owned_driver':synthDriverHandler.getSynth() is DRIVER,
+        'done_notification_seen':DONE,'counters':dict(COUNTERS),'thread':threading.current_thread().name,
+        'high_level_inputs':len(HIGH_LEVEL),'driver_sequences':len(SEQUENCES),'planned_routes':len(ROUTES),'feed_events':len(EVENTS),'reference_bytes':len(PCM)}
+    if DRIVER is not None:
+        row.update(driver_name=DRIVER.name,driver_type=type(DRIVER).__module__+'.'+type(DRIVER).__name__,
+            driver_rate=DRIVER.rate,driver_rate_multiplier=DRIVER.rateMultiplier,
+            driver_default_tempo=DRIVER._tempo(DRIVER.rate,DRIVER.rateMultiplier),
+            driver_generation=getattr(DRIVER,'_generation',None),driver_paused=getattr(DRIVER,'_paused',None),driver_closed=getattr(DRIVER,'_closed',None),
+            driver_error=str(getattr(DRIVER,'_dordiai_last_error',None))[:1000])
+        queue=getattr(DRIVER,'_jobs',None);thread=getattr(DRIVER,'_thread',None)
+        row['driver_jobs_size_approximate']=queue.qsize() if queue is not None else None
+        row['driver_thread_alive']=thread.is_alive() if thread is not None else None
+    implementation=getattr(speech,'speech',None)
+    manager=getattr(implementation,'_manager',None) if implementation is not None else None
+    if manager is None:manager=getattr(speech,'_manager',None)
+    if manager is not None:
+        row['manager_type']=type(manager).__module__+'.'+type(manager).__name__
+        indexes=getattr(manager,'_indexesSpeaking',None)
+        row['manager_indexes_speaking']={'count':len(indexes),'strict_int_items':[x for x in list(indexes)[:8] if type(x) is int]} if isinstance(indexes,(list,tuple,set,frozenset)) else None
+        row['manager_should_push_when_done']=bool(getattr(manager,'_shouldPushWhenDoneSpeaking',False))
+        current=getattr(manager,'_curPriQueue',None)
+        def queue_state(queue):
+            if queue is None:return None
+            priority=getattr(queue,'priority',None);pending=getattr(queue,'pendingSequences',None)
+            return {'priority':int(priority) if isinstance(priority,int) else None,'pending_sequence_count':len(pending) if pending is not None else None}
+        row['manager_current_priority_queue']=queue_state(current)
+        queues=getattr(manager,'_priQueues',None)
+        if isinstance(queues,dict):queues=list(queues.values())
+        if isinstance(queues,(list,tuple)):row['manager_priority_queues']=[queue_state(q) for q in queues[:3]]
+    if len(SNAPSHOTS)<128:SNAPSHOTS.append(row)
+    return row
+
+
+def heartbeat():
+    if FINISHED:return
+    COUNTERS['wx_heartbeats']+=1;state_snapshot('wx-heartbeat')
+    core.callLater(1000,guarded(heartbeat))
+
+
+def on_high_level(speechSequence,originalSpeechSequence=None,**kwargs):
+    if PHASE in ('longread','cancelling') and len(HIGH_LEVEL)<128:
+        HIGH_LEVEL.append({'when_ns':time.perf_counter_ns(),'speech_sequence':_plain_sequence(speechSequence),
+            'original_speech_sequence':_plain_sequence(originalSpeechSequence if originalSpeechSequence is not None else speechSequence)})
+
+
 def fail(error):
     global FINISHED,PHASE
     if FINISHED:return
-    FINISHED=True;PHASE='failed'
-    REPORT.update(status='failed',error=type(error).__name__+': '+str(error))
+    state_snapshot('failure-before-cleanup')
+    FINISHED=True
+    with LOCK:raw=bytes(PCM);events=list(EVENTS)
+    with (ROOT/'partial-reference.pcm').open('xb') as out:out.write(raw)
+    REPORT.update(status='failed',error=type(error).__name__+': '+str(error),failure_phase=PHASE,
+        diagnostic_snapshots=list(SNAPSHOTS),feed_events=events,planned_routes=list(ROUTES),driver_sequences=list(SEQUENCES),
+        high_level_speech_inputs=list(HIGH_LEVEL),partial_reference_scope='Exact feed payloads observed before failure; incomplete workload, never accepted as complete reference',
+        partial_reference_pcm={'filename':'partial-reference.pcm','size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()})
+    PHASE='failed'
+    try:cleanup()
+    except Exception as cleanup_error:REPORT['cleanup_error']=type(cleanup_error).__name__+': '+str(cleanup_error)
+    # The controller may still be finishing its exact90second capture. Keep
+    # focus-destroy/desktop announcements suppressed until it reaps this child.
+    speech.setSpeechMode(speech.SpeechMode.off)
+    state_snapshot('failure-after-cleanup');REPORT['diagnostic_snapshots']=list(SNAPSHOTS)
     try:publish('plugin-complete.json',REPORT)
     except FileExistsError:pass
-    cleanup()
 
 
 def observe_feed(data,*args,**kwargs):
     global CANCEL_SCHEDULED
     before=time.perf_counter_ns();phase=PHASE;raw=None
+    COUNTERS['feed_entered']+=1
     if phase in ('longread','cancelling'):
         if not isinstance(data,(bytes,bytearray,memoryview)):raise TypeError('Actual WavePlayer bytes required')
         raw=bytes(data)
@@ -69,7 +135,7 @@ def observe_feed(data,*args,**kwargs):
                 CANCEL_SCHEDULED=True
                 wx.CallAfter(core.callLater,300,guarded(cancel_actual_speech))
     result=ORIGINAL_FEED(data,*args,**kwargs)
-    after=time.perf_counter_ns()
+    after=time.perf_counter_ns();COUNTERS['feed_returned']+=1
     if raw is not None:
         with LOCK:
             offset=len(PCM)//2;PCM.extend(raw)
@@ -84,6 +150,7 @@ def observe_parts(*args,**kwargs):
             kind,value=part
             if PHASE in ('longread','cancelling') and kind in ('text','character') and isinstance(value,dict):
                 if len(ROUTES)>=1024:raise ValueError('Route observation quota exceeded')
+                COUNTERS['planner_requests']+=1
                 ROUTES.append({key:value.get(key) for key in ('text','language','profile','character','speed')})
             yield part
     finally:
@@ -109,6 +176,8 @@ def cleanup():
     try:synthDriverHandler.synthDoneSpeaking.unregister(on_done)
     except Exception:pass
     try:synthDriverHandler.pre_synthSpeak.unregister(on_synth)
+    except Exception:pass
+    try:speech.pre_speech.unregister(on_high_level)
     except Exception:pass
     if DRIVER is not None:
         if ORIGINAL_FEED is not None:DRIVER._player.feed=ORIGINAL_FEED;ORIGINAL_FEED=None
@@ -146,7 +215,12 @@ def poll_ready(deadline):
 
 def read_actual_file(cancel=False):
     global PHASE,DONE,CANCEL_SCHEDULED
-    speech.cancelSpeech();speech.setSpeechMode(speech.SpeechMode.off)
+    state_snapshot('read-boundary-before-public-mode-and-cancel')
+    speech.setSpeechMode(speech.SpeechMode.talk)
+    state_snapshot('read-boundary-talk-before-cancel')
+    speech.cancelSpeech()
+    state_snapshot('read-boundary-after-public-cancel')
+    speech.setSpeechMode(speech.SpeechMode.off)
     if not focus_owned():raise RuntimeError('Owned Edit focus changed before real read')
     text=SETTINGS['cancel_text'] if cancel else CASE['text']
     if cancel:
@@ -166,7 +240,9 @@ def read_actual_file(cancel=False):
     REPORT['cancel_request_started_ns' if cancel else 'read_started_ns']=time.perf_counter_ns()
     if not cancel:REPORT.update(input_text=text,input_utf8_sha256=hashlib.sha256(text.encode('utf-8')).hexdigest(),source_words=CASE['words'],textinfo_type=type(info).__name__,textinfo_language_fields=fields,complete_range_api='POSITION_ALL',read_api='speech.speakTextInfo')
     speech.setSpeechMode(speech.SpeechMode.talk)
+    COUNTERS['public_read_dispatches']+=1;state_snapshot('before-public-speakTextInfo')
     speech.speakTextInfo(info,unit=textInfos.UNIT_PARAGRAPH,reason=controlTypes.OutputReason.CARET)
+    COUNTERS['public_read_returns']+=1;state_snapshot('after-public-speakTextInfo')
     if not cancel:core.callLater(50,guarded(lambda:wait_read(time.monotonic()+80)))
     else:core.callLater(6000,guarded(lambda:cancel_watchdog()))
 
@@ -186,7 +262,8 @@ def wait_read(deadline):
     REPORT.update(status='completed-real-waveplayer-longread',sample_rate=RATE,reference_pcm={'filename':'longread-reference.pcm','size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()},
         actual_rate=DRIVER.rate,actual_rate_multiplier=DRIVER.rateMultiplier,effective_default_tempo=DRIVER._tempo(DRIVER.rate,DRIVER.rateMultiplier),
         per_request_speed_is_authoritative=True,planned_routes=list(ROUTES),route_audit=audit,driver_sequences=list(SEQUENCES),feed_events=events,
-        real_wave_player_type=type(DRIVER._player).__module__+'.'+type(DRIVER._player).__name__,read_finished_ns=time.perf_counter_ns(),driver_error=error)
+        real_wave_player_type=type(DRIVER._player).__module__+'.'+type(DRIVER._player).__name__,read_finished_ns=time.perf_counter_ns(),driver_error=error,
+        diagnostic_snapshots=list(SNAPSHOTS),high_level_speech_inputs=list(HIGH_LEVEL))
     publish('plugin-longread.json',REPORT)
 
 
@@ -270,6 +347,7 @@ def begin(deadline):
     ORIGINAL_FEED=DRIVER._player.feed;ORIGINAL_PARTS=DRIVER._planned_parts
     DRIVER._player.feed=observe_feed;DRIVER._planned_parts=observe_parts
     synthDriverHandler.synthDoneSpeaking.register(on_done);synthDriverHandler.pre_synthSpeak.register(on_synth)
+    if getattr(speech,'pre_speech',None) is not None:speech.pre_speech.register(on_high_level)
     USER=ctypes.WinDLL('user32',use_last_error=True)
     USER.GetForegroundWindow.argtypes=[];USER.GetForegroundWindow.restype=ctypes.c_void_p
     USER.GetWindowThreadProcessId.argtypes=[ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint32)];USER.GetWindowThreadProcessId.restype=ctypes.c_uint32
@@ -279,6 +357,7 @@ def begin(deadline):
     if not CONTROL.LoadFile(str(path)) or CONTROL.GetValue()!=CASE['text']:raise RuntimeError('Owned UTF8 file not loaded exactly')
     CONTROL.SetInsertionPoint(0);FRAME.Show();FRAME.Raise();CONTROL.SetFocus()
     core.callLater(300,guarded(lambda:poll_ready(time.monotonic()+10)))
+    core.callLater(1000,guarded(heartbeat))
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def __init__(self,*args,**kwargs):

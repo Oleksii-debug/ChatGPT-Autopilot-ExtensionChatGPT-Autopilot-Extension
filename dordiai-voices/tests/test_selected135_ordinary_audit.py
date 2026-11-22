@@ -14,11 +14,12 @@ class OrdinaryAudit(unittest.TestCase):
     def test_selected135_are_unique_and_missing_tables_are_not_missing_runtime_claims(self):
         m=load('_selected135_audit',PACKET/'tools/research/audit_ordinary_names_selected135.py');d=m.audit(ROOT)
         self.assertEqual(len({r['id'] for r in d['languages']}),135)
-        self.assertEqual(d['summary']['source_complete'],14)
-        self.assertEqual(d['summary']['identified_explicit_mapping_tables'],19)
+        extra_ar=int((ROOT/'source/0.12.2/kx47Runtime/models/CharacterNames/ar.json').is_file())
+        self.assertEqual(d['summary']['source_complete'],14+extra_ar)
+        self.assertEqual(d['summary']['identified_explicit_mapping_tables'],19+extra_ar)
         missing=[r for r in d['languages'] if not r['known_ordinary_name_mapping_present']]
-        self.assertEqual(len(missing),116)
-        self.assertEqual(sum(r['engine_native_spelling_candidate'] for r in missing),67)
+        self.assertEqual(len(missing),116-extra_ar)
+        self.assertEqual(sum(r['engine_native_spelling_candidate'] for r in missing),67-extra_ar)
         self.assertFalse(d['installed_language_count_recomputed'])
         self.assertFalse(d['acceptance']['product_ready'])
     def test_bank_file_count_is_not_languages_or_full_multilingual_name_acceptance(self):

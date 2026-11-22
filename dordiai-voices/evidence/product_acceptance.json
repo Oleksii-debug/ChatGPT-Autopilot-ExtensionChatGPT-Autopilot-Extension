@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.12",
+  "target_version": "0.13.1-dev.13",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -649,6 +649,33 @@
         "product_ready": false
       },
       "evidence": "evidence/source12_additional_typing_result.json"
+    },
+    "source13_integration_candidate": {
+      "status": "integrated_for_actual_build_not_product_ready",
+      "baseline_source12": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+      "runtime_blobs": {
+        "word_leaf": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+        "resource_manager": "960459711ee3af8976540fd4595489fb7f69aedb",
+        "driver": "06e9f652060dd78c9aae6b17d8d38692d58e9ec4",
+        "personal_language": "c5c8d4dc2a0a666283c6ab6041df6228e5016d45",
+        "voice_packages": "2abe2a50bcf58aea423764ef15acc04538ee2f9b",
+        "preferences": "adbb32c6c6858bc7aee4cad5c116bd456cc8173f",
+        "upgrade": "ffb73001ca1036dec1ec4ae66f257398b87308e2"
+      },
+      "new_model_files": [
+        "kx47Runtime/models/CharacterNames/ar.json"
+      ],
+      "old_model_files_must_remain_byte_identical": 8510,
+      "old_bank_files": 180,
+      "private_files": 1596,
+      "allowed_ids": 45,
+      "actual_personal_config_host_run": 45046562415,
+      "actual_ar29_native_projection_run": 45046562273,
+      "updated_voice_ownership_focused_tests": 29,
+      "updated_voice_ownership_actual_windows_verified": false,
+      "archive_exists": false,
+      "actual_nvda_verified": false,
+      "product_ready": false
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -708,7 +735,7 @@
     "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
   },
   "current_environment_blocker": "Local executor available; actual12 owned virtual WavePlayer phrase capture verified. Physical speaker/microphone and acoustic latency validation unavailable in hosted CI.",
-  "working_source_target_version": "Immutable12 sourcebe7f4e: actual Windows1330/1280pass/50skip, worker225, all5actualNVDAmodes pass; future production changes require13.",
+  "working_source_target_version": "Source13 integration: reviewed V2 leaf/bounded path manager, profile-language policy, durable voice ownership, new Arabic29 data. Actual13 archive/build/NVDA verification pending; immutable actual12 remains available.",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,

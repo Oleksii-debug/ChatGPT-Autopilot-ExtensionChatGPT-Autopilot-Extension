@@ -259,12 +259,13 @@ def prepare_owned_inputs(dataset, run):
     if descriptor.is_symlink() or descriptor.stat().st_size != 558 or file_sha(descriptor) != DESCRIPTOR_SHA:
         raise ValueError("Exact trusted558B descriptor required")
     runtime = ROOT/"source/0.12.2/kx47Runtime"
+    archived_manager = ROOT/"experiments/native-resource-path-cache/baseline_source12.py"
     baseline = ROOT/"experiments/native-word-cache/baseline_source11.py"
     candidate = ROOT/"experiments/native-word-cache/native_word_membership.py"
     for path, blob in ((baseline, BASELINE_BLOB), (candidate, CANDIDATE_BLOB)):
         pinned_source(path, blob)
     for name, blob in MODULE_PINS.items():
-        pinned_source(runtime/name, blob)
+        pinned_source(archived_manager if name == "native_membership_runtime.py" else runtime/name, blob)
     external = run/"external-word-cache"
     external.mkdir()
     data_root = external/"data"
@@ -290,7 +291,8 @@ def prepare_owned_inputs(dataset, run):
         code.mkdir()
         (code/"native_word_membership.py").write_bytes(pinned_source(path, blob))
         for name, expected in MODULE_PINS.items():
-            (code/name).write_bytes(pinned_source(runtime/name, expected))
+            source = archived_manager if name == "native_membership_runtime.py" else runtime/name
+            (code/name).write_bytes(pinned_source(source, expected))
         variants[variant] = {"folder": str(code), "leaf_git_blob": blob}
     return {"data_path": str(copied_data), "plain_data_path": str(data_path),
         "descriptor_path": str(copied_descriptor), "models_path": str(namespace(models)),

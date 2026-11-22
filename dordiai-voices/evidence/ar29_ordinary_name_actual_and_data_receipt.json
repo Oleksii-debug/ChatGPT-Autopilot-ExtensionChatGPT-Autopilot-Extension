@@ -1,0 +1,404 @@
+{
+  "format": "dordiai-ar29-ordinary-name-proof-and-data-receipt",
+  "format_version": 1,
+  "source_commit": "19005bb8b46ec7a316b2d6ea2fa66cb54b65b18d",
+  "run": 45046562273,
+  "job": 137282351931,
+  "status": "actual-isolated-native-and-viktoriia-pcm-passed",
+  "exact_report": {
+    "path": "evidence/ar29_ordinary_names_windows_45046562273.json",
+    "git_blob": "870e6d96d091e83f275b0666de2ef074ad6ca053",
+    "size_bytes": 42035,
+    "sha256": "86df626c7900b6b42332cb8cfd5c805fe6fbaff2c4ab2ead62b10189949c3ab3"
+  },
+  "audio_proof_archive": {
+    "path": "evidence/audio/ar29-ordinary-names-45046562273.zip",
+    "git_blob": "2c8c148520dab530ae8de1f16f235f7bf09cdea9",
+    "artifact": 14763618100,
+    "size_bytes": 1532045,
+    "sha256": "87449b39246025c2619ee0ad4a1345978f92b71a1fe1ae253adae265078d42ff",
+    "member_count": 63,
+    "wav_count": 58,
+    "files": [
+      {
+        "path": "network-policy.json",
+        "size_bytes": 196,
+        "sha256": "824f2b01771db88186825c5a5d7152fdb4079b5108284d36594e1b663e0ef916"
+      },
+      {
+        "path": "pcm/00-native.wav",
+        "size_bytes": 59584,
+        "sha256": "15ea12c02309aa0a85c505a5ed0eee74e7921e0107685054c55f25258516af48"
+      },
+      {
+        "path": "pcm/00-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "e1d5a09e0e2ae57d54389d5e0bf3c422ea6239e8de9af0687a3e99c70b186aa0"
+      },
+      {
+        "path": "pcm/01-native.wav",
+        "size_bytes": 59272,
+        "sha256": "d8e034ec87734515aacbbe636cabead21223dccd9dd557626431f6715a58a997"
+      },
+      {
+        "path": "pcm/01-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "9183b60e48821030bdfecb354275b84f347651c51eb9471c2f46ab9c2171d223"
+      },
+      {
+        "path": "pcm/02-native.wav",
+        "size_bytes": 59260,
+        "sha256": "f3103f5540a759fd700cc35e0dcc788a30f7a5c20031d85fb9875eff21087d27"
+      },
+      {
+        "path": "pcm/03-native.wav",
+        "size_bytes": 59460,
+        "sha256": "bc4175388bccdab470b3842d8ab58c0fa3e071254e0d47cab163a558c7e5fbd7"
+      },
+      {
+        "path": "pcm/02-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "c4fc7e64f77e638ef840f5e98f14a5f91323a639f2373ea03a40cc1d70a8c1cf"
+      },
+      {
+        "path": "pcm/03-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "5868d6618bb797482b2605faeb6336389e19ec308d86da15bbd32cf5f8a4e53a"
+      },
+      {
+        "path": "pcm/04-native.wav",
+        "size_bytes": 59352,
+        "sha256": "921eca972a4c0b749637c123b58941d7be3a4bf3149cbeb4f26a524817ccb095"
+      },
+      {
+        "path": "pcm/04-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "a6ff2845dd2c38a0d21bda4e753ae588d8833f68e988b341bfc288e933df5a19"
+      },
+      {
+        "path": "pcm/05-native.wav",
+        "size_bytes": 59412,
+        "sha256": "8b1725afd3ec28dd35b16ee56aff5595603b4e8428b5ccb3997c78daa98e27f6"
+      },
+      {
+        "path": "pcm/05-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "da89cf2714cfc8ca3486bb672915ec97f57fe11483b63b4cb246ecbf907ec987"
+      },
+      {
+        "path": "pcm/06-native.wav",
+        "size_bytes": 59292,
+        "sha256": "172ffb52d3ed08b05b62674f713619558c9e19904ceff4ff87ee7966c75e80c8"
+      },
+      {
+        "path": "pcm/07-native.wav",
+        "size_bytes": 59342,
+        "sha256": "231d32dcfa8a826ac56184d624021bc31a59d6e62ac427c5ac931b532b4f5dce"
+      },
+      {
+        "path": "pcm/06-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "c85e91db7acd9d11c1d3fffea80170489ca1f5ce6292951c903230bd9d147269"
+      },
+      {
+        "path": "pcm/07-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "f027d65ff166337219b3d23e22f3952a310036537977eba7f457a9fad5258832"
+      },
+      {
+        "path": "pcm/08-native.wav",
+        "size_bytes": 59238,
+        "sha256": "9a892475b40dd7a8a2423f421cddaee7ba8e72f043d781abb010db0daccde12b"
+      },
+      {
+        "path": "pcm/08-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "02dd788312a6fa5f88ca0f5b580fa657626c922e5621e1ab91b86d190bbc581b"
+      },
+      {
+        "path": "pcm/09-native.wav",
+        "size_bytes": 59128,
+        "sha256": "9f8c7ee3b930b22e833719dda63992892af3429e5849b121a163777467cf6405"
+      },
+      {
+        "path": "pcm/09-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "ad3eea5dc47eefa24046d38004c80e679c52109f6bdf6305a0e74c7d5621e098"
+      },
+      {
+        "path": "pcm/10-native.wav",
+        "size_bytes": 59348,
+        "sha256": "cfd5faf3170b2e2d7250c76da769abd586071ae38642c0cede607087a499c928"
+      },
+      {
+        "path": "pcm/10-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "aab60bdf6b9ab11d46f32170ba2d0a4830cb9eb2c909fe3ecdbaeceb5cb7efba"
+      },
+      {
+        "path": "pcm/11-native.wav",
+        "size_bytes": 59402,
+        "sha256": "f52dd0aa9dd489914353895c1c3c226483f2cec49675deb7fa3a4bf17eb3e32a"
+      },
+      {
+        "path": "pcm/11-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "d1a501802e4408946f39bd18de5c4ca6081257c0c267b927993f8cc9ba80bb63"
+      },
+      {
+        "path": "pcm/12-native.wav",
+        "size_bytes": 59352,
+        "sha256": "9f097964a7c8023443ae131e31140b706a27a480bea3c5a4384f3d165d45ba75"
+      },
+      {
+        "path": "pcm/12-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "29d8c1e48e20ddd96987b705b83276cd6ca94444899fbec624c454f16013e701"
+      },
+      {
+        "path": "pcm/13-native.wav",
+        "size_bytes": 59546,
+        "sha256": "782ca14f8666923577201b1171ed1c6d53e0e9037672e3aa9a26ba7d773d0c19"
+      },
+      {
+        "path": "pcm/13-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "79992594c7f415b6df11ecf016db5460334e1aabf2f899229eedd6124818a152"
+      },
+      {
+        "path": "pcm/14-native.wav",
+        "size_bytes": 59372,
+        "sha256": "96ebf24928bade854249f3ca1960f6aa41152d81ea0b5626c915dd7247de028f"
+      },
+      {
+        "path": "pcm/14-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "a91cd7183996114f48cc203cac005009d46bb57ac70566e13d6386b9631930ce"
+      },
+      {
+        "path": "pcm/15-native.wav",
+        "size_bytes": 59324,
+        "sha256": "56806254e603dec8c691f1e1b3d6779294f3470c966ea6730c5f8ea8397d6cee"
+      },
+      {
+        "path": "pcm/15-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "89e9286883d62816ae7e9a1c89cbee0f6f0f025547d7ebb8b45a8ea8fe279408"
+      },
+      {
+        "path": "pcm/16-native.wav",
+        "size_bytes": 59368,
+        "sha256": "dcff4573fa18fbf6852654d41dd4dd59c4572a84c0d62171982cec2c8ff8b89a"
+      },
+      {
+        "path": "pcm/16-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "8dd4e914f869591bde38dfe08bfc8a1e00c7249294a61d5928def2165b4853d3"
+      },
+      {
+        "path": "pcm/17-native.wav",
+        "size_bytes": 59436,
+        "sha256": "cf14d48a5b321619942b3a581c7592dd8112ce5abc7e389bfaa0d22042861e39"
+      },
+      {
+        "path": "pcm/17-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "c7483158bbbc05967b25973ed880952989f3e3068e6e2811e3baf6af9b054499"
+      },
+      {
+        "path": "pcm/18-native.wav",
+        "size_bytes": 59408,
+        "sha256": "329e78b0a4fe1b06d6b391dae5523f8ac6d9a9e59a31e70405f3171ce0e9d6bd"
+      },
+      {
+        "path": "pcm/18-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "1a73bb0c51bd97ae487c1f9369e6c6852c2e5894465034f15dce6ff07c467658"
+      },
+      {
+        "path": "pcm/19-native.wav",
+        "size_bytes": 59442,
+        "sha256": "df0cf88c97803bb5d8403b437953efc6585eda6ead828a720b62771c6f1325aa"
+      },
+      {
+        "path": "pcm/19-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "2ef6d30643c0bb298f6ab4ff86330b5dceadb4ea82fbee59acb3e0672636bbd5"
+      },
+      {
+        "path": "pcm/20-native.wav",
+        "size_bytes": 59546,
+        "sha256": "3302062f306b8a0497f7ba9006abf2d6bf114ff70c6487e394a9f96d35bc1333"
+      },
+      {
+        "path": "pcm/20-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "81bd6ad9e31b72c2d02905e96fc5fee4e398a9afda2c759d48e885a60de67149"
+      },
+      {
+        "path": "pcm/21-native.wav",
+        "size_bytes": 59518,
+        "sha256": "0491149848f30fd80063c33c41a9a945d9a85650eb3f9ffeb8fae20a79a84489"
+      },
+      {
+        "path": "pcm/21-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "8f0e572be790b7c1c32b77519ba633400de66228c5be672ba8022a5b0ab1d67f"
+      },
+      {
+        "path": "pcm/22-native.wav",
+        "size_bytes": 59278,
+        "sha256": "4ee8c4df32d97036e1061a8e8aaa6a798e4efdaac66f7d137ab26004770a4fb8"
+      },
+      {
+        "path": "pcm/22-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "caf91b4708891e1d5094fcf8258852f3ac84c6864ab0a48ed03b794f9ed79120"
+      },
+      {
+        "path": "pcm/23-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "14a34ef3e2cfdc3e73a3acbc35044961b7c0bf7b33b782611b293826ea77c9cb"
+      },
+      {
+        "path": "pcm/23-native.wav",
+        "size_bytes": 59354,
+        "sha256": "5598da7fc04c8a92af6a99ec6a73d391d89546f45f541a344605cfc16e11b002"
+      },
+      {
+        "path": "pcm/24-native.wav",
+        "size_bytes": 59484,
+        "sha256": "3efe3e246b67b9b4bd59d7e018136b898a1b0c3896bd412ff910fb0e4fc5eac5"
+      },
+      {
+        "path": "pcm/24-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "d0ac1756a337511ec81ce442a4a5a93325aafdbd37b88bf50a5d71b8f6f3d10c"
+      },
+      {
+        "path": "pcm/25-native.wav",
+        "size_bytes": 59150,
+        "sha256": "47b37c458217fbbb2bca6c0f146f4203c081a819045800336bf611a4dd6aa38c"
+      },
+      {
+        "path": "pcm/25-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "58502d25692c5b4d2de37f5b7e4e64f936f1b2310a12615dbc5fd68c4f79979b"
+      },
+      {
+        "path": "pcm/26-native.wav",
+        "size_bytes": 59300,
+        "sha256": "452eb012a852af28b6b37dcedf707e64a06067422ffd38b1f001d817ce2420af"
+      },
+      {
+        "path": "pcm/26-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "496214a2b30b082747a76af3f5d1881a309e97b15fd6d559b234f19b2f228c8f"
+      },
+      {
+        "path": "pcm/27-viktoriia.wav",
+        "size_bytes": 58924,
+        "sha256": "f028bbb2af1f1e5498e60fc89d2a9b0b808a02685c9eaa54facddd5bd85cb422"
+      },
+      {
+        "path": "pcm/27-native.wav",
+        "size_bytes": 59296,
+        "sha256": "389ed45824dd9c48744f3271ca86a74ed633c913c18627106480cda52b35584e"
+      },
+      {
+        "path": "pcm/28-native.wav",
+        "size_bytes": 59858,
+        "sha256": "b0b02a691fa8fecbe14082a0b9afba37d619cd6760cc4bf193e1a185838bbcde"
+      },
+      {
+        "path": "pcm/28-viktoriia.wav",
+        "size_bytes": 59436,
+        "sha256": "034634bcc7aa193cd6ebba87eee9a44e95c3baac285bdbab2636969c6e132c5f"
+      },
+      {
+        "path": "pcm/report.json",
+        "size_bytes": 42035,
+        "sha256": "86df626c7900b6b42332cb8cfd5c805fe6fbaff2c4ab2ead62b10189949c3ab3"
+      },
+      {
+        "path": "primary-source-acquisition.json",
+        "size_bytes": 452,
+        "sha256": "c9c70425e76cef0f69bc497ad52b103d9d5428beef199956e4c8f76471a68cc3"
+      },
+      {
+        "path": "shared-resource-inventory.json",
+        "size_bytes": 2511,
+        "sha256": "186bef5df3304131c9dc624903687b8ff52387325111cf21e9afcdb2b883104e"
+      },
+      {
+        "path": "stage-receipt.json",
+        "size_bytes": 3772,
+        "sha256": "db2f96b03cdc810d0610deea470ad9fd2569ca31a709213a36cc715a750408be"
+      }
+    ],
+    "safety": "Original ZIP exact bytes, safe nonlinked nonencrypted bounded paths, all JSON parsed, each58 WAV mono PCM16/22050Hz full-frame checked. No PDF/book images, model weights, code, private DLLs, tokens or signedURLs."
+  },
+  "original_runtime": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "onnxruntime": "1.26.0",
+    "utf8_mode": 1,
+    "stdout_encoding": "utf-8",
+    "immutable_source12_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "immutable_wide_outer_sha256": "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262",
+    "existing_payloads_byte_unchanged": 10230,
+    "input_hashes": {
+      "source": "643fd8c683786aa4af6619ac59f2227588034b214db05ef94137e5743b598447",
+      "flow": "831fe762c0b47137e20753b9023b3901fc229bbc05bd6644ddce7073d7015404",
+      "decoder": "9d57879aff5d3d50ae810b4e4791170b3fd1d27004be71fc2ae3f90afd588d36",
+      "target": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+    },
+    "model_graph_sample_rate": 44100,
+    "native_common_output_sample_rate": 22050,
+    "original_core_resampling_preserved": true,
+    "projection_sample_rate": 22050
+  },
+  "measured_scope": {
+    "ordinary_source_names": 29,
+    "native_and_selected_profile_wavs": 58,
+    "all_nfkd_characters_preserved_by_actual_original_processor": true,
+    "native_speech_seconds": 39.02145124716553,
+    "projection_speech_seconds": 38.8237641723356,
+    "native_complete_wave_render_seconds": 4.51141680000012,
+    "projection_seconds": 6.939574900000025,
+    "timing_caution": "Complete cached-session generation, not first audio/NVDA/typing/device latency; no human correctness assessment."
+  },
+  "candidate13_data": {
+    "new_payload": "kx47Runtime/models/CharacterNames/ar.json",
+    "git_blob": "8033638d55b431498a4bedccebaa4acf9293c754",
+    "size_bytes": 296127,
+    "sha256": "5966d74af4bcf9e3a7be2221e7d3a04b481b5598332c32a3cc70ec2097092bb8",
+    "source_repertoire": 29,
+    "source_complete": true,
+    "native_symbol_names": 1967,
+    "unreviewed_english_identical_candidates_excluded": 5,
+    "all56_preexisting_character_metadata_files_unchanged": true,
+    "bank_entries_are_preparation_plans_only": true,
+    "models_or_voices_regenerated": false,
+    "language_inventory_increment": 0
+  },
+  "historical_preinference_failures": [
+    {
+      "run": 45045240562,
+      "source_commit": "85df7165087b797e3a99737a0743b6e6964f5238",
+      "scope": "Host-only tests failed before asset acquisition/inference due missing explicit UTF-8 in test fixture reads; fixed tests, no runtime incompatibility result."
+    },
+    {
+      "run": 45045639066,
+      "source_commit": "a05463b0917c6fdc51807e79304e270819d0c301",
+      "scope": "Host7tests and exact primary/acoustic inputs passed; stage incorrectly demanded .onnx instead of original .ort-preferred path. No native inference attempted. Fixed stage to exact existing acoustic_graph selection with every source manifest hash retained."
+    }
+  ],
+  "acceptance": {
+    "listener_pronunciation_verified": false,
+    "native_pronunciation_verified": false,
+    "nvda_typing_verified": false,
+    "physical_audio_verified": false,
+    "new_language_registered": false,
+    "product_ready": false
+  }
+}

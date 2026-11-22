@@ -1,6 +1,7 @@
 """Build source13 from immutable core12 resources, then probe the real packaged worker.
 
-All source12 models, including accepted AY/FIL name JSON, remain exact by default.
+All source12 models, including accepted AY/FIL name JSON, remain exact. The one
+new reviewed Arabic29 name JSON is data-only and is not a quality claim.
 
 This never reapplies the old source-bound bank overlay. Existing bank/private
 bytes must survive unchanged. Audio is measured at the worker pipe, not a device.
@@ -162,7 +163,48 @@ IMMUTABLE_MODELS = "kx47Runtime/models/"
 PRIVATE_PREFIX = "kx47Runtime/python/"
 BANK_PREFIXES = ("kx47Runtime/models/voices/native_letters/",
                  "kx47Runtime/models/voices/native_commands/")
-def verify_preservation(old, new):
+CHARACTER_NAME_SOURCES = {"ar": (29, "940efb9723bab5f877c08dbb1f8bddfd8c79cfb62430c6e5874335406d91a385")}
+CHARACTER_NAME_PATHS = {"kx47Runtime/models/CharacterNames/ar.json"}
+AR_REVIEW_RUN = 45046562273
+AR_REVIEW_REPORT_BLOB = "870e6d96d091e83f275b0666de2ef074ad6ca053"
+
+
+def character_name_review(source, pin_path):
+    """Bind the only new data file to its exact reviewed bytes and source facts."""
+    pin_path = Path(pin_path)
+    if pin_path.is_symlink() or not pin_path.is_file() or pin_path.stat().st_size > 65536:
+        raise ValueError("Bounded reviewed Arabic29 pin file required")
+    document = json.loads(pin_path.read_text(encoding="utf-8"))
+    files = document.get("files")
+    if (document.get("format") != "dordiai-source13-character-name-review"
+            or type(document.get("format_version")) is not int or document["format_version"] != 1
+            or not isinstance(files, dict) or set(files) != CHARACTER_NAME_PATHS):
+        raise ValueError("Exactly one reviewed new Arabic29 path is required")
+    count, primary_sha = CHARACTER_NAME_SOURCES["ar"]
+    name = next(iter(CHARACTER_NAME_PATHS))
+    row = files[name]
+    if (not isinstance(row, dict) or row.get("source_repertoire_count") != count
+            or row.get("primary_source_sha256") != primary_sha
+            or not re.fullmatch(r"[0-9a-f]{64}", str(row.get("sha256", "")))
+            or type(row.get("size_bytes")) is not int or not 0 < row["size_bytes"] <= 2*1024**2):
+        raise ValueError("Invalid reviewed Arabic29 byte/source pin")
+    path = Path(source) / name
+    pinned(path, row["size_bytes"], row["sha256"])
+    value = json.loads(path.read_text(encoding="utf-8"))
+    repertoire = value.get("ordinary_alphabet_source_repertoire", [])
+    names = value.get("letter_names", {})
+    primary = value.get("sources", {}).get("curated_primary_alphabet_names", {})
+    if (value.get("format") != "dordiai-character-name-sources" or value.get("format_version") != 1
+            or value.get("language") != "ar" or value.get("ordinary_alphabet_source_complete") is not True
+            or not isinstance(repertoire, list) or len(repertoire) != count or len(set(repertoire)) != count
+            or not isinstance(names, dict) or any(not isinstance(names.get(glyph), str) or not names[glyph].strip() for glyph in repertoire)
+            or primary.get("sha256") != primary_sha or value.get("letter_names_ready") is not False
+            or value.get("semantics", {}).get("native_pronunciation_verified") is not False):
+        raise ValueError("Arabic29 facts/source/counts or honest acceptance flags differ")
+    return {name: {"sha256": row["sha256"], "size_bytes": row["size_bytes"]}}
+
+
+def verify_preservation(old, new, reviewed_character_names):
     """Require all8510 source12 model files,45 identities,180 banks and1596 private files."""
     if (old.get("version") != "0.13.1-dev.12" or new.get("version") != VERSION
             or len(old.get("voice_ids", [])) != 45
@@ -173,11 +215,15 @@ def verify_preservation(old, new):
     original, produced = old.get("files"), new.get("files")
     if not isinstance(original, dict) or not isinstance(produced, dict):
         raise ValueError("Missing release inventories")
+    approved = reviewed_character_names
+    if (not isinstance(approved, dict) or set(approved) != CHARACTER_NAME_PATHS
+            or any(name in original for name in approved)):
+        raise ValueError("Only the one NEW reviewed Arabic29 file may be added; no existing model exceptions")
     banks = {name: row for name, row in original.items() if name.startswith(BANK_PREFIXES)}
     private = {name: row for name, row in original.items() if name.startswith(PRIVATE_PREFIX)}
     models = {name: row for name, row in original.items() if name.startswith(IMMUTABLE_MODELS)}
     extra_models = {name for name in produced if name.startswith(IMMUTABLE_MODELS) and name not in original}
-    if extra_models:
+    if extra_models != set(approved):
         raise ValueError("Unreviewed new model/identity payload in core13")
     if any(name.startswith(PRIVATE_PREFIX) and name not in original for name in produced):
         raise ValueError("New private runtime/package payload in core13")
@@ -188,6 +234,8 @@ def verify_preservation(old, new):
     for label, records in (("prepared bank", banks), ("private runtime", private), ("model/identity", models)):
         if any(produced.get(name) != row for name, row in records.items()):
             raise ValueError("An immutable core12 " + label + " payload changed")
+    if any(produced.get(name) != row for name, row in approved.items()):
+        raise ValueError("Reviewed new Arabic29 payload is missing or differs from its exact pin")
     required = {
         "kx47Runtime/models/WordLanguage/native-word-membership.bin":
             {"size_bytes": BINARY_SIZE, "sha256": BINARY_SHA256},
@@ -204,11 +252,15 @@ def verify_preservation(old, new):
             "existing_model_identity_files_byte_identical": len(models),
             "allowed_voice_identity_set_unchanged": True,
             "native_membership_data_descriptor_notice_byte_identical": True,
-            "character_name_payloads_byte_identical": True}
+            "existing_character_name_payloads_byte_identical": True,
+            "reviewed_new_character_name_payloads": approved,
+            "new_model_identity_file_count": len(extra_models),
+            "output_model_identity_file_count": len(models) + len(extra_models)}
 
 
 def build(args):
     check_source_version(args.source)
+    reviewed_names = character_name_review(args.source, args.character_name_pins)
     pinned(args.baseline_addon, CORE12_SIZE, CORE12_SHA256)
     check_packs(args.packs)
     work = args.work.resolve()
@@ -247,7 +299,7 @@ def build(args):
         manifest = json.loads(archive.read("dordiai-release.json"))
         if len(archive.namelist()) != len(set(archive.namelist())):
             raise ValueError("Generated core contains duplicate inventory entry")
-        unchanged = verify_preservation(old, manifest)
+        unchanged = verify_preservation(old, manifest, reviewed_names)
     proof = {"status": "actual-source13-built-from-immutable-core12-resources",
              "source_commit": os.environ.get("GITHUB_SHA"), "version": VERSION, "artifact": artifact,
              "resource_baseline": {"run": CORE12_RUN, "sha256": CORE12_SHA256, "bytes": CORE12_SIZE,
@@ -256,6 +308,9 @@ def build(args):
              "acoustic_model_preparation_performed": False, "native_dictionary_rebuilt": False,
              **unchanged, "native_membership_sha256": BINARY_SHA256,
              "native_membership_descriptor_sha256": DESCRIPTOR_SHA256,
+             "arabic29_data_review": {"actual_native29_and_viktoriia29_run": AR_REVIEW_RUN,
+                                      "actual_report_git_blob": AR_REVIEW_REPORT_BLOB,
+                                      "human_pronunciation_verified": False},
              "optional_pack_files": PACKS, "nvda_verified": False,
              "physical_audio_verified": False, "pronunciation_verified": False, "product_ready": False}
     write_json(args.report, proof)
@@ -400,6 +455,7 @@ def main():
     parser.add_argument("phase",choices=("build","probe"))
     parser.add_argument("--source",type=Path)
     parser.add_argument("--baseline-addon",type=Path)
+    parser.add_argument("--character-name-pins",type=Path)
     parser.add_argument("--packs",type=Path,required=True)
     parser.add_argument("--work",type=Path,required=True)
     parser.add_argument("--output",type=Path)
@@ -410,7 +466,7 @@ def main():
     args = parser.parse_args()
     if args.report.exists() or args.report.is_symlink():
         parser.error("Report must be new")
-    needed = ("source","baseline_addon","output") if args.phase=="build" else ("addon","build_report")
+    needed = ("source","baseline_addon","output","character_name_pins") if args.phase=="build" else ("addon","build_report")
     if any(getattr(args,name) is None for name in needed):
         parser.error("Missing phase-specific input")
     if not 0<args.timeout<=300:

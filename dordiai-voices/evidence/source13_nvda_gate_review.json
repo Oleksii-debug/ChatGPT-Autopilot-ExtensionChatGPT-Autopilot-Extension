@@ -1,0 +1,61 @@
+{
+  "format": "dordiai-source13-nvda-integration-candidate",
+  "format_version": 1,
+  "launch_tag": "[source13-nvda]",
+  "launch_ready": false,
+  "reason": "No actual source13 build receipt has been supplied; checked-in pin is intentionally unfilled.",
+  "files": {
+    ".github/workflows/dordiai-source13-nvda.yml": "27abc67c39e6cfe2bac986068a844d17eade975f",
+    "dordiai-voices/tools/validate_source13_integration_receipt.py": "1d785fb951625b424e4d620426640b5bfab3a73e",
+    "dordiai-voices/tests/test_source13_integration_receipt.py": "2c667c33502128a3aff4787daa2c7bc39e9bb679",
+    "dordiai-voices/tools/data/source13_build_pin.json": "efbe6da02a86e921dd767ce028fd17cc5b567b88"
+  },
+  "modes": [
+    "normal",
+    "typing",
+    "plain-text",
+    "ru-missing",
+    "descriptor-corruption",
+    "characters-only",
+    "navigation",
+    "forced-uk",
+    "disabled-ru"
+  ],
+  "preserved": {
+    "production12_unchanged": true,
+    "historical12_workflow_pin_helpers_unchanged": true,
+    "original100_input_unchanged": true,
+    "original7plain_auditor_unchanged": true,
+    "historical4typing_audit_AST_parity": true
+  },
+  "pin_completion_required": {
+    "status": "actual-build-verified",
+    "source_run_id": "actual successful owned run integer",
+    "source_commit": "actual40hex build SHA",
+    "source_workflow_path": "actual .github/workflows/dordiai-source13-*.yml path",
+    "artifact_id": "actual owned artifact ID",
+    "artifact_name": "actual owned source13 core artifact name",
+    "artifact_bytes": "actual outer artifact size",
+    "artifact_sha256": "actual outer artifact SHA256 from GitHub receipt",
+    "archive_bytes": "actual inner addon size <=3GB",
+    "archive_sha256": "actual inner addon SHA256",
+    "archive_name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+    "product_ready": false
+  },
+  "verification": {
+    "local_tests": 14,
+    "passed": 14,
+    "actual13_execution": false,
+    "physical_audio": false,
+    "optional_language_acceptance": false
+  },
+  "guards": [
+    "Unfilled pin fails before API request or core download",
+    "Successful source run/branch/path/repository/source SHA verified through official API",
+    "Artifact ID/name/size/digest/run/source SHA verified before artifact download",
+    "Downloaded inner addon size/SHA/version checked before NVDA launch",
+    "Explicit RecordingSink scope and false physical/acoustic/product flags required",
+    "Strict functional counts, cleanup and genuine resource-fault restoration",
+    "Normal headless mode requires both measurement targets explicitly BLOCKED with 100 measured requests; absence or a false passed claim is rejected"
+  ]
+}
