@@ -539,7 +539,10 @@ def validate_phase(controller,phase,pin):
         selected=[(i,r) for i,r in enumerate(events) if r.get('name')=='native_menu_selection_verified']
         if len(targets)!=1 or len(selected)!=1:raise ValueError('Exact native menu target/selection proof missing')
         ti,target=targets[0];si,selection=selected[0];ident=target.get('menu_item_id')
-        if (type(ident) is not int or ident<0 or target.get('observer')!='wx-taskbar-popup-owner'
+        # wxMSW allocates actual wxID_ANY menu IDs in the negative range
+        # [-32000, -2000]. Reject sentinels, not genuine signed item IDs.
+        if (type(ident) is not int or not -(2**31)<=ident<2**31 or ident in {-1,-2,-3}
+            or target.get('observer')!='wx-taskbar-popup-owner'
             or selection.get('menu_item_id')!=ident or selection.get('observed_menu_item_id')!=ident
             or not any(ti<i<si and r.get('name')=='native_menu_highlight' and r.get('menu_item_id')==ident
                        for i,r in enumerate(events))):

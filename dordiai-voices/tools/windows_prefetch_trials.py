@@ -25,10 +25,18 @@ import windows_nvda_process_capture_probe as short
 from nvda_longread_analysis import analyze_longread, cancellation_tail, MIN_NCC
 from nvda_process_capture_support import read_json, validate_ready
 from plain_word_workload import original_source100, audit_original100, ORIGINAL_INPUT_UTF8_SHA256
-from prefetch_research import install_owned_overlay
+from prefetch_research import install_owned_overlay, DEFAULT_EXPERIMENT, EXTENDED_EXPERIMENT, declared_counts
 
 TOOLS = Path(__file__).resolve().parent
 ORDER = (12, 24, 32, 32, 24, 12)
+EXTENDED_ORDER = (32, 64, 128, 128, 64, 32)
+
+
+def experiment_order(experiment):
+    declared_counts(experiment)  # Reject unknown modes before any side effect.
+    return ORDER if experiment == DEFAULT_EXPERIMENT else EXTENDED_ORDER
+
+
 DRIVER_SHA = "17eeda6106858c4eb14ede91dd2a698cae0abaa9894d3df3e3d445d374a042ee"
 DRIVER_BYTES = 93785
 ARCHIVE_SHA = "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d"
@@ -201,6 +209,7 @@ def verify_loaded_research_source():
         'source_commit':SETTINGS['source_commit'],'archive_sha256':SETTINGS['archive_sha256'],
         'loaded_driver_sha256':hashlib.sha256(raw).hexdigest(),
         'loaded_driver_bytes':len(raw),'pending_count':SETTINGS['pending_count'],
+        'experiment':SETTINGS.get('experiment','baseline-12-24-32'),
         'profile':'adam','rate':80,'rate_multiplier':1,'initial_worker_pid':getattr(process,'pid',None),
         'initial_cache_and_bootstrap_state':initial,
         'explicit_preload_called_by_probe':False,'warmup_workload_words_synthesized_by_probe':False}
@@ -356,7 +365,10 @@ def evidence_index(run):
 
 def judge_trial(result, correlation, tail, overlay):
     audit = result.get("route_audit", {})
-    valid = (result.get("status") == "completed-real-waveplayer-longread"
+    try:
+        declared=type(overlay.get("pending_count")) is int and overlay["pending_count"] in declared_counts(overlay.get("experiment",DEFAULT_EXPERIMENT))
+    except (ValueError,TypeError):declared=False
+    valid = (declared and result.get("status") == "completed-real-waveplayer-longread"
              and result.get("input_utf8_sha256") == ORIGINAL_INPUT_UTF8_SHA256
              and result.get("actual_rate") == 80 and result.get("actual_rate_multiplier") == 1
              and result.get("driver_error") is None
@@ -364,6 +376,7 @@ def judge_trial(result, correlation, tail, overlay):
              and result.get("research_identity", {}).get("loaded_driver_sha256") == overlay["candidate_source_sha256"]
              and result.get("research_identity", {}).get("profile") == "adam"
              and result.get("research_identity", {}).get("pending_count") == overlay["pending_count"]
+             and result.get("research_identity", {}).get("experiment") == overlay.get("experiment")
              and result.get("pre_read_quiescence", {}).get("passed") is True
              and audit.get("input_word_count") == 100 and audit.get("input_lexical_piece_count") == 102
              and audit.get("lexical_content_preserved_in_order") is True
@@ -379,9 +392,11 @@ def judge_trial(result, correlation, tail, overlay):
 
 
 def run_trial(args, output_device, instance, count, index, base):
+    experiment=getattr(args,"experiment",DEFAULT_EXPERIMENT)
+    if count not in declared_counts(experiment):raise ValueError("Count does not belong to the explicit experiment")
     run = args.output / ("nvda-" + uuid.uuid4().hex)
     run.mkdir()
-    report = {"ordinal": index, "pending_count": count, "status": "failed",
+    report = {"ordinal": index, "pending_count": count, "experiment":experiment,"status": "failed",
               "source_commit": SOURCE_COMMIT, "archive_sha256": ARCHIVE_SHA,
               "product_ready": False, "physical_audio_verified": False,
               "acoustic_latency_verified": False, "native_pronunciation_verified": False}
@@ -389,7 +404,7 @@ def run_trial(args, output_device, instance, count, index, base):
     job = None
     try:
         image, config = short.create_portable(base, run, args.addon, output_device)
-        overlay = install_owned_overlay(run, source_sha256=DRIVER_SHA, pending_count=count)
+        overlay = install_owned_overlay(run, source_sha256=DRIVER_SHA, pending_count=count,experiment=experiment)
         report["overlay"] = overlay
         driver = config / "addons/kx47Voices/synthDrivers/kx47Preview.py"
         image_sha = short.digest(image)
@@ -403,7 +418,7 @@ def run_trial(args, output_device, instance, count, index, base):
                     "source_probe_sha256": capture.PLAIN_PROBE_SHA, "source_helpers_sha256": PURE_SHA,
                     "source_commit": SOURCE_COMMIT, "archive_sha256": ARCHIVE_SHA,
                     "driver_path": str(driver), "driver_sha256": overlay["candidate_source_sha256"],
-                    "pending_count": count}
+                    "pending_count": count,"experiment":experiment}
         (plugins / "dordiaiCaptureProbe.py").write_text(plugin_source(settings), encoding="utf8")
         with (run / "nvda-console.log").open("wb") as console:
             job = OwnedProcessJob()
@@ -467,12 +482,14 @@ def run_trial(args, output_device, instance, count, index, base):
     return report
 
 
-def summarize(trials):
+def summarize(trials,experiment=DEFAULT_EXPERIMENT):
     """Keep every failed gate and compare the two repetitions of each count."""
-    order_valid = tuple(r.get("pending_count") for r in trials) == ORDER
+    order=experiment_order(experiment)
+    order_valid = tuple(r.get("pending_count") for r in trials) == order and all(
+        r.get("experiment",DEFAULT_EXPERIMENT)==experiment for r in trials)
     complete = order_valid and all(r.get("status") == "completed-research-trial" for r in trials)
     groups = {}
-    for count in (12, 24, 32):
+    for count in declared_counts(experiment):
         group = [r for r in trials if r.get("pending_count") == count]
         groups[str(count)] = {
             "trials": len(group),
@@ -481,7 +498,7 @@ def summarize(trials):
             "ncc": [r.get("correlation", {}).get("normalized_correlation") for r in group],
             "cancel_status": [r.get("judgment", {}).get("clock_and_cancel_status", "open") for r in group],
         }
-    return {"declared_order": list(ORDER), "order_verified": order_valid, "six_trials_completed": complete,
+    return {"experiment":experiment,"declared_order": list(order), "order_verified": order_valid, "six_trials_completed": complete,
             "counts": groups, "automatic_runtime_change_performed": False, "production_fix_accepted": False,
             "product_ready": False, "physical_audio_verified": False, "acoustic_latency_verified": False}
 
@@ -489,7 +506,10 @@ def summarize(trials):
 def run(args):
     import windows_virtual_audio_trial as device
     import process_loopback_guard as guard
-    report = {"format": "dordiai-source13-six-owned-prefetch-trials", "format_version": 1,
+    experiment=getattr(args,"experiment",DEFAULT_EXPERIMENT)
+    order=experiment_order(experiment)
+    report = {"format": "dordiai-source13-six-owned-prefetch-trials", "format_version": 1,"experiment":experiment,
+              "declared_order":list(order),
               "status": "failed", "trials": [], "physical_audio_verified": False,
               "acoustic_latency_verified": False, "native_pronunciation_verified": False, "product_ready": False}
     created = False
@@ -522,7 +542,7 @@ def run(args):
                 raise RuntimeError("Owned endpoint identity description failed")
             endpoint = json.loads(described.stdout)["selected_endpoint"]
             report["selected_endpoint"] = endpoint
-            for index, count in enumerate(ORDER, 1):
+            for index, count in enumerate(order, 1):
                 trial = run_trial(args, endpoint["id"], report["owned_instance_id"], count, index, base)
                 report["trials"].append(trial)
                 short.publish(args.output / ("completed-trial-%02d.json" % index), trial)
@@ -530,14 +550,14 @@ def run(args):
                         or not trial.get("owned_worker_tree_reaped")
                         or "cleanup_error" in trial):
                     raise RuntimeError("Owned cleanup failed; next trial must not start")
-            report["summary"] = summarize(report["trials"])
+            report["summary"] = summarize(report["trials"],experiment)
             report["status"] = "six-research-trials-completed" if report["summary"]["six_trials_completed"] else "six-trials-retained-with-failures"
         if short.digest(args.addon) != ARCHIVE_SHA:
             raise ValueError("Immutable source13 archive changed during trials")
     except Exception as error:
         report.update(status="failed", error=type(error).__name__ + ": " + str(error))
     finally:
-        report["summary"] = summarize(report["trials"])
+        report["summary"] = summarize(report["trials"],experiment)
         cleanup = report.get("cleanup", {})
         if cleanup.get("attempted") and (cleanup.get("removed") is not True or cleanup.get("absence_verified") is not True):
             report.update(status="failed", error="Exact own endpoint absence was not verified")
@@ -554,6 +574,7 @@ def main(argv=None):
                  "marker-helper", "marker-build-receipt"):
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--ephemeral-ci", action="store_true")
+    parser.add_argument("--experiment",choices=(DEFAULT_EXPERIMENT,EXTENDED_EXPERIMENT),default=DEFAULT_EXPERIMENT)
     return run(parser.parse_args(argv))
 
 

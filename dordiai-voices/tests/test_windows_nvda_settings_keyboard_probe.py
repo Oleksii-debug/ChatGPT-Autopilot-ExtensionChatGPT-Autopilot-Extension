@@ -110,6 +110,25 @@ class SourceContracts(unittest.TestCase):
 
 
 class ReceiptTests(unittest.TestCase):
+    def test_signed_wxmsw_automatic_menu_id_matches_exact_observed_target(self):
+        r=receipt('resume')
+        for event in r['probe']['keyboard_settings']['events']:
+            for key in ('menu_item_id','observed_menu_item_id'):
+                if key in event:event[key]=-31958
+        self.assertEqual(m.validate_phase(r,'resume',{'archive_sha256':'a'*64})['phase'],'resume')
+        next(e for e in r['probe']['keyboard_settings']['events']
+             if e['name']=='native_menu_highlight')['menu_item_id']=-31959
+        with self.assertRaises(ValueError):m.validate_phase(r,'resume',{'archive_sha256':'a'*64})
+
+    def test_wx_menu_sentinels_bool_and_out_of_range_ids_cannot_prove_target(self):
+        for ident in (-3,-2,-1,True,2**31,-2**31-1):
+            r=receipt('resume')
+            for event in r['probe']['keyboard_settings']['events']:
+                for key in ('menu_item_id','observed_menu_item_id'):
+                    if key in event:event[key]=ident
+            with self.subTest(ident=ident),self.assertRaises(ValueError):
+                m.validate_phase(r,'resume',{'archive_sha256':'a'*64})
+
     def test_both_metadata_fixtures_pass_without_actual_model_claim(self):
         for phase in ['edit','resume']:
             row=m.validate_phase(receipt(phase),phase,{'archive_sha256':'a'*64})

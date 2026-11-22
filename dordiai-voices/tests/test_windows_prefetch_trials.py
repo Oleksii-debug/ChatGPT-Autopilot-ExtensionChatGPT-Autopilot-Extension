@@ -21,6 +21,19 @@ class PrefetchTrialTests(unittest.TestCase):
     def test_frozen_order(self):
         self.assertEqual(trial.ORDER,(12,24,32,32,24,12))
 
+    def test_extended_order_is_separate_and_baseline_stays_default(self):
+        self.assertEqual(trial.experiment_order(prefetch_research.DEFAULT_EXPERIMENT),trial.ORDER)
+        self.assertEqual(trial.experiment_order(prefetch_research.EXTENDED_EXPERIMENT),(32,64,128,128,64,32))
+        with self.assertRaises(ValueError):trial.experiment_order('unknown')
+        arguments=[]
+        for name in ('package','validation','output','addon','helper','helper-build-receipt','marker-helper','marker-build-receipt'):
+            arguments+=['--'+name,'unused']
+        with patch.object(trial,'run',return_value=0) as run:
+            self.assertEqual(trial.main(arguments),0)
+            self.assertEqual(run.call_args.args[0].experiment,prefetch_research.DEFAULT_EXPERIMENT)
+            self.assertEqual(trial.main(arguments+['--experiment',prefetch_research.EXTENDED_EXPERIMENT]),0)
+            self.assertEqual(run.call_args.args[0].experiment,prefetch_research.EXTENDED_EXPERIMENT)
+
     def test_source13_pin_matches_durable_receipt(self):
         pin=json.loads((ROOT/"tools/data/source13_build_pin.json").read_bytes())
         self.assertEqual(pin["archive_sha256"],trial.ARCHIVE_SHA)
@@ -163,6 +176,26 @@ class PrefetchTrialTests(unittest.TestCase):
         self.assertEqual(out["counts"]["24"]["strict_transport_passes"],2)
         self.assertEqual(out["counts"]["24"]["independent_all_gate_passes"],0)
 
+    def test_extended_rows_cannot_be_relabelled_as_baseline_or_mixed(self):
+        mode=prefetch_research.EXTENDED_EXPERIMENT
+        rows=[dict(pending_count=n,experiment=mode,status='completed-research-trial') for n in trial.EXTENDED_ORDER]
+        out=trial.summarize(rows,mode)
+        self.assertTrue(out['six_trials_completed']);self.assertEqual(set(out['counts']),{'32','64','128'})
+        self.assertFalse(out['production_fix_accepted'])
+        self.assertFalse(trial.summarize(rows)['six_trials_completed'])
+        rows[0]['experiment']=prefetch_research.DEFAULT_EXPERIMENT
+        self.assertFalse(trial.summarize(rows,mode)['six_trials_completed'])
+
+    def test_overlay_and_loaded_experiment_identity_must_match(self):
+        r,c,t,o=self.passing();o['experiment']=prefetch_research.EXTENDED_EXPERIMENT
+        o['pending_count']=32;r['research_identity']['pending_count']=32
+        r['research_identity']['experiment']=prefetch_research.DEFAULT_EXPERIMENT
+        self.assertFalse(trial.judge_trial(r,c,t,o)['structural_workload_and_identity_verified'])
+        r['research_identity']['experiment']=o['experiment']
+        self.assertTrue(trial.judge_trial(r,c,t,o)['structural_workload_and_identity_verified'])
+        o['pending_count']=12;r['research_identity']['pending_count']=12
+        self.assertFalse(trial.judge_trial(r,c,t,o)['structural_workload_and_identity_verified'])
+
     def test_reordered_or_failed_trial_cannot_be_complete(self):
         rows=[dict(pending_count=n,status="completed-research-trial") for n in trial.ORDER]
         rows[0]["pending_count"]=32
@@ -216,6 +249,10 @@ class PrefetchTrialTests(unittest.TestCase):
         self.assertNotIn("--addon-sha256 908a9825",source)
         self.assertNotIn("pull_request_target:",source)
         self.assertIn("PYTHONUTF8: '1'",source)
+        self.assertIn("default: baseline-12-24-32",source)
+        self.assertIn("[source13-prefetch-extended]",source)
+        self.assertIn("--experiment $env:DORDIAI_PREFETCH_EXPERIMENT",source)
+        self.assertIn("DORDIAI_PREFETCH_VARIANT",source)
 
     def test_workflow_stages_early_failure_without_helper_or_trial(self):
         source=(ROOT.parent/".github/workflows/dordiai-source13-prefetch.yml").read_text("utf8")
@@ -227,17 +264,20 @@ class PrefetchTrialTests(unittest.TestCase):
             if line and not line.startswith("          "):
                 break
             block.append(line[10:] if line else "")
-        with tempfile.TemporaryDirectory() as d:
-            environment={"RUNNER_TEMP":d,"GITHUB_RUN_ID":"1234","GITHUB_SHA":"a"*40}
-            with patch.dict(os.environ,environment,clear=True):
-                exec(compile("\n".join(block),"<failed-prebuild-stage>","exec"),{})
-            path=Path(d)/"dordiai-source13-prefetch-evidence-1234/evidence-index.json"
-            receipt=json.loads(path.read_text("utf8"))
-            self.assertTrue(receipt["early_failure_without_trials"])
-            self.assertFalse(receipt["helper_root_created"])
-            self.assertFalse(receipt["controller_report_present"])
-            self.assertFalse(receipt["product_ready"])
-            self.assertEqual(receipt["owned_trial_directories"],0)
+        for variant,experiment in (('',prefetch_research.DEFAULT_EXPERIMENT),('-extended',prefetch_research.EXTENDED_EXPERIMENT)):
+            with tempfile.TemporaryDirectory() as d:
+                environment={"RUNNER_TEMP":d,"GITHUB_RUN_ID":"1234","GITHUB_SHA":"a"*40,
+                             "DORDIAI_PREFETCH_VARIANT":variant,"DORDIAI_PREFETCH_EXPERIMENT":experiment}
+                with patch.dict(os.environ,environment,clear=True):
+                    exec(compile("\n".join(block),"<failed-prebuild-stage>","exec"),{})
+                path=Path(d)/('dordiai-source13-prefetch-evidence'+variant+'-1234/evidence-index.json')
+                receipt=json.loads(path.read_text("utf8"))
+                self.assertEqual(receipt['experiment'],experiment)
+                self.assertTrue(receipt["early_failure_without_trials"])
+                self.assertFalse(receipt["helper_root_created"])
+                self.assertFalse(receipt["controller_report_present"])
+                self.assertFalse(receipt["product_ready"])
+                self.assertEqual(receipt["owned_trial_directories"],0)
 
     def test_workflow_python_blocks_compile(self):
         source=(ROOT.parent/".github/workflows/dordiai-source13-prefetch.yml").read_text("utf8")

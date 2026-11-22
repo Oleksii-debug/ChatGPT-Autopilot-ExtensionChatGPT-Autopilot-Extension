@@ -1,0 +1,74 @@
+{
+  "format": "dordiai-six-prefetch-actual-result",
+  "run": 45061544904,
+  "job": 137328354835,
+  "source_commit": "bd4fbbe7f0621955d2da0b166dc72b06e828aa01",
+  "actual_trials": 6,
+  "summary": {
+    "acoustic_latency_verified": false,
+    "automatic_runtime_change_performed": false,
+    "counts": {
+      "12": {
+        "cancel_status": [
+          "open",
+          "open"
+        ],
+        "independent_all_gate_passes": 0,
+        "ncc": [
+          0.2247147362608356,
+          0.11787805926662402
+        ],
+        "strict_transport_passes": 0,
+        "trials": 2
+      },
+      "24": {
+        "cancel_status": [
+          "open",
+          "open"
+        ],
+        "independent_all_gate_passes": 0,
+        "ncc": [
+          0.9999465019914493,
+          0.8705367002791231
+        ],
+        "strict_transport_passes": 0,
+        "trials": 2
+      },
+      "32": {
+        "cancel_status": [
+          "open",
+          "open"
+        ],
+        "independent_all_gate_passes": 0,
+        "ncc": [
+          0.7159614407665978,
+          0.9999465043965108
+        ],
+        "strict_transport_passes": 0,
+        "trials": 2
+      }
+    },
+    "declared_order": [
+      12,
+      24,
+      32,
+      32,
+      24,
+      12
+    ],
+    "order_verified": true,
+    "physical_audio_verified": false,
+    "product_ready": false,
+    "production_fix_accepted": false,
+    "six_trials_completed": true
+  },
+  "full_exact_report": "evidence\\source13_prefetch_actual_45061544904.json.gz.b64",
+  "report_sha256": "44f170cb32cfb57c114905b3af10c9f37728b684a7cf2cfbf92dfed6b52d86a8",
+  "raw_artifact_id": 14770561254,
+  "raw_artifact_bytes": 30299443,
+  "raw_artifact_sha256": "a9005dbf902ca92402044d8b4754c0ab32da863208a075c9baa68d1d09808258",
+  "raw_artifact_expires": "2026-12-22",
+  "raw_artifact_local_copy": "downloads/source13-prefetch-45061544904.zip",
+  "interpretation": "Two of six complete PCM windows matched at NCC .9999465. Larger queues were inconsistent; packet device positions were all zero, so strict transport/clock/cancel gates remain open or failed. No production optimization accepted. NCC is not a pronunciation or lost-word score.",
+  "product_ready": false
+}

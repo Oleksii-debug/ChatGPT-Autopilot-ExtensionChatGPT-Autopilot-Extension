@@ -1,0 +1,3006 @@
+{
+  "format": "dordiai-source13-prefetch-raw-six-analysis",
+  "date": "2026-11-22",
+  "run_id": 45061544904,
+  "artifact_id": 14770561254,
+  "artifact_bytes": 30299443,
+  "artifact_sha256": "a9005dbf902ca92402044d8b4754c0ab32da863208a075c9baa68d1d09808258",
+  "original_order": [
+    12,
+    24,
+    32,
+    32,
+    24,
+    12
+  ],
+  "rows": [
+    {
+      "ordinal": 1,
+      "pending_count": 12,
+      "folder": "nvda-6014bebeb992453b88f42c20238ab625",
+      "status": "completed-research-trial",
+      "judgment": {
+        "acoustic_latency_verified": false,
+        "all_independent_gates_passed": false,
+        "clock_and_cancel_status": "open",
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "strict_full_transport_verified": false,
+        "structural_workload_and_identity_verified": true
+      },
+      "ncc": 0.2247147362608356,
+      "anchors_stable": false,
+      "active_drop_windows_reported": 100,
+      "active_drop_count_scope": "Analyzer retains at most100 windows; not an exact total of independent audible gaps",
+      "reference_frames": 1405366,
+      "reference_sha256": "0e01b01b078db7b2e61d589359ff294bad73161a383ed562e602d177568a57c5",
+      "sample_rate": 24000,
+      "route_audit": {
+        "hyphenated_source_forms": [
+          "небесно-голубому",
+          "синевато-сером"
+        ],
+        "input_lexical_piece_count": 102,
+        "input_word_count": 100,
+        "input_words_preserved_in_order": true,
+        "lexical_content_preserved_in_order": true,
+        "mismatches": [],
+        "observed_lexical_piece_count": 102,
+        "observed_word_count": 102,
+        "observed_word_routes": [
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          },
+          {
+            "language": "ru",
+            "word": "аминбаевны"
+          },
+          {
+            "language": "ru",
+            "word": "курятинами"
+          },
+          {
+            "language": "uk",
+            "word": "витівкових"
+          },
+          {
+            "language": "ru",
+            "word": "прорубишься"
+          },
+          {
+            "language": "ru",
+            "word": "непальцем"
+          },
+          {
+            "language": "uk",
+            "word": "мегакрутими"
+          },
+          {
+            "language": "ru",
+            "word": "ковыляниями"
+          },
+          {
+            "language": "ru",
+            "word": "списались"
+          },
+          {
+            "language": "uk",
+            "word": "утеплювавсь"
+          },
+          {
+            "language": "ru",
+            "word": "припоминаньи"
+          },
+          {
+            "language": "ru",
+            "word": "переволочило"
+          },
+          {
+            "language": "uk",
+            "word": "рушникосушки"
+          },
+          {
+            "language": "ru",
+            "word": "оплёвывающуюся"
+          },
+          {
+            "language": "ru",
+            "word": "антитеатру"
+          },
+          {
+            "language": "uk",
+            "word": "яснесенькою"
+          },
+          {
+            "language": "ru",
+            "word": "ильменским"
+          },
+          {
+            "language": "ru",
+            "word": "небесно"
+          },
+          {
+            "language": "ru",
+            "word": "голубому"
+          },
+          {
+            "language": "uk",
+            "word": "вигибатимеш"
+          },
+          {
+            "language": "ru",
+            "word": "донецки"
+          },
+          {
+            "language": "ru",
+            "word": "нордах"
+          },
+          {
+            "language": "uk",
+            "word": "висловлень"
+          },
+          {
+            "language": "ru",
+            "word": "пожалевши"
+          },
+          {
+            "language": "ru",
+            "word": "затекли"
+          },
+          {
+            "language": "uk",
+            "word": "малопривабливій"
+          },
+          {
+            "language": "ru",
+            "word": "простерёгшего"
+          },
+          {
+            "language": "ru",
+            "word": "спохватитесь"
+          },
+          {
+            "language": "uk",
+            "word": "детектуй"
+          },
+          {
+            "language": "ru",
+            "word": "воспринимала"
+          },
+          {
+            "language": "ru",
+            "word": "кольчуги"
+          },
+          {
+            "language": "uk",
+            "word": "погамував"
+          },
+          {
+            "language": "ru",
+            "word": "зарумянивших"
+          },
+          {
+            "language": "ru",
+            "word": "скверна"
+          },
+          {
+            "language": "uk",
+            "word": "зализуватимусь"
+          },
+          {
+            "language": "ru",
+            "word": "лилиянн"
+          },
+          {
+            "language": "ru",
+            "word": "шапочками"
+          },
+          {
+            "language": "uk",
+            "word": "проголених"
+          },
+          {
+            "language": "ru",
+            "word": "картофелесортировальных"
+          },
+          {
+            "language": "ru",
+            "word": "питого"
+          },
+          {
+            "language": "uk",
+            "word": "попідливано"
+          },
+          {
+            "language": "ru",
+            "word": "низлагаемы"
+          },
+          {
+            "language": "ru",
+            "word": "зашушукайтесь"
+          },
+          {
+            "language": "uk",
+            "word": "найпискливіш"
+          },
+          {
+            "language": "ru",
+            "word": "питиримах"
+          },
+          {
+            "language": "ru",
+            "word": "камуфляже"
+          },
+          {
+            "language": "uk",
+            "word": "розплішіться"
+          },
+          {
+            "language": "ru",
+            "word": "безмельницыны"
+          },
+          {
+            "language": "ru",
+            "word": "уколупнули"
+          },
+          {
+            "language": "uk",
+            "word": "оберстдорфові"
+          },
+          {
+            "language": "ru",
+            "word": "иносказательно"
+          },
+          {
+            "language": "ru",
+            "word": "полонянка"
+          },
+          {
+            "language": "uk",
+            "word": "без'ядерності"
+          },
+          {
+            "language": "ru",
+            "word": "петрунелями"
+          },
+          {
+            "language": "ru",
+            "word": "тумаком"
+          },
+          {
+            "language": "uk",
+            "word": "озимій"
+          },
+          {
+            "language": "ru",
+            "word": "синевато"
+          },
+          {
+            "language": "ru",
+            "word": "сером"
+          },
+          {
+            "language": "ru",
+            "word": "контрпропагандою"
+          },
+          {
+            "language": "uk",
+            "word": "променітимем"
+          },
+          {
+            "language": "ru",
+            "word": "посахаренную"
+          },
+          {
+            "language": "ru",
+            "word": "маликам"
+          },
+          {
+            "language": "uk",
+            "word": "дідуню"
+          },
+          {
+            "language": "ru",
+            "word": "истолковываемое"
+          },
+          {
+            "language": "ru",
+            "word": "червоточиною"
+          },
+          {
+            "language": "uk",
+            "word": "плагіоклазі"
+          },
+          {
+            "language": "ru",
+            "word": "тяготимому"
+          },
+          {
+            "language": "ru",
+            "word": "тугрику"
+          },
+          {
+            "language": "uk",
+            "word": "бережечками"
+          },
+          {
+            "language": "ru",
+            "word": "отсасываемых"
+          },
+          {
+            "language": "ru",
+            "word": "дискомфортах"
+          },
+          {
+            "language": "uk",
+            "word": "драйвували"
+          },
+          {
+            "language": "ru",
+            "word": "саживаешь"
+          },
+          {
+            "language": "ru",
+            "word": "конденсорами"
+          },
+          {
+            "language": "uk",
+            "word": "кріогідратів"
+          },
+          {
+            "language": "ru",
+            "word": "поточенной"
+          },
+          {
+            "language": "ru",
+            "word": "секуляризуй"
+          },
+          {
+            "language": "uk",
+            "word": "діагенезом"
+          },
+          {
+            "language": "ru",
+            "word": "зашлифовывала"
+          },
+          {
+            "language": "ru",
+            "word": "поморочило"
+          },
+          {
+            "language": "uk",
+            "word": "одкочено"
+          },
+          {
+            "language": "ru",
+            "word": "кудесниками"
+          },
+          {
+            "language": "ru",
+            "word": "блефуй"
+          },
+          {
+            "language": "uk",
+            "word": "незім'яте"
+          },
+          {
+            "language": "ru",
+            "word": "взаимопроникающего"
+          },
+          {
+            "language": "ru",
+            "word": "скрипни"
+          },
+          {
+            "language": "ru",
+            "word": "плющена"
+          },
+          {
+            "language": "ru",
+            "word": "термосифонною"
+          },
+          {
+            "language": "ru",
+            "word": "обагритесь"
+          },
+          {
+            "language": "ru",
+            "word": "лонам"
+          },
+          {
+            "language": "ru",
+            "word": "черпав"
+          },
+          {
+            "language": "ru",
+            "word": "неоген"
+          },
+          {
+            "language": "ru",
+            "word": "перешитому"
+          },
+          {
+            "language": "ru",
+            "word": "фталазолом"
+          },
+          {
+            "language": "ru",
+            "word": "латникам"
+          },
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          }
+        ],
+        "raw_nonwhitespace_text_preserved": true,
+        "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+        "routing_passed": true,
+        "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+      },
+      "planned_routes": 61,
+      "feed_events": 5993,
+      "first_feed_after_public_read_ms": 3152.6181,
+      "between_feed_calls_ms": {
+        "p95": 0.09447999999999993,
+        "p99": 136.35410300000015,
+        "maximum": 324.0024,
+        "over20": 166,
+        "over100": 91,
+        "largest_intervals": [
+          {
+            "after_feed_ms": 324.0024,
+            "reference_frame": 196571
+          },
+          {
+            "after_feed_ms": 322.0468,
+            "reference_frame": 542548
+          },
+          {
+            "after_feed_ms": 316.1371,
+            "reference_frame": 191683
+          },
+          {
+            "after_feed_ms": 250.3967,
+            "reference_frame": 1207068
+          },
+          {
+            "after_feed_ms": 246.4482,
+            "reference_frame": 494755
+          }
+        ]
+      },
+      "inside_waveplayer_feed_ms": {
+        "p95": 16.39894,
+        "p99": 18.564344000000002,
+        "maximum": 21.3543
+      },
+      "native_packets": 8998,
+      "device_position_values": [
+        0
+      ],
+      "strict_clock_continuous": false,
+      "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+      "whole_workload_warmup": false
+    },
+    {
+      "ordinal": 2,
+      "pending_count": 24,
+      "folder": "nvda-ca474f586d9846738e210fa03f76d622",
+      "status": "completed-research-trial",
+      "judgment": {
+        "acoustic_latency_verified": false,
+        "all_independent_gates_passed": false,
+        "clock_and_cancel_status": "open",
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "strict_full_transport_verified": false,
+        "structural_workload_and_identity_verified": true
+      },
+      "ncc": 0.9999465019914493,
+      "anchors_stable": true,
+      "active_drop_windows_reported": 0,
+      "active_drop_count_scope": "Analyzer retains at most100 windows; not an exact total of independent audible gaps",
+      "reference_frames": 1405017,
+      "reference_sha256": "4a8cd732bcb7c8b5c51ed4751529843c441f594b20e4c12ae17adc40a22ffd53",
+      "sample_rate": 24000,
+      "route_audit": {
+        "hyphenated_source_forms": [
+          "небесно-голубому",
+          "синевато-сером"
+        ],
+        "input_lexical_piece_count": 102,
+        "input_word_count": 100,
+        "input_words_preserved_in_order": true,
+        "lexical_content_preserved_in_order": true,
+        "mismatches": [],
+        "observed_lexical_piece_count": 102,
+        "observed_word_count": 102,
+        "observed_word_routes": [
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          },
+          {
+            "language": "ru",
+            "word": "аминбаевны"
+          },
+          {
+            "language": "ru",
+            "word": "курятинами"
+          },
+          {
+            "language": "uk",
+            "word": "витівкових"
+          },
+          {
+            "language": "ru",
+            "word": "прорубишься"
+          },
+          {
+            "language": "ru",
+            "word": "непальцем"
+          },
+          {
+            "language": "uk",
+            "word": "мегакрутими"
+          },
+          {
+            "language": "ru",
+            "word": "ковыляниями"
+          },
+          {
+            "language": "ru",
+            "word": "списались"
+          },
+          {
+            "language": "uk",
+            "word": "утеплювавсь"
+          },
+          {
+            "language": "ru",
+            "word": "припоминаньи"
+          },
+          {
+            "language": "ru",
+            "word": "переволочило"
+          },
+          {
+            "language": "uk",
+            "word": "рушникосушки"
+          },
+          {
+            "language": "ru",
+            "word": "оплёвывающуюся"
+          },
+          {
+            "language": "ru",
+            "word": "антитеатру"
+          },
+          {
+            "language": "uk",
+            "word": "яснесенькою"
+          },
+          {
+            "language": "ru",
+            "word": "ильменским"
+          },
+          {
+            "language": "ru",
+            "word": "небесно"
+          },
+          {
+            "language": "ru",
+            "word": "голубому"
+          },
+          {
+            "language": "uk",
+            "word": "вигибатимеш"
+          },
+          {
+            "language": "ru",
+            "word": "донецки"
+          },
+          {
+            "language": "ru",
+            "word": "нордах"
+          },
+          {
+            "language": "uk",
+            "word": "висловлень"
+          },
+          {
+            "language": "ru",
+            "word": "пожалевши"
+          },
+          {
+            "language": "ru",
+            "word": "затекли"
+          },
+          {
+            "language": "uk",
+            "word": "малопривабливій"
+          },
+          {
+            "language": "ru",
+            "word": "простерёгшего"
+          },
+          {
+            "language": "ru",
+            "word": "спохватитесь"
+          },
+          {
+            "language": "uk",
+            "word": "детектуй"
+          },
+          {
+            "language": "ru",
+            "word": "воспринимала"
+          },
+          {
+            "language": "ru",
+            "word": "кольчуги"
+          },
+          {
+            "language": "uk",
+            "word": "погамував"
+          },
+          {
+            "language": "ru",
+            "word": "зарумянивших"
+          },
+          {
+            "language": "ru",
+            "word": "скверна"
+          },
+          {
+            "language": "uk",
+            "word": "зализуватимусь"
+          },
+          {
+            "language": "ru",
+            "word": "лилиянн"
+          },
+          {
+            "language": "ru",
+            "word": "шапочками"
+          },
+          {
+            "language": "uk",
+            "word": "проголених"
+          },
+          {
+            "language": "ru",
+            "word": "картофелесортировальных"
+          },
+          {
+            "language": "ru",
+            "word": "питого"
+          },
+          {
+            "language": "uk",
+            "word": "попідливано"
+          },
+          {
+            "language": "ru",
+            "word": "низлагаемы"
+          },
+          {
+            "language": "ru",
+            "word": "зашушукайтесь"
+          },
+          {
+            "language": "uk",
+            "word": "найпискливіш"
+          },
+          {
+            "language": "ru",
+            "word": "питиримах"
+          },
+          {
+            "language": "ru",
+            "word": "камуфляже"
+          },
+          {
+            "language": "uk",
+            "word": "розплішіться"
+          },
+          {
+            "language": "ru",
+            "word": "безмельницыны"
+          },
+          {
+            "language": "ru",
+            "word": "уколупнули"
+          },
+          {
+            "language": "uk",
+            "word": "оберстдорфові"
+          },
+          {
+            "language": "ru",
+            "word": "иносказательно"
+          },
+          {
+            "language": "ru",
+            "word": "полонянка"
+          },
+          {
+            "language": "uk",
+            "word": "без'ядерності"
+          },
+          {
+            "language": "ru",
+            "word": "петрунелями"
+          },
+          {
+            "language": "ru",
+            "word": "тумаком"
+          },
+          {
+            "language": "uk",
+            "word": "озимій"
+          },
+          {
+            "language": "ru",
+            "word": "синевато"
+          },
+          {
+            "language": "ru",
+            "word": "сером"
+          },
+          {
+            "language": "ru",
+            "word": "контрпропагандою"
+          },
+          {
+            "language": "uk",
+            "word": "променітимем"
+          },
+          {
+            "language": "ru",
+            "word": "посахаренную"
+          },
+          {
+            "language": "ru",
+            "word": "маликам"
+          },
+          {
+            "language": "uk",
+            "word": "дідуню"
+          },
+          {
+            "language": "ru",
+            "word": "истолковываемое"
+          },
+          {
+            "language": "ru",
+            "word": "червоточиною"
+          },
+          {
+            "language": "uk",
+            "word": "плагіоклазі"
+          },
+          {
+            "language": "ru",
+            "word": "тяготимому"
+          },
+          {
+            "language": "ru",
+            "word": "тугрику"
+          },
+          {
+            "language": "uk",
+            "word": "бережечками"
+          },
+          {
+            "language": "ru",
+            "word": "отсасываемых"
+          },
+          {
+            "language": "ru",
+            "word": "дискомфортах"
+          },
+          {
+            "language": "uk",
+            "word": "драйвували"
+          },
+          {
+            "language": "ru",
+            "word": "саживаешь"
+          },
+          {
+            "language": "ru",
+            "word": "конденсорами"
+          },
+          {
+            "language": "uk",
+            "word": "кріогідратів"
+          },
+          {
+            "language": "ru",
+            "word": "поточенной"
+          },
+          {
+            "language": "ru",
+            "word": "секуляризуй"
+          },
+          {
+            "language": "uk",
+            "word": "діагенезом"
+          },
+          {
+            "language": "ru",
+            "word": "зашлифовывала"
+          },
+          {
+            "language": "ru",
+            "word": "поморочило"
+          },
+          {
+            "language": "uk",
+            "word": "одкочено"
+          },
+          {
+            "language": "ru",
+            "word": "кудесниками"
+          },
+          {
+            "language": "ru",
+            "word": "блефуй"
+          },
+          {
+            "language": "uk",
+            "word": "незім'яте"
+          },
+          {
+            "language": "ru",
+            "word": "взаимопроникающего"
+          },
+          {
+            "language": "ru",
+            "word": "скрипни"
+          },
+          {
+            "language": "ru",
+            "word": "плющена"
+          },
+          {
+            "language": "ru",
+            "word": "термосифонною"
+          },
+          {
+            "language": "ru",
+            "word": "обагритесь"
+          },
+          {
+            "language": "ru",
+            "word": "лонам"
+          },
+          {
+            "language": "ru",
+            "word": "черпав"
+          },
+          {
+            "language": "ru",
+            "word": "неоген"
+          },
+          {
+            "language": "ru",
+            "word": "перешитому"
+          },
+          {
+            "language": "ru",
+            "word": "фталазолом"
+          },
+          {
+            "language": "ru",
+            "word": "латникам"
+          },
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          }
+        ],
+        "raw_nonwhitespace_text_preserved": true,
+        "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+        "routing_passed": true,
+        "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+      },
+      "planned_routes": 61,
+      "feed_events": 5985,
+      "first_feed_after_public_read_ms": 3156.2127,
+      "between_feed_calls_ms": {
+        "p95": 0.0657,
+        "p99": 4.106199000000028,
+        "maximum": 157.2939,
+        "over20": 53,
+        "over100": 6,
+        "largest_intervals": [
+          {
+            "after_feed_ms": 157.2939,
+            "reference_frame": 16148
+          },
+          {
+            "after_feed_ms": 129.7698,
+            "reference_frame": 104959
+          },
+          {
+            "after_feed_ms": 129.3448,
+            "reference_frame": 1244689
+          },
+          {
+            "after_feed_ms": 121.9729,
+            "reference_frame": 1249149
+          },
+          {
+            "after_feed_ms": 103.9418,
+            "reference_frame": 20817
+          }
+        ]
+      },
+      "inside_waveplayer_feed_ms": {
+        "p95": 16.95302,
+        "p99": 18.70745599999999,
+        "maximum": 22.746
+      },
+      "native_packets": 8998,
+      "device_position_values": [
+        0
+      ],
+      "strict_clock_continuous": false,
+      "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+      "whole_workload_warmup": false
+    },
+    {
+      "ordinal": 3,
+      "pending_count": 32,
+      "folder": "nvda-f9677a76a1594463b0ae125133aafe1f",
+      "status": "completed-research-trial",
+      "judgment": {
+        "acoustic_latency_verified": false,
+        "all_independent_gates_passed": false,
+        "clock_and_cancel_status": "open",
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "strict_full_transport_verified": false,
+        "structural_workload_and_identity_verified": true
+      },
+      "ncc": 0.7159614407665978,
+      "anchors_stable": false,
+      "active_drop_windows_reported": 100,
+      "active_drop_count_scope": "Analyzer retains at most100 windows; not an exact total of independent audible gaps",
+      "reference_frames": 1405372,
+      "reference_sha256": "afbf431fd0ef8d044f5ba6f1da80181e5964853aa4b1099302d60753340fae3e",
+      "sample_rate": 24000,
+      "route_audit": {
+        "hyphenated_source_forms": [
+          "небесно-голубому",
+          "синевато-сером"
+        ],
+        "input_lexical_piece_count": 102,
+        "input_word_count": 100,
+        "input_words_preserved_in_order": true,
+        "lexical_content_preserved_in_order": true,
+        "mismatches": [],
+        "observed_lexical_piece_count": 102,
+        "observed_word_count": 102,
+        "observed_word_routes": [
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          },
+          {
+            "language": "ru",
+            "word": "аминбаевны"
+          },
+          {
+            "language": "ru",
+            "word": "курятинами"
+          },
+          {
+            "language": "uk",
+            "word": "витівкових"
+          },
+          {
+            "language": "ru",
+            "word": "прорубишься"
+          },
+          {
+            "language": "ru",
+            "word": "непальцем"
+          },
+          {
+            "language": "uk",
+            "word": "мегакрутими"
+          },
+          {
+            "language": "ru",
+            "word": "ковыляниями"
+          },
+          {
+            "language": "ru",
+            "word": "списались"
+          },
+          {
+            "language": "uk",
+            "word": "утеплювавсь"
+          },
+          {
+            "language": "ru",
+            "word": "припоминаньи"
+          },
+          {
+            "language": "ru",
+            "word": "переволочило"
+          },
+          {
+            "language": "uk",
+            "word": "рушникосушки"
+          },
+          {
+            "language": "ru",
+            "word": "оплёвывающуюся"
+          },
+          {
+            "language": "ru",
+            "word": "антитеатру"
+          },
+          {
+            "language": "uk",
+            "word": "яснесенькою"
+          },
+          {
+            "language": "ru",
+            "word": "ильменским"
+          },
+          {
+            "language": "ru",
+            "word": "небесно"
+          },
+          {
+            "language": "ru",
+            "word": "голубому"
+          },
+          {
+            "language": "uk",
+            "word": "вигибатимеш"
+          },
+          {
+            "language": "ru",
+            "word": "донецки"
+          },
+          {
+            "language": "ru",
+            "word": "нордах"
+          },
+          {
+            "language": "uk",
+            "word": "висловлень"
+          },
+          {
+            "language": "ru",
+            "word": "пожалевши"
+          },
+          {
+            "language": "ru",
+            "word": "затекли"
+          },
+          {
+            "language": "uk",
+            "word": "малопривабливій"
+          },
+          {
+            "language": "ru",
+            "word": "простерёгшего"
+          },
+          {
+            "language": "ru",
+            "word": "спохватитесь"
+          },
+          {
+            "language": "uk",
+            "word": "детектуй"
+          },
+          {
+            "language": "ru",
+            "word": "воспринимала"
+          },
+          {
+            "language": "ru",
+            "word": "кольчуги"
+          },
+          {
+            "language": "uk",
+            "word": "погамував"
+          },
+          {
+            "language": "ru",
+            "word": "зарумянивших"
+          },
+          {
+            "language": "ru",
+            "word": "скверна"
+          },
+          {
+            "language": "uk",
+            "word": "зализуватимусь"
+          },
+          {
+            "language": "ru",
+            "word": "лилиянн"
+          },
+          {
+            "language": "ru",
+            "word": "шапочками"
+          },
+          {
+            "language": "uk",
+            "word": "проголених"
+          },
+          {
+            "language": "ru",
+            "word": "картофелесортировальных"
+          },
+          {
+            "language": "ru",
+            "word": "питого"
+          },
+          {
+            "language": "uk",
+            "word": "попідливано"
+          },
+          {
+            "language": "ru",
+            "word": "низлагаемы"
+          },
+          {
+            "language": "ru",
+            "word": "зашушукайтесь"
+          },
+          {
+            "language": "uk",
+            "word": "найпискливіш"
+          },
+          {
+            "language": "ru",
+            "word": "питиримах"
+          },
+          {
+            "language": "ru",
+            "word": "камуфляже"
+          },
+          {
+            "language": "uk",
+            "word": "розплішіться"
+          },
+          {
+            "language": "ru",
+            "word": "безмельницыны"
+          },
+          {
+            "language": "ru",
+            "word": "уколупнули"
+          },
+          {
+            "language": "uk",
+            "word": "оберстдорфові"
+          },
+          {
+            "language": "ru",
+            "word": "иносказательно"
+          },
+          {
+            "language": "ru",
+            "word": "полонянка"
+          },
+          {
+            "language": "uk",
+            "word": "без'ядерності"
+          },
+          {
+            "language": "ru",
+            "word": "петрунелями"
+          },
+          {
+            "language": "ru",
+            "word": "тумаком"
+          },
+          {
+            "language": "uk",
+            "word": "озимій"
+          },
+          {
+            "language": "ru",
+            "word": "синевато"
+          },
+          {
+            "language": "ru",
+            "word": "сером"
+          },
+          {
+            "language": "ru",
+            "word": "контрпропагандою"
+          },
+          {
+            "language": "uk",
+            "word": "променітимем"
+          },
+          {
+            "language": "ru",
+            "word": "посахаренную"
+          },
+          {
+            "language": "ru",
+            "word": "маликам"
+          },
+          {
+            "language": "uk",
+            "word": "дідуню"
+          },
+          {
+            "language": "ru",
+            "word": "истолковываемое"
+          },
+          {
+            "language": "ru",
+            "word": "червоточиною"
+          },
+          {
+            "language": "uk",
+            "word": "плагіоклазі"
+          },
+          {
+            "language": "ru",
+            "word": "тяготимому"
+          },
+          {
+            "language": "ru",
+            "word": "тугрику"
+          },
+          {
+            "language": "uk",
+            "word": "бережечками"
+          },
+          {
+            "language": "ru",
+            "word": "отсасываемых"
+          },
+          {
+            "language": "ru",
+            "word": "дискомфортах"
+          },
+          {
+            "language": "uk",
+            "word": "драйвували"
+          },
+          {
+            "language": "ru",
+            "word": "саживаешь"
+          },
+          {
+            "language": "ru",
+            "word": "конденсорами"
+          },
+          {
+            "language": "uk",
+            "word": "кріогідратів"
+          },
+          {
+            "language": "ru",
+            "word": "поточенной"
+          },
+          {
+            "language": "ru",
+            "word": "секуляризуй"
+          },
+          {
+            "language": "uk",
+            "word": "діагенезом"
+          },
+          {
+            "language": "ru",
+            "word": "зашлифовывала"
+          },
+          {
+            "language": "ru",
+            "word": "поморочило"
+          },
+          {
+            "language": "uk",
+            "word": "одкочено"
+          },
+          {
+            "language": "ru",
+            "word": "кудесниками"
+          },
+          {
+            "language": "ru",
+            "word": "блефуй"
+          },
+          {
+            "language": "uk",
+            "word": "незім'яте"
+          },
+          {
+            "language": "ru",
+            "word": "взаимопроникающего"
+          },
+          {
+            "language": "ru",
+            "word": "скрипни"
+          },
+          {
+            "language": "ru",
+            "word": "плющена"
+          },
+          {
+            "language": "ru",
+            "word": "термосифонною"
+          },
+          {
+            "language": "ru",
+            "word": "обагритесь"
+          },
+          {
+            "language": "ru",
+            "word": "лонам"
+          },
+          {
+            "language": "ru",
+            "word": "черпав"
+          },
+          {
+            "language": "ru",
+            "word": "неоген"
+          },
+          {
+            "language": "ru",
+            "word": "перешитому"
+          },
+          {
+            "language": "ru",
+            "word": "фталазолом"
+          },
+          {
+            "language": "ru",
+            "word": "латникам"
+          },
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          }
+        ],
+        "raw_nonwhitespace_text_preserved": true,
+        "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+        "routing_passed": true,
+        "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+      },
+      "planned_routes": 61,
+      "feed_events": 6005,
+      "first_feed_after_public_read_ms": 3237.1423,
+      "between_feed_calls_ms": {
+        "p95": 0.0753,
+        "p99": 86.58523200000008,
+        "maximum": 238.0598,
+        "over20": 146,
+        "over100": 52,
+        "largest_intervals": [
+          {
+            "after_feed_ms": 238.0598,
+            "reference_frame": 390251
+          },
+          {
+            "after_feed_ms": 206.8478,
+            "reference_frame": 1145598
+          },
+          {
+            "after_feed_ms": 203.185,
+            "reference_frame": 1135159
+          },
+          {
+            "after_feed_ms": 184.1928,
+            "reference_frame": 923196
+          },
+          {
+            "after_feed_ms": 170.1564,
+            "reference_frame": 1253010
+          }
+        ]
+      },
+      "inside_waveplayer_feed_ms": {
+        "p95": 16.46978,
+        "p99": 18.889644,
+        "maximum": 33.9458
+      },
+      "native_packets": 8998,
+      "device_position_values": [
+        0
+      ],
+      "strict_clock_continuous": false,
+      "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+      "whole_workload_warmup": false
+    },
+    {
+      "ordinal": 4,
+      "pending_count": 32,
+      "folder": "nvda-14de97147c1a4a7e86c735a3108acf79",
+      "status": "completed-research-trial",
+      "judgment": {
+        "acoustic_latency_verified": false,
+        "all_independent_gates_passed": false,
+        "clock_and_cancel_status": "open",
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "strict_full_transport_verified": false,
+        "structural_workload_and_identity_verified": true
+      },
+      "ncc": 0.9999465043965108,
+      "anchors_stable": true,
+      "active_drop_windows_reported": 0,
+      "active_drop_count_scope": "Analyzer retains at most100 windows; not an exact total of independent audible gaps",
+      "reference_frames": 1406007,
+      "reference_sha256": "47aa502c33de86477ae9426a333c8b1e8d0779e7f4d022f8b5a6305f2d6977f0",
+      "sample_rate": 24000,
+      "route_audit": {
+        "hyphenated_source_forms": [
+          "небесно-голубому",
+          "синевато-сером"
+        ],
+        "input_lexical_piece_count": 102,
+        "input_word_count": 100,
+        "input_words_preserved_in_order": true,
+        "lexical_content_preserved_in_order": true,
+        "mismatches": [],
+        "observed_lexical_piece_count": 102,
+        "observed_word_count": 102,
+        "observed_word_routes": [
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          },
+          {
+            "language": "ru",
+            "word": "аминбаевны"
+          },
+          {
+            "language": "ru",
+            "word": "курятинами"
+          },
+          {
+            "language": "uk",
+            "word": "витівкових"
+          },
+          {
+            "language": "ru",
+            "word": "прорубишься"
+          },
+          {
+            "language": "ru",
+            "word": "непальцем"
+          },
+          {
+            "language": "uk",
+            "word": "мегакрутими"
+          },
+          {
+            "language": "ru",
+            "word": "ковыляниями"
+          },
+          {
+            "language": "ru",
+            "word": "списались"
+          },
+          {
+            "language": "uk",
+            "word": "утеплювавсь"
+          },
+          {
+            "language": "ru",
+            "word": "припоминаньи"
+          },
+          {
+            "language": "ru",
+            "word": "переволочило"
+          },
+          {
+            "language": "uk",
+            "word": "рушникосушки"
+          },
+          {
+            "language": "ru",
+            "word": "оплёвывающуюся"
+          },
+          {
+            "language": "ru",
+            "word": "антитеатру"
+          },
+          {
+            "language": "uk",
+            "word": "яснесенькою"
+          },
+          {
+            "language": "ru",
+            "word": "ильменским"
+          },
+          {
+            "language": "ru",
+            "word": "небесно"
+          },
+          {
+            "language": "ru",
+            "word": "голубому"
+          },
+          {
+            "language": "uk",
+            "word": "вигибатимеш"
+          },
+          {
+            "language": "ru",
+            "word": "донецки"
+          },
+          {
+            "language": "ru",
+            "word": "нордах"
+          },
+          {
+            "language": "uk",
+            "word": "висловлень"
+          },
+          {
+            "language": "ru",
+            "word": "пожалевши"
+          },
+          {
+            "language": "ru",
+            "word": "затекли"
+          },
+          {
+            "language": "uk",
+            "word": "малопривабливій"
+          },
+          {
+            "language": "ru",
+            "word": "простерёгшего"
+          },
+          {
+            "language": "ru",
+            "word": "спохватитесь"
+          },
+          {
+            "language": "uk",
+            "word": "детектуй"
+          },
+          {
+            "language": "ru",
+            "word": "воспринимала"
+          },
+          {
+            "language": "ru",
+            "word": "кольчуги"
+          },
+          {
+            "language": "uk",
+            "word": "погамував"
+          },
+          {
+            "language": "ru",
+            "word": "зарумянивших"
+          },
+          {
+            "language": "ru",
+            "word": "скверна"
+          },
+          {
+            "language": "uk",
+            "word": "зализуватимусь"
+          },
+          {
+            "language": "ru",
+            "word": "лилиянн"
+          },
+          {
+            "language": "ru",
+            "word": "шапочками"
+          },
+          {
+            "language": "uk",
+            "word": "проголених"
+          },
+          {
+            "language": "ru",
+            "word": "картофелесортировальных"
+          },
+          {
+            "language": "ru",
+            "word": "питого"
+          },
+          {
+            "language": "uk",
+            "word": "попідливано"
+          },
+          {
+            "language": "ru",
+            "word": "низлагаемы"
+          },
+          {
+            "language": "ru",
+            "word": "зашушукайтесь"
+          },
+          {
+            "language": "uk",
+            "word": "найпискливіш"
+          },
+          {
+            "language": "ru",
+            "word": "питиримах"
+          },
+          {
+            "language": "ru",
+            "word": "камуфляже"
+          },
+          {
+            "language": "uk",
+            "word": "розплішіться"
+          },
+          {
+            "language": "ru",
+            "word": "безмельницыны"
+          },
+          {
+            "language": "ru",
+            "word": "уколупнули"
+          },
+          {
+            "language": "uk",
+            "word": "оберстдорфові"
+          },
+          {
+            "language": "ru",
+            "word": "иносказательно"
+          },
+          {
+            "language": "ru",
+            "word": "полонянка"
+          },
+          {
+            "language": "uk",
+            "word": "без'ядерності"
+          },
+          {
+            "language": "ru",
+            "word": "петрунелями"
+          },
+          {
+            "language": "ru",
+            "word": "тумаком"
+          },
+          {
+            "language": "uk",
+            "word": "озимій"
+          },
+          {
+            "language": "ru",
+            "word": "синевато"
+          },
+          {
+            "language": "ru",
+            "word": "сером"
+          },
+          {
+            "language": "ru",
+            "word": "контрпропагандою"
+          },
+          {
+            "language": "uk",
+            "word": "променітимем"
+          },
+          {
+            "language": "ru",
+            "word": "посахаренную"
+          },
+          {
+            "language": "ru",
+            "word": "маликам"
+          },
+          {
+            "language": "uk",
+            "word": "дідуню"
+          },
+          {
+            "language": "ru",
+            "word": "истолковываемое"
+          },
+          {
+            "language": "ru",
+            "word": "червоточиною"
+          },
+          {
+            "language": "uk",
+            "word": "плагіоклазі"
+          },
+          {
+            "language": "ru",
+            "word": "тяготимому"
+          },
+          {
+            "language": "ru",
+            "word": "тугрику"
+          },
+          {
+            "language": "uk",
+            "word": "бережечками"
+          },
+          {
+            "language": "ru",
+            "word": "отсасываемых"
+          },
+          {
+            "language": "ru",
+            "word": "дискомфортах"
+          },
+          {
+            "language": "uk",
+            "word": "драйвували"
+          },
+          {
+            "language": "ru",
+            "word": "саживаешь"
+          },
+          {
+            "language": "ru",
+            "word": "конденсорами"
+          },
+          {
+            "language": "uk",
+            "word": "кріогідратів"
+          },
+          {
+            "language": "ru",
+            "word": "поточенной"
+          },
+          {
+            "language": "ru",
+            "word": "секуляризуй"
+          },
+          {
+            "language": "uk",
+            "word": "діагенезом"
+          },
+          {
+            "language": "ru",
+            "word": "зашлифовывала"
+          },
+          {
+            "language": "ru",
+            "word": "поморочило"
+          },
+          {
+            "language": "uk",
+            "word": "одкочено"
+          },
+          {
+            "language": "ru",
+            "word": "кудесниками"
+          },
+          {
+            "language": "ru",
+            "word": "блефуй"
+          },
+          {
+            "language": "uk",
+            "word": "незім'яте"
+          },
+          {
+            "language": "ru",
+            "word": "взаимопроникающего"
+          },
+          {
+            "language": "ru",
+            "word": "скрипни"
+          },
+          {
+            "language": "ru",
+            "word": "плющена"
+          },
+          {
+            "language": "ru",
+            "word": "термосифонною"
+          },
+          {
+            "language": "ru",
+            "word": "обагритесь"
+          },
+          {
+            "language": "ru",
+            "word": "лонам"
+          },
+          {
+            "language": "ru",
+            "word": "черпав"
+          },
+          {
+            "language": "ru",
+            "word": "неоген"
+          },
+          {
+            "language": "ru",
+            "word": "перешитому"
+          },
+          {
+            "language": "ru",
+            "word": "фталазолом"
+          },
+          {
+            "language": "ru",
+            "word": "латникам"
+          },
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          }
+        ],
+        "raw_nonwhitespace_text_preserved": true,
+        "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+        "routing_passed": true,
+        "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+      },
+      "planned_routes": 61,
+      "feed_events": 5989,
+      "first_feed_after_public_read_ms": 3263.9908,
+      "between_feed_calls_ms": {
+        "p95": 0.0668,
+        "p99": 0.34430900000000103,
+        "maximum": 85.9783,
+        "over20": 14,
+        "over100": 0,
+        "largest_intervals": [
+          {
+            "after_feed_ms": 85.9783,
+            "reference_frame": 1245463
+          },
+          {
+            "after_feed_ms": 55.344,
+            "reference_frame": 6479
+          },
+          {
+            "after_feed_ms": 53.209,
+            "reference_frame": 18363
+          },
+          {
+            "after_feed_ms": 51.7627,
+            "reference_frame": 1249923
+          },
+          {
+            "after_feed_ms": 44.6478,
+            "reference_frame": 288578
+          }
+        ]
+      },
+      "inside_waveplayer_feed_ms": {
+        "p95": 16.8102,
+        "p99": 18.988936000000002,
+        "maximum": 26.238
+      },
+      "native_packets": 8998,
+      "device_position_values": [
+        0
+      ],
+      "strict_clock_continuous": false,
+      "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+      "whole_workload_warmup": false
+    },
+    {
+      "ordinal": 5,
+      "pending_count": 24,
+      "folder": "nvda-7c883197561445dea0f2e6ae71a9771e",
+      "status": "completed-research-trial",
+      "judgment": {
+        "acoustic_latency_verified": false,
+        "all_independent_gates_passed": false,
+        "clock_and_cancel_status": "open",
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "strict_full_transport_verified": false,
+        "structural_workload_and_identity_verified": true
+      },
+      "ncc": 0.8705367002791231,
+      "anchors_stable": false,
+      "active_drop_windows_reported": 100,
+      "active_drop_count_scope": "Analyzer retains at most100 windows; not an exact total of independent audible gaps",
+      "reference_frames": 1405439,
+      "reference_sha256": "bd6c9da6fe15c4cdaf0c58c4dce491ff6cad53283188d512550690cf7c016253",
+      "sample_rate": 24000,
+      "route_audit": {
+        "hyphenated_source_forms": [
+          "небесно-голубому",
+          "синевато-сером"
+        ],
+        "input_lexical_piece_count": 102,
+        "input_word_count": 100,
+        "input_words_preserved_in_order": true,
+        "lexical_content_preserved_in_order": true,
+        "mismatches": [],
+        "observed_lexical_piece_count": 102,
+        "observed_word_count": 102,
+        "observed_word_routes": [
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          },
+          {
+            "language": "ru",
+            "word": "аминбаевны"
+          },
+          {
+            "language": "ru",
+            "word": "курятинами"
+          },
+          {
+            "language": "uk",
+            "word": "витівкових"
+          },
+          {
+            "language": "ru",
+            "word": "прорубишься"
+          },
+          {
+            "language": "ru",
+            "word": "непальцем"
+          },
+          {
+            "language": "uk",
+            "word": "мегакрутими"
+          },
+          {
+            "language": "ru",
+            "word": "ковыляниями"
+          },
+          {
+            "language": "ru",
+            "word": "списались"
+          },
+          {
+            "language": "uk",
+            "word": "утеплювавсь"
+          },
+          {
+            "language": "ru",
+            "word": "припоминаньи"
+          },
+          {
+            "language": "ru",
+            "word": "переволочило"
+          },
+          {
+            "language": "uk",
+            "word": "рушникосушки"
+          },
+          {
+            "language": "ru",
+            "word": "оплёвывающуюся"
+          },
+          {
+            "language": "ru",
+            "word": "антитеатру"
+          },
+          {
+            "language": "uk",
+            "word": "яснесенькою"
+          },
+          {
+            "language": "ru",
+            "word": "ильменским"
+          },
+          {
+            "language": "ru",
+            "word": "небесно"
+          },
+          {
+            "language": "ru",
+            "word": "голубому"
+          },
+          {
+            "language": "uk",
+            "word": "вигибатимеш"
+          },
+          {
+            "language": "ru",
+            "word": "донецки"
+          },
+          {
+            "language": "ru",
+            "word": "нордах"
+          },
+          {
+            "language": "uk",
+            "word": "висловлень"
+          },
+          {
+            "language": "ru",
+            "word": "пожалевши"
+          },
+          {
+            "language": "ru",
+            "word": "затекли"
+          },
+          {
+            "language": "uk",
+            "word": "малопривабливій"
+          },
+          {
+            "language": "ru",
+            "word": "простерёгшего"
+          },
+          {
+            "language": "ru",
+            "word": "спохватитесь"
+          },
+          {
+            "language": "uk",
+            "word": "детектуй"
+          },
+          {
+            "language": "ru",
+            "word": "воспринимала"
+          },
+          {
+            "language": "ru",
+            "word": "кольчуги"
+          },
+          {
+            "language": "uk",
+            "word": "погамував"
+          },
+          {
+            "language": "ru",
+            "word": "зарумянивших"
+          },
+          {
+            "language": "ru",
+            "word": "скверна"
+          },
+          {
+            "language": "uk",
+            "word": "зализуватимусь"
+          },
+          {
+            "language": "ru",
+            "word": "лилиянн"
+          },
+          {
+            "language": "ru",
+            "word": "шапочками"
+          },
+          {
+            "language": "uk",
+            "word": "проголених"
+          },
+          {
+            "language": "ru",
+            "word": "картофелесортировальных"
+          },
+          {
+            "language": "ru",
+            "word": "питого"
+          },
+          {
+            "language": "uk",
+            "word": "попідливано"
+          },
+          {
+            "language": "ru",
+            "word": "низлагаемы"
+          },
+          {
+            "language": "ru",
+            "word": "зашушукайтесь"
+          },
+          {
+            "language": "uk",
+            "word": "найпискливіш"
+          },
+          {
+            "language": "ru",
+            "word": "питиримах"
+          },
+          {
+            "language": "ru",
+            "word": "камуфляже"
+          },
+          {
+            "language": "uk",
+            "word": "розплішіться"
+          },
+          {
+            "language": "ru",
+            "word": "безмельницыны"
+          },
+          {
+            "language": "ru",
+            "word": "уколупнули"
+          },
+          {
+            "language": "uk",
+            "word": "оберстдорфові"
+          },
+          {
+            "language": "ru",
+            "word": "иносказательно"
+          },
+          {
+            "language": "ru",
+            "word": "полонянка"
+          },
+          {
+            "language": "uk",
+            "word": "без'ядерності"
+          },
+          {
+            "language": "ru",
+            "word": "петрунелями"
+          },
+          {
+            "language": "ru",
+            "word": "тумаком"
+          },
+          {
+            "language": "uk",
+            "word": "озимій"
+          },
+          {
+            "language": "ru",
+            "word": "синевато"
+          },
+          {
+            "language": "ru",
+            "word": "сером"
+          },
+          {
+            "language": "ru",
+            "word": "контрпропагандою"
+          },
+          {
+            "language": "uk",
+            "word": "променітимем"
+          },
+          {
+            "language": "ru",
+            "word": "посахаренную"
+          },
+          {
+            "language": "ru",
+            "word": "маликам"
+          },
+          {
+            "language": "uk",
+            "word": "дідуню"
+          },
+          {
+            "language": "ru",
+            "word": "истолковываемое"
+          },
+          {
+            "language": "ru",
+            "word": "червоточиною"
+          },
+          {
+            "language": "uk",
+            "word": "плагіоклазі"
+          },
+          {
+            "language": "ru",
+            "word": "тяготимому"
+          },
+          {
+            "language": "ru",
+            "word": "тугрику"
+          },
+          {
+            "language": "uk",
+            "word": "бережечками"
+          },
+          {
+            "language": "ru",
+            "word": "отсасываемых"
+          },
+          {
+            "language": "ru",
+            "word": "дискомфортах"
+          },
+          {
+            "language": "uk",
+            "word": "драйвували"
+          },
+          {
+            "language": "ru",
+            "word": "саживаешь"
+          },
+          {
+            "language": "ru",
+            "word": "конденсорами"
+          },
+          {
+            "language": "uk",
+            "word": "кріогідратів"
+          },
+          {
+            "language": "ru",
+            "word": "поточенной"
+          },
+          {
+            "language": "ru",
+            "word": "секуляризуй"
+          },
+          {
+            "language": "uk",
+            "word": "діагенезом"
+          },
+          {
+            "language": "ru",
+            "word": "зашлифовывала"
+          },
+          {
+            "language": "ru",
+            "word": "поморочило"
+          },
+          {
+            "language": "uk",
+            "word": "одкочено"
+          },
+          {
+            "language": "ru",
+            "word": "кудесниками"
+          },
+          {
+            "language": "ru",
+            "word": "блефуй"
+          },
+          {
+            "language": "uk",
+            "word": "незім'яте"
+          },
+          {
+            "language": "ru",
+            "word": "взаимопроникающего"
+          },
+          {
+            "language": "ru",
+            "word": "скрипни"
+          },
+          {
+            "language": "ru",
+            "word": "плющена"
+          },
+          {
+            "language": "ru",
+            "word": "термосифонною"
+          },
+          {
+            "language": "ru",
+            "word": "обагритесь"
+          },
+          {
+            "language": "ru",
+            "word": "лонам"
+          },
+          {
+            "language": "ru",
+            "word": "черпав"
+          },
+          {
+            "language": "ru",
+            "word": "неоген"
+          },
+          {
+            "language": "ru",
+            "word": "перешитому"
+          },
+          {
+            "language": "ru",
+            "word": "фталазолом"
+          },
+          {
+            "language": "ru",
+            "word": "латникам"
+          },
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          }
+        ],
+        "raw_nonwhitespace_text_preserved": true,
+        "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+        "routing_passed": true,
+        "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+      },
+      "planned_routes": 61,
+      "feed_events": 5996,
+      "first_feed_after_public_read_ms": 3150.2207,
+      "between_feed_calls_ms": {
+        "p95": 0.06626000000000003,
+        "p99": 32.51841000000123,
+        "maximum": 261.938,
+        "over20": 66,
+        "over100": 14,
+        "largest_intervals": [
+          {
+            "after_feed_ms": 261.938,
+            "reference_frame": 68022
+          },
+          {
+            "after_feed_ms": 225.6326,
+            "reference_frame": 73151
+          },
+          {
+            "after_feed_ms": 221.6914,
+            "reference_frame": 63326
+          },
+          {
+            "after_feed_ms": 210.7711,
+            "reference_frame": 87764
+          },
+          {
+            "after_feed_ms": 205.0564,
+            "reference_frame": 160855
+          }
+        ]
+      },
+      "inside_waveplayer_feed_ms": {
+        "p95": 16.547774999999998,
+        "p99": 18.931540000000005,
+        "maximum": 36.5218
+      },
+      "native_packets": 8998,
+      "device_position_values": [
+        0
+      ],
+      "strict_clock_continuous": false,
+      "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+      "whole_workload_warmup": false
+    },
+    {
+      "ordinal": 6,
+      "pending_count": 12,
+      "folder": "nvda-05719f171a5048e4a31449ff9d932f7c",
+      "status": "completed-research-trial",
+      "judgment": {
+        "acoustic_latency_verified": false,
+        "all_independent_gates_passed": false,
+        "clock_and_cancel_status": "open",
+        "physical_audio_verified": false,
+        "product_ready": false,
+        "strict_full_transport_verified": false,
+        "structural_workload_and_identity_verified": true
+      },
+      "ncc": 0.11787805926662402,
+      "anchors_stable": false,
+      "active_drop_windows_reported": 100,
+      "active_drop_count_scope": "Analyzer retains at most100 windows; not an exact total of independent audible gaps",
+      "reference_frames": 1405260,
+      "reference_sha256": "30f97d42378a5e7364be9fc8c039a6ac34d4b46be268534424c39f9e28108ae7",
+      "sample_rate": 24000,
+      "route_audit": {
+        "hyphenated_source_forms": [
+          "небесно-голубому",
+          "синевато-сером"
+        ],
+        "input_lexical_piece_count": 102,
+        "input_word_count": 100,
+        "input_words_preserved_in_order": true,
+        "lexical_content_preserved_in_order": true,
+        "mismatches": [],
+        "observed_lexical_piece_count": 102,
+        "observed_word_count": 102,
+        "observed_word_routes": [
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          },
+          {
+            "language": "ru",
+            "word": "аминбаевны"
+          },
+          {
+            "language": "ru",
+            "word": "курятинами"
+          },
+          {
+            "language": "uk",
+            "word": "витівкових"
+          },
+          {
+            "language": "ru",
+            "word": "прорубишься"
+          },
+          {
+            "language": "ru",
+            "word": "непальцем"
+          },
+          {
+            "language": "uk",
+            "word": "мегакрутими"
+          },
+          {
+            "language": "ru",
+            "word": "ковыляниями"
+          },
+          {
+            "language": "ru",
+            "word": "списались"
+          },
+          {
+            "language": "uk",
+            "word": "утеплювавсь"
+          },
+          {
+            "language": "ru",
+            "word": "припоминаньи"
+          },
+          {
+            "language": "ru",
+            "word": "переволочило"
+          },
+          {
+            "language": "uk",
+            "word": "рушникосушки"
+          },
+          {
+            "language": "ru",
+            "word": "оплёвывающуюся"
+          },
+          {
+            "language": "ru",
+            "word": "антитеатру"
+          },
+          {
+            "language": "uk",
+            "word": "яснесенькою"
+          },
+          {
+            "language": "ru",
+            "word": "ильменским"
+          },
+          {
+            "language": "ru",
+            "word": "небесно"
+          },
+          {
+            "language": "ru",
+            "word": "голубому"
+          },
+          {
+            "language": "uk",
+            "word": "вигибатимеш"
+          },
+          {
+            "language": "ru",
+            "word": "донецки"
+          },
+          {
+            "language": "ru",
+            "word": "нордах"
+          },
+          {
+            "language": "uk",
+            "word": "висловлень"
+          },
+          {
+            "language": "ru",
+            "word": "пожалевши"
+          },
+          {
+            "language": "ru",
+            "word": "затекли"
+          },
+          {
+            "language": "uk",
+            "word": "малопривабливій"
+          },
+          {
+            "language": "ru",
+            "word": "простерёгшего"
+          },
+          {
+            "language": "ru",
+            "word": "спохватитесь"
+          },
+          {
+            "language": "uk",
+            "word": "детектуй"
+          },
+          {
+            "language": "ru",
+            "word": "воспринимала"
+          },
+          {
+            "language": "ru",
+            "word": "кольчуги"
+          },
+          {
+            "language": "uk",
+            "word": "погамував"
+          },
+          {
+            "language": "ru",
+            "word": "зарумянивших"
+          },
+          {
+            "language": "ru",
+            "word": "скверна"
+          },
+          {
+            "language": "uk",
+            "word": "зализуватимусь"
+          },
+          {
+            "language": "ru",
+            "word": "лилиянн"
+          },
+          {
+            "language": "ru",
+            "word": "шапочками"
+          },
+          {
+            "language": "uk",
+            "word": "проголених"
+          },
+          {
+            "language": "ru",
+            "word": "картофелесортировальных"
+          },
+          {
+            "language": "ru",
+            "word": "питого"
+          },
+          {
+            "language": "uk",
+            "word": "попідливано"
+          },
+          {
+            "language": "ru",
+            "word": "низлагаемы"
+          },
+          {
+            "language": "ru",
+            "word": "зашушукайтесь"
+          },
+          {
+            "language": "uk",
+            "word": "найпискливіш"
+          },
+          {
+            "language": "ru",
+            "word": "питиримах"
+          },
+          {
+            "language": "ru",
+            "word": "камуфляже"
+          },
+          {
+            "language": "uk",
+            "word": "розплішіться"
+          },
+          {
+            "language": "ru",
+            "word": "безмельницыны"
+          },
+          {
+            "language": "ru",
+            "word": "уколупнули"
+          },
+          {
+            "language": "uk",
+            "word": "оберстдорфові"
+          },
+          {
+            "language": "ru",
+            "word": "иносказательно"
+          },
+          {
+            "language": "ru",
+            "word": "полонянка"
+          },
+          {
+            "language": "uk",
+            "word": "без'ядерності"
+          },
+          {
+            "language": "ru",
+            "word": "петрунелями"
+          },
+          {
+            "language": "ru",
+            "word": "тумаком"
+          },
+          {
+            "language": "uk",
+            "word": "озимій"
+          },
+          {
+            "language": "ru",
+            "word": "синевато"
+          },
+          {
+            "language": "ru",
+            "word": "сером"
+          },
+          {
+            "language": "ru",
+            "word": "контрпропагандою"
+          },
+          {
+            "language": "uk",
+            "word": "променітимем"
+          },
+          {
+            "language": "ru",
+            "word": "посахаренную"
+          },
+          {
+            "language": "ru",
+            "word": "маликам"
+          },
+          {
+            "language": "uk",
+            "word": "дідуню"
+          },
+          {
+            "language": "ru",
+            "word": "истолковываемое"
+          },
+          {
+            "language": "ru",
+            "word": "червоточиною"
+          },
+          {
+            "language": "uk",
+            "word": "плагіоклазі"
+          },
+          {
+            "language": "ru",
+            "word": "тяготимому"
+          },
+          {
+            "language": "ru",
+            "word": "тугрику"
+          },
+          {
+            "language": "uk",
+            "word": "бережечками"
+          },
+          {
+            "language": "ru",
+            "word": "отсасываемых"
+          },
+          {
+            "language": "ru",
+            "word": "дискомфортах"
+          },
+          {
+            "language": "uk",
+            "word": "драйвували"
+          },
+          {
+            "language": "ru",
+            "word": "саживаешь"
+          },
+          {
+            "language": "ru",
+            "word": "конденсорами"
+          },
+          {
+            "language": "uk",
+            "word": "кріогідратів"
+          },
+          {
+            "language": "ru",
+            "word": "поточенной"
+          },
+          {
+            "language": "ru",
+            "word": "секуляризуй"
+          },
+          {
+            "language": "uk",
+            "word": "діагенезом"
+          },
+          {
+            "language": "ru",
+            "word": "зашлифовывала"
+          },
+          {
+            "language": "ru",
+            "word": "поморочило"
+          },
+          {
+            "language": "uk",
+            "word": "одкочено"
+          },
+          {
+            "language": "ru",
+            "word": "кудесниками"
+          },
+          {
+            "language": "ru",
+            "word": "блефуй"
+          },
+          {
+            "language": "uk",
+            "word": "незім'яте"
+          },
+          {
+            "language": "ru",
+            "word": "взаимопроникающего"
+          },
+          {
+            "language": "ru",
+            "word": "скрипни"
+          },
+          {
+            "language": "ru",
+            "word": "плющена"
+          },
+          {
+            "language": "ru",
+            "word": "термосифонною"
+          },
+          {
+            "language": "ru",
+            "word": "обагритесь"
+          },
+          {
+            "language": "ru",
+            "word": "лонам"
+          },
+          {
+            "language": "ru",
+            "word": "черпав"
+          },
+          {
+            "language": "ru",
+            "word": "неоген"
+          },
+          {
+            "language": "ru",
+            "word": "перешитому"
+          },
+          {
+            "language": "ru",
+            "word": "фталазолом"
+          },
+          {
+            "language": "ru",
+            "word": "латникам"
+          },
+          {
+            "language": "uk",
+            "word": "ольсену"
+          },
+          {
+            "language": "ru",
+            "word": "присмирённая"
+          },
+          {
+            "language": "ru",
+            "word": "доктрину"
+          },
+          {
+            "language": "uk",
+            "word": "галапагосе"
+          }
+        ],
+        "raw_nonwhitespace_text_preserved": true,
+        "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+        "routing_passed": true,
+        "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+      },
+      "planned_routes": 61,
+      "feed_events": 5998,
+      "first_feed_after_public_read_ms": 3172.5503,
+      "between_feed_calls_ms": {
+        "p95": 0.08281999999999998,
+        "p99": 124.08494799999978,
+        "maximum": 275.4962,
+        "over20": 150,
+        "over100": 74,
+        "largest_intervals": [
+          {
+            "after_feed_ms": 275.4962,
+            "reference_frame": 16148
+          },
+          {
+            "after_feed_ms": 262.6472,
+            "reference_frame": 936800
+          },
+          {
+            "after_feed_ms": 228.8816,
+            "reference_frame": 575225
+          },
+          {
+            "after_feed_ms": 213.7332,
+            "reference_frame": 188972
+          },
+          {
+            "after_feed_ms": 208.5157,
+            "reference_frame": 237862
+          }
+        ]
+      },
+      "inside_waveplayer_feed_ms": {
+        "p95": 16.388015000000003,
+        "p99": 18.515036000000002,
+        "maximum": 20.7972
+      },
+      "native_packets": 8998,
+      "device_position_values": [
+        0
+      ],
+      "strict_clock_continuous": false,
+      "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+      "whole_workload_warmup": false
+    }
+  ],
+  "whole_fixed_waveform_ncc_ge98": 2,
+  "strict_transport_passes": 0,
+  "clock_and_cancel_gates_relaxed": false,
+  "production_fix_accepted": false,
+  "product_ready": false,
+  "interpretation": [
+    "All100 words and102 lexical pieces are preserved by route audit as61 planned routes; no word was omitted from the workload. This is textual routing proof, not native-listener acoustic word accuracy.",
+    "Between-feed intervals exclude time inside WavePlayer.feed. Feed call blocking is distinct from producer/consumer scheduling, and neither directly proves a CPU synthesis stall.",
+    "The two high-NCC trials support testing bounded lookahead against intermittent starvation; repeated24/32 results still vary, so current results do not establish a reliable fix or optimum.",
+    "All native packet device positions are0, preserving strict continuity/clock and cancellation blockers even for complete high-NCC waveforms.",
+    "The first feed starts3.15-3.26seconds after the public read in all trials. More lookahead is not a remedy or acceptance for that separate cold-start delay.",
+    "Reference-frame locations of long feed intervals are software emitted-PCM positions. They are not assigned to particular words or called audible gaps without appropriate acoustic/clock evidence.",
+    "Each trial uses its own complete emitted reference; different references have different hashes. No common remembered recording or fitted waveform was substituted."
+  ],
+  "next_experiment": {
+    "name": "extended-32-64-128",
+    "order": [
+      32,
+      64,
+      128,
+      128,
+      64,
+      32
+    ],
+    "maximum_queued_pcm_bytes": 61440,
+    "scope": "Outer queue mono24kHz16bit10ms chunks only, excludes Python objects, models, caches and sink buffers",
+    "no_startup_reserve": true,
+    "no_word_warmup": true,
+    "hypothesis": "Test whether additional bounded ahead-of-consumer production reduces scheduling-related fragmentation while returning the first ready PCM immediately; no predicted pass or hidden hardware-clock repair"
+  }
+}

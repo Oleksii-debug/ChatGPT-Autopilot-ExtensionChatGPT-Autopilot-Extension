@@ -1,0 +1,104 @@
+{
+  "format": "dordiai-source13-explicit-extended-prefetch-contract",
+  "format_version": 1,
+  "date": "2026-11-22",
+  "status": "declared-experiment-not-actual-extended-nvda-result",
+  "basis": "evidence/source13_prefetch_raw_six_45061544904.json",
+  "existing_experiment_preserved": {
+    "name": "baseline-12-24-32",
+    "default": true,
+    "order": [12, 24, 32, 32, 24, 12],
+    "existing_contract_file_unchanged": "evidence/prefetch_research_contract.json",
+    "original_45061544904_artifact_unchanged": true,
+    "production_source13_changed": false
+  },
+  "new_experiment": {
+    "name": "extended-32-64-128",
+    "order": [32, 64, 128, 128, 64, 32],
+    "explicit_cli": "--experiment extended-32-64-128",
+    "explicit_workflow_dispatch_choice": "extended-32-64-128",
+    "explicit_commit_trigger": "[source13-prefetch-extended]",
+    "count_repetitions": 2,
+    "change": "One explicit outer buffered_items pending_count keyword in a newly extracted nonce-bound source13 copy. The remaining source bytes and AST, inner2, original helper default12, generation cancellation and first-ready delivery stay unchanged.",
+    "hypothesis": "Additional bounded work ahead of the consumer may absorb intermittent producer scheduling/readiness variation. The previous complete waveform results varied within the same count, so a benefit is not guaranteed and no chosen optimum is claimed.",
+    "startup_reserve_added": false,
+    "first_ready_wait_for_queue_fill_added": false,
+    "model_or_test_word_warmup_added": false,
+    "new_large_startup_buffer_added": false,
+    "automatic_production_tuning": false,
+    "fresh_process_and_worker_for_each_trial": true,
+    "own_profile_rate_multiplier": "adam /80 /1; exact per-request speed recorded",
+    "hypothesis_does_not_address": [
+      "The observed3.15-3.26second public-read-to-first-feed cold start",
+      "All-zero device-position clocks or cancellation-clock acceptance",
+      "Native pronunciation and perceived naturalness"
+    ]
+  },
+  "queue_budget": {
+    "scope": "Maximum outer queued PCM payload only, not installed size or process RAM. Excludes Python objects, queues, models, workers, caches and WavePlayer buffers.",
+    "mono_sample_rate": 24000,
+    "bits_per_sample": 16,
+    "chunk_ms": 10,
+    "maximum_pcm_bytes_per_chunk": 480,
+    "payload_bytes": {"32": 15360, "64": 30720, "128": 61440},
+    "increment_payload_bytes_over_original12": {"32": 9600, "64": 24960, "128": 55680},
+    "maximum_queue_audio_duration_ms": 1280,
+    "duration_scope": "Capacity after production gets ahead, never a requirement to wait1280ms before playback"
+  },
+  "unchanged_acceptance": {
+    "complete_trial_reference_at_one_fixed_offset": true,
+    "ncc_threshold": 0.98,
+    "no_piecewise_warping_resampling_or_fitted_pass": true,
+    "require_unique_stable_anchors": true,
+    "require_no_new_active_drop_windows": true,
+    "strict_native_packet_continuity_and_clock_gate": "Unchanged; all-zero positions remain open/fail, even if full-waveform NCC passes",
+    "public_cancel_capture": "Unchanged separate8second capture; no automatic clock waiver",
+    "full_read_capture_limit_seconds": 90,
+    "read_limit_seconds": 80,
+    "original100_input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+    "full100_words102_lexical_pieces_required": true,
+    "no_test_word_filtering_or_text_changes": true,
+    "shared_architecture_license_and_resource_gates_unchanged": true
+  },
+  "immutable_identity": {
+    "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+    "archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "archive_bytes": 1992990314,
+    "driver_sha256": "17eeda6106858c4eb14ede91dd2a698cae0abaa9894d3df3e3d445d374a042ee",
+    "driver_bytes": 93785,
+    "both_overlay_and_loaded_probe_must_record_matching_experiment": true,
+    "baseline_cannot_accept64_or128_without_explicit_extended_mode": true
+  },
+  "evidence_separation": {
+    "extended_owned_root": "dordiai-vb46-source13-prefetch-extended-<run_id>",
+    "extended_stage_root": "dordiai-source13-prefetch-evidence-extended-<run_id>",
+    "extended_artifact": "dordiai-source13-six-prefetch-comparisons-extended",
+    "each_process_root": "nvda-<fresh UUID>",
+    "all_six_order_and_identity_checks_required": true,
+    "baseline_names_preserved": true
+  },
+  "local_verification": {
+    "prefetch_tests_run": 53,
+    "prefetch_tests_passed": 52,
+    "prefetch_tests_skipped": 1,
+    "skip_reason": "Host lacks symbolic-link creation permission; mandatory source-path rejection implementation retained",
+    "unchanged_full_workload_tests_passed": 8,
+    "both_helpers_compile": true,
+    "covers": [
+      "Baseline defaults/order remain unchanged",
+      "Extended counts require explicit mode and matching loaded/overlay identity",
+      "Exact AST and byte preservation outside one explicit outer count",
+      "Real unchanged buffering helper at12/24/32/64/128 returns first ready PCM without filling queue",
+      "Real unchanged buffering helper at all five counts preserves PCM/index order and generation cancellation",
+      "Strict complete-waveform threshold/clock/cancel judgment remains unchanged",
+      "Separate baseline/extended workflow evidence paths, including early preflight failure"
+    ],
+    "log": "evidence/prefetch_extended_local_review_20261122.log",
+    "scope": "Logical/helper/mechanics tests and bounded own Python Job tests only, no actual extended NVDA or acoustic result"
+  },
+  "product_ready": false,
+  "production_fix_accepted": false,
+  "actual_extended_trials_run": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false
+}

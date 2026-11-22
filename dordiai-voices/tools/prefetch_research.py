@@ -8,6 +8,9 @@ import argparse,ast,collections,hashlib,json,os,re,stat
 from pathlib import Path
 
 COUNTS=(12,24,32)
+DEFAULT_EXPERIMENT='baseline-12-24-32'
+EXTENDED_EXPERIMENT='extended-32-64-128'
+EXPERIMENT_COUNTS={DEFAULT_EXPERIMENT:COUNTS,EXTENDED_EXPERIMENT:(32,64,128)}
 CHUNK_MS=10
 SAMPLE_RATE=24000
 PCM_BYTES_PER_CHUNK=480
@@ -34,9 +37,14 @@ def _contract(tree):
     return call
 
 
-def overlay(source_raw,*,source_sha256,pending_count):
+def declared_counts(experiment):
+    if experiment not in EXPERIMENT_COUNTS:raise ValueError('Explicit declared prefetch experiment required')
+    return EXPERIMENT_COUNTS[experiment]
+
+
+def overlay(source_raw,*,source_sha256,pending_count,experiment=DEFAULT_EXPERIMENT):
     """Insert only an explicit outer count; whole remaining AST must match."""
-    if type(pending_count) is not int or pending_count not in COUNTS:raise ValueError('Only declared12/24/32 comparison accepted')
+    if type(pending_count) is not int or pending_count not in declared_counts(experiment):raise ValueError('Only counts declared by this explicit experiment accepted')
     if not isinstance(source_raw,bytes) or not 0<len(source_raw)<=512*1024 or not isinstance(source_sha256,str) or not re.fullmatch('[0-9a-f]{64}',source_sha256):
         raise ValueError('Bounded exact caller-pinned source bytes required')
     actual=hashlib.sha256(source_raw).hexdigest()
@@ -63,6 +71,7 @@ def overlay(source_raw,*,source_sha256,pending_count):
     inner_counts=[k.value.value for n in inner for k in n.keywords if k.arg=='pending_count' and isinstance(k.value,ast.Constant)]
     if inner_counts!=[2]:raise ValueError('Exactly the original inner explicit2 buffering call required')
     receipt={'format':'dordiai-research-only-outer-prefetch-overlay','format_version':1,'pending_count':pending_count,
+        'experiment':experiment,'declared_comparison_counts':list(declared_counts(experiment)),
         'original_source_sha256':actual,'candidate_source_sha256':hashlib.sha256(candidate).hexdigest(),
         'original_source_bytes':len(source_raw),'candidate_source_bytes':len(candidate),'added_source_bytes':len(insertion),
         'only_outer_keyword_ast_difference_verified':True,'original_default_count_unchanged':12,
@@ -84,7 +93,7 @@ def _regular_no_links(path):
     if not stat.S_ISREG(path.stat().st_mode):raise ValueError('Exact owned regular source required')
 
 
-def install_owned_overlay(owned_run_root,*,source_sha256,pending_count):
+def install_owned_overlay(owned_run_root,*,source_sha256,pending_count,experiment=DEFAULT_EXPERIMENT):
     root=Path(owned_run_root).absolute()
     if not re.fullmatch('nvda-[0-9a-f]{32}',root.name):raise ValueError('Fresh nonce-bound owned run root required')
     source=root/'config/addons/kx47Voices/synthDrivers/kx47Preview.py'
@@ -94,7 +103,7 @@ def install_owned_overlay(owned_run_root,*,source_sha256,pending_count):
     receipt_path=root/'prefetch-overlay.json';temporary=source.with_name(source.name+'.prefetch-candidate')
     if receipt_path.exists() or receipt_path.is_symlink() or temporary.exists() or temporary.is_symlink():
         raise ValueError('Fresh one-time research overlay only')
-    raw=source.read_bytes();candidate,receipt=overlay(raw,source_sha256=source_sha256,pending_count=pending_count)
+    raw=source.read_bytes();candidate,receipt=overlay(raw,source_sha256=source_sha256,pending_count=pending_count,experiment=experiment)
     receipt.update(owned_run_root=str(root),owned_source=str(source))
     with temporary.open('xb') as output:
         output.write(candidate);output.flush();os.fsync(output.fileno())
@@ -103,14 +112,14 @@ def install_owned_overlay(owned_run_root,*,source_sha256,pending_count):
     return receipt
 
 
-def simulate_spikes(chunks_per_word,render_costs_ms,*,pending_count,cancel_at_ms=None):
+def simulate_spikes(chunks_per_word,render_costs_ms,*,pending_count,cancel_at_ms=None,experiment=DEFAULT_EXPERIMENT):
     """Virtual bounded producer and a ten-ms consumer, with NO sink reserve.
 
     Render costs are synthetic WHOLE-word readiness costs, not fitted feed-gap
     measurements. An actual WavePlayer has additional buffering and scheduling;
     this simulation establishes mechanics, never predicts a device latency.
     """
-    if type(pending_count) is not int or pending_count not in COUNTS:raise ValueError('Declared count required')
+    if type(pending_count) is not int or pending_count not in declared_counts(experiment):raise ValueError('Declared count required')
     if not 1<=len(chunks_per_word)<=100 or len(chunks_per_word)!=len(render_costs_ms):raise ValueError('Bounded matching word/cost lists required')
     if any(type(x) is not int or not 1<=x<=1000 for x in chunks_per_word):raise ValueError('Bounded positive chunk counts required')
     if sum(chunks_per_word)>20000:raise ValueError('Synthetic trace exceeds declared20000chunk quota')
@@ -146,7 +155,7 @@ def simulate_spikes(chunks_per_word,render_costs_ms,*,pending_count,cancel_at_ms
     expected=[(w,c) for w,amount in enumerate(chunks_per_word) for c in range(amount)]
     observed=[(r['word'],r['chunk']) for r in started]
     return {'format':'dordiai-synthetic-prefetch-spike-timeline','format_version':1,'simulation_only':True,
-        'not_actual_nvda_or_acoustic_measurement':True,'pending_count':pending_count,'synthetic_render_costs_ms':list(render_costs_ms),
+        'not_actual_nvda_or_acoustic_measurement':True,'pending_count':pending_count,'experiment':experiment,'synthetic_render_costs_ms':list(render_costs_ms),
         'chunks_per_word':list(chunks_per_word),'first_chunk_ready_ms':render_costs_ms[0],'first_play_ms':first,
         'startup_reserve_ms':0,'modeled_sink_reserve_ms':0,'maximum_pending_items':maximum,
         'maximum_queued_pcm_bytes':maximum*PCM_BYTES_PER_CHUNK,'gaps':gaps,'extra_gap_ms':sum(g['duration_ms'] for g in gaps),
@@ -159,7 +168,8 @@ def simulate_spikes(chunks_per_word,render_costs_ms,*,pending_count,cancel_at_ms
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--owned-run-root',type=Path,required=True);parser.add_argument('--source-sha256',required=True)
-    parser.add_argument('--pending-count',type=int,choices=COUNTS,required=True);args=parser.parse_args()
-    print(json.dumps(install_owned_overlay(args.owned_run_root,source_sha256=args.source_sha256,pending_count=args.pending_count),sort_keys=True))
+    parser.add_argument('--pending-count',type=int,required=True)
+    parser.add_argument('--experiment',choices=tuple(EXPERIMENT_COUNTS),default=DEFAULT_EXPERIMENT);args=parser.parse_args()
+    print(json.dumps(install_owned_overlay(args.owned_run_root,source_sha256=args.source_sha256,pending_count=args.pending_count,experiment=args.experiment),sort_keys=True))
 
 if __name__=='__main__':main()

@@ -1,0 +1,77 @@
+{
+  "format": "dordiai-settings-fourth-independent-diagnosis",
+  "run": 45063824021,
+  "job": 137335453415,
+  "artifact": 14770633015,
+  "artifact_sha256": "1362027b3a6a7f8f0dcff01b20cda2a4b4399c4c771c2fd6a3ede8784c676f03",
+  "original_controller_status": "failed",
+  "original_error": "Actual native menu highlight does not match the exact preferences item",
+  "actual_probe_phases": {
+    "edit": "edit",
+    "resume": "resume"
+  },
+  "actual_generated_wx_menu_id": -31958,
+  "diagnosis": "False rejection of a genuine signed wxMSW automatic menu ID. Actual target/highlight/selection all match -31958; both actual host phases passed and all owned processes exited0. Original reports remain unchanged. Final post-restart runtime integrity branch did not run after the false rejection, so full supplement gate requires a fresh run.",
+  "primary_source": "https://raw.githubusercontent.com/wxWidgets/wxWidgets/v3.2.8/include/wx/defs.h",
+  "source_constant_ranges": {
+    "wxID_AUTO_LOWEST": -32000,
+    "wxID_AUTO_HIGHEST": -2000,
+    "reserved_sentinels": [
+      -3,
+      -2,
+      -1
+    ]
+  },
+  "owned_process_cleanup": {
+    "children": [
+      {
+        "pid": 3564,
+        "executable": "nvda_2026.3.1.exe",
+        "returncode": 0,
+        "reaped": true
+      },
+      {
+        "pid": 7888,
+        "executable": "nvda.exe",
+        "returncode": 0,
+        "reaped": true
+      },
+      {
+        "pid": 3984,
+        "executable": "nvda.exe",
+        "returncode": 0,
+        "reaped": true
+      }
+    ],
+    "errors": [],
+    "all_reaped_before_device_cleanup": true,
+    "owned_nvda_jobs": [
+      {
+        "pid": 7888,
+        "active_before_cleanup": 0,
+        "active_after_cleanup": 0,
+        "forced_tree_termination": false,
+        "all_owned_workers_reaped": true
+      },
+      {
+        "pid": 3984,
+        "active_before_cleanup": 0,
+        "active_after_cleanup": 0,
+        "forced_tree_termination": false,
+        "all_owned_workers_reaped": true
+      }
+    ],
+    "all_owned_nvda_descendants_reaped": true,
+    "actual_nvda_process_count": 2
+  },
+  "resume_process_exit": {
+    "pid": 3984,
+    "returncode": 0,
+    "windows_status_hex": "0x00000000",
+    "reaped": true,
+    "normal_shutdown_verified": true
+  },
+  "validator_recheck": "Both original phases pass corrected signed-ID validator; all exact identity/matching/order checks retained.",
+  "whole_supplement_accepted": false,
+  "product_ready": false
+}

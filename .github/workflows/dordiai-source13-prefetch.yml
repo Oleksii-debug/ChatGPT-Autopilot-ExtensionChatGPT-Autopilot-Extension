@@ -9,6 +9,12 @@ on:
       - "dordiai-voices/tools/prefetch_research.py"
       - "dordiai-voices/tools/plain_word_workload.py"
   workflow_dispatch:
+    inputs:
+      experiment:
+        description: Explicit bounded queue comparison; baseline is preserved
+        type: choice
+        options: [baseline-12-24-32, extended-32-64-128]
+        default: baseline-12-24-32
 permissions:
   contents: read
   actions: read
@@ -21,13 +27,16 @@ jobs:
       github.repository == 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension' &&
       github.ref == 'refs/heads/dordiai-voices/audit-20261122' &&
       (github.event_name == 'workflow_dispatch' ||
-       contains(github.event.head_commit.message, '[source13-prefetch]'))
+       contains(github.event.head_commit.message, '[source13-prefetch]') ||
+       contains(github.event.head_commit.message, '[source13-prefetch-extended]'))
     runs-on: windows-latest
     timeout-minutes: 60
     permissions:
       contents: read
       actions: read
     env:
+      DORDIAI_PREFETCH_EXPERIMENT: ${{ (github.event.inputs.experiment == 'extended-32-64-128' || contains(github.event.head_commit.message, '[source13-prefetch-extended]')) && 'extended-32-64-128' || 'baseline-12-24-32' }}
+      DORDIAI_PREFETCH_VARIANT: ${{ (github.event.inputs.experiment == 'extended-32-64-128' || contains(github.event.head_commit.message, '[source13-prefetch-extended]')) && '-extended' || '' }}
       PYTHONUTF8: '1'
       PYTHONDONTWRITEBYTECODE: '1'
       HF_HUB_OFFLINE: '1'
@@ -210,16 +219,16 @@ jobs:
         run: |
           $package = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-package-' + $env:GITHUB_RUN_ID)
           $validation = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-verification-' + $env:GITHUB_RUN_ID + '\validation.json')
-          $output = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-source13-prefetch-' + $env:GITHUB_RUN_ID)
+          $output = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-source13-prefetch' + $env:DORDIAI_PREFETCH_VARIANT + '-' + $env:GITHUB_RUN_ID)
           $addon = Join-Path $env:RUNNER_TEMP 'nvda-capture-core13\dordiai-voices-0.13.1-dev.13.nvda-addon'
-          python dordiai-voices/tools/windows_prefetch_trials.py --package $package --validation $validation --output $output --addon $addon --helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-longread.exe') --helper-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-longread-build.json') --marker-helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'helper.exe') --marker-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'build.json') --ephemeral-ci
+          python dordiai-voices/tools/windows_prefetch_trials.py --package $package --validation $validation --output $output --addon $addon --helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-longread.exe') --helper-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-longread-build.json') --marker-helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'helper.exe') --marker-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'build.json') --ephemeral-ci --experiment $env:DORDIAI_PREFETCH_EXPERIMENT
           exit $LASTEXITCODE
       - name: Preserve bounded exact owned engineering JSON without physical claims
         if: always()
         shell: python
         run: |
           import base64,gzip,hashlib,json,os,pathlib,stat
-          root=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-vb46-source13-prefetch-"+os.environ["GITHUB_RUN_ID"])
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-vb46-source13-prefetch"+os.environ.get("DORDIAI_PREFETCH_VARIANT","")+"-"+os.environ["GITHUB_RUN_ID"])
           paths=[root/"prefetch-trials.json"]
           for run in root.glob("nvda-*"):
               paths.extend(run/name for name in ("trial.json","prefetch-overlay.json","plugin-ready.json","plugin-complete.json","plugin-longread.json","plugin-cancel.json","owned-launch.json","longread-analysis.json","cancel-analysis.json","longread-capture/ready.json","longread-capture/capture.json","cancel-capture/ready.json","cancel-capture/capture.json"))
@@ -238,8 +247,8 @@ jobs:
         shell: python
         run: |
           import hashlib,json,os,pathlib,shutil,stat
-          root=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-vb46-source13-prefetch-"+os.environ["GITHUB_RUN_ID"])
-          stage=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-source13-prefetch-evidence-"+os.environ["GITHUB_RUN_ID"])
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-vb46-source13-prefetch"+os.environ.get("DORDIAI_PREFETCH_VARIANT","")+"-"+os.environ["GITHUB_RUN_ID"])
+          stage=pathlib.Path(os.environ["RUNNER_TEMP"])/("dordiai-source13-prefetch-evidence"+os.environ.get("DORDIAI_PREFETCH_VARIANT","")+"-"+os.environ["GITHUB_RUN_ID"])
           if stage.exists():raise ValueError("Fresh evidence stage required")
           stage.mkdir();paths=[root/"prefetch-trials.json"]
           names=("trial.json","prefetch-overlay.json","plugin-ready.json","plugin-complete.json","plugin-longread.json","plugin-cancel.json","owned-launch.json","longread-reference.pcm","cancel-reference.pcm","partial-reference.pcm","original100.txt","longread-analysis.json","cancel-analysis.json","longread-capture/ready.json","longread-capture/capture.json","longread-capture/captured.pcm","cancel-capture/ready.json","cancel-capture/capture.json","cancel-capture/captured.pcm","nvda.log","nvda-console.log","bootstrap.log")
@@ -264,6 +273,7 @@ jobs:
                   shutil.copyfile(source,stage/name)
           (stage/"evidence-index.json").write_text(json.dumps({
               "files":index,"total_bytes":total,"physical_audio_verified":False,"product_ready":False,
+              "experiment":os.environ.get("DORDIAI_PREFETCH_EXPERIMENT","baseline-12-24-32"),
               "controller_report_present":(root/"prefetch-trials.json").is_file(),
               "helper_root_created":bool(helper_root),
               "owned_trial_directories":len(list(root.glob("nvda-*"))),
@@ -276,7 +286,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: dordiai-source13-six-prefetch-comparisons
-          path: ${{ runner.temp }}/dordiai-source13-prefetch-evidence-${{ github.run_id }}/
+          name: dordiai-source13-six-prefetch-comparisons${{ env.DORDIAI_PREFETCH_VARIANT }}
+          path: ${{ runner.temp }}/dordiai-source13-prefetch-evidence${{ env.DORDIAI_PREFETCH_VARIANT }}-${{ github.run_id }}/
           if-no-files-found: warn
           retention-days: 30
