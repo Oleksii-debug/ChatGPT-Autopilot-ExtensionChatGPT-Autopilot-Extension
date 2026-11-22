@@ -19,7 +19,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     env:
-      PRIVATE_CORE: ${{ runner.temp }}/dordiai-afri-private-core/kx47Runtime
       RESEARCH_ASSETS: ${{ github.workspace }}/ci-six-small-assets
       DERIVED_GRAPHS: ${{ github.workspace }}/ci-six-graphs
       RESEARCH_REPORTS: ${{ github.workspace }}/dordiai-voices/afri-six-embedded-results
@@ -44,7 +43,9 @@ jobs:
           python-version: "3.12"
       - name: Prepare only host report directory
         shell: pwsh
-        run: New-Item -ItemType Directory -Path "$env:RESEARCH_REPORTS" -Force | Out-Null
+        run: |
+          New-Item -ItemType Directory -Path "$env:RESEARCH_REPORTS" -Force | Out-Null
+          "PRIVATE_CORE=$env:RUNNER_TEMP/dordiai-afri-private-core/kx47Runtime" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Download exact existing immutable core9 artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:

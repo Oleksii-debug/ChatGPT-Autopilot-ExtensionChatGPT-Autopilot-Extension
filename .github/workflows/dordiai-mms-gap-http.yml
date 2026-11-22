@@ -1,0 +1,50 @@
+name: Dordiai public native resource HTTP audit
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-mms-gap-http.yml"
+      - "dordiai-voices/tools/audit_mms_gap_resources.py"
+      - "dordiai-voices/tests/test_audit_mms_gap_resources.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata-only:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[mms-gap-http]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Verify exact gap and positive control metadata selection
+        run: python -m unittest discover -s dordiai-voices/tests -p test_audit_mms_gap_resources.py -v
+      - name: Read only primary metadata with no acoustic downloads
+        run: python dordiai-voices/tools/audit_mms_gap_resources.py --output dordiai-voices/mms-gap-results/mms-gap-http.json
+      - name: Preserve exact original bounded report
+        if: always()
+        shell: python
+        run: |
+          import pathlib,gzip,base64,hashlib
+          path=pathlib.Path("dordiai-voices/mms-gap-results/mms-gap-http.json")
+          if path.is_file():
+              raw=path.read_bytes()
+              if len(raw)>262144:
+                  raise ValueError("Unexpected metadata size")
+              data=gzip.compress(raw,mtime=0)
+              print("MMS_GAP_HTTP_GZIP_SHA256 "+hashlib.sha256(data).hexdigest(),flush=True)
+              encoded=base64.b64encode(data).decode()
+              parts=[encoded[i:i+12000] for i in range(0,len(encoded),12000)]
+              for i,part in enumerate(parts,1):
+                  print("MMS_GAP_HTTP_GZIP_B64 "+str(i)+"/"+str(len(parts))+" "+part,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-native-gap-http-${{ github.run_id }}
+          path: dordiai-voices/mms-gap-results
+          if-no-files-found: warn
+          retention-days: 30
