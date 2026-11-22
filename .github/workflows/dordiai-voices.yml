@@ -160,8 +160,17 @@ jobs:
   artifact-diagnostics:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[diagnose-nvda]')
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: typing
+            artifact_id: "14752316501"
+          - mode: required
+            artifact_id: "14752207026"
     env:
-      DORDIAI_DIAGNOSTIC_ARTIFACT: "14752285091"
+      DORDIAI_DIAGNOSTIC_ARTIFACT: ${{ matrix.artifact_id }}
+      DORDIAI_DIAGNOSTIC_MODE: ${{ matrix.mode }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -174,7 +183,7 @@ jobs:
       - name: Recover only small diagnostics from the previous Windows artifact
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id "14752285091" --output dordiai-voices/diagnosed-windows-evidence
+        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id "${{ matrix.artifact_id }}" --output dordiai-voices/diagnosed-windows-evidence
       - name: Print bounded fixed-input worker diagnostics
         if: always()
         shell: python
@@ -193,6 +202,17 @@ jobs:
           for path in root.rglob("nvda-probe.json"):
               report = json.loads(path.read_text(encoding="utf-8"))
               print("NVDA SUMMARY " + json.dumps({key: report.get(key) for key in ("status", "worker_bootstrap", "native_import_diagnostics", "initial_smoke_predevice_latency", "api_latency", "injected_fatal_recovery", "required_resource_recovery", "required_resource_path_diagnostics", "actual_typing", "required_resource_quarantine", "required_resource_cleanup", "pcm_metrics")}, ensure_ascii=True), flush=True)
+          for path in sorted(root.rglob("nvda-probe.json")):
+              report=json.loads(path.read_text(encoding="utf-8"))
+              typed=report.get("actual_typing") or {}
+              if typed:
+                  print("ACTUAL_TYPING_SUMMARY "+json.dumps({key:typed.get(key) for key in ("scope","cleanup")},ensure_ascii=True),flush=True)
+                  for row in typed.get("cases",[]):
+                      fields=("language","glyph","actual_hkl","status","routing_status","emitted_languages","effective_languages","first_pcm_ms","expected_symbol_label","expected_word_echo","expected_letter_name","symbol_label_matches","word_echo_matches","letter_name_matches","actual_control_value","driver_error","normal_typed_speech","routes","pcm_metrics")
+                      print("ACTUAL_TYPING_CASE "+json.dumps({key:row.get(key) for key in fields},ensure_ascii=True),flush=True)
+              recovery=report.get("required_resource_recovery")
+              if recovery is not None:
+                  print("ACTUAL_REQUIRED_RESOURCE "+json.dumps(recovery,ensure_ascii=True),flush=True)
           for path in root.rglob("windows-nvda-probe.json"):
               report = json.loads(path.read_text(encoding="utf-8"))
               print("CORE RECEIPT " + json.dumps({key: report.get(key) for key in ("addon_sha256", "status", "recording_pcm_sink_test_double", "physical_audio_verified", "product_ready", "required_resource_quarantine", "required_resource_cleanup")}, ensure_ascii=True), flush=True)
@@ -206,14 +226,14 @@ jobs:
           for path in sorted(root.rglob("*.json")):
               raw=path.read_bytes()
               files[path.relative_to(root).as_posix()]={"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}
-          document={"format":"dordiai-exact-windows-json-evidence","format_version":1,"run_id":45014461174,"artifact_id":int(os.environ["DORDIAI_DIAGNOSTIC_ARTIFACT"]),"scope":"Exact engineering reports; recording sink never certifies physical audio or pronunciation","files":files}
+          document={"format":"dordiai-exact-windows-json-evidence","format_version":1,"run_id":45016446860,"artifact_id":int(os.environ["DORDIAI_DIAGNOSTIC_ARTIFACT"]),"mode":os.environ["DORDIAI_DIAGNOSTIC_MODE"],"scope":"Exact engineering reports; recording sink never certifies physical audio or pronunciation","files":files}
           compressed=gzip.compress(json.dumps(document,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode("utf-8"),mtime=0)
-          print("DORDIAI_DEV9_FIRST_BUNDLE_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
-          print("DORDIAI_DEV9_FIRST_BUNDLE_B64 "+base64.b64encode(compressed).decode("ascii"),flush=True)
+          print("DORDIAI_DEV9_FAST_BUNDLE_SHA256 "+hashlib.sha256(compressed).hexdigest(),flush=True)
+          print("DORDIAI_DEV9_FAST_BUNDLE_B64 "+base64.b64encode(compressed).decode("ascii"),flush=True)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dordiai-voices-recovered-dev9-windows-diagnostics
+          name: dordiai-voices-recovered-dev9-${{ matrix.mode }}-diagnostics
           path: dordiai-voices/diagnosed-windows-evidence
           if-no-files-found: warn
           retention-days: 7

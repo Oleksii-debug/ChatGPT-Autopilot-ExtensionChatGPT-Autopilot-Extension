@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.8",
+  "target_version": "0.13.1-dev.9",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -12,11 +12,11 @@
     },
     "core_size": {
       "status": "windows_build_passed",
-      "bytes": 1767411258,
+      "bytes": 1767414839,
       "maximum_bytes": 3000000000,
-      "built_version": "0.13.1-dev.8",
-      "archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
-      "evidence": "evidence/windows_dev8_run_45005894766.json.gz"
+      "built_version": "0.13.1-dev.9",
+      "archive_sha256": "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a",
+      "evidence": "evidence/windows_dev9_initial_45014461174.json.gz"
     },
     "selected_language_resources": {
       "status": "incomplete",
@@ -35,23 +35,65 @@
       "status": "not_accepted",
       "evidence": [
         "evidence/omnivoice_cpu_word_benchmark.json",
-        "evidence/windows_dev8_run_45005894766.json.gz"
+        "evidence/windows_dev9_initial_45014461174.json.gz"
       ],
       "slow_model_language_count": 5,
-      "caveat": "Five primary Omni paths remain slow; native Bodo/Kashmiri alternatives do not establish typing, pronunciation or physical latency acceptance. First-use direct glyph p95 242ms/p99 573ms and worst1067ms; repeated cached2.75ms is not first-use or physical acceptance.",
+      "caveat": "Host namespace fix restores prepared alphabet access. Remaining72 unprepared digit/punctuation requests per profile keep overall176 first-use p95 at238.2162ms. Cached and unprimed-alphabet API measurements are not physical sound acceptance.",
       "first_use_glyph_predevice": {
         "count": 176,
-        "p50_ms": 130.38,
-        "p95_ms": 242.0168,
-        "p99_ms": 572.6739,
-        "minimum_ms": 2.7615,
-        "maximum_ms": 1066.98
+        "p50_ms": 2.7529,
+        "p95_ms": 238.2162,
+        "p99_ms": 282.9965,
+        "minimum_ms": 2.1221,
+        "maximum_ms": 291.2245
+      },
+      "dev9_headless_api": {
+        "scope": "Actual NVDA driver requests, RecordingPCMSink only; no physical audio endpoint.",
+        "alphabet_first_pass": {
+          "count": 176,
+          "p50_ms": 2.7529,
+          "p95_ms": 238.2162,
+          "p99_ms": 282.9965,
+          "minimum_ms": 2.1221,
+          "maximum_ms": 291.2245
+        },
+        "warm_letters": {
+          "count": 100,
+          "p50_ms": 2.1056,
+          "p95_ms": 2.596,
+          "p99_ms": 2.6771,
+          "minimum_ms": 2.0061,
+          "maximum_ms": 2.8929
+        },
+        "warm_switch_requests": {
+          "count": 100,
+          "p50_ms": 2.1575,
+          "p95_ms": 2.657,
+          "p99_ms": 2.8611,
+          "minimum_ms": 2.0145,
+          "maximum_ms": 3.2547
+        },
+        "cancel_api": {
+          "count": 100,
+          "p50_ms": 0.0086,
+          "p95_ms": 0.0204,
+          "p99_ms": 0.0364,
+          "minimum_ms": 0.0076,
+          "maximum_ms": 0.1882
+        },
+        "unprimed_letters_derived": {
+          "count": 89,
+          "p95_ms_nearest_rank": 2.927,
+          "p99_ms_nearest_rank": 3.7304,
+          "maximum_ms": 3.7304,
+          "physical_audio_verified": false
+        }
       }
     },
     "windows_models": {
-      "status": "dev8_standalone_pcm_smoke_passed",
-      "current_run": 45005894766,
-      "core_version": "0.13.1-dev.8",
+      "status": "dev9_standalone_pcm_smoke_passed",
+      "current_run": 45014461174,
+      "core_version": "0.13.1-dev.9",
       "core_language_count": 3,
       "core_runs_per_language": 2,
       "extended_passed_language_count": 21,
@@ -81,7 +123,7 @@
       ],
       "new_mms_ha_representative": "passed-engine-smoke",
       "native_extension_preflight": "RecordTrie import, dictionary construction and nonoverride word passed in inherited and reset child modes",
-      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
+      "evidence": "evidence/windows_dev9_initial_45014461174.json.gz",
       "report_members": [
         "engine/report.json",
         "extra-engines/report.json",
@@ -93,10 +135,10 @@
     },
     "actual_nvda": {
       "status": "headless_functional_checks_complete_physical_blocked",
-      "current_run": 45005894766,
+      "current_run": 45014461174,
       "nvda_version": "2026.3.1",
-      "core_version": "0.13.1-dev.8",
-      "core_archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
+      "core_version": "0.13.1-dev.9",
+      "core_archive_sha256": "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a",
       "recording_sink_test_double": true,
       "driver_selection_with_recording_sink": true,
       "allowed_profiles": 45,
@@ -113,23 +155,25 @@
       "confirmed_import_module": null,
       "worker_bootstrap_reset_observed": true,
       "dll_search_reset_resolved_import_error": false,
-      "reason": "Physical audio absent. Actual6-key echo pipeline works but Russian shared а is misrouted; first-use glyph latency also unaccepted. Working-source path fix not yet built.",
+      "reason": "Core9 headless functional typing/recovery and normal NVDA probes pass. Physical device/audio and all135-language acceptance remain open.",
       "builtin_windows_fallback_selected": true,
       "fallback_notice_requested": true,
       "fallback_audibility_verified": false,
       "wave_player_verified": false,
       "physical_acoustic_latency_verified": false,
       "physical_audio_verified": false,
-      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
+      "evidence": "evidence/windows_dev9_initial_45014461174.json.gz",
       "report_member": "nvda/windows-nvda-probe.json",
-      "actual_keyboard_echo_verified": false,
+      "actual_keyboard_echo_verified": true,
       "import_notification_recovery_notice_pcm_verified": true,
-      "actual_keyboard_pipeline_cases": 6,
+      "actual_keyboard_pipeline_cases": 9,
       "actual_keyboard_pipeline_verified": true,
-      "actual_keyboard_language_routes_accepted": false,
+      "actual_keyboard_language_routes_accepted": true,
       "required_resource_failure_recovery_verified": true,
-      "required_resource_recovery_evidence": "evidence/windows_core8_required_resource_45010564271.json.gz",
-      "actual_keyboard_evidence": "evidence/windows_core8_typing_45010564271.json.gz"
+      "required_resource_recovery_evidence": "Original artifact14752207026 from45016446860; exact report extraction queued",
+      "actual_keyboard_evidence": "Original artifact14752316501 from45016446860; exact report extraction queued",
+      "actual_keyboard_probe_run": 45016446860,
+      "required_resource_probe_run": 45016446860
     },
     "native_pronunciation": {
       "status": "not_accepted",
@@ -144,24 +188,36 @@
     },
     "main_unit_suite": {
       "status": "passed",
-      "tests_per_platform": 568,
+      "tests_per_platform": 683,
       "platforms": [
         "Linux CI",
         "Windows CI"
       ],
       "windows_skipped": 27,
-      "checkpoint_version": "0.13.1-dev.8",
-      "run": 45005894766,
-      "evidence": "evidence/windows_dev8_run_45005894766.json.gz"
+      "checkpoint_version": "0.13.1-dev.9",
+      "run": 45014461174,
+      "source_commit": "b364060750b4fda22eb7f06b5c52085c3f4e0bfc",
+      "evidence": "evidence/windows_dev9_initial_45014461174.json.gz",
+      "later_tooling_linux": {
+        "run": 45017569212,
+        "tests": 748,
+        "skipped": 31,
+        "source_commit": "656a46c18eae2b859f7cc6a7d642b1e99a9ababd"
+      },
+      "later_probe_windows": {
+        "run": 45016446860,
+        "tests": 684,
+        "source_commit": "43fbf37cf5665d7af4046daa2d42226e22e574dd"
+      }
     },
     "windows_character_structure": {
       "status": "passed_limited_structural_smoke",
       "required_structure_cases_passed": 11,
       "required_failures": 0,
       "exploratory_raw_supplementary_case": "explicitly unsupported",
-      "nvda_typing_verified": false,
+      "nvda_typing_verified": "Core3 real keyboard separately passed; this structural report itself is not typing proof",
       "pronunciation_verified": false,
-      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
+      "evidence": "evidence/windows_dev9_initial_45014461174.json.gz",
       "report_member": "characters/report.json"
     },
     "physical_audio_output": {
@@ -170,7 +226,7 @@
       "wave_player_verified": false,
       "physical_audio_verified": false,
       "acoustic_latency_verified": false,
-      "evidence": "evidence/windows_dev8_run_45005894766.json.gz",
+      "evidence": "evidence/windows_dev9_initial_45014461174.json.gz",
       "report_member": "audio/audio-endpoint.json"
     },
     "mms_shared_graph_numerical_parity": {
@@ -185,16 +241,25 @@
       "shared_raw_graphs": 1,
       "fingerprinted_inputs_unchanged": true,
       "scope": "New actual zero-noise native-grapheme numerical reproduction, not recovered earlier lost data; not pronunciation or device acceptance."
+    },
+    "mms_optional_packs": {
+      "status": "actual_all29_build_install_verify_uninstall_passed",
+      "run": 45014461158,
+      "total_inner_zip_bytes": 3059910988,
+      "version": "1.0.1+ci.45014461158.1",
+      "evidence": "evidence/mms_resource_packs_run_45014461158.json.gz",
+      "artifact_receipts": "evidence/mms_resource_artifacts_45014461158.json",
+      "caveat": "Exact original native FP32 resources; package integrity does not certify all language pronunciation."
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
-  "latest_windows_run": 45005894766,
+  "latest_windows_run": 45014461174,
   "durable_windows_reports": {
-    "path": "evidence/windows_dev8_run_45005894766.json.gz",
-    "sha256": "2c64d094abcca8446d120e8d09da404ee2d887aa108b3954f90ff61cd481fb75",
-    "run": 45005894766,
-    "source_commit": "e527c0e64666bf34f030e6a5b2dbff30d539ade8",
-    "scope": "Exact original reports stored as byte-preserving Base64 records inside gzip; headless recording-output functional checks only. Not physical output, pronunciation or full product acceptance."
+    "path": "evidence/windows_dev9_initial_45014461174.json.gz",
+    "sha256": "9f01d1146d93cd6c19f62331793354ce0fe42548fea5e8ccccdb6d4ec55a42f8",
+    "run": 45014461174,
+    "source_commit": "b364060750b4fda22eb7f06b5c52085c3f4e0bfc",
+    "scope": "Original normal NVDA probe and engine tests passed. Initial separate typing/recovery harness startup failed before product load; identical archive passed corrected short-root probes in45016446860."
   },
   "native_loader_diagnosis": {
     "run_id": 44999586051,
@@ -203,26 +268,27 @@
     "production_fix_accepted": "Functional Windows NVDA private worker import and PCM verified in dev8; acoustic output unverified."
   },
   "current_frozen_core": {
-    "version": "0.13.1-dev.8",
-    "archive_sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
-    "archive_bytes": 1767411258,
-    "windows_run": 45005894766,
-    "source_commit": "e527c0e64666bf34f030e6a5b2dbff30d539ade8",
+    "version": "0.13.1-dev.9",
+    "archive_sha256": "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a",
+    "archive_bytes": 1767414839,
+    "windows_run": 45014461174,
+    "source_commit": "b364060750b4fda22eb7f06b5c52085c3f4e0bfc",
     "core_three_engines_passed": true,
     "sampled_extended21_passed": true,
     "mms_original_and_default_shared_passed": true,
     "nvda_176_first_pass_glyphs_completed": true,
     "nvda_three_100_sample_series_completed": true,
     "genuine_builtin_import_notification_recovery_passed": true,
-    "actual_required_resource_failure_verified": false,
+    "actual_required_resource_failure_verified": true,
+    "actual_keyboard_echo_verified": true,
+    "actual_keyboard_proof_run": 45016446860,
     "physical_audio_verified": false,
-    "actual_keyboard_echo_verified": false,
-    "first_use_glyph_latency_accepted": false,
+    "first_use_all_glyph_latency_accepted": false,
     "new_word_latency_verified": false,
-    "source_snapshot_note": "Exact source8 and recipe in Git; separate compressed source snapshot remains dev6."
+    "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
   },
-  "current_environment_blocker": "Local exec-server unavailable; frozen source6 and binary source snapshot6 already committed. GitHub Windows verification continues.",
-  "working_source_target_version": "0.13.1-dev.9",
+  "current_environment_blocker": "Local executor remains unavailable; real Linux/Windows execution and byte-preserving checkpoints continue through owned GitHub Actions.",
+  "working_source_target_version": "next development build; immutable dev9 remains pinned to b364060750b4fda22eb7f06b5c52085c3f4e0bfc",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,
@@ -232,7 +298,7 @@
     "namespace_file_bytes": 9644,
     "quarantine_plain_chars": 310,
     "quarantine_namespace_readable": true,
-    "production_fix_status": "working-source candidate under Linux/Windows regressions; not yet built or measured",
+    "production_fix_status": "Built in immutable core9; actual NVDA176 run45014461174 restores all92 core alphabet bank paths; 89 nonprimed letters have maximum3.7304ms before recording sink. Physical output remains unverified.",
     "evidence": "evidence/windows_core8_required_resource_45010564271.json.gz",
     "sha256": "b475cfa9f54a81c184b644a285b5b1220dcd2e14ba2410f534efe85862fb3885"
   }
