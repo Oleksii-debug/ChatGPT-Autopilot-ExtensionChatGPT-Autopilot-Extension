@@ -14,14 +14,14 @@ RUN_ID="a"*32
 
 
 class LongInstalledConfigTests(unittest.TestCase):
-    def test_only_fixed_config_child_is_lengthened_by28(self):
+    def test_only_fixed_config_child_is_lengthened_by12(self):
         run=Path("owned-nvda-run")
         normal=TOOL.owned_config_directory(run)
         long=TOOL.owned_config_directory(run,long_installed=True)
         self.assertEqual(normal,run/"config")
         self.assertEqual(long.parent,run)
-        self.assertEqual(long.name,"config-native-membership-long-path")
-        self.assertEqual(len(str(long))-len(str(normal)),28)
+        self.assertEqual(long.name,"config-native-host")
+        self.assertEqual(len(str(long))-len(str(normal)),12)
         self.assertNotEqual(long,run/"portable")
 
     def test_cli_exposes_explicit_optin(self):
@@ -56,7 +56,7 @@ class LongInstalledConfigTests(unittest.TestCase):
 
     def test_host_ownership_guard_uses_same_two_fixed_config_names(self):
         self.assertIn('owned / "config" / "addons"',TOOL.PROBE_PLUGIN)
-        self.assertIn('owned / "config-native-membership-long-path" / "addons"',TOOL.PROBE_PLUGIN)
+        self.assertIn('owned / "config-native-host" / "addons"',TOOL.PROBE_PLUGIN)
         self.assertNotIn("config_directory_name",TOOL.PROBE_PLUGIN)
 
 
