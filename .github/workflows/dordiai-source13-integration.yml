@@ -26,6 +26,7 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: 2d70515a4c49413efcb23198491bbc675a55db0a
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -138,3 +139,4 @@ jobs:
           path: dordiai-voices/source13-results/
           if-no-files-found: warn
           retention-days: 30
+

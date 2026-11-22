@@ -1,0 +1,67 @@
+name: Recover immutable Dordiai source13 backup in bounded parts
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+permissions:
+  contents: read
+jobs:
+  recover:
+    if: contains(github.event.head_commit.message, '[recover-source13-parts]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Read private owned development backup and verify complete SHA256
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 dordiai-voices/tools/recover_core13_transport.py --output "${{ runner.temp }}/source13-parts"
+      - name: Retain bounded verified part 001
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-core13-part-001
+          path: ${{ runner.temp }}/source13-parts/dordiai-core13-001.bin
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Retain bounded verified part 002
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-core13-part-002
+          path: ${{ runner.temp }}/source13-parts/dordiai-core13-002.bin
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Retain bounded verified part 003
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-core13-part-003
+          path: ${{ runner.temp }}/source13-parts/dordiai-core13-003.bin
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Retain bounded verified part 004
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-core13-part-004
+          path: ${{ runner.temp }}/source13-parts/dordiai-core13-004.bin
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Retain bounded verified part 005
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-core13-part-005
+          path: ${{ runner.temp }}/source13-parts/dordiai-core13-005.bin
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Retain whole-file and ordered part checksums
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-core13-parts-receipt
+          path: ${{ runner.temp }}/source13-parts/parts.json
+          if-no-files-found: error
+          retention-days: 30

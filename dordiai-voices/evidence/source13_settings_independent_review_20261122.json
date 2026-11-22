@@ -1,0 +1,17 @@
+{
+  "format": "dordiai-source13-settings-independent-review",
+  "date": "2026-11-22",
+  "source_branch_head": "d69f3b32d7bbf0df4f001b1f774a2610bf8d540f",
+  "synthetic_tests": {
+    "total": 33,
+    "passed": 33
+  },
+  "reviewed": [
+    "same exact synth instance observed before manual reselection in second NVDA process",
+    "saved settings and genuine WavePlayer endpoint assertions",
+    "owned process stop/wait/poll before CI-owned endpoint cleanup"
+  ],
+  "production_changed": false,
+  "actual_windows_run_launched": false,
+  "product_ready": false
+}

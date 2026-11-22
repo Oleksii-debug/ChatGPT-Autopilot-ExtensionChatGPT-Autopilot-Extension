@@ -1,7 +1,7 @@
 {
   "product": "dordiai-voices",
   "authorization": "User authorized start, subagents and automatic decisions without additional questions on 2026-11-22",
-  "status": "paused_for_user_requested_Codex_handoff",
+  "status": "active_resumed_in_Codex_Windows",
   "product_ready": false,
   "base_version": "0.12.2",
   "target_version": "0.13.1-dev.13",
@@ -1691,6 +1691,19 @@
     ],
     "feature_development_stopped": true,
     "new_experiments_launched_during_save": false,
+    "product_ready": false
+  },
+  "codex_resume": {
+    "date": "2026-11-22",
+    "source_branch_head": "d69f3b32d7bbf0df4f001b1f774a2610bf8d540f",
+    "owned_checkout": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій",
+    "immutable_baseline": "0.13.1-dev.13",
+    "next_tasks": [
+      "Actual source13 keyboard save and restart on owned Windows CI",
+      "Six paired actual full-word prefetch/capture trials without a production change",
+      "Recover pinned development resources in bounded transport parts"
+    ],
+    "resource_transfer_limitation": "Connector binary downloads limited to 512 MiB. Core13 is 1,992,990,314 bytes; verified CI transport parts are being prepared.",
     "product_ready": false
   }
 }
