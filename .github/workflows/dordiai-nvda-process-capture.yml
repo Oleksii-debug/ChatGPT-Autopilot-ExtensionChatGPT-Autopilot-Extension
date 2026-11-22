@@ -197,21 +197,21 @@ jobs:
           print(json.dumps({"existing_service_receipt":state,"returncode":completed.returncode,
                             "wave_out_devices_after":report["wave_out_devices_after"],
                             "physical_audio_verified":False,"driver_installed_by_service_helper":False}),flush=True)
-      - name: Acquire unchanged immutable core11 for the actual transport control
+      - name: Acquire exact immutable core12 for matching-source actual transport
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: dordiai-source11-development-core-45029834209
-          run-id: 45029834209
+          name: dordiai-source12-development-core-45040668513
+          run-id: 45040668513
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/nvda-capture-core11
+          path: ${{ runner.temp }}/nvda-capture-core12
       - name: Capture only the controller-owned official NVDA sibling and correlate its exact actual player PCM
         shell: pwsh
         run: |
           $package = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-package-' + $env:GITHUB_RUN_ID)
           $validation = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-verification-' + $env:GITHUB_RUN_ID + '\validation.json')
           $output = Join-Path $env:RUNNER_TEMP ('dordiai-vb46-nvda-capture-' + $env:GITHUB_RUN_ID)
-          $addon = Join-Path $env:RUNNER_TEMP 'nvda-capture-core11\dordiai-voices-0.13.1-dev.11.nvda-addon'
-          python dordiai-voices/tools/windows_nvda_process_capture_probe.py --package $package --validation $validation --output $output --addon $addon --helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-capture.exe') --helper-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-capture-build.json') --marker-helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'helper.exe') --marker-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'build.json') --ephemeral-ci
+          $addon = Join-Path $env:RUNNER_TEMP 'nvda-capture-core12\dordiai-voices-0.13.1-dev.12.nvda-addon'
+          python dordiai-voices/tools/windows_nvda_process_capture_probe.py --package $package --validation $validation --output $output --addon $addon --addon-bytes 1992944744 --addon-sha256 908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573 --helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-capture.exe') --helper-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'nvda-capture-build.json') --marker-helper (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'helper.exe') --marker-build-receipt (Join-Path $env:DORDIAI_PROCESS_HELPER_ROOT 'build.json') --ephemeral-ci
           exit $LASTEXITCODE
       - name: Preserve bounded exact owned engineering JSON without physical claims
         if: always()

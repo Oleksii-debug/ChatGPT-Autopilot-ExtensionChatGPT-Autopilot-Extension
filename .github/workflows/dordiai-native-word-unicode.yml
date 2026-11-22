@@ -1,0 +1,102 @@
+name: Unpublished Unicode exactness and first-use dictionary experiment
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  unicode-first-use:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[word-unicode-benchmark]')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - name: Preserve exact reviewed source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Differential controls and unchanged reader-cache compatibility
+        shell: python
+        run: |
+          import pathlib,shutil,subprocess,sys
+          root=pathlib.Path('dordiai-voices')
+          subprocess.run([sys.executable,'-m','unittest','discover','-s',str(root/'tests'),'-p','test_native_word_unicode.py','-v'],check=True)
+          overlay=root/'unicode-candidate-compat'
+          candidate=root/'experiments/native-word-unicode-fast/native_word_membership.py'
+          copies={
+              'source/0.12.2/kx47Runtime/native_word_membership.py':candidate,
+              'experiments/native-word-cache/native_word_membership.py':candidate,
+              'tools/build_native_word_membership.py':root/'tools/build_native_word_membership.py',
+              'tools/probe_native_membership.py':root/'tools/probe_native_membership.py',
+              'tests/test_native_word_membership.py':root/'tests/test_native_word_membership.py',
+              'tests/test_native_word_cache.py':root/'tests/test_native_word_cache.py'}
+          for relative,source in copies.items():
+              target=overlay/relative;target.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(source,target)
+          subprocess.run([sys.executable,'-m','unittest','discover','-s',str(overlay/'tests'),'-p','test_native_word*.py','-v'],check=True)
+          print('Only disposable experimental overlay changed; source11 and promoted1738 remain untouched.',flush=True)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dordiai-compact-native-word-membership
+          run-id: 45027190211
+          github-token: ${{ github.token }}
+          path: dordiai-voices/native-membership-build
+      - name: Exhaustive all-codepoint contexts and complete semantic data validation
+        shell: python
+        run: |
+          import pathlib,subprocess,sys
+          root=pathlib.Path('dordiai-voices');output=root/'unicode-fast-results';output.mkdir()
+          subprocess.run([sys.executable,str(root/'tools/audit_native_word_unicode.py'),
+              '--candidate-git-blob','7fadc20d6bd735db2b7cc08f0b694422ed27ea2e',
+              '--lexicon',str(root/'native-membership-build/native-word-membership.bin'),
+              '--output',str(output/'unicode-audit.json')],check=True)
+      - name: Three matched fresh-process first97 and cached comparisons
+        run: >-
+          python dordiai-voices/tools/probe_native_word_unicode.py
+          --lexicon dordiai-voices/native-membership-build/native-word-membership.bin
+          --acquisition-report dordiai-voices/native-membership-build/acquisition-report.json
+          --baseline-module dordiai-voices/experiments/native-word-cache/native_word_membership.py
+          --candidate-module dordiai-voices/experiments/native-word-unicode-fast/native_word_membership.py
+          --candidate-git-blob 7fadc20d6bd735db2b7cc08f0b694422ed27ea2e
+          --rounds 3 --iterations 1000
+          --output dordiai-voices/unicode-fast-results/matched-first-use.json
+      - name: Preserve exact audit and comparison reports
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path('dordiai-voices/unicode-fast-results')
+          for name in ('unicode-audit.json','matched-first-use.json'):
+              path=root/name
+              if not path.is_file():print('Unicode experiment missing '+name,flush=True);continue
+              raw=path.read_bytes()
+              if len(raw)>1024*1024:raise ValueError('Unexpected Unicode report size')
+              json.loads(raw)
+              doc={'format':'dordiai-exact-unpublished-unicode-word-report','format_version':1,
+                  'run_id':os.environ['GITHUB_RUN_ID'],'commit':os.environ['GITHUB_SHA'],
+                  'runner_os':os.environ['RUNNER_OS'],
+                  'file':{'name':name,'size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
+                          'source_base64':base64.b64encode(raw).decode('ascii')}}
+              encoded=json.dumps(doc,sort_keys=True,separators=(',',':')).encode()
+              payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode('ascii')
+              label='AUDIT' if name=='unicode-audit.json' else 'BENCH'
+              print('DORDIAI_UNICODE_'+label+'_JSON_SHA256 '+hashlib.sha256(encoded).hexdigest(),flush=True)
+              for index in range(0,len(payload),24000):print('DORDIAI_UNICODE_'+label+'_GZIP_B64_%03d '%(index//24000)+payload[index:index+24000],flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: unpublished-unicode-first-use-${{ matrix.os }}
+          path: dordiai-voices/unicode-fast-results/*.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -113,6 +113,31 @@ class ReadyAndLineageTests(unittest.TestCase):
 
 
 class PassivePluginAndControllerTests(unittest.TestCase):
+    def test_exact_addon_validation_retains_observed_size_and_hash_on_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"core.nvda-addon";raw=b"exact-test-payload";path.write_bytes(raw)
+            record={};row=probe.verify_addon_input(path,len(raw),sha256(raw).hexdigest(),record)
+            self.assertTrue(row["verified"]);self.assertEqual(record["core_input"]["actual_sha256"],sha256(raw).hexdigest())
+            for size,digest in ((len(raw)+1,sha256(raw).hexdigest()),(len(raw),"f"*64),(len(raw),"bad")):
+                failed={}
+                with self.assertRaisesRegex(ValueError,"actual_bytes"):
+                    probe.verify_addon_input(path,size,digest,failed)
+                self.assertEqual(failed["core_input"]["actual_bytes"],len(raw))
+                self.assertEqual(failed["core_input"]["actual_sha256"],sha256(raw).hexdigest())
+
+    def test_linked_or_missing_addon_is_reported_without_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"missing.nvda-addon";record={}
+            with self.assertRaises(ValueError):probe.verify_addon_input(path,10,"a"*64,record)
+            self.assertFalse(record["core_input"]["exists"])
+            source=Path(directory)/"source";source.write_bytes(b"payload")
+            try:path.symlink_to(source)
+            except OSError:return
+            record={}
+            with self.assertRaises(ValueError):probe.verify_addon_input(path,7,sha256(b"payload").hexdigest(),record)
+            self.assertTrue(record["core_input"]["is_symlink"])
+            self.assertIsNone(record["core_input"]["actual_sha256"])
+
     def function(self,name,namespace):
         tree=ast.parse(probe.PLUGIN_CODE.replace("__SETTINGS__","{}"))
         node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name==name)

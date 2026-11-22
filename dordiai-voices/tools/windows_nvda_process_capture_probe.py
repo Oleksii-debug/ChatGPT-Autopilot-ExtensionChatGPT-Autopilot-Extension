@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import time
@@ -195,6 +196,27 @@ def digest(path):
         return __import__("hashlib").file_digest(source,"sha256").hexdigest()
 
 
+def verify_addon_input(path, expected_bytes, expected_sha256, report):
+    """Retain observed input metadata even when a download/declared pin fails."""
+    path=Path(path)
+    observed={"path":str(path),"expected_bytes":expected_bytes,"expected_sha256":expected_sha256,
+        "expected_sha256_well_formed":bool(re.fullmatch(r"[a-f0-9]{64}",expected_sha256)),
+        "is_symlink":path.is_symlink(),"exists":path.exists(),"actual_bytes":None,"actual_sha256":None}
+    report["core_input"]=observed
+    if not observed["is_symlink"] and observed["exists"]:
+        before=path.stat();observed["regular_file"]=stat.S_ISREG(before.st_mode);observed["actual_bytes"]=before.st_size
+        if observed["regular_file"] and 0<before.st_size<=3_000_000_000:
+            observed["actual_sha256"]=digest(path)
+            after=path.stat()
+            observed["unchanged_during_read"]=(before.st_size,before.st_mtime_ns,before.st_ino)==(after.st_size,after.st_mtime_ns,after.st_ino)
+    if (observed["is_symlink"] or not observed.get("regular_file")
+            or observed["actual_bytes"]!=expected_bytes or not observed["expected_sha256_well_formed"]
+            or observed["actual_sha256"]!=expected_sha256 or observed.get("unchanged_during_read") is not True):
+        raise ValueError("Exact caller-pinned immutable addon rejected: "+json.dumps(observed,sort_keys=True))
+    observed["verified"]=True
+    return observed
+
+
 def publish(path, value):
     with Path(path).open("x", encoding="utf-8") as out:
         json.dump(value, out, sort_keys=True, separators=(",", ":"))
@@ -337,10 +359,8 @@ def run(args):
         if not args.ephemeral_ci:raise device.TrialBlocked("Explicit owned CI scope required")
         device.guard_environment(os.environ,args.package,args.output)
         if args.output.exists():raise ValueError("Fresh owned evidence output required")
-        if (args.addon.is_symlink() or args.addon.stat().st_size!=args.addon_bytes
-                or not re.fullmatch(r"[a-f0-9]{64}",args.addon_sha256) or digest(args.addon)!=args.addon_sha256):
-            raise ValueError("Exact caller-pinned immutable addon bytes differ")
         args.output.mkdir();created=True
+        verify_addon_input(args.addon,args.addon_bytes,args.addon_sha256,report)
         report["verification"]=device.verify_package(args.package,args.validation)
         report["endpoints_before"]=device.endpoints()
         pnp=device.WindowsPnP()

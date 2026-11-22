@@ -1,0 +1,257 @@
+{
+  "format": "dordiai-guarded-unicode-word-fastpath-v2-local-review",
+  "format_version": 1,
+  "baseline_git_blob": "1738de70c9a81fab54eddde9f1e3442b9d962813",
+  "candidate_git_blob": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+  "superseded_unpromoted_candidate": {
+    "rejected_candidate": "be53e9a03c2b6acea96e6a9024152c5a802b8c86",
+    "guarded_candidate": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
+    "old_candidate_promoted": false,
+    "old_extended_regression_failed": true,
+    "error": "Unicode normalization differs for '\\u043f\\u2019\\u044f\\u0442\\u044c'",
+    "old_future_ordinary_value": "пPOISONять",
+    "baseline_future_ordinary_value": "п'ять"
+  },
+  "actual_local_scope": "Linux CPython3.12.14 Unicode15.0.0; no Windows/NVDA/typing/voice acceptance.",
+  "changes": "After casefold, only exact ordinary str receives shared apostrophe map. Subclasses receive fresh original mapping. Ordinary no-U+0301 strings return exact NFC folded value; ordinary all-letter strings use builtin isalpha after old length/boundary checks; all other cases preserve original predicates.",
+  "all_other_module_ast_unchanged": true,
+  "all_block_validations_and_cache_class_unchanged": true,
+  "local_tests": {
+    "unicode_and_poisoning_regressions": 11,
+    "existing_reader_and_cache_compat": 46,
+    "all_passed": true
+  },
+  "exhaustive": {
+    "codepoints": 1114112,
+    "contexts": 6,
+    "comparisons": 6684672,
+    "random_strings": 50000,
+    "edge_strings": 23,
+    "str_subclasses": 4,
+    "future_ordinary_after_mutation_control": true,
+    "actual_full_source_words": 6642550,
+    "actual_full_source_blocks": 25948,
+    "reader_closed": true
+  },
+  "fresh_process_benchmark": [
+    {
+      "round": 1,
+      "variant": "original",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 3.869721,
+        "median_ms": 0.817572,
+        "minimum_ms": 0.638302,
+        "p95_ms": 2.589292,
+        "p99_ms": 3.869721,
+        "total_ms": 106.659758
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 0.165229,
+        "median_ms": 0.005619,
+        "minimum_ms": 0.004968,
+        "p95_ms": 0.007782,
+        "p99_ms": 0.043966,
+        "total_ms": 7.164716
+      }
+    },
+    {
+      "round": 1,
+      "variant": "candidate-cache0",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 2.6291,
+        "median_ms": 0.475216,
+        "minimum_ms": 0.362016,
+        "p95_ms": 0.990242,
+        "p99_ms": 2.6291,
+        "total_ms": 55.034965
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 3.8569,
+        "median_ms": 0.4518305,
+        "minimum_ms": 0.006049,
+        "p95_ms": 0.831423,
+        "p99_ms": 2.248237,
+        "total_ms": 529.432867
+      }
+    },
+    {
+      "round": 1,
+      "variant": "candidate-default",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 1.380319,
+        "median_ms": 0.426002,
+        "minimum_ms": 0.35158,
+        "p95_ms": 1.091765,
+        "p99_ms": 1.380319,
+        "total_ms": 48.090441
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 0.456718,
+        "median_ms": 0.004377,
+        "minimum_ms": 0.004026,
+        "p95_ms": 0.005649,
+        "p99_ms": 0.040591,
+        "total_ms": 5.889441
+      }
+    },
+    {
+      "round": 2,
+      "variant": "candidate-default",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 0.82296,
+        "median_ms": 0.43138,
+        "minimum_ms": 0.35822,
+        "p95_ms": 0.697,
+        "p99_ms": 0.82296,
+        "total_ms": 44.869279
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 0.71032,
+        "median_ms": 0.004446,
+        "minimum_ms": 0.004066,
+        "p95_ms": 0.00638,
+        "p99_ms": 0.045128,
+        "total_ms": 6.621885
+      }
+    },
+    {
+      "round": 2,
+      "variant": "candidate-cache0",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 1.803226,
+        "median_ms": 0.440934,
+        "minimum_ms": 0.369066,
+        "p95_ms": 0.852093,
+        "p99_ms": 1.803226,
+        "total_ms": 48.210953
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 2.783423,
+        "median_ms": 0.425681,
+        "minimum_ms": 0.005859,
+        "p95_ms": 0.715007,
+        "p99_ms": 1.941394,
+        "total_ms": 489.347495
+      }
+    },
+    {
+      "round": 2,
+      "variant": "original",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 2.600678,
+        "median_ms": 0.774506,
+        "minimum_ms": 0.667165,
+        "p95_ms": 1.509494,
+        "p99_ms": 2.600678,
+        "total_ms": 82.568768
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 0.074572,
+        "median_ms": 0.005519,
+        "minimum_ms": 0.004907,
+        "p95_ms": 0.00641,
+        "p99_ms": 0.018458,
+        "total_ms": 6.264977
+      }
+    },
+    {
+      "round": 3,
+      "variant": "original",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 3.336626,
+        "median_ms": 0.75723,
+        "minimum_ms": 0.640705,
+        "p95_ms": 1.050613,
+        "p99_ms": 3.336626,
+        "total_ms": 81.021287
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 0.077587,
+        "median_ms": 0.0055635,
+        "minimum_ms": 0.004938,
+        "p95_ms": 0.00667,
+        "p99_ms": 0.01974,
+        "total_ms": 6.336395
+      }
+    },
+    {
+      "round": 3,
+      "variant": "candidate-cache0",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 1.744648,
+        "median_ms": 0.405681,
+        "minimum_ms": 0.355485,
+        "p95_ms": 1.109802,
+        "p99_ms": 1.744648,
+        "total_ms": 45.337103
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 2.924626,
+        "median_ms": 0.41839499999999996,
+        "minimum_ms": 0.00627,
+        "p95_ms": 0.720055,
+        "p99_ms": 1.565618,
+        "total_ms": 477.00063
+      }
+    },
+    {
+      "round": 3,
+      "variant": "candidate-default",
+      "first_pass_97_unique": {
+        "count": 97,
+        "maximum_ms": 2.570462,
+        "median_ms": 0.432531,
+        "minimum_ms": 0.379661,
+        "p95_ms": 1.420009,
+        "p99_ms": 2.570462,
+        "total_ms": 51.726518
+      },
+      "repeated": {
+        "count": 1000,
+        "maximum_ms": 0.110606,
+        "median_ms": 0.004607,
+        "minimum_ms": 0.004216,
+        "p95_ms": 0.005738,
+        "p99_ms": 0.008813,
+        "total_ms": 5.249137
+      }
+    }
+  ],
+  "exact_local_proof": {
+    "path": "evidence/native_word_unicode_fast_v2_local.json.gz",
+    "json_sha256": "773aabc0915f05016c34594c259a1efd31e22f0556ce56f0136ab33acc4ca517",
+    "gzip_sha256": "d14258e4ba5949d22566d4be644098a8511adcc837d1b006cf86f1e81f62fb4d",
+    "gzip_bytes": 7600,
+    "files": {
+      "unicode-v2-full-local.json": {
+        "sha256": "69982f5d618fdf8d962322b49a95765e78f0c518c94c1ce17b8f59f8c0a2bfcd",
+        "bytes": 1769
+      },
+      "unicode-v2-matched-local.json": {
+        "sha256": "040c9f4030847498222daf4af947d6017514f0a9a726a2dee2c4f234bfa4c6d4",
+        "bytes": 29331
+      }
+    },
+    "git_blob": "a6be612a38e16a584903a3adb5bd60f3adfb9e2b"
+  },
+  "production_integrated": false,
+  "windows_nvda_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}
